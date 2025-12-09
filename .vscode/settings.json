@@ -1,0 +1,24 @@
+{
+    "eslint.workingDirectories": [
+        {
+            "pattern": "./angular/**/*",
+            "!cwd": false
+        }
+    ],
+    "eslint.validate": [
+        "javascript",
+        "typescript",
+        "html"
+    ],
+    "eslint.options": {
+        "configFile": "./angular/.eslintrc.json",
+        "overrideConfigFile": "./angular/.eslintrc.json"
+    },
+    "typescript.tsdk": "./angular/node_modules/typescript/lib",
+    "typescript.enablePromptUseWorkspaceTsdk": true,
+    "search.exclude": {
+        "**/node_modules": true,
+        "**/dist": true,
+        "**/coverage": true
+    }
+}
