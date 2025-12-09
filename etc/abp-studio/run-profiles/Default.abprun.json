@@ -1,0 +1,42 @@
+﻿{
+  "applications": {
+    "Liberap.HttpApi.Host": {
+      "type": "dotnet-project",
+      "launchUrl": "https://localhost:44396",
+      "path": "../../../src/Liberap.HttpApi.Host/Liberap.HttpApi.Host.csproj",
+      "kubernetesService": ".*-httpapihost$",
+      "healthCheckEndpoint": "/health-status",
+      "healthUiEndpoint": "/health-ui",
+      "execution": {
+        "order": 4
+      }
+    },
+    "Liberap.Angular": {
+      "type": "cli",
+      "workingDirectory": "../../../angular",
+      "startCommand": "./start.ps1",
+      "launchUrl": "http://localhost:4200",
+      "kubernetesService": ".*-angular$",
+      "execution": {
+        "order": 2
+      }    
+    }
+  },
+  "containers": {
+    "serviceName": "Liberap-Containers",
+  },
+  "tasks":{
+    "Initialize Solution":{
+      "behaviour": 2,
+      "startCommand": "./initialize-solution.ps1",
+      "workingDirectory": "../../scripts",
+      "shortDescription": "Installs required UI libraries, creates required certificates and seeds the database."
+    },
+    "Migrate Database":{
+      "behaviour": 0,
+      "startCommand": "./migrate-database.ps1",
+      "workingDirectory": "../../scripts",
+      "shortDescription": "Migrates the database to the latest version."
+    }
+  }
+}

@@ -1,0 +1,23 @@
+<Solution>
+    <Configurations>
+        <Platform Name="Any CPU" />
+    </Configurations>
+    <Folder Name="/src/">
+        <Project Path="src\Liberap.Domain\Liberap.Domain.csproj" />
+        <Project Path="src\Liberap.Application\Liberap.Application.csproj" />
+        <Project Path="src\Liberap.EntityFrameworkCore\Liberap.EntityFrameworkCore.csproj" />
+        <Project Path="src\Liberap.Domain.Shared\Liberap.Domain.Shared.csproj" />
+        <Project Path="src\Liberap.Application.Contracts\Liberap.Application.Contracts.csproj" />
+        <Project Path="src\Liberap.HttpApi\Liberap.HttpApi.csproj" />
+        <Project Path="src\Liberap.HttpApi.Client\Liberap.HttpApi.Client.csproj" />
+        <Project Path="src\Liberap.DbMigrator\Liberap.DbMigrator.csproj" />
+        <Project Path="src\Liberap.HttpApi.Host\Liberap.HttpApi.Host.csproj" />
+    </Folder>
+    <Folder Name="/test/">
+        <Project Path="test\Liberap.Application.Tests\Liberap.Application.Tests.csproj" />
+        <Project Path="test\Liberap.EntityFrameworkCore.Tests\Liberap.EntityFrameworkCore.Tests.csproj" />
+        <Project Path="test\Liberap.TestBase\Liberap.TestBase.csproj" />
+        <Project Path="test\Liberap.Domain.Tests\Liberap.Domain.Tests.csproj" />
+        <Project Path="test\Liberap.HttpApi.Client.ConsoleTestApp\Liberap.HttpApi.Client.ConsoleTestApp.csproj" />
+    </Folder>
+</Solution>
