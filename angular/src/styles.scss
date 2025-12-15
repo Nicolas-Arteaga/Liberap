@@ -1,1 +1,102 @@
-/* You can add global styles to this file, and also import other style files */
+/* ===============================
+   Liberap – Global Styles
+   =============================== */
+
+:root {
+  --font-size: 16px;
+
+  /* Base colors */
+  --deudaso-dark: #0B0F1A;
+  --deudaso-dark-lighter: #151925;
+  --deudaso-success: #00C47D;
+
+  --text-primary: #ffffff;
+  --text-secondary: #9ca3af;
+
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+}
+
+/* Ionic base overrides */
+ion-app {
+  background: linear-gradient(
+    180deg,
+    var(--deudaso-dark) 0%,
+    var(--deudaso-dark-lighter) 100%
+  );
+  color: var(--text-primary);
+}
+
+ion-content {
+  --background: transparent;
+}
+
+/* Buttons */
+ion-button {
+  text-transform: none;
+  --border-radius: var(--radius-xl);
+}
+
+/* Cards */
+ion-card {
+  --border-radius: var(--radius-xl);
+}
+
+ion-toolbar {
+  --padding-top: env(safe-area-inset-top);
+}
+
+.deudaso-bg {
+  --background: transparent;
+}
+
+/* Utility */
+.text-success {
+  color: var(--deudaso-success);
+}
+
+/* Safe area handling for modern iOS devices */
+ion-app {
+  min-height: 100vh;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Actions grid responsive */
+.actions-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  width: 100%;
+  overflow: visible;
+  @media (max-width: 360px) {
+    gap: 8px;
+  }
+}
+
+/* Para que los textos dentro de card-icon se alineen bien */
+.card-icon:not(.stacked) .content .flex {
+  width: 100%;
+}
+
+/* Estilo específico para botón "Ver todas" */
+
+.text-\[\#00C47D\]:hover {
+  color: #00E68F !important;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+}
+
+.see-all {
+  background: none;
+  border: none;
+  color: #00C47D;
+  font-size: 14px;
+  font-weight: 500;
+}
+

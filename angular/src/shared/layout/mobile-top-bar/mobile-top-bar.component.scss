@@ -1,0 +1,43 @@
+.deudaso-header {
+  background: linear-gradient(
+    180deg,
+    #0b0f1a 0%,
+    #151925 100%
+  );
+  overflow: visible;
+}
+
+.header-toolbar {
+  --background: transparent;
+  --min-height: auto;
+  padding: env(safe-area-inset-top) 24px 20px;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  top: 8px;
+}
+
+.logo {
+  font-size: 24px;
+  font-weight: 700;
+  color: white;
+  letter-spacing: -0.02em;
+
+  span {
+    color: #00c47d;
+  }
+}
+
+.profile-btn {
+  --padding-start: 0;
+  --padding-end: 0;
+   
+  ion-icon {
+    font-size: 20px;
+    color: #00c47d;
+  }
+}

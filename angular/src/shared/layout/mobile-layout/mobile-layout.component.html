@@ -1,0 +1,19 @@
+<ion-app>
+
+  <!-- HEADER -->
+  <app-mobile-top-bar></app-mobile-top-bar>
+
+  <!-- CONTENIDO (ÚNICO SCROLL) -->
+  <ion-content fullscreen class="deudaso-bg">
+    <div class="pb-28">
+      <router-outlet></router-outlet>
+    </div>
+  </ion-content>
+
+  <!-- FOOTER -->
+  <app-mobile-bottom-nav
+    [activeTab]="activeTab"
+    (tabChange)="onTabChange($event)">
+  </app-mobile-bottom-nav>
+
+</ion-app>

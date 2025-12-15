@@ -1,20 +1,18 @@
-import { Component, inject } from '@angular/core';
-import { AuthService, LocalizationPipe } from '@abp/ng.core';
+  import { Component } from '@angular/core';
+  import { CommonModule } from '@angular/common';
+  import { CardContentComponent } from 'src/shared/components/card-content/card-content.component';
+  import { CardIconComponent } from 'src/shared/components/card-icon/card-icon.component';
+  import { GlassButtonComponent } from 'src/shared/components/glass-button/glass-button.component';
 
-@Component({
-  selector: 'app-home',
-  templateUrl: './home.component.html',
-  styleUrls: ['./home.component.scss'],
-  imports: [LocalizationPipe]
-})
-export class HomeComponent {
-  private authService = inject(AuthService);
-
-  get hasLoggedIn(): boolean {
-    return this.authService.isAuthenticated
-  }
-
-  login() {
-    this.authService.navigateToLogin();
-  }
-}
+  @Component({
+    selector: 'app-home',
+    standalone: true,
+    imports: [
+      CommonModule,
+      CardContentComponent,
+      CardIconComponent,
+      GlassButtonComponent,
+  ],
+    templateUrl: './home.component.html'
+  })
+  export class HomeComponent {}

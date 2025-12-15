@@ -1,0 +1,35 @@
+<ion-footer class="deudaso-footer ion-no-border">
+  <div class="bottom-nav">
+
+    <button
+      class="nav-item"
+      [class.active]="activeTab === 'home'"
+      (click)="onTabClick('home')">
+      <div class="icon-wrapper">
+        <ion-icon name="home-outline"></ion-icon>
+      </div>
+      <span>Home</span>
+    </button>
+
+    <button
+      class="nav-item"
+      [class.active]="activeTab === 'debts'"
+      (click)="onTabClick('debts')">
+      <div class="icon-wrapper">
+        <ion-icon name="card-outline"></ion-icon>
+      </div>
+      <span>Deudas</span>
+    </button>
+
+    <button
+      class="nav-item"
+      [class.active]="activeTab === 'profile'"
+      (click)="onTabClick('profile')">
+      <div class="icon-wrapper">
+        <ion-icon name="person-outline"></ion-icon>
+      </div>
+      <span>Perfil</span>
+    </button>
+
+  </div>
+</ion-footer>

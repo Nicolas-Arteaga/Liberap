@@ -3,14 +3,15 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve",
+    "start": "ng serve --configuration=development",
     "build": "ng build",
     "build:prod": "ng build --configuration production",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "lint": "ng lint",
     "symlinks:setup": "cd scripts && pwsh ./setup-symlinks.ps1",
-    "symlinks:remove": "cd scripts && pwsh ./remove-symlinks.ps1"
+    "symlinks:remove": "cd scripts && pwsh ./remove-symlinks.ps1",
+    "start:prod": "ng serve --configuration=production"
   },
   "private": true,
   "dependencies": {
@@ -33,6 +34,9 @@
     "@angular/platform-browser": "~20.0.0",
     "@angular/platform-browser-dynamic": "~20.0.0",
     "@angular/router": "~20.0.0",
+    "@ionic/angular": "^8.7.13",
+    "@ionic/core": "^8.7.13",
+    "ionicons": "^8.0.13",
     "rxjs": "~7.8.0",
     "tslib": "^2.0.0",
     "zone.js": "~0.15.0"
@@ -53,7 +57,7 @@
     "@typescript-eslint/parser": "^7.0.0",
     "eslint": "^8.0.0",
     "jasmine-core": "~4.0.0",
-    "karma": "~6.3.0",
+    "karma": "^6.4.4",
     "karma-chrome-launcher": "~3.1.0",
     "karma-coverage": "~2.1.0",
     "karma-jasmine": "~4.0.0",

@@ -1,0 +1,20 @@
+<div
+  class="card-icon"
+  [class.stacked]="variant === 'stacked'"
+  [class.al-dia]="status === 'al-dia'"
+  [class.vencida]="status === 'vencida'"
+  [class.card-content-bg]="useCardContentBg"  
+>
+  <div class="icon-wrapper">
+    <ion-icon [name]="icon"></ion-icon>
+  </div>
+
+  <div class="content">
+    <ng-content></ng-content>
+  </div>
+
+  <!-- TEXTO SIMPLE A LA DERECHA -->
+  <span *ngIf="status" class="status-text">
+    {{ status === 'vencida' ? 'Vencida' : 'Al día' }}
+  </span>
+</div>

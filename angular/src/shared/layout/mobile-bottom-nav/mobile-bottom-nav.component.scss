@@ -1,0 +1,53 @@
+.deudaso-footer {
+  background: linear-gradient(
+    180deg,
+    rgba(11, 15, 26, 0.9) 0%,
+    rgba(21, 25, 37, 0.95) 100%
+  );
+  padding-bottom: env(safe-area-inset-bottom);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.bottom-nav {
+  height: 80px;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+}
+
+.nav-item {
+  background: none;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: #9ca3af;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.icon-wrapper {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  ion-icon {
+    font-size: 22px;
+  }
+}
+
+.nav-item.active {
+  color: #00c47d;
+
+  .icon-wrapper {
+    background: rgba(0, 196, 125, 0.15);
+  }
+
+  ion-icon {
+    color: #00c47d;
+  }
+}
