@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, Input } from '@angular/core';
 
 @Component({
   selector: 'app-glass-button',
@@ -6,4 +6,8 @@ import { Component } from '@angular/core';
   templateUrl: './glass-button.component.html',
   styleUrls: ['./glass-button.component.scss']
 })
-export class GlassButtonComponent {}
+export class GlassButtonComponent {
+  @Input() variant: 'glass' | 'solid' = 'glass';
+  @Input() color: string = '#00C47D';
+  @Input() disabled: boolean = false; // ✅
+}

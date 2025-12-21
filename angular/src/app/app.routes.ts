@@ -1,7 +1,14 @@
-import { authGuard, permissionGuard } from '@abp/ng.core';
 import { Routes } from '@angular/router';
+import { eLayoutType } from '@abp/ng.core';
 
 export const APP_ROUTES: Routes = [
+  {
+    path: 'login',
+    loadComponent: () => import('./login/login.component').then(c => c.LoginComponent),
+    data: {
+      layout: eLayoutType.empty,  
+    },
+  },
   {
     path: '',
     pathMatch: 'full',

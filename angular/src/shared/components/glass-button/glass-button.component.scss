@@ -53,6 +53,18 @@
   }
 }
 
+/* ESTILO PARA SOLID (login) */
+.glass-btn.solid-btn {
+  background: #00C47D !important;
+  border: none !important;
+  backdrop-filter: none !important;
+  
+  &:hover {
+    background: #00E68F !important;
+    box-shadow: 0 4px 12px rgba(0, 196, 125, 0.3);
+  }
+}
+
 /* Responsive para móvil */
 @media (max-width: 767px) {
   .glass-btn {

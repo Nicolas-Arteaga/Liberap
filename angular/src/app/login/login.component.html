@@ -1,0 +1,89 @@
+<ion-content class="ion-padding login-content">
+  
+  <div class="login-container">
+    <div class="login-card">
+      <!-- Logo -->
+      <div class="text-center mb-5">
+        <h1 class="fw-bold text-white m-0">
+          Liber<span class="text-success">ap</span>
+        </h1>
+      </div>
+
+      <!-- Title -->
+      <div class="text-center mb-4">
+        <h2 class="text-white fw-semibold mb-2">
+          Ingresar a tu cuenta
+        </h2>
+        <p class="text-white-50 mb-0">
+          La forma más fácil de entender y negociar tus deudas
+        </p>
+      </div>
+
+      <!-- Form -->
+      <form (submit)="onSubmit($event)" class="d-flex flex-column gap-4">
+        <!-- Email -->
+        <div>
+          <app-label htmlFor="email" class="text-white mb-2">
+            Email
+          </app-label>
+          <app-input
+            id="email"
+            name="email"
+            type="email"
+            autocomplete="email"
+            placeholder="tu@email.com"
+            [(ngModel)]="email"
+            required
+          />
+        </div>
+
+        <!-- Password con ojito -->
+        <div>
+          <app-label htmlFor="password" class="text-white mb-2">
+            Contraseña
+          </app-label>
+          <app-input
+            id="password"
+            name="password"
+            type="password"
+            placeholder="••••••••"
+            [(ngModel)]="password"
+            required
+            autocomplete="current-password"
+            showPasswordToggle
+          ></app-input>
+        </div>
+
+        <!-- Forgot -->
+        <div class="text-end">
+          <button
+            type="button"
+            class="btn btn-link p-0 text-success text-decoration-none"
+            (click)="onForgotPassword()"
+          >
+            ¿Olvidaste tu contraseña?
+          </button>
+        </div>
+
+        <!-- Login -->
+        <app-glass-button
+          variant="solid"
+          [disabled]="isLoading"
+        >
+          <span *ngIf="!isLoading">Ingresar</span>
+          <span *ngIf="isLoading">Ingresando…</span>
+        </app-glass-button>
+
+        <!-- Create account -->
+        <button
+          type="button"
+          class="btn btn-outline-light btn-lg w-100 rounded-4"
+          (click)="onCreateAccount()"
+        >
+          Crear cuenta
+        </button>
+      </form>
+    </div>
+  </div>
+
+</ion-content>
