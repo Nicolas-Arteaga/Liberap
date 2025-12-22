@@ -3,6 +3,7 @@
   [class.stacked]="variant === 'stacked'"
   [class.al-dia]="status === 'al-dia'"
   [class.vencida]="status === 'vencida'"
+  [class.proximo]="status === 'proximo'"
   [class.card-content-bg]="useCardContentBg"  
 >
   <div class="icon-wrapper">
@@ -14,7 +15,7 @@
   </div>
 
   <!-- TEXTO SIMPLE A LA DERECHA -->
-  <span *ngIf="status" class="status-text">
-    {{ status === 'vencida' ? 'Vencida' : 'Al día' }}
+  <span *ngIf="statusLabel" class="fw-medium">
+    {{ statusLabel }}
   </span>
 </div>

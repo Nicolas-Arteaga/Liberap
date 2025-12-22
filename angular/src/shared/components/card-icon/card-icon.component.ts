@@ -14,6 +14,8 @@ export class CardIconComponent {
   @Input() vertical = false;
   @Input() contentClass = '';
   @Input() variant: 'inline' | 'stacked' = 'inline';
-  @Input() status: 'al-dia' | 'vencida' | null = null;
-  @Input() useCardContentBg = false;  
+  @Input() status: 'al-dia' | 'vencida' | 'proximo' | null = null;
+  @Input() statusLabel?: string;
+  @Input() useCardContentBg = false;
+
 }

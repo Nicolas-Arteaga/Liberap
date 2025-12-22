@@ -22,9 +22,4 @@ import { MobileBottomNavComponent } from '../mobile-bottom-nav/mobile-bottom-nav
   styleUrls: ['./mobile-layout.component.scss']
 })
 export class MobileLayoutComponent {
-  activeTab: 'home' | 'debts' | 'profile' = 'home';
-
-  onTabChange(tab: 'home' | 'debts' | 'profile') {
-    this.activeTab = tab;
-  }
 }

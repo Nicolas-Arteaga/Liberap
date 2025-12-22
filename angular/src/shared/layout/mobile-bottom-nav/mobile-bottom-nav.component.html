@@ -1,35 +1,26 @@
 <ion-footer class="deudaso-footer ion-no-border">
   <div class="bottom-nav">
-
-    <button
-      class="nav-item"
-      [class.active]="activeTab === 'home'"
-      (click)="onTabClick('home')">
+    
+    <a class="nav-item" [routerLink]="['/']" routerLinkActive="active">
       <div class="icon-wrapper">
         <ion-icon name="home-outline"></ion-icon>
       </div>
       <span>Home</span>
-    </button>
+    </a>
 
-    <button
-      class="nav-item"
-      [class.active]="activeTab === 'debts'"
-      (click)="onTabClick('debts')">
+    <a class="nav-item" [routerLink]="['/debts']" routerLinkActive="active">
       <div class="icon-wrapper">
         <ion-icon name="card-outline"></ion-icon>
       </div>
       <span>Deudas</span>
-    </button>
+    </a>
 
-    <button
-      class="nav-item"
-      [class.active]="activeTab === 'profile'"
-      (click)="onTabClick('profile')">
+    <a class="nav-item" [routerLink]="['/profile']" routerLinkActive="active">
       <div class="icon-wrapper">
         <ion-icon name="person-outline"></ion-icon>
       </div>
       <span>Perfil</span>
-    </button>
+    </a>
 
   </div>
 </ion-footer>

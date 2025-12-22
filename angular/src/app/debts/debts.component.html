@@ -1,0 +1,68 @@
+<main class="px-4 space-y-6 pt-4">
+  
+  <!-- Header -->
+  <header class="mb-4">
+    <h1 class="text-white font-bold text-2xl mb-1">
+      Mis Deudas
+    </h1>
+    <p class="text-white-50 text-sm">
+      Listado completo de tus deudas activas
+    </p>
+  </header>
+
+  <!-- Filtros CON CONTADORES CORRECTOS -->
+  <div class="flex gap-3 overflow-x-auto pb-2">
+    <app-button
+      label="Todas"
+      [count]="totalCount"   
+      [active]="activeFilter === 'all'"
+      (click)="activeFilter = 'all'"
+    />
+
+    <app-button
+      label="Vencidas"
+      variant="danger"
+      [count]="vencidaCount"  
+      [active]="activeFilter === 'vencida'"
+      (click)="activeFilter = 'vencida'"
+    />
+
+    <app-button
+      label="Al día"
+      variant="success"
+      [count]="alDiaCount"   
+      [active]="activeFilter === 'al-dia'"
+      (click)="activeFilter = 'al-dia'"
+    />
+
+    <app-button
+      label="Próximo venc."
+      variant="warning"
+      [count]="proximoCount"   
+      [active]="activeFilter === 'proximo'"
+      (click)="activeFilter = 'proximo'"
+    />
+  </div>
+
+  <!-- Lista de Deudas -->
+  <div class="space-y-3">
+    @for (debt of filteredDebts; track debt.id) {
+      <app-card-icon 
+        [icon]="getIcon(debt.type)"
+        [status]="getVisualStatus(debt)"   
+        [statusLabel]="getStatusLabel(debt)"
+        [useCardContentBg]="true">
+        <div class="flex flex-col">
+          <p class="text-white text-sm font-medium mb-0">{{ debt.name }}</p>
+          <div class="flex items-center gap-2 mt-1">
+            <span class="text-white font-semibold">
+              ${{ debt.amount.toLocaleString('es-AR') }}
+            </span>
+            <span class="text-white-50 text-xs">• {{ debt.dueDate }}</span>
+          </div>
+        </div>
+      </app-card-icon>
+    }
+  </div>
+
+</main>

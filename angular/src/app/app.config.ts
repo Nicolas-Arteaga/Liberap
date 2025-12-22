@@ -36,7 +36,8 @@ import {
   addCircleOutline,      
   chatbubbleOutline,
   timeOutline,
-  cashOutline,           
+  cashOutline,    
+  businessOutline       
 } from 'ionicons/icons';
 
 addIcons({
@@ -47,7 +48,8 @@ addIcons({
   'add-circle-outline': addCircleOutline,     
   'chatbubble-outline': chatbubbleOutline,
   'time-outline': timeOutline,
-  'cash-outline': cashOutline,               
+  'cash-outline': cashOutline, 
+  'business-outline': businessOutline              
 });
 
 export const appConfig: ApplicationConfig = {

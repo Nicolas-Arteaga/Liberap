@@ -1,0 +1,15 @@
+<button
+  class="btn"
+  [class.active]="active"
+  [class.default]="variant === 'default'"
+  [class.success]="variant === 'success'"
+  [class.danger]="variant === 'danger'"
+  [class.warning]="variant === 'warning'"
+  [disabled]="disabled"
+>
+  <span class="label">{{ label }}</span>
+
+  <span *ngIf="count !== undefined" class="count">
+    {{ count }}
+  </span>
+</button>

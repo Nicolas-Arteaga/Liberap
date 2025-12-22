@@ -149,3 +149,15 @@
 .card-icon.stacked:hover .icon-wrapper {
   transform: scale(1.18);
 }
+.card-icon.proximo {
+  .icon-wrapper {
+    background: rgba(234, 179, 8, 0.22);  
+    ion-icon {
+      color: #eab308;  
+    }
+  }
+
+  .fw-medium {
+    color: #eab308;   
+  }
+}
