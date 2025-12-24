@@ -72,36 +72,18 @@
     </div>
 
     <div class="space-y-3">
-      <!-- Tarjeta Visa -->
-      <app-card-icon 
-        icon="card-outline" 
-        status="vencida"
-        [useCardContentBg]="true">
-        <div class="flex flex-col mt-3">
-          <p class="text-white text-sm font-medium mb-0">Tarjeta Visa</p>
-          <p class="label text-white/60 text-xs">$45.000</p>
-        </div>
-      </app-card-icon>
-
-      <app-card-icon 
-        icon="cash-outline" 
-        status="al-dia"
-        [useCardContentBg]="true">
-        <div class="flex flex-col mt-3">
-          <p class="text-white text-sm font-medium mb-0">Préstamo Personal</p>
-          <p class="label text-white/60 text-xs">$120.000</p>
-        </div>
-      </app-card-icon>
-
-      <app-card-icon 
-        icon="card-outline" 
-        status="al-dia"
-        [useCardContentBg]="true">
-        <div class="flex flex-col mt-3">
-          <p class="text-white text-sm font-medium mb-0">Tarjeta Mastercard</p>
-          <p class="label text-white/60 text-xs">$28.500</p>
-        </div>
-      </app-card-icon>
+      @for (debt of recentDebts; track debt.name) {
+        <app-card-icon 
+          [icon]="debt.icon"
+          [status]="debt.status"
+          [statusLabel]="getStatusLabel(debt.status)"
+          [useCardContentBg]="true">
+          <div class="flex flex-col mt-3">
+            <p class="text-white text-sm font-medium mb-0">{{ debt.name }}</p>
+            <p class="label text-white/60 text-xs">${{ debt.amount.toLocaleString('es-AR') }}</p>
+          </div>
+        </app-card-icon>
+      }
     </div>
   </section>
 </main>
