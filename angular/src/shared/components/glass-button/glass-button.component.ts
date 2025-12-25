@@ -7,7 +7,7 @@ import { Component, Input } from '@angular/core';
   styleUrls: ['./glass-button.component.scss']
 })
 export class GlassButtonComponent {
-  @Input() variant: 'glass' | 'solid' = 'glass';
+  @Input() variant: 'glass' | 'solid' | 'danger' = 'glass';
   @Input() color: string = '#00C47D';
-  @Input() disabled: boolean = false; // ✅
+  @Input() disabled: boolean = false;  
 }

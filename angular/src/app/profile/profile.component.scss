@@ -1,0 +1,40 @@
+.profile-avatar {
+  width: 64px;
+  height: 64px;
+  min-width: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #00e3a5, #00c18f);  
+  box-shadow: 0 0 0 6px rgba(0, 227, 165, 0.18);
+}
+
+.profile-avatar ion-icon {
+  font-size: 32px;
+  color: #fff;
+}
+
+.name {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: white;
+  margin: 0;
+}
+
+.email {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0;
+}
+
+.profile-divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.15),
+    transparent
+  );
+  width: 100%;
+}

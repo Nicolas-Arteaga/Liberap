@@ -46,15 +46,16 @@
 
   <!-- Lista de Deudas -->
   <div class="space-y-3">
-    @for (debt of filteredDebts; track debt.id) {
+  @for (debt of filteredDebts; track debt.id) {
+    <div class="debt-card-wrapper">
       <app-card-icon 
         [icon]="getIcon(debt.type)"
         [status]="getVisualStatus(debt)"   
         [statusLabel]="getStatusLabel(debt)"
         [useCardContentBg]="true">
-        <div class="flex flex-col">
-          <p class="text-white text-sm font-medium mb-0">{{ debt.name }}</p>
-          <div class="flex items-center gap-2 mt-1">
+        <div class="flex flex-col py-2"> <!-- ← Padding interno extra -->
+          <p class="text-white text-sm font-medium mb-1">{{ debt.name }}</p>
+          <div class="flex items-center gap-2 mt-2"> <!-- ← Más margen -->
             <span class="text-white font-semibold">
               ${{ debt.amount.toLocaleString('es-AR') }}
             </span>
@@ -62,7 +63,8 @@
           </div>
         </div>
       </app-card-icon>
-    }
-  </div>
+    </div>
+  }
+</div>
 
 </main>

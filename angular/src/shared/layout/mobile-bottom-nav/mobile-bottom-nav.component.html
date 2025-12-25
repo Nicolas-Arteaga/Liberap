@@ -1,7 +1,10 @@
 <ion-footer class="deudaso-footer ion-no-border">
   <div class="bottom-nav">
     
-    <a class="nav-item" [routerLink]="['/']" routerLinkActive="active">
+    <a class="nav-item" 
+       [routerLink]="['/']" 
+       routerLinkActive="active"
+       [routerLinkActiveOptions]="{ exact: true }">  
       <div class="icon-wrapper">
         <ion-icon name="home-outline"></ion-icon>
       </div>

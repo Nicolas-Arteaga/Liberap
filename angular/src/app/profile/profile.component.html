@@ -1,0 +1,135 @@
+<main class="px-4 space-y-5 pt-4">
+  
+  <!-- Header -->
+  <header class="mb-3">
+    <h1 class="text-white fw-bold fs-2 mb-1">
+      Perfil
+    </h1>
+    <p class="text-white-50 text-sm">
+      Configuración de tu cuenta
+    </p>
+  </header>
+
+  <!-- Perfil del Usuario -->
+  <app-card-content class="mb-">
+    <div class="d-flex align-items-start mb-1">
+      <!-- Avatar - círculo verde usando variable global -->
+      <div class="profile-avatar me-3">
+        <ion-icon name="person-outline" class="text-white fs-1"></ion-icon>
+      </div>
+      
+      <!-- Información -->
+      <div class="flex-grow-1">
+        <p class="name mt-1">Nicolás Arteaga</p>
+        <p class="email mt-1">nicolas.arteagaemail.com</p>  
+      </div>
+    </div>
+ 
+    <!-- Action -->
+    <app-glass-button
+      class="w-100 py-3"
+      (click)="onEditProfile()">
+      Editar perfil
+    </app-glass-button>
+  </app-card-content>
+
+  <!-- Opciones de Configuración -->
+  <section class="space-y-3 mt-4">
+    <!-- Información Personal -->
+    <app-card-icon 
+      icon="person-outline"
+      [useCardContentBg]="true"
+      (click)="onPersonalInfo()">
+
+      <div class="flex flex-col">
+        <p class="text-white text-sm font-medium mt-3 mb-1">
+          Información personal
+        </p>
+        <p class="text-white/60 text-xs mb-3">
+          Actualiza tus datos personales
+        </p>
+      </div>
+
+    </app-card-icon>
+
+
+      <!-- Métodos de Pago -->
+    <app-card-icon 
+      icon="card-outline"
+      [useCardContentBg]="true"
+      (click)="onPaymentMethods()">
+      <div class="flex flex-col">
+        <p class="text-white text-sm font-medium mt-3 mb-1">
+          Métodos de pago
+        </p>
+        <p class="text-white/60 text-xs mb-3">
+          Gestiona tus tarjetas y cuentas
+        </p>
+      </div>
+    </app-card-icon>
+
+    <!-- Notificaciones -->
+    <app-card-icon 
+      icon="notifications-outline"
+      [useCardContentBg]="true"
+      (click)="onNotifications()">
+      <div class="flex flex-col">
+        <p class="text-white text-sm font-medium mt-3 mb-1">
+          Notificaciones
+        </p>
+        <p class="text-white/60 text-xs mb-3">
+          Configura alertas y recordatorios
+        </p>
+      </div>
+    </app-card-icon>
+
+    <!-- Seguridad y Privacidad -->
+    <app-card-icon 
+      icon="lock-closed-outline"
+      [useCardContentBg]="true"
+      (click)="onSecurity()">
+      <div class="flex flex-col">
+        <p class="text-white text-sm font-medium mt-3 mb-1">
+          Seguridad y privacidad
+        </p>
+        <p class="text-white/60 text-xs mb-3">
+          Contraseña y datos privados
+        </p>
+      </div>
+    </app-card-icon>
+
+    <!-- Preferencias de la App -->
+    <app-card-icon 
+      icon="settings-outline"
+      [useCardContentBg]="true"
+      (click)="onPreferences()">
+      <div class="flex flex-col">
+        <p class="text-white text-sm font-medium mt-3 mb-1">
+          Preferencias de la app
+        </p>
+        <p class="text-white/60 text-xs mb-3">
+          Personaliza tu experiencia
+        </p>
+      </div>
+    </app-card-icon>
+
+  </section>
+
+  <!-- Cerrar Sesión -->
+  <section class="pt-4 space-y-4">
+    <app-glass-button 
+      variant="danger"
+      (click)="onLogout()">
+      Cerrar sesión
+    </app-glass-button>
+
+
+    <!-- Versión de la App -->
+    <div class="text-center pt-2">
+      <p class="text-white-50 text-xs">
+        Liberap v1.0.0
+      </p>
+    </div>
+  </section>
+
+</main>

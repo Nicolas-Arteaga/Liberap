@@ -37,7 +37,10 @@ import {
   chatbubbleOutline,
   timeOutline,
   cashOutline,    
-  businessOutline       
+  businessOutline,
+  notificationsOutline,
+  lockClosedOutline,
+  settingsOutline       
 } from 'ionicons/icons';
 
 addIcons({
@@ -49,7 +52,10 @@ addIcons({
   'chatbubble-outline': chatbubbleOutline,
   'time-outline': timeOutline,
   'cash-outline': cashOutline, 
-  'business-outline': businessOutline              
+  'business-outline': businessOutline,
+  'notifications-outline': notificationsOutline,
+  'lock-closed-outline': lockClosedOutline,
+  'settings-outline': settingsOutline              
 });
 
 export const appConfig: ApplicationConfig = {

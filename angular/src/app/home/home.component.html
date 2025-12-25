@@ -73,17 +73,29 @@
 
     <div class="space-y-3">
       @for (debt of recentDebts; track debt.name) {
-        <app-card-icon 
-          [icon]="debt.icon"
-          [status]="debt.status"
-          [statusLabel]="getStatusLabel(debt.status)"
-          [useCardContentBg]="true">
-          <div class="flex flex-col mt-3">
-            <p class="text-white text-sm font-medium mb-0">{{ debt.name }}</p>
-            <p class="label text-white/60 text-xs">${{ debt.amount.toLocaleString('es-AR') }}</p>
-          </div>
-        </app-card-icon>
+        <div class="debt-card-wrapper">
+          <app-card-icon 
+            [icon]="debt.icon"
+            [status]="debt.status"
+            [statusLabel]="getStatusLabel(debt.status)"
+            [useCardContentBg]="true">
+
+            <div class="flex flex-col py-2">
+              <p class="text-white text-sm font-medium mb-1">
+                {{ debt.name }}
+              </p>
+
+              <div class="flex items-center gap-2 mt-2">
+                <span class="text-white font-semibold">
+                  ${{ debt.amount.toLocaleString('es-AR') }}
+                </span>
+              </div>
+            </div>
+
+          </app-card-icon>
+        </div>
       }
     </div>
+
   </section>
 </main>

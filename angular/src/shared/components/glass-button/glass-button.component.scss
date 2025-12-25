@@ -72,3 +72,20 @@
     font-size: 15px;
   }
 }
+
+.glass-btn.danger-btn {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  backdrop-filter: blur(10px);
+
+  &:hover {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.3);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+  }
+
+  &::after {
+    display: none;  
+  }
+}

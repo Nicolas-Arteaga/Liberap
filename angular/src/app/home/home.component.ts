@@ -1,4 +1,4 @@
-import { Component, AfterViewInit } from '@angular/core';
+import { Component, AfterViewInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CardContentComponent } from 'src/shared/components/card-content/card-content.component';
 import { CardIconComponent } from 'src/shared/components/card-icon/card-icon.component';
@@ -25,13 +25,13 @@ interface HomeDebt {
 })
 export class HomeComponent implements AfterViewInit {
   
+  private iconService = inject(IconService);  
+  
   recentDebts: HomeDebt[] = [
     { name: 'Tarjeta Visa', amount: 45000, icon: 'card-outline', status: 'vencida' },
     { name: 'Préstamo Personal', amount: 120000, icon: 'cash-outline', status: 'al-dia' },
     { name: 'Tarjeta Mastercard', amount: 28500, icon: 'card-outline', status: 'al-dia' },
   ];
-  
-  constructor(private iconService: IconService) {}
   
   ngAfterViewInit() {
     this.iconService.fixMissingIcons();  

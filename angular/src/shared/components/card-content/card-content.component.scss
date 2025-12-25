@@ -7,15 +7,12 @@
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 28px;
-  padding: 20px 16px;  
+  padding: 20px !important;   
   backdrop-filter: blur(20px);
   margin-bottom: 0;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
   position: relative;
   overflow: hidden;
-  width: calc(100% - 0px);  
-  
-  /* Elimina cualquier margen automático que pueda estar centrando */
   margin-left: 0 !important;
   margin-right: 0 !important;
   

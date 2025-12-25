@@ -1,0 +1,15 @@
+.debt-card-wrapper ::ng-deep {
+  .card-icon {
+    min-height: 72px;
+  }
+  
+  .content {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  
+  .icon-container {
+    align-self: flex-start;
+    margin-top: 8px;
+  }
+}

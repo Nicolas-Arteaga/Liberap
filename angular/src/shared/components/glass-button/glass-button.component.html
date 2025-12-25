@@ -1,6 +1,7 @@
 <button
   class="glass-btn"
   [class.solid-btn]="variant === 'solid'"
+  [class.danger-btn]="variant === 'danger'"
   [style.background]="variant === 'solid' ? color : null"
   [disabled]="disabled"
 >
