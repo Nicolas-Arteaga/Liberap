@@ -100,3 +100,20 @@ ion-app {
   font-weight: 500;
 }
 
+/* Divisor con gradiente elegante */
+.profile-divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255,255,255,.15),
+    transparent
+  );
+  margin: 0.5rem 0;
+}
+
+/* Ajustes de espaciado para el historial */
+.space-y-1 > * + * {
+  margin-top: 0.25rem;
+}
+ 

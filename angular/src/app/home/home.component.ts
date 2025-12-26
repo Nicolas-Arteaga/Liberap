@@ -4,6 +4,8 @@ import { CardContentComponent } from 'src/shared/components/card-content/card-co
 import { CardIconComponent } from 'src/shared/components/card-icon/card-icon.component';
 import { GlassButtonComponent } from 'src/shared/components/glass-button/glass-button.component';
 import { IconService } from 'src/shared/services/icon.service';
+import { RouterLink } from '@angular/router';
+import { DisabledDirective } from "../../../node_modules/@abp/ng.theme.shared/index";
 
 interface HomeDebt {
   name: string;
@@ -20,7 +22,8 @@ interface HomeDebt {
     CardContentComponent,
     CardIconComponent,
     GlassButtonComponent,
-  ],
+    RouterLink
+],
   templateUrl: './home.component.html'
 })
 export class HomeComponent implements AfterViewInit {

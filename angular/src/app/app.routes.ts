@@ -23,6 +23,10 @@ export const APP_ROUTES: Routes = [
     loadComponent: () => import('./profile/profile.component').then(c => c.ProfileComponent),
   },
   {
+    path: 'debt-detail',
+    loadComponent: () => import('./debt-detail/debt-detail.component').then(c => c.DebtDetailComponent),
+  },
+  {
     path: 'account',
     loadChildren: () => import('@abp/ng.account').then(c => c.createRoutes()),
   },

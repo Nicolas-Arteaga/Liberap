@@ -40,7 +40,15 @@ import {
   businessOutline,
   notificationsOutline,
   lockClosedOutline,
-  settingsOutline       
+  settingsOutline,
+  chevronBackOutline,
+  trashOutline,
+  createOutline,
+  checkmarkCircleOutline,
+  arrowBackOutline,
+  checkmark,
+  close,
+         
 } from 'ionicons/icons';
 
 addIcons({
@@ -55,7 +63,14 @@ addIcons({
   'business-outline': businessOutline,
   'notifications-outline': notificationsOutline,
   'lock-closed-outline': lockClosedOutline,
-  'settings-outline': settingsOutline              
+  'settings-outline': settingsOutline,
+  'chevron-back-outline': chevronBackOutline,
+  'trash-outline': trashOutline,
+  'create-outline': createOutline,
+  'checkmark-circle-outline': checkmarkCircleOutline,
+  'arrow-back-outline': arrowBackOutline,
+  'checkmark': checkmark,
+  'close': close,              
 });
 
 export const appConfig: ApplicationConfig = {

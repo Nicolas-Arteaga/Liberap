@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ViewEncapsulation } from '@angular/core';
 import { IonCard } from '@ionic/angular/standalone';
 
 @Component({
@@ -6,6 +6,7 @@ import { IonCard } from '@ionic/angular/standalone';
   standalone: true,
   imports: [IonCard],
   templateUrl: './card-content.component.html',
-  styleUrls: ['./card-content.component.scss']
+  styleUrls: ['./card-content.component.scss'],
+  encapsulation: ViewEncapsulation.None  
 })
 export class CardContentComponent {}
