@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { CardContentComponent } from 'src/shared/components/card-content/card-content.component';
 import { GlassButtonComponent } from 'src/shared/components/glass-button/glass-button.component';
 import { IonIcon } from '@ionic/angular/standalone';
@@ -12,7 +12,8 @@ import { IonIcon } from '@ionic/angular/standalone';
     CommonModule,
     CardContentComponent,
     GlassButtonComponent,
-    IonIcon
+    IonIcon,
+    RouterLink
   ],
   templateUrl: './debt-detail.component.html'
 })
@@ -89,7 +90,7 @@ export class DebtDetailComponent {
   }
 
   onBack() {
-    this.router.navigate(['/debts']);
+    this.router.navigate(['/']);  
   }
 
   onRegisterPayment() {

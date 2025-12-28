@@ -1,0 +1,124 @@
+<div class="min-vh-100 pb-4" >
+
+  <!-- Header -->
+  <header class="d-flex align-items-center gap-3 px-4 py-4">
+    <button 
+      class="btn p-0 border-0 bg-transparent"
+      (click)="handleBack()">
+      <ion-icon name="arrow-back-outline" class="text-white fs-5"></ion-icon>
+    </button>
+    <h1 class="text-white fw-bold mt-0 fs-4 text-center w-100">Registrar pago</h1>
+  </header>
+
+  <!-- Main Content -->
+  <main class="px-4">
+    
+    <!-- Debt Info Card -->
+
+      <app-card-icon 
+        icon="card-outline"
+        [status]="debtInfo.status === 'overdue' ? 'vencida' : 
+                 debtInfo.status === 'pending' ? 'proximo' : 'al-dia'"
+        [statusLabel]="getStatusInfo().label">
+
+        <div class="d-flex flex-column w-100">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <h3 class="text-white fs-5 mb-0">{{ debtInfo.name }}</h3>
+          </div>
+          
+          <div class="mb-1">
+            <span class="text-white-50 small">Monto pendiente:</span>
+            <span class="text-white fw-bold fs-4 ms-2">
+              ${{ formatCurrency(debtInfo.totalAmount) }}
+            </span>
+          </div>
+          
+          <p class="text-white-50 small mb-0">
+            Próximo vencimiento: {{ debtInfo.nextDueDate }}
+          </p>
+        </div>
+
+      </app-card-icon>
+ 
+    <div class="mt-4">
+      <!-- Payment Form -->
+      <app-card-content>
+        <div class="form-group position-relative">
+          <app-label htmlFor="amount" class="text-white-50 small mb-3">
+            Monto pagado
+          </app-label>
+          
+          <app-input
+            id="amount"
+            type="number"
+            placeholder="Ej: 5000"
+            [(ngModel)]="formData.amount"
+            name="amount"
+            class="pe-4">   
+          </app-input>
+          
+          <ion-icon 
+            name="cash-outline" 
+            class="position-absolute end-0 top-50 translate-middle-y text-success z-1 p-3 me-1 mt-1">
+          </ion-icon>
+        </div>
+
+        <!-- Payment Date -->
+        <div class="form-group mt-0">
+          <app-label htmlFor="paymentDate" class="text-white-50 small mb-3">
+            Fecha del pago
+          </app-label>
+          <app-input
+            id="paymentDate"
+            type="date"
+            [(ngModel)]="formData.paymentDate"
+            name="paymentDate">
+          </app-input>
+        </div>
+
+        <!-- Payment Method -->
+        <div class="form-group mt-3 mb-3">
+          <app-label class="text-white-50 small mb-3 d-block"> <!-- Agrega mb-3 aquí -->
+            Método de pago
+          </app-label>
+          <app-select
+            [options]="paymentMethodOptions"
+            placeholder="Seleccionar método..."
+            [(value)]="formData.paymentMethod">
+          </app-select>
+        </div>
+
+        <!-- Note -->
+        <div class="form-group">
+            <app-label class="text-white-50 small mb-3 d-block"> <!-- Agrega mb-3 aquí -->
+              Nota (Opcional)
+            </app-label>
+          <app-textarea
+            
+            id="note"
+            placeholder="Ej: Pago parcial correspondiente a la cuota de noviembre"
+            [optional]="true"
+            rows="3"
+            [(ngModel)]="formData.note"
+            name="note">
+          </app-textarea>
+        </div>
+      </app-card-content>
+    </div>
+    <!-- Confirmation Info --> 
+    <div class="d-flex gap-3 confirmation-message mt-4 align-items-center">
+      <ion-icon name="checkmark-circle-outline" class="text-success fs-5 flex-shrink-0"></ion-icon>
+      <p class="text-success-bright small mb-0">
+        Este pago será registrado en tu historial y se actualizará el saldo de tu deuda.
+      </p>
+    </div>
+
+    <!-- Submit Button -->
+    <div class="mt-2">
+      <app-glass-button class="w-100 py-3 rounded-3">
+        Registrar pago
+      </app-glass-button>
+    </div>
+
+  </main>
+</div>

@@ -1,0 +1,26 @@
+<div class="textarea-wrapper">
+  <!-- Label -->
+  <label *ngIf="label" [for]="id" class="textarea-label">
+    {{ label }}
+    <span *ngIf="optional" class="optional-text">(Opcional)</span>
+  </label>
+
+  <!-- Textarea -->
+  <textarea
+    [id]="id"
+    [name]="name"
+    [placeholder]="placeholder"
+    [required]="required"
+    [rows]="rows"
+    [disabled]="disabled"
+    [value]="value"
+    (input)="onInput($event)"
+    (blur)="onBlur()"
+    class="textarea-field">
+  </textarea>
+
+  <!-- Character counter (opcional) -->
+  <div *ngIf="value.length > 0" class="char-counter">
+    {{ value.length }} caracteres
+  </div>
+</div>

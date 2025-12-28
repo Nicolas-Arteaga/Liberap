@@ -117,3 +117,51 @@ ion-app {
   margin-top: 0.25rem;
 }
  
+/* Confirmation message style */
+.confirmation-message {
+  background: rgba(0, 196, 125, 0.1);
+  border: 1px solid rgba(0, 196, 125, 0.2);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+}
+
+/* mejorar el color del texto de éxito */
+.text-success-bright {
+  color: #00E68F;
+}
+
+/* Info Box azulado */
+.info-message {
+  background: rgba(59, 130, 246, 0.1) !important; /* Azul suave */
+  border: 1px solid rgba(59, 130, 246, 0.2) !important;
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  
+  .info-icon {
+    color: #3b82f6 !important; /* Azul más brillante */
+  }
+  
+  .info-text {
+    color: #60a5fa !important; /* Azul claro */
+  }
+}
+
+/* Variante para mensajes informativos */
+.text-info {
+  color: #60a5fa !important;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(53%) sepia(99%) saturate(2476%) hue-rotate(130deg) brightness(98%) contrast(101%);
+}
+
+/* Oculta los spinners en TODOS los inputs number */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}

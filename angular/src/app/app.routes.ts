@@ -25,6 +25,18 @@ export const APP_ROUTES: Routes = [
   {
     path: 'debt-detail',
     loadComponent: () => import('./debt-detail/debt-detail.component').then(c => c.DebtDetailComponent),
+  }, 
+  {
+    path: 'register-payment',
+    loadComponent: () => import('./register-payment/register-payment.component').then(c => c.RegisterPaymentComponent),
+  },
+  {
+    path: 'add-debt',
+    loadComponent: () => import('./add-debt/add-debt.component').then(c => c.AddDebtComponent),
+  },
+  {
+    path: 'negotiate-debt',
+    loadComponent: () => import('./negotiate-debt/negotiate-debt.component').then(c => c.NegotiateDebtComponent),
   },
   {
     path: 'account',

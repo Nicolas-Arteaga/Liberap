@@ -1,0 +1,19 @@
+<div class="select">
+  <label *ngIf="label" class="select-label">{{ label }}</label>
+  
+  <div class="select-box" (click)="isOpen = !isOpen" [class.open]="isOpen">
+    <span class="select-text">
+      {{ getSelectedText() || placeholder }}
+    </span>
+    <span class="select-arrow p-1">▼</span>
+  </div>
+  
+  <div *ngIf="isOpen" class="select-options">
+    <div 
+      *ngFor="let option of options" 
+      class="select-option"
+      (click)="select(option)">
+      {{ option.label }}
+    </div>
+  </div>
+</div>

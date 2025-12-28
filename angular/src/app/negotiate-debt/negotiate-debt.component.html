@@ -1,0 +1,121 @@
+<div class="min-vh-100 pb-4">
+  
+  <!-- Header -->
+  <header class="d-flex align-items-center gap-3 px-4 py-4">
+    <button 
+      class="btn p-0 border-0 bg-transparent"
+      (click)="handleBack()">
+      <ion-icon name="arrow-back-outline" class="text-white fs-5"></ion-icon>
+    </button>
+    <h1 class="text-white fw-bold mt-0 fs-4 text-center w-100">Negociar deuda</h1>
+  </header>
+
+  <!-- Main Content -->
+  <main class="px-4">
+    
+    <!-- Selected Debt Card -->
+    <!-- Versión con clases Bootstrap -->
+<app-card-icon 
+  icon="card-outline"
+  [status]="selectedDebt.status === 'overdue' ? 'vencida' : 
+           selectedDebt.status === 'pending' ? 'proximo' : 'al-dia'"
+  [statusLabel]="getStatusInfo().label"
+  [useCardContentBg]="true">
+  
+  <div class="d-flex flex-column w-100">
+    <div class="d-flex justify-content-between align-items-start mb-2">
+      <h3 class="text-white fs-6 fw-medium mb-0">{{ selectedDebt.name }}</h3>
+    </div>
+    
+    <p class="text-white-50 small mb-3">
+      Última actualización: {{ selectedDebt.lastUpdate }}
+    </p>
+    
+    <!-- Divider -->
+    <div class="profile-divider mb-3"></div>
+    
+    <div>
+      <p class="text-white-50 small mb-0">Monto total</p>
+      <p class="text-white fw-semibold fs-5">
+        ${{ formatCurrency(selectedDebt.amount) }}
+      </p>
+    </div>
+  </div>
+  
+</app-card-icon>
+
+    <!-- Negotiation Options Section -->
+    <div class="mb-4">
+      <p class="text-white px-2 mb-3">Opciones disponibles</p>
+      
+      <div class="space-y-3">
+        <!-- Plan de pagos -->
+        <app-card-icon 
+          icon="calendar-outline"
+          [useCardContentBg]="true"
+          (click)="handlePaymentPlan()"
+          style="cursor: pointer">
+          
+          <div class="d-flex flex-column py-2">
+            <h4 class="text-white fs-6 fw-medium mb-0 mt-1">Plan de pagos</h4>
+            <p class="text-white-50 small mb-0">
+              Dividir la deuda en cuotas accesibles según tu capacidad de pago
+            </p>
+          </div>
+          
+        </app-card-icon>
+
+        <!-- Oferta de pago único -->
+        <app-card-icon 
+          icon="cash-outline"
+          [useCardContentBg]="true"
+          (click)="handleOneTimeOffer()"
+          style="cursor: pointer">
+          
+          <div class="d-flex flex-column py-2">
+            <h4 class="text-white fs-6 fw-medium mb-0 mt-1">Oferta de pago único</h4>
+            <p class="text-white-50 small mb-0">
+              Ofrecer un pago total con descuento para liquidar la deuda
+            </p>
+          </div>
+          
+        </app-card-icon>
+
+        <!-- Hablar con asesor -->
+        <app-card-icon 
+          icon="chatbubble-outline"
+          [useCardContentBg]="true"
+          (click)="handleContactAdvisor()"
+          style="cursor: pointer">
+          
+          <div class="d-flex flex-column py-2">
+            <h4 class="text-white fs-6 fw-medium mb-0 mt-1">Hablar con un asesor</h4>
+            <p class="text-white-50 small mb-0">
+              Contactar soporte para evaluar alternativas personalizadas
+            </p>
+          </div>
+          
+        </app-card-icon>
+      </div>
+    </div>
+
+    <!-- Info Box (azulado) -->
+    <div class="info-message d-flex gap-3 align-items-center mb-4">
+      <ion-icon name="information-circle-outline" class="info-icon fs-5 flex-shrink-0"></ion-icon>
+      <p class="info-text small mb-0">
+        Las propuestas de negociación dependen del acreedor. Te mostraremos las opciones más beneficiosas según tu situación financiera.
+      </p>
+    </div>
+
+    <!-- Continue Button -->
+    <div>
+      <app-glass-button
+        variant="solid"
+        (click)="handleContinue()"
+        class="w-100 py-3 rounded-3">
+        Continuar con negociación
+      </app-glass-button>
+    </div>
+
+  </main>
+</div>

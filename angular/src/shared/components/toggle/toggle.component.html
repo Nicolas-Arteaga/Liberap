@@ -1,0 +1,12 @@
+<div class="toggle-container">
+  <div class="toggle-header" (click)="toggle()">
+    <div class="toggle-label">{{ label }}</div>
+    <div class="toggle-switch" [class.active]="value">
+      <div class="toggle-slider"></div>
+    </div>
+  </div>
+  
+  <div *ngIf="description" class="toggle-description">
+    {{ description }}
+  </div>
+</div>
