@@ -48,7 +48,9 @@ import {
   arrowBackOutline,
   checkmark,
   close,
-  logoUsd
+  logoUsd,
+  peopleOutline 
+
          
 } from 'ionicons/icons';
 
@@ -72,7 +74,8 @@ addIcons({
   'arrow-back-outline': arrowBackOutline,
   'checkmark': checkmark,
   'close': close,
-  'logo-usd': logoUsd,              
+  'logo-usd': logoUsd,   
+  'people-outline': peopleOutline,            
 });
 
 export const appConfig: ApplicationConfig = {

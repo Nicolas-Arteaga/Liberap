@@ -39,6 +39,10 @@ export const APP_ROUTES: Routes = [
     loadComponent: () => import('./negotiate-debt/negotiate-debt.component').then(c => c.NegotiateDebtComponent),
   },
   {
+    path: 'history',
+    loadComponent: () => import('./history/history.component').then(c => c.HistoryComponent),
+  },
+  {
     path: 'account',
     loadChildren: () => import('@abp/ng.account').then(c => c.createRoutes()),
   },

@@ -1,0 +1,138 @@
+<div class="min-vh-100 pb-4">
+  
+  <!-- Header -->
+  <header class="d-flex align-items-center gap-3 px-4 py-4">
+    <button 
+      class="btn p-0 border-0 bg-transparent"
+      (click)="handleBack()">
+      <ion-icon name="arrow-back-outline" class="text-white fs-5"></ion-icon>
+    </button>
+    <h1 class="text-white fw-bold mt-0 fs-4 text-center w-100">Historial de pagos</h1>
+  </header>
+
+  <!-- Main Content -->
+  <main class="px-4 space-y-6">
+    
+    <!-- Resumen General -->
+    <app-card-content>
+      <div class="d-flex align-items-center gap-2 mb-4">
+        <ion-icon name="trending-up-outline" class="text-success fs-5"></ion-icon>
+        <h3 class="text-white mb-0 ps-2">Resumen general</h3>
+      </div>
+
+      <!-- Estadísticas -->
+      <div class="row mb-4">
+        <div class="col-6 ps-5">  
+          <p class="text-white-50 small mb-1">Total pagado</p>
+          <p class="text-white fw-bold fs-2">${{ formatCurrency(totalPaid) }}</p>
+        </div>
+        <div class="col-6 pe-5 text-end">  
+          <p class="text-white-50 small mb-1">Pagos realizados</p>
+          <p class="text-white fw-bold fs-2">{{ completedPayments }} <span class="fs-6 text-white-50">pagos</span></p>
+        </div>
+      </div>
+
+      <!-- Gráfico -->
+      <app-payment-chart [data]="chartData"></app-payment-chart>
+    </app-card-content>
+
+    <!-- Filtros -->
+    <div class="row g-3">
+      <div class="col-6">
+        <app-label class="text-white-50 small mb-3 mt-3 d-block">Filtrar por</app-label>
+        <app-select
+          [options]="movementOptions"
+          placeholder="Tipo de movimiento"
+          [(value)]="movementType">
+        </app-select>
+      </div>
+      <div class="col-6">
+        <app-label class="text-white-50 small mb-3 mt-3 d-block">Rango de fechas</app-label>
+        <app-select
+          [options]="dateOptions"
+          placeholder="Seleccionar periodo"
+          [(value)]="dateRange">
+        </app-select>
+      </div>
+    </div>
+
+    <!-- Movimientos - COPIADO EXACTAMENTE DE DEBT-DETAIL -->
+    <div>
+      <h3 class="text-white fw-bold mb-3">Movimientos</h3>
+      
+      <!-- Tarjeta de historial -->
+      <app-card-content class="payment-history-card">
+        
+        <div *ngIf="filteredItems.length > 0; else noItems">
+          <div *ngFor="let item of filteredItems; let last = last" 
+               class="payment-item d-flex align-items-start position-relative">
+            
+            <!-- Contenedor de círculo -->
+            <div class="payment-circle-container">
+              <div class="payment-circle-outer" 
+                   [class]="getPaymentStatusClass(item.action).circleClass">
+                <div class="payment-circle-inner">
+                  <ion-icon [name]="getPaymentStatusClass(item.action).icon"></ion-icon>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Contenido -->
+            <div class="payment-details d-flex justify-content-between align-items-center w-100 mt-0">
+              <div>
+                <p class="text-white mb-0 fw-medium">{{ item.debtName }}</p>
+                <span [class]="getPaymentStatusClass(item.action).textClass">
+                  {{ getPaymentStatusLabel(item.action) }}
+                </span>
+              </div>
+              
+              <div class="text-end">
+                <p class="text-white mb-0 fw-medium">${{ formatCurrency(item.amount) }}</p>
+                <span class="payment-date text-white-50">{{ item.date }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <ng-template #noItems>
+          <div class="text-center py-4">
+            <p class="text-white-50 mb-0">No hay movimientos para mostrar</p>
+          </div>
+        </ng-template>
+        
+      </app-card-content>
+    </div>
+
+    <!-- Leyenda -->
+    <app-card-content class="p-3">
+      <div class="d-flex justify-content-around gap-2 text-xs">
+        <div class="d-flex align-items-center gap-2">
+          <div class="rounded-circle" style="width: 10px; height: 10px; background: #00C47D"></div>
+          <span class="text-white-50">Pagado</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <div class="rounded-circle" style="width: 10px; height: 10px; background: #FBBF24"></div>
+          <span class="text-white-50">Pendiente</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <div class="rounded-circle" style="width: 10px; height: 10px; background: #EF4444"></div>
+          <span class="text-white-50">Vencido</span>
+        </div>
+      </div>
+    </app-card-content>
+
+    <!-- Botón para más acciones -->
+    <div>
+      <app-glass-button
+        variant="glass"
+        class="w-100 py-3 rounded-3"
+        (click)="handleBack()">
+        <div class="d-flex align-items-center justify-content-center gap-2">
+          <ion-icon name="home-outline"></ion-icon>
+          <span>Volver al inicio</span>
+        </div>
+      </app-glass-button>
+    </div>
+
+  </main>
+</div>

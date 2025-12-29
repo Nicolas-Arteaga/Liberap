@@ -1,0 +1,41 @@
+<div class="payment-chart">
+  <div class="chart-wrapper">
+    
+    <!-- Contenedor de barras con línea de conexión -->
+    <div class="chart-line-container">
+      <!-- Línea que conecta los puntos superiores -->
+      <div class="chart-connection-line"></div>
+      
+      <!-- Barras individuales -->
+      <div *ngFor="let item of data; let i = index" 
+           class="chart-column"
+           [style]="{
+             'left': (i * (100 / data.length)) + '%',
+             'width': (100 / data.length) + '%'
+           }">
+        
+        <!-- Punto verde en la parte superior -->
+        <div class="chart-dot" 
+             [style]="{
+               'bottom': getBarHeight(item.amount) + '%'
+             }"></div>
+        
+        <!-- Barra vertical -->
+        <div class="chart-bar" 
+             [style]="{
+               'height': getBarHeight(item.amount) + '%'
+             }">
+          <div class="chart-bar-fill"></div>
+        </div>
+        
+        <!-- Etiquetas -->
+        <div class="chart-labels">
+          <div class="chart-month">{{ item.month }}</div>
+          <div class="chart-amount">{{ formatAmount(item.amount) }}</div>
+        </div>
+        
+      </div>
+    </div>
+    
+  </div>
+</div>
