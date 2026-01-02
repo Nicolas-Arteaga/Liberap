@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CardIconComponent } from 'src/shared/components/card-icon/card-icon.component';
 import { ButtonComponent } from 'src/shared/components/button/button.component';
@@ -22,7 +22,8 @@ interface Debt {
   selector: 'app-debts',
   standalone: true,
   imports: [CommonModule, CardIconComponent, ButtonComponent],
-  templateUrl: './debts.component.html'
+  templateUrl: './debts.component.html',
+  styleUrls: ['./debts.component.scss']
 })
 export class DebtsComponent {
   activeFilter: 'all' | DebtStatus | 'proximo' = 'all';

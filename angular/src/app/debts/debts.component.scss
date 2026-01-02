@@ -1,15 +1,31 @@
-.debt-card-wrapper ::ng-deep {
-  .card-icon {
-    min-height: 72px;
+/* ===== Desktop ===== */
+.filters {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: nowrap;     // 4 botones en una sola línea
+}
+
+.filter-row-wrapper {
+  display: contents;    // desaparece en desktop
+}
+
+.filter-row {
+  display: contents;    // NO hay agrupación visual
+}
+
+/* ===== Mobile ===== */
+@media (max-width: 640px) {
+  .filters {
+    flex-direction: column;
+    gap: 0.75rem;
   }
-  
-  .content {
-    padding-top: 8px;
-    padding-bottom: 8px;
+
+  .filter-row-wrapper {
+    display: flex;
+    justify-content: center;
   }
-  
-  .icon-container {
-    align-self: flex-start;
-    margin-top: 8px;
+
+  .filter-row {
+    display: inline-flex;   // grupo visual
   }
 }

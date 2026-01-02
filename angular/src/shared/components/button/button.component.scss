@@ -88,3 +88,24 @@
   }
 }
 
+/* 👇 SOLO cuando el botón participa de un grupo */
+.btn.group-left {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: none;
+}
+
+.btn.group-right {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: none;
+
+  /* evita doble borde visual */
+  margin-left: -1px;
+}
+
+.btn.desktop-spacing {
+  padding: 7px 9px;    
+  margin-bottom: 0.7rem;
+  margin-right: 0.5rem;
+}
