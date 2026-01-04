@@ -14,17 +14,5 @@ export class ButtonComponent {
   @Input() variant: 'default' | 'success' | 'danger' | 'warning' = 'default';
   @Input() active = false;
   @Input() disabled = false;
-  @Input() group: 'left' | 'right' | null = null;
-
-  isMobile = window.innerWidth <= 640;
-
-  @HostListener('window:resize')
-  onResize() {
-    this.isMobile = window.innerWidth <= 640;
-  }
-
-  /** 👇 SOLO en mobile se permite agrupar */
-  get applyGroup(): boolean {
-    return this.isMobile && this.group !== null;
-  }
+  
 }

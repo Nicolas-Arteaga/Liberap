@@ -49,7 +49,15 @@ import {
   checkmark,
   close,
   logoUsd,
-  peopleOutline 
+  peopleOutline,
+  analyticsOutline,      // Para "Analizar resumen"
+  mailOutline,          // Para "Generar carta" 
+  documentOutline,      // Alternativa
+  readerOutline,        // Alternativa
+  receiptOutline,       // Para resúmenes
+  calculatorOutline,    // Para cálculos
+  statsChartOutline,    // Para análisis
+  pricetagOutline       // Para ahorro 
 
          
 } from 'ionicons/icons';
@@ -75,7 +83,15 @@ addIcons({
   'checkmark': checkmark,
   'close': close,
   'logo-usd': logoUsd,   
-  'people-outline': peopleOutline,            
+  'people-outline': peopleOutline,
+  'analytics-outline': analyticsOutline,
+  'mail-outline': mailOutline,
+  'document-outline': documentOutline,
+  'reader-outline': readerOutline,
+  'receipt-outline': receiptOutline,
+  'calculator-outline': calculatorOutline,
+  'stats-chart-outline': statsChartOutline,
+  'pricetag-outline': pricetagOutline,            
 });
 
 export const appConfig: ApplicationConfig = {

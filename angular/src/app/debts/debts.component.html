@@ -1,83 +1,64 @@
-<main class="px-4 space-y-6 pt-4">
+<main class="px-4 pt-4">
   
-  <!-- Header -->
-  <header class="mb-4">
+  <!-- Header minimal -->
+  <header class="mb-6">
     <h1 class="text-white font-bold text-2xl mb-1">
-      Mis Deudas
+      Mis Análisis
     </h1>
-    <p class="text-white-50 text-sm">
-      Listado completo de tus deudas activas
+    <p class="text-white text-sm">
+      Tasas detectadas en tus productos
     </p>
   </header>
 
-  <!-- Fila 1 -->
-  <div class="filter-row-wrapper">
-    <div class="filter-row">
-
-      <app-button
-        group="left"
-        label="Todas"
-        [count]="totalCount"
-        [active]="activeFilter === 'all'"
-        (click)="activeFilter = 'all'"
-      />
-
-      <app-button
-        group="right"
-        label="Al día"
-        variant="success"
-        [count]="alDiaCount"
-        [active]="activeFilter === 'al-dia'"
-        (click)="activeFilter = 'al-dia'"
-      />
-    </div>
-  </div>
-
-  <!-- Fila 2 -->
-  <div class="filter-row-wrapper p-2 mb-1">
-    <div class="filter-row">
-      <app-button
-        group="left"
-        label="Próximo venc."
-        variant="warning"
-        [count]="proximoCount"
-        [active]="activeFilter === 'proximo'"
-        (click)="activeFilter = 'proximo'"
-      />
-
-      <app-button
-        group="right"
-        label="Vencidas"
-        variant="danger"
-        [count]="vencidaCount"
-        [active]="activeFilter === 'vencida'"
-        (click)="activeFilter = 'vencida'"
-      />
-    </div>
-  </div>
-
-
-  <!-- Lista de Deudas -->
-  <div class="space-y-3">
-  @for (debt of filteredDebts; track debt.id) {
-    <div class="debt-card-wrapper">
-      <app-card-icon 
-        [icon]="getIcon(debt.type)"
-        [status]="getVisualStatus(debt)"   
-        [statusLabel]="getStatusLabel(debt)"
-        [useCardContentBg]="true">
-        <div class="flex flex-col py-2"> <!-- ← Padding interno extra -->
-          <p class="text-white text-sm font-medium mb-1">{{ debt.name }}</p>
-          <div class="flex items-center gap-2 mt-2"> <!-- ← Más margen -->
-            <span class="text-white font-semibold">
-              ${{ debt.amount.toLocaleString('es-AR') }}
-            </span>
-            <span class="text-white-50 text-xs">• {{ debt.dueDate }}</span>
-          </div>
-        </div>
-      </app-card-icon>
-    </div>
-  }
+<!-- Filtros - una sola línea -->
+<div class="flex gap-3 mb-6 pb-3">  
+  <app-button
+    label="Todos"
+    [count]="allAnalyses.length"
+    [active]="activeFilter === 'todos'"
+    (click)="activeFilter = 'todos'" 
+    class="me-2"
+  />
+  <app-button
+    label="Abusivas"
+    variant="danger"
+    [count]="abusivaCount"
+    [active]="activeFilter === 'abusiva'"
+    (click)="activeFilter = 'abusiva'"
+    class="p-1 me-1"
+  />
+  <app-button
+    label="Elevadas"
+    variant="warning"
+    [count]="elevadaCount"
+    [active]="activeFilter === 'elevada'"
+    (click)="activeFilter = 'elevada'"
+    class="p-1"
+  />
 </div>
+
+  <!-- Lista ULTRA MINIMALISTA -->
+  <div class="space-y-3">
+    @for (analysis of filteredAnalyses; track analysis.id) {
+      <div class="debt-card-wrapper">
+        <!-- DEJA que CardIcon maneje el status visual -->
+        <app-card-icon 
+          [icon]="getIcon(analysis.type)"
+          [status]="getStatusColor(analysis.status)"   
+          [statusLabel]="getStatusLabel(analysis.status)"
+          [useCardContentBg]="true">
+          
+          <!-- Contenido ULTRA minimalista -->
+          <div class=" mt-0 mb-0">
+            <!-- Solo nombre y número grande -->
+            <p class="text-white text-sm font-medium mb-0 mt-3">{{ analysis.name }}</p>
+            <p class="text-white font-bold text-xl">
+              {{ formatPercent(analysis.interestRate) }}%
+            </p>
+          </div>
+        </app-card-icon>
+      </div>
+    }
+  </div>
 
 </main>

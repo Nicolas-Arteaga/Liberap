@@ -27,8 +27,8 @@ export const APP_ROUTES: Routes = [
     loadComponent: () => import('./debt-detail/debt-detail.component').then(c => c.DebtDetailComponent),
   }, 
   {
-    path: 'register-payment',
-    loadComponent: () => import('./register-payment/register-payment.component').then(c => c.RegisterPaymentComponent),
+    path: 'generate-letter',
+    loadComponent: () => import('./generate-letter/generate-letter.component').then(c => c.GenerateLetterComponent),
   },
   {
     path: 'add-debt',

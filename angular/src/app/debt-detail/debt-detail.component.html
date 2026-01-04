@@ -1,169 +1,128 @@
 <div class="min-vh-100">
-  <!-- Header simple -->
-   <header class="d-flex align-items-center gap-3 px-4 py-4">
-    <button 
-      class="btn p-0 border-0 bg-transparent"
-      (click)="onBack()">
+  <!-- Header -->
+  <header class="d-flex align-items-center gap-3 px-4 py-4">
+    <button class="btn p-0 border-0 bg-transparent" (click)="onBack()">
       <ion-icon name="arrow-back-outline" class="text-white fs-5"></ion-icon>
     </button>
-    <h1 class="text-white fw-bold mt-0 fs-4 text-center w-100">Detalle de deuda</h1>
+    <h1 class="text-white fw-bold mt-0 fs-4 text-center w-100">Detalle del reclamo</h1>
   </header>
 
-  <!-- Main Content -->
   <main class="px-4 mb-4">
-    <div class="card-wrapper mb-4"> 
-      <!-- Tarjeta 1: Resumen Principal -->
-      <app-card-content  class="mb-4">
-        <!-- Nombre y estado -->
-        <div>
-          <h2 class="text-white fw-bold fs-3 mb-2">{{ debt.name }}</h2>
+   <!-- Tarjeta 1: Resumen Principal - PREMIUM, LIMPIO e IMPACTANTE (exacto como tu captura) -->
+    <div class="card-wrapper mb-4">
+      <app-card-content class="p-6 text-center">
+        <!-- Nombre de la tarjeta/banco -->
+        <h2 class="text-white fw-bold fs-3 mb-5">{{ claim.name }}</h2>
+
+        <!-- Badge rojo potente -->
+        <div class="mb-6">
           <span 
-            class="badge rounded-pill px-3 py-1 fs-7"
-            [style.background]="getStatusInfo().bgColor"
-            [style.color]="getStatusInfo().color">
-            {{ getStatusInfo().label }}
+            class="badge rounded-pill px-5 py-2 fs-7 fw-bold">
+            {{ getAbuseLevelInfo().label }}
           </span>
         </div>
 
-        <!-- Monto total -->
-        <div class="mt-3">
-          <p class="text-white-50 mb-1">Monto total adeudado</p>
-          <p class="text-white fw-bold fs-2">
-            ${{ debt.totalAmount.toLocaleString('es-AR') }}
-          </p>
-        </div>
+        <!-- Ahorro potencial - EL GRAN IMPACTO -->
+        <p class="text-white-50 text-sm mb-2">Ahorro potencial si reclamás</p>
+        <p class="text-success fw-bold fs-1 mb-4">
+          ${{ claim.potentialSavings.toLocaleString('es-AR') }}
+        </p>
+        <p class="text-white-50 text-sm mb-6 max-w-md mx-auto">
+          Por intereses abusivos detectados ({{ claim.currentRate }}% TEA vs {{ claim.legalRate }}% máximo razonable)
+        </p>
 
-        <!-- Fecha de vencimiento -->
-        <div class="profile-divider mb-3"></div>
-        <div class="d-flex align-items-center justify-content-between">
-          <span class="text-white-50">Fecha de vencimiento</span>
-          <span class="text-white fw-medium">{{ debt.dueDate }}</span>
-        </div>
-
-        <!-- Botón Registrar pago -->
+        <!-- Botón grande y hermoso -->
         <app-glass-button 
-          [routerLink]="'/register-payment'"
-          (click)="onRegisterPayment()"
-          class="mt-4">
-          <div class="d-flex align-items-center justify-content-center gap-2">
-            <span>Registrar pago</span>
+          routerLink="/generate-letter"
+          (click)="onGenerateLetter()"
+          class="w-full py-4 fw-bold text-lg rounded-3xl">
+          <div class="d-flex align-items-center justify-content-center gap-3">
+            <ion-icon name="document-text-outline" class="fs-4"></ion-icon>
+            <span>Generar carta documento automática</span>
           </div>
         </app-glass-button>
       </app-card-content>
     </div>
-    <div class="card-wrapper mb-4"> 
-      <!-- Tarjeta 2: Información detallada -->
+
+    <!-- Tarjeta 2: Información detallada del abuso -->
+    <div class="card-wrapper mb-4">
       <app-card-content>
-        <h3 class="text-white fw-bold mb-4">Información detallada</h3>
+        <h3 class="text-white fw-bold mb-4">Análisis detallado</h3>
         
         <div class="space-y-1">
-          <!-- Monto original -->
           <div class="d-flex align-items-center justify-content-between py-3">
-            <span class="text-white-50">Monto original</span>
-            <span class="text-white fw-medium">
-              ${{ debt.originalAmount.toLocaleString('es-AR') }}
-            </span>
+            <span class="text-white-50">Monto original del resumen</span>
+            <span class="text-white fw-medium">${{ claim.originalAmount.toLocaleString('es-AR') }}</span>
           </div>
           <div class="profile-divider"></div>
           
-          <!-- Intereses acumulados -->
           <div class="d-flex align-items-center justify-content-between py-3">
-            <span class="text-white-50">Intereses acumulados</span>
-            <span class="text-danger fw-medium">
-              ${{ debt.accumulatedInterest.toLocaleString('es-AR') }}
-            </span>
+            <span class="text-white-50">Tasa detectada (TEA)</span>
+            <span class="text-danger fw-bold">{{ claim.currentRate }}%</span>
           </div>
           <div class="profile-divider"></div>
           
-          <!-- Pago mínimo -->
           <div class="d-flex align-items-center justify-content-between py-3">
-            <span class="text-white-50">Pago mínimo</span>
-            <span class="text-white fw-medium">
-              ${{ debt.minimumPayment.toLocaleString('es-AR') }}
-            </span>
+            <span class="text-white-50">Máximo razonable (BCRA/ley)</span>
+            <span class="text-success fw-medium">{{ claim.legalRate }}%</span>
           </div>
           <div class="profile-divider"></div>
           
-          <!-- Próxima cuota -->
           <div class="d-flex align-items-center justify-content-between py-3">
-            <span class="text-white-50">Próxima cuota</span>
-            <span class="text-white fw-medium">
-              ${{ debt.nextInstallment.toLocaleString('es-AR') }}
-            </span>
+            <span class="text-white-50">Intereses abusivos estimados</span>
+            <span class="text-danger fw-bold">${{ claim.abusiveInterest.toLocaleString('es-AR') }}</span>
           </div>
           <div class="profile-divider"></div>
           
-          <!-- Días restantes -->
           <div class="d-flex align-items-center justify-content-between py-3">
-            <span class="text-white-50">Días restantes</span>
-            <span [class.text-danger]="debt.daysRemaining < 0" 
-                  [class.text-success]="debt.daysRemaining >= 0"
-                  class="fw-medium">
-              {{ debt.daysRemaining < 0 ? 
-                'Vencida (' + (-debt.daysRemaining) + ' días)' : 
-                debt.daysRemaining + ' días' }}
-            </span>
+            <span class="text-white-50">Pago mínimo sugerido por banco</span>
+            <span class="text-white fw-medium">${{ claim.minimumPayment.toLocaleString('es-AR') }}</span>
           </div>
         </div>
       </app-card-content>
     </div>
-    <div class="card-wrapper mb-2"> 
-    <!-- Tarjeta 3: Historial de pagos -->   
-    <app-card-content class="payment-history-card">
-      <h3 class="text-white fw-bold mb-5">Historial de pagos</h3>
-      
-      <div>
-        <div *ngFor="let payment of paymentHistory; let last = last" 
-            class="payment-item d-flex align-items-start position-relative">
-          
-          <!-- Contenedor de círculo -->
-          <div class="payment-circle-container">
-            <div class="payment-circle-outer" [class]="getPaymentStatusClass(payment.status).circleClass">
-              <div class="payment-circle-inner">
-                <ion-icon [name]="getPaymentStatusClass(payment.status).icon"></ion-icon>
+
+    <!-- Tarjeta 3: Historial del reclamo (reutilizando el diseño hermoso) -->
+    <div class="card-wrapper mb-2">
+      <app-card-content class="payment-history-card">
+        <h3 class="text-white fw-bold mb-5">Progreso del reclamo</h3>
+        
+        <div>
+          <div *ngFor="let step of claimHistory; let last = last" 
+              class="payment-item d-flex align-items-start position-relative">
+            
+            <div class="payment-circle-container">
+              <div class="payment-circle-outer" [class]="getHistoryStatusClass(step.status).circleClass">
+                <div class="payment-circle-inner">
+                  <ion-icon [name]="getHistoryStatusClass(step.status).icon"></ion-icon>
+                </div>
+              </div>
+            </div>
+            
+            <div class="payment-details d-flex justify-content-between align-items-center w-100 mt-0">
+              <div>
+                <p class="text-white mb-0 fw-medium">{{ step.description }}</p>
+              </div>
+              <div class="payment-date text-white-50 mb-2">
+                {{ step.date }}
               </div>
             </div>
           </div>
-          
-          <!-- Contenido -->
-          <div class="payment-details d-flex justify-content-between align-items-center w-100 mt-0">
-            <div>
-              <p class="text-white mb-0">${{ payment.amount.toLocaleString('es-AR') }}</p>
-              <span [class]="getPaymentStatusClass(payment.status).textClass">
-                {{ getPaymentStatusLabel(payment.status) }}
-              </span>
-            </div>
-            
-            <div class="payment-date text-white-50 mb-2">
-              {{ payment.date }}
-            </div>
-          </div>
         </div>
+      </app-card-content>
+    </div>
+
+    <!-- Botones de acción (mantenemos el diseño) -->
+    <div class="d-flex gap-3 ">
+       <app-glass-button 
+      (click)="onGenerateLetter()"
+      class="w-full py-4 fw-bold text-lg rounded-3xl">
+      <div class="d-flex align-items-center justify-content-center gap-3">
+        <ion-icon name="download-outline" class="fs-4"></ion-icon>
+        <span>Descargar carta documento</span>
       </div>
-    </app-card-content>
-    </div>
-    <!-- Botones de acción -->
-    <div class="d-flex gap-3 pt-3 mb-3 mt-1">
-      <!-- Editar deuda -->
-      <button 
-        class="btn btn-outline-success flex-grow-1 py-3 rounded-4 border-1"
-        (click)="onEditDebt()">
-        <div class="d-flex align-items-center justify-content-center gap-2">
-          <ion-icon name="create-outline"></ion-icon>
-          <span>Editar</span>
-        </div>
-      </button>
+    </app-glass-button>
 
-      <!-- Eliminar deuda -->
-      <button 
-        class="btn btn-outline-danger flex-grow-1 py-3 rounded-4 border-1"
-        (click)="onDeleteDebt()">
-        <div class="d-flex align-items-center justify-content-center gap-2">
-          <ion-icon name="trash-outline"></ion-icon>
-          <span>Eliminar</span>
-        </div>
-      </button>
     </div>
-
   </main>
 </div>

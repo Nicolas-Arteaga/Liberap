@@ -1,104 +1,112 @@
 <main class="px-4 space-y-8 pt-4">
-  
-  <!-- Dashboard Card -->
+
+  <!-- Dashboard Card - Mismo diseño, nuevo contenido potente -->
   <app-card-content class="mb-2">
     <div class="mb-6">
       <p class="label text-white/60 text-xs mb-1">
-        Total de deuda
+        <!-- Usuario nuevo -->
+        <span *ngIf="!hasAnalyses">¿Cuánto te están robando los bancos?</span>
+        <!-- Usuario con análisis -->
+        <span *ngIf="hasAnalyses">Ahorro potencial detectado</span>
       </p>
       <p class="text-white fw-bold fs-2">
-        $193.500
+        <!-- Usuario nuevo: texto motivador -->
+        <span *ngIf="!hasAnalyses">Descubrilo en 2 minutos</span>
+        <!-- Usuario con análisis: número grande -->
+        <span *ngIf="hasAnalyses">${{ totalPotentialSavings.toLocaleString('es-AR') }}</span>
       </p>
     </div>
 
-    <!-- Este NO tiene el fondo especial -->
+    <!-- Próximo vencimiento → Próximo reclamo posible (mismo componente) -->
     <app-card-icon icon="calendar-outline">
       <div class="flex flex-col gap-0 items-start mt-3">
         <p class="label text-white/60 text-xs mb-0">
-          Próximo vencimiento
+          <span *ngIf="!hasAnalyses">Primer análisis gratis disponible</span>
+          <span *ngIf="hasAnalyses">Próximo reclamo recomendado</span>
         </p>
         <p class="value text-white text-sm font-medium">
-          15 de Diciembre, 2025
+          <span *ngIf="!hasAnalyses">Hoy mismo</span>
+          <span *ngIf="hasAnalyses">15 de Enero, 2026</span>
         </p>
       </div>
     </app-card-icon>
 
+    <!-- Botón principal -->
     <div class="mt-2">
-      <app-glass-button class="w-full" [routerLink]="'/debt-detail'">
-        Ver detalle
+      <app-glass-button 
+        class="w-full" 
+        [routerLink]="'/debt-detail'">
+        <span *ngIf="!hasAnalyses">Analizar mi primer resumen – GRATIS</span>
+        <span *ngIf="hasAnalyses">Ver mis reclamos y cartas</span>
       </app-glass-button>
     </div>
   </app-card-content>
 
-  <!-- Quick Actions -->
+  <!-- Quick Actions - Mismo grid hermoso -->
   <section class="space-y-4">
-  <p class="text-white font-medium text-base px-2 mb-3 mt-3">Gestionar deudas</p>
-
+    <p class="text-white font-medium text-base px-2 mb-3 mt-3">Herramientas</p>
     <div class="actions-grid px-0">
-      <!-- Estos SÍ tienen el fondo especial -->
-      <app-card-icon 
-        icon="add-circle-outline" 
+      <app-card-icon
+        icon="analytics-outline"
         variant="stacked"
         [useCardContentBg]="true"
-        [routerLink]="'./add-debt'">
-        <p class="text-white text-sm">Agregar</p>
+        routerLink="/add-debt">
+        <p class="text-white text-sm">Analizar resumen</p>
       </app-card-icon>
       
-      <app-card-icon 
-        icon="chatbubble-outline" 
+      <app-card-icon
+        icon="mail-outline" 
         variant="stacked"
         [useCardContentBg]="true"
-        [routerLink]="'./negotiate-debt'">
-        <p class="text-white text-sm">Negociar</p>
+        routerLink="/generate-letter">
+        <p class="text-white text-sm">Generar carta</p>
       </app-card-icon>
       
-      <app-card-icon 
-        icon="time-outline" 
+      <app-card-icon
+        icon="time-outline"
         variant="stacked"
         [useCardContentBg]="true"
-        [routerLink]="'./history'">
+        routerLink="/history">
         <p class="text-white text-sm">Historial</p>
       </app-card-icon>
     </div>
   </section>
 
-  <!-- Deudas Recientes -->
+  <!-- Deudas recientes → Mis análisis recientes (misma lista perfecta) -->
   <section class="space-y-4">
     <div class="section-header">
       <p class="text-white font-medium text-base">
-        Deudas recientes
+        <span *ngIf="!hasAnalyses">Ejemplos reales de usuarios</span>
+        <span *ngIf="hasAnalyses">Mis análisis recientes</span>
       </p>
-
-      <button class="see-all mb-2">
+      <button class="see-all mb-2" routerLink="/all-analyses">
         Ver todas
       </button>
     </div>
 
     <div class="space-y-3">
-      @for (debt of recentDebts; track debt.name) {
+      @for (item of recentAnalyses; track item.name) {
         <div class="debt-card-wrapper">
-          <app-card-icon 
-            [icon]="debt.icon"
-            [status]="debt.status"
-            [statusLabel]="getStatusLabel(debt.status)"
+          <app-card-icon
+            [icon]="item.icon"
+            [status]="getStatusColor(item.status)"
+            [statusLabel]="getStatusLabel(item.status)"
             [useCardContentBg]="true">
-
             <div class="flex flex-col py-2">
               <p class="text-white text-sm font-medium mb-1">
-                {{ debt.name }}
+                {{ item.name }}
               </p>
-
               <div class="flex items-center gap-2 mt-2">
                 <span class="text-white font-semibold">
-                  ${{ debt.amount.toLocaleString('es-AR') }}
+                  ${{ item.amount.toLocaleString('es-AR') }}
                 </span>
+                <span class="text-white-50 text-xs" *ngIf="hasAnalyses">ahorro potencial</span>
               </div>
             </div>
-
           </app-card-icon>
         </div>
       }
     </div>
-
   </section>
+
 </main>
