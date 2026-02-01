@@ -3,116 +3,178 @@
   <!-- Header -->
   <header class="mb-3">
     <h1 class="text-white fw-bold fs-2 mb-1">
-      Perfil
+      Perfil de Trader
     </h1>
     <p class="text-white-50 text-sm">
-      Configuración de tu cuenta
+      Configuración y estadísticas de trading
     </p>
   </header>
 
-  <!-- Perfil del Usuario -->
+  <!-- Perfil del Trader -->
   <app-card-content>
-    <div class="d-flex align-items-start mb-1">
-      <!-- Avatar - círculo verde usando variable global -->
+    <div class="d-flex align-items-start mb-3">
+      <!-- Avatar - círculo con ícono de trader -->
       <div class="profile-avatar me-3">
-        <ion-icon name="person-outline" class="text-white fs-1"></ion-icon>
+        <ion-icon name="rocket-outline" class="text-white fs-1"></ion-icon>
       </div>
       
-      <!-- Información -->
+      <!-- Información del trader -->
       <div class="flex-grow-1">
-        <p class="name mt-1">Nicolás Arteaga</p>
-        <p class="email mt-1">nicolas.arteagaemail.com</p>  
+        <p class="name mt-1">{{ traderProfile.name }}</p>
+        <p class="email mt-1">{{ traderProfile.email }}</p>
+        
+        <!-- Stats rápidas del trader -->
+        <div class="d-flex gap-3 mt-3">
+          <div>
+            <p class="text-white fw-bold mb-0">{{ traderProfile.accuracy }}%</p>
+            <p class="text-white-50 text-xs mb-0">Precisión</p>
+          </div>
+          <div>
+            <p class="text-success fw-bold mb-0">+{{ formatCurrency(traderProfile.totalProfit) }}</p>
+            <p class="text-white-50 text-xs mb-0">Ganancia</p>
+          </div>
+          <div>
+            <p class="text-white fw-bold mb-0">{{ traderProfile.activeStrategies }}</p>
+            <p class="text-white-50 text-xs mb-0">Estrategias</p>
+          </div>
+        </div>
       </div>
     </div>
  
-    <!-- Action -->
+    <!-- Botón de edición -->
     <app-glass-button
       class="w-100 py-3"
       (click)="onEditProfile()">
-      Editar perfil
+      <ion-icon name="create-outline" class="me-2"></ion-icon>
+      Editar perfil de trader
     </app-glass-button>
   </app-card-content>
 
-  <!-- Opciones de Configuración -->
+  <!-- Exchanges Conectados -->
+  <section class="space-y-3">
+    <p class="text-white font-medium text-base px-2">🔗 Exchanges Conectados</p>
+    
+    @for (api of connectedApis; track api.name) {
+      <app-card-icon 
+        [icon]="api.connected ? 'link-outline' : 'link-outline'"
+        [status]="api.connected ? 'success' : 'danger'"
+        [statusLabel]="api.connected ? 'Conectado' : 'Desconectado'"
+        [useCardContentBg]="true"
+        (click)="onConnectExchange()">
+        
+        <div class="flex flex-col py-2">
+          <div class="d-flex justify-content-between align-items-start">
+            <p class="text-white text-sm font-medium mb-0">{{ api.name }}</p>
+            @if (api.connected && api.lastSync) {
+              <span class="text-white-50 text-xs">{{ api.lastSync }}</span>
+            }
+          </div>
+          <p class="text-white-50 text-xs mb-0 mt-1">
+            {{ api.connected ? 'API conectada y funcionando' : 'Conectar para trading automático' }}
+          </p>
+        </div>
+      </app-card-icon>
+    }
+  </section>
+
+  <!-- Configuración de Trading -->
   <section class="space-y-3 mt-4">
-    <!-- Información Personal -->
+    <p class="text-white font-medium text-base px-2">⚙️ Configuración</p>
+    
+    <!-- API Keys y Seguridad -->
     <app-card-icon 
-      icon="person-outline"
+      icon="key-outline"
       [useCardContentBg]="true"
-      (click)="onPersonalInfo()">
-
+      (click)="onApiKeys()">
       <div class="flex flex-col">
         <p class="text-white text-sm font-medium mt-3 mb-1">
-          Información personal
+          API Keys y Seguridad
         </p>
-        <p class="text-white/60 text-xs mb-3">
-          Actualiza tus datos personales
-        </p>
-      </div>
-
-    </app-card-icon>
-
-
-      <!-- Métodos de Pago -->
-    <app-card-icon 
-      icon="card-outline"
-      [useCardContentBg]="true"
-      (click)="onPaymentMethods()">
-      <div class="flex flex-col">
-        <p class="text-white text-sm font-medium mt-3 mb-1">
-          Métodos de pago
-        </p>
-        <p class="text-white/60 text-xs mb-3">
-          Gestiona tus tarjetas y cuentas
+        <p class="text-white-60 text-xs mb-3">
+          Gestiona tus claves de API y 2FA
         </p>
       </div>
     </app-card-icon>
 
-    <!-- Notificaciones -->
+    <!-- Configuración de Trading -->
+    <app-card-icon 
+      icon="stats-chart-outline"
+      [useCardContentBg]="true"
+      (click)="onTradingSettings()">
+      <div class="flex flex-col">
+        <p class="text-white text-sm font-medium mt-3 mb-1">
+          Configuración de Trading
+        </p>
+        <p class="text-white-60 text-xs mb-3">
+          Parámetros, apalancamiento, stop-loss
+        </p>
+      </div>
+    </app-card-icon>
+
+    <!-- Alertas y Notificaciones -->
     <app-card-icon 
       icon="notifications-outline"
       [useCardContentBg]="true"
-      (click)="onNotifications()">
+      (click)="onAlertsSettings()">
       <div class="flex flex-col">
         <p class="text-white text-sm font-medium mt-3 mb-1">
-          Notificaciones
+          Sistema de Alertas
         </p>
-        <p class="text-white/60 text-xs mb-3">
-          Configura alertas y recordatorios
+        <p class="text-white-60 text-xs mb-3">
+          Configura las alertas 1-2-3-4 y notificaciones push
         </p>
       </div>
     </app-card-icon>
 
-    <!-- Seguridad y Privacidad -->
+    <!-- Backup y Datos -->
     <app-card-icon 
-      icon="lock-closed-outline"
+      icon="cloud-download-outline"
       [useCardContentBg]="true"
-      (click)="onSecurity()">
+      (click)="onBackupData()">
       <div class="flex flex-col">
         <p class="text-white text-sm font-medium mt-3 mb-1">
-          Seguridad y privacidad
+          Backup y Exportación
         </p>
-        <p class="text-white/60 text-xs mb-3">
-          Contraseña y datos privados
+        <p class="text-white-60 text-xs mb-3">
+          Exporta tu historial de trades y datos
         </p>
       </div>
     </app-card-icon>
 
-    <!-- Preferencias de la App -->
+    <!-- Ayuda y Soporte -->
     <app-card-icon 
-      icon="settings-outline"
+      icon="help-circle-outline"
       [useCardContentBg]="true"
-      (click)="onPreferences()">
+      (click)="onHelp()">
       <div class="flex flex-col">
         <p class="text-white text-sm font-medium mt-3 mb-1">
-          Preferencias de la app
+          Ayuda y Soporte
         </p>
-        <p class="text-white/60 text-xs mb-3">
-          Personaliza tu experiencia
+        <p class="text-white-60 text-xs mb-3">
+          Tutoriales, FAQ y contacto
         </p>
       </div>
     </app-card-icon>
+  </section>
 
+  <!-- Información del Perfil de Riesgo -->
+  <section class="mt-4">
+    <app-card-content class="p-4">
+      <div class="d-flex align-items-center gap-3">
+        <ion-icon name="shield-outline" class="text-warning fs-4"></ion-icon>
+        <div>
+          <p class="text-white text-sm font-medium mb-0">
+            Perfil de Riesgo: 
+            <span [class]="getRiskColor(traderProfile.riskTolerance)">
+              {{ traderProfile.riskTolerance }}
+            </span>
+          </p>
+          <p class="text-white-50 text-xs mb-0">
+            Nivel de Trader: {{ traderProfile.tradingLevel }} • Miembro desde {{ traderProfile.joinDate }}
+          </p>
+        </div>
+      </div>
+    </app-card-content>
   </section>
 
   <!-- Cerrar Sesión -->
@@ -120,14 +182,14 @@
     <app-glass-button 
       variant="danger"
       (click)="onLogout()">
+      <ion-icon name="log-out-outline" class="me-2"></ion-icon>
       Cerrar sesión
     </app-glass-button>
-
 
     <!-- Versión de la App -->
     <div class="text-center pt-2">
       <p class="text-white-50 text-xs">
-        Liberap v1.0.0
+        Crypto Predictor v1.0.0 • Trade Responsably
       </p>
     </div>
   </section>

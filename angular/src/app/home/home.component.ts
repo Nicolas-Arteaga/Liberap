@@ -6,12 +6,12 @@ import { GlassButtonComponent } from 'src/shared/components/glass-button/glass-b
 import { IconService } from 'src/shared/services/icon.service';
 import { RouterLink } from '@angular/router';
 
-// Reutilizamos la misma interfaz, pero ahora representa un análisis/reclamo
-interface RecentAnalysis {
-  name: string;          // Nombre del banco/tarjeta
-  amount: number;        // Ahorro potencial detectado
-  icon: string;
-  status: 'abusiva' | 'elevada' | 'normal';  // Nuevo status visual
+// Mantengo la misma interfaz pero para trading
+interface TradingSignal {
+  name: string;          // Par de trading (ej: BTC/USDT)
+  amount: number;        // Ganancia potencial en USDT
+  icon: string;          // Icono de la cripto
+  status: 'alta' | 'media' | 'baja';  // Confianza de la señal
 }
 
 @Component({
@@ -29,15 +29,16 @@ interface RecentAnalysis {
 export class HomeComponent implements AfterViewInit {
   private iconService = inject(IconService);
 
-  // Estado del usuario (conectarás después con servicio real)
-  hasAnalyses = false;                    // false = usuario nuevo
-  totalPotentialSavings = 0;              // Para dashboard superior
+  // Estado del usuario
+  hasActiveStrategies = false;            // false = usuario nuevo
+  totalPotentialProfit = 0;               // Ganancia potencial total
 
-  // Mock temporal → después vendrá del servicio
-  recentAnalyses: RecentAnalysis[] = [
-    { name: 'Tarjeta Visa Banco Nación', amount: 457820, icon: 'card-outline', status: 'abusiva' },
-    { name: 'Préstamo Personal Galicia', amount: 312000, icon: 'cash-outline', status: 'elevada' },
-    { name: 'Tarjeta Mastercard Macro', amount: 189500, icon: 'card-outline', status: 'abusiva' },
+  // Mock de señales de trading
+  recentSignals: TradingSignal[] = [
+    { name: 'BTC/USDT - LONG', amount: 2450, icon: 'trending-up-outline', status: 'alta' },
+    { name: 'ETH/USDT - SHORT', amount: 1250, icon: 'trending-down-outline', status: 'media' },
+    { name: 'SOL/USDT - LONG', amount: 850, icon: 'trending-up-outline', status: 'alta' },
+    { name: 'BNB/USDT - SHORT', amount: 620, icon: 'trending-down-outline', status: 'baja' },
   ];
 
   ngAfterViewInit() {
@@ -46,27 +47,47 @@ export class HomeComponent implements AfterViewInit {
   }
 
   private updateDashboard() {
-    if (this.recentAnalyses.length > 0) {
-      this.hasAnalyses = true;
-      this.totalPotentialSavings = this.recentAnalyses.reduce((sum, a) => sum + a.amount, 0);
+    if (this.recentSignals.length > 0) {
+      this.hasActiveStrategies = true;
+      this.totalPotentialProfit = this.recentSignals.reduce((sum, a) => sum + a.amount, 0);
     }
   }
 
-  getStatusLabel(status: 'abusiva' | 'elevada' | 'normal'): string {
+  getStatusLabel(status: 'alta' | 'media' | 'baja'): string {
     switch (status) {
-      case 'abusiva': return 'Abusiva';
-      case 'elevada': return 'Elevada';
-      case 'normal': return 'Normal';
+      case 'alta': return 'Alta Confianza';
+      case 'media': return 'Confianza Media';
+      case 'baja': return 'Baja Confianza';
       default: return '';
     }
   }
 
-  getStatusColor(status: 'abusiva' | 'elevada' | 'normal'): 'danger' | 'warning' | 'success' {
+  getStatusColor(status: 'alta' | 'media' | 'baja'): 'danger' | 'warning' | 'success' {
     switch (status) {
-      case 'abusiva': return 'danger';
-      case 'elevada': return 'warning';
-      case 'normal': return 'success';
+      case 'alta': return 'success';    // Verde para alta confianza
+      case 'media': return 'warning';   // Amarillo para media
+      case 'baja': return 'danger';     // Rojo para baja
       default: return 'success';
     }
   }
 }
+
+
+// 📋 Mapeo de Rutas y Componentes (Solo nombres)
+// Mantengo exactamente la misma estructura de archivos, solo renombro las rutas:
+
+// Archivo Original	Nueva Ruta	Nuevo Propósito
+// home.component	/home	✅ YA LISTO - Home de trading
+// profile.component	/profile	Perfil de trader (conectar APIs, etc.)
+// debts.component	/signals	Lista de señales detectadas
+// add-debt.component	/configure	Configurar estrategia de trading
+// debt-detail.component	/signal-detail	Detalle de una señal específica
+// generate-letter.component	/execute-trade	Ejecutar trade manual
+// negotiate-debt.component	❌ ELIMINAR	No aplica para trading
+// NUEVO	/dashboard	Dashboard con super gráfico
+// NUEVO	/alerts	Sistema de alertas 1-2-3-4
+// NUEVO	/backtesting	Probar estrategias históricas
+// 🔧 Cambios Mínimos Necesarios
+// En app-routing.module.ts:
+
+ 

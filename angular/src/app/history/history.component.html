@@ -7,33 +7,52 @@
       (click)="handleBack()">
       <ion-icon name="arrow-back-outline" class="text-white fs-5"></ion-icon>
     </button>
-    <h1 class="text-white fw-bold mt-0 fs-4 text-center w-100">Historial de pagos</h1>
+    <h1 class="text-white fw-bold mt-0 fs-4 text-center w-100">Historial de Trades</h1>
   </header>
 
   <!-- Main Content -->
   <main class="px-4 space-y-6">
     
-    <!-- Resumen General -->
+    <!-- Resumen de Performance -->
     <app-card-content>
       <div class="d-flex align-items-center gap-2 mb-4">
-        <ion-icon name="trending-up-outline" class="text-success fs-5"></ion-icon>
-        <h3 class="text-white mb-0 ps-2">Resumen general</h3>
+        <ion-icon name="stats-chart-outline" class="text-success fs-5"></ion-icon>
+        <h3 class="text-white mb-0 ps-2">Resumen de Performance</h3>
       </div>
 
       <!-- Estadísticas -->
       <div class="row mb-4">
         <div class="col-6 ps-5">  
-          <p class="text-white-50 small mb-1">Total pagado</p>
-          <p class="text-white fw-bold fs-2">${{ formatCurrency(totalPaid) }}</p>
+          <p class="text-white-50 small mb-1">Ganancia Total</p>
+          <p class="text-success fw-bold fs-2">+{{ formatCurrency(totalProfit) }}</p>
         </div>
         <div class="col-6 pe-5 text-end">  
-          <p class="text-white-50 small mb-1">Pagos realizados</p>
-          <p class="text-white fw-bold fs-2">{{ completedPayments }} <span class="fs-6 text-white-50">pagos</span></p>
+          <p class="text-white-50 small mb-1">Win Rate</p>
+          <p class="text-white fw-bold fs-2">{{ winRate }}% <span class="fs-6 text-white-50">precisión</span></p>
         </div>
       </div>
 
-      <!-- Gráfico -->
-      <app-payment-chart [data]="chartData"></app-payment-chart>
+      <!-- Stats adicionales -->
+      <div class="row g-2 mb-3">
+        <div class="col-6">
+          <div class="bg-dark rounded-2 p-2 text-center">
+            <p class="text-white fw-bold mb-0">{{ totalTrades }}</p>
+            <p class="text-white-50 text-xs mb-0">Total Trades</p>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="bg-dark rounded-2 p-2 text-center">
+            <p class="text-white fw-bold mb-0">{{ formatCurrency(averageProfit) }}</p>
+            <p class="text-white-50 text-xs mb-0">Avg por Trade</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gráfico de Evolución -->
+      <div class="mt-4">
+        <p class="text-white-50 small mb-2">Evolución de Capital (simulada)</p>
+        <app-payment-chart [data]="chartData"></app-payment-chart>
+      </div>
     </app-card-content>
 
     <!-- Filtros -->
@@ -41,13 +60,13 @@
       <div class="col-6">
         <app-label class="text-white-50 small mb-3 mt-3 d-block">Filtrar por</app-label>
         <app-select
-          [options]="movementOptions"
-          placeholder="Tipo de movimiento"
-          [(value)]="movementType">
+          [options]="tradeOptions"
+          placeholder="Tipo de trade"
+          [(value)]="tradeType">
         </app-select>
       </div>
       <div class="col-6">
-        <app-label class="text-white-50 small mb-3 mt-3 d-block">Rango de fechas</app-label>
+        <app-label class="text-white-50 small mb-3 mt-3 d-block">Periodo</app-label>
         <app-select
           [options]="dateOptions"
           placeholder="Seleccionar periodo"
@@ -56,82 +75,112 @@
       </div>
     </div>
 
-    <!-- Movimientos - COPIADO EXACTAMENTE DE DEBT-DETAIL -->
+    <!-- Historial de Trades -->
     <div>
-      <h3 class="text-white fw-bold mb-3">Movimientos</h3>
+      <h3 class="text-white fw-bold mb-3">Trades Recientes</h3>
       
       <!-- Tarjeta de historial -->
       <app-card-content class="payment-history-card">
         
-        <div *ngIf="filteredItems.length > 0; else noItems">
-          <div *ngFor="let item of filteredItems; let last = last" 
+        <div *ngIf="filteredTrades.length > 0; else noTrades">
+          <div *ngFor="let trade of filteredTrades; let last = last" 
                class="payment-item d-flex align-items-start position-relative">
             
             <!-- Contenedor de círculo -->
             <div class="payment-circle-container">
               <div class="payment-circle-outer" 
-                   [class]="getPaymentStatusClass(item.action).circleClass">
+                   [class]="getTradeStatusClass(trade.action).circleClass">
                 <div class="payment-circle-inner">
-                  <ion-icon [name]="getPaymentStatusClass(item.action).icon"></ion-icon>
+                  <ion-icon [name]="getTradeStatusClass(trade.action).icon"></ion-icon>
                 </div>
               </div>
             </div>
             
-            <!-- Contenido -->
+            <!-- Contenido del trade -->
             <div class="payment-details d-flex justify-content-between align-items-center w-100 mt-0">
               <div>
-                <p class="text-white mb-0 fw-medium">{{ item.debtName }}</p>
-                <span [class]="getPaymentStatusClass(item.action).textClass">
-                  {{ getPaymentStatusLabel(item.action) }}
-                </span>
+                <p class="text-white mb-0 fw-medium">{{ trade.cryptoPair }}</p>
+                <div class="d-flex align-items-center gap-2 mt-1">
+                  <span [class]="getTradeStatusClass(trade.action).textClass">
+                    {{ getTradeStatusLabel(trade.action) }}
+                  </span>
+                  <span class="text-white-50 text-xs">•</span>
+                  <span [class]="getDirectionColor(trade.direction)" class="text-xs fw-medium">
+                    {{ trade.direction }}
+                  </span>
+                  <span class="text-white-50 text-xs">•</span>
+                  <span class="text-white-50 text-xs">{{ trade.leverage }}x</span>
+                </div>
               </div>
               
               <div class="text-end">
-                <p class="text-white mb-0 fw-medium">${{ formatCurrency(item.amount) }}</p>
-                <span class="payment-date text-white-50">{{ item.date }}</span>
+                <p [class]="getProfitColor(trade.profitLoss)" class="mb-0 fw-bold">
+                  {{ trade.profitLoss > 0 ? '+' : '' }}{{ formatCurrency(trade.profitLoss) }}
+                </p>
+                <div class="d-flex align-items-center justify-content-end gap-1">
+                  <span class="payment-date text-white-50">{{ trade.date }}</span>
+                  <span class="text-white-50 text-xs">•</span>
+                  <span class="text-white-50 text-xs">{{ formatCurrency(trade.amount) }}</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <ng-template #noItems>
+        <ng-template #noTrades>
           <div class="text-center py-4">
-            <p class="text-white-50 mb-0">No hay movimientos para mostrar</p>
+            <ion-icon name="stats-chart-outline" class="text-white-50 fs-1 mb-3"></ion-icon>
+            <p class="text-white-50 mb-0">No hay trades para mostrar con estos filtros</p>
           </div>
         </ng-template>
         
       </app-card-content>
     </div>
 
-    <!-- Leyenda -->
+    <!-- Leyenda de Trades -->
     <app-card-content class="p-3">
       <div class="d-flex justify-content-around gap-2 text-xs">
         <div class="d-flex align-items-center gap-2">
           <div class="rounded-circle" style="width: 10px; height: 10px; background: #00C47D"></div>
-          <span class="text-white-50">Pagado</span>
-        </div>
-        <div class="d-flex align-items-center gap-2">
-          <div class="rounded-circle" style="width: 10px; height: 10px; background: #FBBF24"></div>
-          <span class="text-white-50">Pendiente</span>
+          <span class="text-white-50">Trade Ganador</span>
         </div>
         <div class="d-flex align-items-center gap-2">
           <div class="rounded-circle" style="width: 10px; height: 10px; background: #EF4444"></div>
-          <span class="text-white-50">Vencido</span>
+          <span class="text-white-50">Trade Perdedor</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <div class="rounded-circle" style="width: 10px; height: 10px; background: #3B82F6"></div>
+          <span class="text-white-50">Trade Abierto</span>
         </div>
       </div>
     </app-card-content>
 
-    <!-- Botón para más acciones -->
-    <div>
+    <!-- Botones de Acción -->
+    <div class="space-y-3">
+      <app-glass-button
+        variant="success"
+        class="w-100 py-3 rounded-3"
+        routerLink="/dashboard">
+        <div class="d-flex align-items-center justify-content-center gap-2">
+          <ion-icon name="play-outline"></ion-icon>
+          <span>Volver a Trading</span>
+        </div>
+      </app-glass-button>
+
       <app-glass-button
         variant="glass"
         class="w-100 py-3 rounded-3"
         (click)="handleBack()">
         <div class="d-flex align-items-center justify-content-center gap-2">
           <ion-icon name="home-outline"></ion-icon>
-          <span>Volver al inicio</span>
+          <span>Volver al Inicio</span>
         </div>
       </app-glass-button>
+    </div>
+
+    <!-- Info adicional -->
+    <div class="text-center text-white-50 text-xs mt-3">
+      <p class="mb-0">📊 {{ filteredTrades.length }} trades mostrados • Última actualización: Hoy</p>
     </div>
 
   </main>

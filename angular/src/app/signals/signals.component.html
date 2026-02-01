@@ -1,0 +1,127 @@
+<main class="px-4 pt-4">
+  
+  <!-- Header minimal -->
+  <header class="mb-6">
+    <h1 class="text-white font-bold text-2xl mb-1">
+      Mis Señales
+    </h1>
+    <p class="text-white text-sm">
+      Señales de trading detectadas por la IA
+    </p>
+  </header>
+
+  <!-- Filtros - misma estructura -->
+  <div class="d-flex gap-2 mb-6 pb-3 overflow-x-auto">  
+    <app-button
+      label="Todas"
+      [count]="allSignals.length"
+      [active]="activeFilter === 'todos'"
+      (click)="activeFilter = 'todos'" 
+      class="flex-shrink-0"
+    />
+    <app-button
+      label="Alta Confianza"
+      variant="success"
+      [count]="altaCount"
+      [active]="activeFilter === 'alta'"
+      (click)="activeFilter = 'alta'"
+      class="flex-shrink-0"
+    />
+    <app-button
+      label="Confianza Media"
+      variant="warning"
+      [count]="mediaCount"
+      [active]="activeFilter === 'media'"
+      (click)="activeFilter = 'media'"
+      class="flex-shrink-0"
+    />
+    <app-button
+      label="Baja Confianza"
+      variant="danger"
+      [count]="bajaCount"
+      [active]="activeFilter === 'baja'"
+      (click)="activeFilter = 'baja'"
+      class="flex-shrink-0"
+    />
+  </div>
+
+  <!-- Lista de señales - MANTENGO la misma estructura ULTRA MINIMALISTA -->
+  <div class="space-y-3">
+    @for (signal of filteredSignals; track signal.id) {
+      <div class="debt-card-wrapper">
+        <app-card-icon 
+          [icon]="getDirectionIcon(signal.direction)"
+          [status]="getConfidenceColor(signal.confidence)"   
+          [statusLabel]="getConfidenceLabel(signal.confidence)"
+          [useCardContentBg]="true">
+          
+          <!-- Contenido ULTRA minimalista - igual estructura -->
+          <div class="mt-0 mb-0">
+            <!-- Primera línea: Nombre + Dirección -->
+            <div class="d-flex justify-content-between align-items-start mb-1">
+              <p class="text-white text-sm font-medium mb-0">{{ signal.name }}</p>
+              <span [class]="getDirectionColor(signal.direction) + ' text-xs fw-bold'">
+                {{ getDirectionText(signal.direction) }}
+              </span>
+            </div>
+            
+            <!-- Segunda línea: Precio de entrada pequeño -->
+            <p class="text-white-50 text-xs mb-1">
+              Entrada: {{ formatPrice(signal.entryPrice) }}
+            </p>
+            
+            <!-- Tercera línea: Ganancia grande + Estado -->
+            <div class="d-flex justify-content-between align-items-end">
+              <div>
+                <p class="text-success font-bold text-lg mb-0">
+                  +{{ formatCurrency(signal.profitPotential) }}
+                </p>
+                <p class="text-white-50 text-xs mb-0">ganancia potencial</p>
+              </div>
+              
+              <div class="text-end">
+                <p class="text-white-50 text-xs mb-0">{{ signal.analyzedDate }}</p>
+                <p [class]="getStatusColor(signal.status) + ' text-xs fw-medium mb-0'">
+                  {{ getStatusText(signal.status) }}
+                </p>
+              </div>
+            </div>
+          </div>
+        </app-card-icon>
+      </div>
+    }
+  </div>
+
+  <!-- Si no hay señales -->
+  @if (filteredSignals.length === 0) {
+    <div class="text-center py-8">
+      <ion-icon name="search-outline" class="text-white-50 fs-1 mb-3"></ion-icon>
+      <p class="text-white-50 mb-2">No hay señales con este filtro</p>
+      <app-button
+        label="Ver todas las señales"
+        (click)="activeFilter = 'todos'"
+        variant="outline"
+        class="mt-2"
+      />
+    </div>
+  }
+
+  <!-- Stats rápidas al final - USANDO LAS PROPIEDADES COMPUTADAS -->
+  <div class="mt-6 pt-4 border-top border-white-10">
+    <div class="d-flex justify-content-between">
+      <div class="text-center">
+        <p class="text-white fs-5 fw-bold mb-0">{{ allSignals.length }}</p>
+        <p class="text-white-50 text-xs">Total Señales</p>
+      </div>
+      <div class="text-center">
+        <p class="text-success fs-5 fw-bold mb-0">{{ completedCount }}</p>
+        <p class="text-white-50 text-xs">Completadas</p>
+      </div>
+      <div class="text-center">
+        <p class="text-white fs-5 fw-bold mb-0">+{{ formatCurrency(totalProfit) }}</p>
+        <p class="text-white-50 text-xs">Ganancia Total</p>
+      </div>
+    </div>
+  </div>
+
+</main>

@@ -15,8 +15,8 @@ export const APP_ROUTES: Routes = [
     loadComponent: () => import('./home/home.component').then(c => c.HomeComponent),
   },
   {
-    path: 'debts',
-    loadComponent: () => import('./debts/debts.component').then(c => c.DebtsComponent),
+    path: 'signals',
+    loadComponent: () => import('./signals/signals.component').then(c => c.SignalsComponent),
   },
   {
     path: 'profile',
@@ -27,12 +27,12 @@ export const APP_ROUTES: Routes = [
     loadComponent: () => import('./debt-detail/debt-detail.component').then(c => c.DebtDetailComponent),
   }, 
   {
-    path: 'generate-letter',
-    loadComponent: () => import('./generate-letter/generate-letter.component').then(c => c.GenerateLetterComponent),
+    path: 'dashboard-advanced',
+    loadComponent: () => import('./dashboard-advanced/dashboard-advanced.component').then(c => c.DashboardAdvancedComponent),
   },
   {
-    path: 'add-debt',
-    loadComponent: () => import('./add-debt/add-debt.component').then(c => c.AddDebtComponent),
+    path: 'configure-strategy',
+    loadComponent: () => import('./configure-strategy/configure-strategy.component').then(c => c.ConfigureStrategyComponent),
   },
   {
     path: 'negotiate-debt',

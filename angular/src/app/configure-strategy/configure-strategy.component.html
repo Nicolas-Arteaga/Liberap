@@ -1,0 +1,235 @@
+<div class="pb-4">
+  <!-- Header -->
+  <header class="d-flex align-items-center gap-3 px-4 py-3">
+    <button class="btn p-0 border-0 bg-transparent" (click)="handleCancel()">
+      <ion-icon name="arrow-back-outline" class="text-white fs-5"></ion-icon>
+    </button>
+    <h1 class="text-white fw-bold mt-0 fs-4 text-center w-100">
+      Configurar Estrategia
+    </h1>
+  </header>
+
+  <!-- Main Content -->
+  <main class="px-4">
+    <app-card-content class="py-4">
+      <div class="text-center space-y-4">
+        <!-- Icono grande -->
+        <ion-icon name="rocket-outline" class="text-success fs-1"></ion-icon>
+
+        <!-- Título -->
+        <h2 class="text-white fw-bold fs-3 mb-2">
+          Configura tu caza de oportunidades
+        </h2>
+
+        <!-- Descripción -->
+        <p class="text-white-50 text-sm px-4 leading-relaxed mb-3">
+          Define los parámetros para que la IA detecte las mejores oportunidades<br>
+          de trading en tiempo real.
+        </p>
+      </div>
+
+      <!-- Divider -->
+      <div class="profile-divider my-4"></div>
+
+      <!-- 1. Dirección del Trade -->
+      <div class="mb-5">
+        <h3 class="text-white fw-medium mb-3">➤ Dirección del Trade</h3>
+        <div class="d-flex gap-2">
+          <button 
+            class="btn flex-fill py-3 rounded-3"
+            [class]="config.direction === 'long' ? 'btn-success' : 'btn-outline-success'"
+            (click)="config.direction = 'long'">
+            <ion-icon name="trending-up-outline" class="me-2"></ion-icon>
+            AL ALZA (LONG)
+          </button>
+          <button 
+            class="btn flex-fill py-3 rounded-3"
+            [class]="config.direction === 'short' ? 'btn-danger' : 'btn-outline-danger'"
+            (click)="config.direction = 'short'">
+            <ion-icon name="trending-down-outline" class="me-2"></ion-icon>
+            A LA BAJA (SHORT)
+          </button>
+        </div>
+        <div class="mt-2">
+          <button 
+            class="btn w-100 py-3 rounded-3"
+            [class]="config.direction === 'auto' ? 'btn-primary' : 'btn-outline-primary'"
+            (click)="config.direction = 'auto'">
+            <ion-icon name="sparkles-outline" class="me-2"></ion-icon>
+            {{ getDirectionLabel(config.direction) }}
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. Criptomonedas a Analizar -->
+      <div class="mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h3 class="text-white fw-medium mb-0">➤ Criptomonedas a Analizar</h3>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-light" (click)="selectAllCryptos(true)">
+              Todas
+            </button>
+            <button class="btn btn-sm btn-outline-light" (click)="selectAllCryptos(false)">
+              Ninguna
+            </button>
+          </div>
+        </div>
+        
+        <!-- Grid de criptomonedas -->
+        <div class="row g-2">
+          @for (crypto of cryptoOptions; track crypto.id) {
+            <div class="col-4">
+              <button 
+                class="btn w-100 py-3"
+                [class]="crypto.selected ? 'btn-primary' : 'btn-outline-light'"
+                (click)="toggleCrypto(crypto.id)">
+                <div class="d-flex flex-column align-items-center">
+                  <span class="fw-medium">{{ crypto.symbol }}</span>
+                  <small class="text-white-50">{{ crypto.name }}</small>
+                </div>
+              </button>
+            </div>
+          }
+        </div>
+        
+        <!-- Contador seleccionados -->
+        <p class="text-white-50 text-xs mt-3 mb-0">
+          {{ config.selectedCryptos.length }} de {{ cryptoOptions.length }} seleccionadas
+        </p>
+      </div>
+
+      <!-- 3. Apalancamiento -->
+      <div class="mb-5">
+        <h3 class="text-white fw-medium mb-3">➤ Apalancamiento</h3>
+        <div class="d-flex gap-2">
+          @for (lev of leverageOptions; track lev) {
+            <button 
+              class="btn flex-fill py-3"
+              [class]="config.leverage === lev ? 'btn-warning' : 'btn-outline-warning'"
+              (click)="setLeverage(lev)">
+              {{ lev }}x
+            </button>
+          }
+        </div>
+        <p class="text-white-50 text-xs mt-2 mb-0">
+          ⚠️ Apalancamiento {{ config.leverage }}x - Mayor riesgo, mayor ganancia potencial
+        </p>
+      </div>
+
+      <!-- 4. Capital a Operar -->
+      <div class="mb-5">
+        <h3 class="text-white fw-medium mb-3">➤ Capital a Operar (USDT)</h3>
+        <div class="input-group">
+          <span class="input-group-text bg-dark text-white border-dark">$</span>
+          <input 
+            type="number" 
+            class="form-control bg-dark text-white border-dark" 
+            placeholder="Ej: 100"
+            [(ngModel)]="config.capital"
+            min="10"
+            max="10000">
+          <span class="input-group-text bg-dark text-white border-dark">USDT</span>
+        </div>
+        <!-- Slider -->
+        <input 
+          type="range" 
+          class="form-range mt-3" 
+          min="10" 
+          max="1000" 
+          step="10"
+          [(ngModel)]="config.capital">
+        <div class="d-flex justify-content-between text-white-50 text-xs mt-1">
+          <span>$10</span>
+          <span>$500</span>
+          <span>$1000</span>
+        </div>
+      </div>
+
+      <!-- Divider -->
+      <div class="profile-divider my-4"></div>
+
+      <!-- Configuración Avanzada -->
+      <div class="px-2">
+        <h3 class="text-white fw-medium mb-3">⚙️ Configuración Avanzada</h3>
+        
+        <!-- Nivel de Riesgo -->
+        <div class="mb-3">
+          <label class="text-white-50 text-xs mb-1">Nivel de Riesgo</label>
+          <div class="d-flex gap-2">
+            <button 
+              class="btn flex-fill py-2"
+              [class]="config.riskLevel === 'low' ? 'btn-success' : 'btn-outline-success'"
+              (click)="config.riskLevel = 'low'">
+              Bajo
+            </button>
+            <button 
+              class="btn flex-fill py-2"
+              [class]="config.riskLevel === 'medium' ? 'btn-warning' : 'btn-outline-warning'"
+              (click)="config.riskLevel = 'medium'">
+              Moderado
+            </button>
+            <button 
+              class="btn flex-fill py-2"
+              [class]="config.riskLevel === 'high' ? 'btn-danger' : 'btn-outline-danger'"
+              (click)="config.riskLevel = 'high'">
+              Alto
+            </button>
+          </div>
+        </div>
+
+        <!-- Toggles de Configuración -->
+        <app-toggle
+          label="Stop-loss automático"
+          description="Vende automáticamente si la pérdida supera el 2%"
+          [(value)]="config.autoStopLoss">
+        </app-toggle>
+
+        <app-toggle
+          label="Take-profit automático"
+          description="Vende cuando alcanza {{ config.takeProfit }}% de ganancia"
+          [(value)]="config.autoStopLoss">
+        </app-toggle>
+
+        <!-- Take-profit personalizado -->
+        <div class="mt-3">
+          <label class="text-white-50 text-xs mb-1">Take-profit objetivo</label>
+          <div class="input-group">
+            <input 
+              type="number" 
+              class="form-control bg-dark text-white border-dark" 
+              [(ngModel)]="config.takeProfit"
+              min="1"
+              max="50">
+            <span class="input-group-text bg-dark text-white border-dark">%</span>
+          </div>
+        </div>
+
+        <app-toggle
+          label="Notificaciones push"
+          description="Recibe alertas en tiempo real (recomendado)"
+          [(value)]="config.notifications">
+        </app-toggle>
+      </div>
+    </app-card-content>
+
+    <!-- Botón para iniciar estrategia -->
+    <div class="mt-4">
+      <app-glass-button
+        variant="solid"
+        (click)="startStrategy()"
+        [disabled]="config.selectedCryptos.length === 0 || config.capital <= 0"
+        class="w-full py-3 rounded-3xl fw-bold text-xl shadow-2xl">
+        <div class="d-flex align-items-center justify-content-center gap-2">
+          <ion-icon name="play-outline" class="fs-5"></ion-icon>
+          <span>🚀 Iniciar Caza Automática</span>
+        </div>
+      </app-glass-button>
+      
+      <!-- Info adicional -->
+      <p class="text-white-50 text-xs text-center mt-3">
+        La IA analizará {{ config.selectedCryptos.length }} criptomonedas cada 2 minutos
+        con {{ config.leverage }}x apalancamiento y capital de ${{ config.capital }} USDT
+      </p>
+    </div>
+  </main>
+</div>

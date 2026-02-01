@@ -1,0 +1,284 @@
+<div class="min-vh-100 pb-6">
+  <!-- Header -->
+  <header class="d-flex align-items-center gap-3 px-4 py-4">
+    <button class="btn p-0 border-0 bg-transparent" (click)="onBack()">
+      <ion-icon name="arrow-back-outline" class="text-white fs-5"></ion-icon>
+    </button>
+    <h1 class="text-white fw-bold mt-0 fs-4 text-center w-100">Dashboard Avanzado</h1>
+  </header>
+
+  <main class="px-4">
+    <!-- Trade Activo -->
+    <app-card-content class="mb-4 p-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="text-white fw-medium mb-0">
+          <ion-icon name="rocket-outline" class="me-2"></ion-icon>
+          {{ activeTrade.crypto }} - {{ activeTrade.direction }}
+        </h3>
+        <span class="badge bg-primary px-3 py-2">
+          {{ activeTrade.leverage }}x Apalancamiento
+        </span>
+      </div>
+      
+      <div class="row g-3">
+        <!-- Precios -->
+        <div class="col-6">
+          <p class="text-white-50 text-xs mb-1">Precio Entrada</p>
+          <p class="text-white fw-bold fs-5">{{ formatCurrency(activeTrade.entryPrice) }}</p>
+        </div>
+        <div class="col-6">
+          <p class="text-white-50 text-xs mb-1">Precio Actual</p>
+          <p class="text-white fw-bold fs-5">{{ formatCurrency(activeTrade.currentPrice) }}</p>
+        </div>
+        
+        <!-- P&L -->
+        <div class="col-12">
+          <div class="d-flex justify-content-between align-items-center mt-2">
+            <div>
+              <p class="text-white-50 text-xs mb-0">Ganancia/Pérdida</p>
+              <p class="fw-bold fs-4 mb-0" [class]="getProfitColor()">
+                {{ activeTrade.profitLoss >= 0 ? '+' : '' }}{{ formatCurrency(activeTrade.profitLoss) }}
+                <span class="fs-6">({{ activeTrade.profitLoss >= 0 ? '+' : '' }}{{ activeTrade.profitPercentage.toFixed(2) }}%)</span>
+              </p>
+            </div>
+            <div class="text-end">
+              <p class="text-white-50 text-xs mb-0">Capital</p>
+              <p class="text-white fw-bold">{{ formatCurrency(activeTrade.invested) }} USDT</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Take Profit / Stop Loss -->
+        <div class="col-6">
+          <div class="d-flex align-items-center gap-2">
+            <ion-icon name="arrow-up-outline" class="text-success"></ion-icon>
+            <div>
+              <p class="text-white-50 text-xs mb-0">Take Profit</p>
+              <p class="text-success fw-medium mb-0">{{ formatCurrency(activeTrade.takeProfit) }}</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="d-flex align-items-center gap-2">
+            <ion-icon name="arrow-down-outline" class="text-danger"></ion-icon>
+            <div>
+              <p class="text-white-50 text-xs mb-0">Stop Loss</p>
+              <p class="text-danger fw-medium mb-0">{{ formatCurrency(activeTrade.stopLoss) }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </app-card-content>
+
+    <!-- Selector de Gráficos y Timeframes -->
+    <app-card-content class="mb-4 p-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="text-white fw-medium mb-0">📈 Análisis Técnico Avanzado</h3>
+        <div class="d-flex gap-1">
+          @for (tf of timeframes; track tf) {
+            <button 
+              class="btn btn-sm px-2"
+              [class]="selectedTimeframe === tf ? 'btn-primary' : 'btn-outline-light'"
+              (click)="setTimeframe(tf)">
+              {{ tf }}
+            </button>
+          }
+        </div>
+      </div>
+      
+      <!-- Selector de gráficos -->
+      <div class="d-flex gap-2 mb-3 overflow-x-auto">
+        @for (chart of availableCharts; track chart) {
+          <button 
+            class="btn flex-shrink-0 px-3"
+            [class]="selectedChart === chart ? 'btn-info' : 'btn-outline-info'"
+            (click)="onOpenChart(chart)">
+            {{ chart }}
+          </button>
+        }
+      </div>
+      
+      <!-- Placeholder del gráfico (simulado) -->
+      <div class="chart-placeholder bg-dark rounded-3 p-4 text-center">
+        <div class="d-flex justify-content-center align-items-center" style="height: 200px;">
+          <div class="text-center">
+            <ion-icon name="stats-chart-outline" class="text-white-50 fs-1 mb-3"></ion-icon>
+            <p class="text-white fw-medium mb-1">{{ selectedChart }} - {{ selectedTimeframe }}</p>
+            <p class="text-white-50 text-xs mb-0">Gráfico en tiempo real con 10+ indicadores</p>
+            <p class="text-white-50 text-xs">RSI • MACD • Bollinger • Fibonacci • Ichimoku</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Métricas en tiempo real -->
+      <div class="row g-2 mt-3">
+        @for (metric of marketMetrics; track metric.name) {
+          <div class="col-3">
+            <div class="bg-dark rounded-2 p-2 text-center">
+              <ion-icon [name]="metric.icon" class="text-primary fs-5 mb-1"></ion-icon>
+              <p class="text-white fw-bold mb-0">{{ metric.value.toFixed(1) }}</p>
+              <p class="text-white-50 text-xs mb-0">{{ metric.name }}</p>
+              <p class="text-xs mb-0" [class]="metric.change >= 0 ? 'text-success' : 'text-danger'">
+                {{ metric.change >= 0 ? '+' : '' }}{{ metric.change.toFixed(1) }}
+              </p>
+            </div>
+          </div>
+        }
+      </div>
+    </app-card-content>
+
+    <!-- Alertas Activas -->
+    <app-card-content class="mb-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="text-white fw-bold mb-0">🚨 Alertas en Tiempo Real</h3>
+        <button class="btn btn-sm btn-outline-light" (click)="onAddAlert()">
+          <ion-icon name="add-outline" class="me-1"></ion-icon> Nueva
+        </button>
+      </div>
+      
+      <div class="space-y-2">
+        @for (alert of activeAlerts; track alert.id) {
+          <div class="alert-item d-flex align-items-center gap-3 p-3 rounded-3"
+               [class]="'alert-' + getAlertColor(alert.type)">
+            <div class="alert-icon">
+              <ion-icon [name]="getAlertIcon(alert.type)" class="fs-5"></ion-icon>
+            </div>
+            <div class="flex-grow-1">
+              <p class="text-white fw-medium mb-0">{{ alert.message }}</p>
+              <div class="d-flex justify-content-between align-items-center">
+                <p class="text-white-50 text-xs mb-0">{{ alert.crypto }} a {{ formatCurrency(alert.price) }}</p>
+                <p class="text-white-50 text-xs mb-0">{{ alert.timestamp }}</p>
+              </div>
+            </div>
+            <div>
+              <app-toggle
+                [value]="alert.active"
+                (valueChange)="onToggleAlert(alert)"
+                size="small">
+              </app-toggle>
+            </div>
+          </div>
+        }
+        
+        @if (activeAlerts.length === 0) {
+          <div class="text-center py-4">
+            <ion-icon name="notifications-off-outline" class="text-white-50 fs-1 mb-3"></ion-icon>
+            <p class="text-white-50 mb-0">No hay alertas activas</p>
+          </div>
+        }
+      </div>
+    </app-card-content>
+
+    <!-- Configuración Avanzada -->
+    <app-card-content class="mb-4">
+      <h3 class="text-white fw-bold mb-3">⚙️ Configuración Avanzada</h3>
+      
+      <div class="space-y-3">
+        <app-toggle
+          label="Trading Automático"
+          description="Ejecuta trades automáticamente cuando se confirman señales"
+          [(value)]="advancedConfig.autoTrading">
+        </app-toggle>
+
+        <app-toggle
+          label="Trailing Stop"
+          description="Ajusta stop-loss automáticamente para proteger ganancias"
+          [(value)]="advancedConfig.trailingStop">
+        </app-toggle>
+
+        @if (advancedConfig.trailingStop) {
+          <div class="ps-4">
+            <app-label>Porcentaje de Trailing Stop</app-label>
+            <div class="input-group">
+              <input 
+                type="number" 
+                class="form-control bg-dark text-white border-dark" 
+                [(ngModel)]="advancedConfig.trailingStopPercent"
+                min="0.1"
+                max="10"
+                step="0.1">
+              <span class="input-group-text bg-dark text-white border-dark">%</span>
+            </div>
+          </div>
+        }
+
+        <app-toggle
+          label="Múltiples Entradas"
+          description="Divide el capital en múltiples entradas para promediar precio"
+          [(value)]="advancedConfig.multipleEntries">
+        </app-toggle>
+
+        <div class="ps-4">
+          <app-label>Ratio Riesgo/Beneficio Mínimo</app-label>
+          <div class="input-group">
+            <input 
+              type="number" 
+              class="form-control bg-dark text-white border-dark" 
+              [(ngModel)]="advancedConfig.riskRewardRatio"
+              min="1"
+              max="5"
+              step="0.1">
+            <span class="input-group-text bg-dark text-white border-dark">:1</span>
+          </div>
+        </div>
+
+        <div class="ps-4">
+          <app-label>Pérdida Máxima Diaria</app-label>
+          <div class="input-group">
+            <input 
+              type="number" 
+              class="form-control bg-dark text-white border-dark" 
+              [(ngModel)]="advancedConfig.maxDailyLoss"
+              min="1"
+              max="20">
+            <span class="input-group-text bg-dark text-white border-dark">%</span>
+          </div>
+        </div>
+
+        <app-toggle
+          label="Sonido de Notificaciones"
+          description="Reproduce sonidos distintos para cada tipo de alerta"
+          [(value)]="advancedConfig.notificationsSound">
+        </app-toggle>
+
+        <app-toggle
+          label="Reportes por Email"
+          description="Recibe resumen diario y semanal de tu performance"
+          [(value)]="advancedConfig.emailReports">
+        </app-toggle>
+      </div>
+    </app-card-content>
+
+    <!-- Acciones -->
+    <div class="space-y-3">
+      <app-glass-button
+        variant="success"
+        (click)="onExecuteTrade()"
+        class="w-full py-3">
+        <ion-icon name="flash-outline" class="me-2"></ion-icon>
+        Ejecutar Trade Avanzado
+      </app-glass-button>
+
+      <app-glass-button
+        variant="danger"
+        (click)="onCloseTrade()"
+        class="w-full py-3">
+        <ion-icon name="close-circle-outline" class="me-2"></ion-icon>
+        Cerrar Trade Manualmente
+      </app-glass-button>
+
+      <app-glass-button
+        (click)="onSaveConfig()"
+        class="w-full py-3">
+        <ion-icon name="save-outline" class="me-2"></ion-icon>
+        Guardar Configuración Avanzada
+      </app-glass-button>
+    </div>
+
+    <!-- Info adicional -->
+    <div class="text-center text-white-50 text-xs mt-4">
+      <p class="mb-1">📊 Dashboard actualizado cada 5 segundos • Última actualización: {{ currentTime }}</p>
+      <p class="mb-0">Los datos son simulados para demostración. Trading real requiere conexión a exchange.</p>
+    </div>
+  </main>
+</div>

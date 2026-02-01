@@ -1,32 +1,32 @@
 <main class="px-4 space-y-8 pt-4">
 
-  <!-- Dashboard Card - Mismo diseño, nuevo contenido potente -->
+  <!-- Dashboard Card - Mismo diseño, contenido de trading -->
   <app-card-content class="mb-2">
     <div class="mb-6">
       <p class="label text-white/60 text-xs mb-1">
         <!-- Usuario nuevo -->
-        <span *ngIf="!hasAnalyses">¿Cuánto te están robando los bancos?</span>
-        <!-- Usuario con análisis -->
-        <span *ngIf="hasAnalyses">Ahorro potencial detectado</span>
+        <span *ngIf="!hasActiveStrategies">💰 Tu Capital para Trading</span>
+        <!-- Usuario con estrategias -->
+        <span *ngIf="hasActiveStrategies">Ganancia Potencial Hoy</span>
       </p>
       <p class="text-white fw-bold fs-2">
-        <!-- Usuario nuevo: texto motivador -->
-        <span *ngIf="!hasAnalyses">Descubrilo en 2 minutos</span>
-        <!-- Usuario con análisis: número grande -->
-        <span *ngIf="hasAnalyses">${{ totalPotentialSavings.toLocaleString('es-AR') }}</span>
+        <!-- Usuario nuevo: capital inicial -->
+        <span *ngIf="!hasActiveStrategies">$1,000 USDT</span>
+        <!-- Usuario con estrategias: ganancia -->
+        <span *ngIf="hasActiveStrategies" class="text-success">+${{ totalPotentialProfit.toLocaleString('es-AR') }} USDT</span>
       </p>
     </div>
 
-    <!-- Próximo vencimiento → Próximo reclamo posible (mismo componente) -->
-    <app-card-icon icon="calendar-outline">
+    <!-- Próxima señal → Mantengo misma estructura -->
+    <app-card-icon icon="flash-outline">
       <div class="flex flex-col gap-0 items-start mt-3">
         <p class="label text-white/60 text-xs mb-0">
-          <span *ngIf="!hasAnalyses">Primer análisis gratis disponible</span>
-          <span *ngIf="hasAnalyses">Próximo reclamo recomendado</span>
+          <span *ngIf="!hasActiveStrategies">Próxima señal en</span>
+          <span *ngIf="hasActiveStrategies">Siguiente alerta programada</span>
         </p>
         <p class="value text-white text-sm font-medium">
-          <span *ngIf="!hasAnalyses">Hoy mismo</span>
-          <span *ngIf="hasAnalyses">15 de Enero, 2026</span>
+          <span *ngIf="!hasActiveStrategies">~ 5 minutos</span>
+          <span *ngIf="hasActiveStrategies">15:30 hs (GMT-3)</span>
         </p>
       </div>
     </app-card-icon>
@@ -35,31 +35,32 @@
     <div class="mt-2">
       <app-glass-button 
         class="w-full" 
-        [routerLink]="'/debt-detail'">
-        <span *ngIf="!hasAnalyses">Analizar mi primer resumen – GRATIS</span>
-        <span *ngIf="hasAnalyses">Ver mis reclamos y cartas</span>
+        [routerLink]="hasActiveStrategies ? '/dashboard' : '/configure'">
+        <span *ngIf="!hasActiveStrategies">🚀 Configurar Mi Primera Estrategia</span>
+        <span *ngIf="hasActiveStrategies">📊 Ver Dashboard en Tiempo Real</span>
       </app-glass-button>
     </div>
   </app-card-content>
 
-  <!-- Quick Actions - Mismo grid hermoso -->
+  <!-- Quick Actions - Mismo grid, nuevas funciones -->
   <section class="space-y-4">
-    <p class="text-white font-medium text-base px-2 mb-3 mt-3">Herramientas</p>
+    <p class="text-white font-medium text-base px-2 mb-3 mt-3">Herramientas de Trading</p>
     <div class="actions-grid px-0">
+      <!-- Mantengo 3 íconos igual que antes -->
       <app-card-icon
         icon="analytics-outline"
         variant="stacked"
         [useCardContentBg]="true"
-        routerLink="/add-debt">
-        <p class="text-white text-sm">Analizar resumen</p>
+        routerLink="/configure-strategy">
+        <p class="text-white text-sm">Configurar Estrategia</p>
       </app-card-icon>
       
       <app-card-icon
-        icon="mail-outline" 
+        icon="stats-chart-outline" 
         variant="stacked"
         [useCardContentBg]="true"
-        routerLink="/generate-letter">
-        <p class="text-white text-sm">Generar carta</p>
+        routerLink="/dashboard-advanced">
+        <p class="text-white text-sm">Dashboard Avanzado</p>
       </app-card-icon>
       
       <app-card-icon
@@ -67,40 +68,68 @@
         variant="stacked"
         [useCardContentBg]="true"
         routerLink="/history">
-        <p class="text-white text-sm">Historial</p>
+        <p class="text-white text-sm">Historial de Trades</p>
+      </app-card-icon>
+    </div>
+    
+    <!-- Agrego una segunda fila de herramientas -->
+    <div class="actions-grid px-0 mt-3">
+      <app-card-icon
+        icon="notifications-outline"
+        variant="stacked"
+        [useCardContentBg]="true"
+        routerLink="/alerts">
+        <p class="text-white text-sm">Alertas en Vivo</p>
+      </app-card-icon>
+      
+      <app-card-icon
+        icon="book-outline" 
+        variant="stacked"
+        [useCardContentBg]="true"
+        routerLink="/backtesting">
+        <p class="text-white text-sm">Backtesting</p>
+      </app-card-icon>
+      
+      <app-card-icon
+        icon="wallet-outline"
+        variant="stacked"
+        [useCardContentBg]="true"
+        routerLink="/wallet">
+        <p class="text-white text-sm">Mi Wallet</p>
       </app-card-icon>
     </div>
   </section>
 
-  <!-- Deudas recientes → Mis análisis recientes (misma lista perfecta) -->
+  <!-- Señales recientes → Mantengo misma lista perfecta -->
   <section class="space-y-4">
     <div class="section-header">
       <p class="text-white font-medium text-base">
-        <span *ngIf="!hasAnalyses">Ejemplos reales de usuarios</span>
-        <span *ngIf="hasAnalyses">Mis análisis recientes</span>
+        <span *ngIf="!hasActiveStrategies">🔥 Señales Detectadas Hoy</span>
+        <span *ngIf="hasActiveStrategies">📈 Mis Señales Activas</span>
       </p>
-      <button class="see-all mb-2" routerLink="/all-analyses">
+      <button class="see-all mb-2" routerLink="/all-signals">
         Ver todas
       </button>
     </div>
 
     <div class="space-y-3">
-      @for (item of recentAnalyses; track item.name) {
+      @for (signal of recentSignals; track signal.name) {
         <div class="debt-card-wrapper">
           <app-card-icon
-            [icon]="item.icon"
-            [status]="getStatusColor(item.status)"
-            [statusLabel]="getStatusLabel(item.status)"
+            [icon]="signal.icon"
+            [status]="getStatusColor(signal.status)"
+            [statusLabel]="getStatusLabel(signal.status)"
             [useCardContentBg]="true">
             <div class="flex flex-col py-2">
               <p class="text-white text-sm font-medium mb-1">
-                {{ item.name }}
+                {{ signal.name }}
               </p>
               <div class="flex items-center gap-2 mt-2">
-                <span class="text-white font-semibold">
-                  ${{ item.amount.toLocaleString('es-AR') }}
+                <span class="text-success font-semibold">
+                  +${{ signal.amount.toLocaleString('es-AR') }}
                 </span>
-                <span class="text-white-50 text-xs" *ngIf="hasAnalyses">ahorro potencial</span>
+                <span class="text-white-50 text-xs" *ngIf="hasActiveStrategies">ganancia potencial</span>
+                <span class="text-white-50 text-xs" *ngIf="!hasActiveStrategies">ejemplo real</span>
               </div>
             </div>
           </app-card-icon>
@@ -108,5 +137,50 @@
       }
     </div>
   </section>
+
+  <!-- Sección adicional: Stats rápidas -->
+<!-- Sección adicional: Stats rápidas -->
+<section class="space-y-4" *ngIf="hasActiveStrategies">
+  <div class="section-header">
+    <p class="text-white font-medium text-base">
+      📊 Métricas del Día
+    </p>
+  </div>
+  
+  <!-- 4 tarjetas en una línea con Bootstrap grid responsive -->
+  <div class="row g-2">
+    <!-- Precisión -->
+    <div class="col-3">
+      <app-card-content class="p-2 text-center h-100">
+        <p class="text-white text-lg font-bold mb-0">82%</p>
+        <p class="text-white-50 text-xs mt-1">Precisión</p>
+      </app-card-content>
+    </div>
+    
+    <!-- Trades Ganadores -->
+    <div class="col-3">
+      <app-card-content class="p-2 text-center h-100">
+        <p class="text-white text-lg font-bold mb-0">5/6</p>
+        <p class="text-white-50 text-xs mt-1">Trades Ganadores</p>
+      </app-card-content>
+    </div>
+    
+    <!-- ROI Diario -->
+    <div class="col-3">
+      <app-card-content class="p-2 text-center h-100">
+        <p class="text-white text-lg font-bold mb-0">+3.2%</p>
+        <p class="text-white-50 text-xs mt-1">ROI Diario</p>
+      </app-card-content>
+    </div>
+    
+    <!-- Señales Hoy -->
+    <div class="col-3">
+      <app-card-content class="p-2 text-center h-100">
+        <p class="text-white text-lg font-bold mb-0">12</p>
+        <p class="text-white-50 text-xs mt-1">Señales Hoy</p>
+      </app-card-content>
+    </div>
+  </div>
+</section>
 
 </main>
