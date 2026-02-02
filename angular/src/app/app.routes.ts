@@ -23,8 +23,8 @@ export const APP_ROUTES: Routes = [
     loadComponent: () => import('./profile/profile.component').then(c => c.ProfileComponent),
   },
   {
-    path: 'debt-detail',
-    loadComponent: () => import('./debt-detail/debt-detail.component').then(c => c.DebtDetailComponent),
+    path: 'dashboard',
+    loadComponent: () => import('./dashboard/dashboard.component').then(c => c.DashboardComponent),
   }, 
   {
     path: 'dashboard-advanced',

@@ -1,0 +1,426 @@
+import { Component, AfterViewInit, OnDestroy, inject } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
+import { CardContentComponent } from 'src/shared/components/card-content/card-content.component';
+import { GlassButtonComponent } from 'src/shared/components/glass-button/glass-button.component';
+import { IonIcon } from '@ionic/angular/standalone';
+import { IconService } from 'src/shared/services/icon.service';
+
+declare const TradingView: any;
+
+interface TradingSignal {
+  id: number;
+  type: 'buy' | 'sell' | 'warning';
+  price: number;
+  confidence: number;
+  timestamp: string;
+  message: string;
+  symbol?: string;
+}
+
+interface StageInfo {
+  label: string;
+  icon: string;
+  color: string;
+  description: string;
+  ctaText: string;
+  ctaVariant: 'primary' | 'warning' | 'success' | 'danger';
+  lineColor: string;
+  price: number;
+}
+
+@Component({
+  selector: 'app-dashboard',
+  standalone: true,
+  imports: [
+    CommonModule,
+    FormsModule,
+    CardContentComponent,
+    GlassButtonComponent,
+    IonIcon
+  ],
+  templateUrl: './dashboard.component.html'
+})
+export class DashboardComponent implements AfterViewInit, OnDestroy {
+  private iconService = inject(IconService);
+  private router = inject(Router);
+
+  // Estado del dashboard
+  isAnalyzing = true;
+  analysisTime = '00:00:00';
+  private analysisInterval: any;
+  private tvWidget: any;
+
+  // Configuración
+  selectedSymbol = 'BTCUSDT';
+  selectedTimeframe = '15';
+  
+  symbols = [
+    { value: 'BTCUSDT', label: 'BTC/USDT' },
+    { value: 'ETHUSDT', label: 'ETH/USDT' },
+    { value: 'SOLUSDT', label: 'SOL/USDT' },
+    { value: 'BNBUSDT', label: 'BNB/USDT' },
+    { value: 'XRPUSDT', label: 'XRP/USDT' }
+  ];
+
+  timeframes = [
+    { value: '1', label: '1 minuto' },
+    { value: '5', label: '5 minutos' },
+    { value: '15', label: '15 minutos' },
+    { value: '60', label: '1 hora' },
+    { value: '240', label: '4 horas' },
+    { value: '1D', label: '1 día' }
+  ];
+
+  // Señales activas (mock)
+  activeSignals: TradingSignal[] = [
+    { 
+      id: 1, 
+      type: 'warning', 
+      price: 68500, 
+      confidence: 85, 
+      timestamp: '15:30', 
+      message: 'BTC entrando en zona de interés',
+      symbol: 'BTCUSDT'
+    },
+    { 
+      id: 2, 
+      type: 'buy', 
+      price: 3850, 
+      confidence: 92, 
+      timestamp: '14:15', 
+      message: '¡COMPRA CONFIRMADA! ETH',
+      symbol: 'ETHUSDT'
+    },
+    { 
+      id: 3, 
+      type: 'warning', 
+      price: 195, 
+      confidence: 78, 
+      timestamp: '13:45', 
+      message: 'Prepárate para vender SOL',
+      symbol: 'SOLUSDT'
+    }
+  ];
+
+  // Sistema de alertas 1-2-3-4
+  currentStage = 1;
+  
+  // Stages con líneas de gráfico
+  stages: StageInfo[] = [
+    { 
+      label: 'EVALUANDO', 
+      icon: 'search-outline', 
+      color: 'warning', 
+      lineColor: '#fbbf24', // Amarillo
+      description: 'Buscando patrón ideal en el mercado...',
+      ctaText: '🔍 Seguir cazando',
+      ctaVariant: 'primary',
+      price: 68000
+    },
+    { 
+      label: 'PREPARADO', 
+      icon: 'warning-outline', 
+      color: 'warning', 
+      lineColor: '#f97316', // Naranja
+      description: 'Oportunidad detectada - Evaluando entrada...',
+      ctaText: '🎯 Preparar entrada',
+      ctaVariant: 'warning',
+      price: 68500
+    },
+    { 
+      label: 'COMPRA', 
+      icon: 'trending-up-outline', 
+      color: 'success', 
+      lineColor: '#22c55e', // Verde
+      description: 'Trade activo - Monitoreando posición...',
+      ctaText: '📊 Monitorear trade',
+      ctaVariant: 'success',
+      price: 68800
+    },
+    { 
+      label: 'VENTA', 
+      icon: 'trending-down-outline', 
+      color: 'danger', 
+      lineColor: '#ef4444', // Rojo
+      description: 'Preparando salida - Objetivo cercano...',
+      ctaText: '💰 Cerrar ciclo',
+      ctaVariant: 'danger',
+      price: 69500
+    }
+  ];
+
+  // Precios simulados para cálculo de posición
+  private chartPrices = {
+    min: 67000,
+    max: 70000,
+    current: 68500
+  };
+
+  ngAfterViewInit() {
+    this.iconService.fixMissingIcons();
+    this.loadTradingViewChart();
+    this.startAnalysisTimer();
+  }
+
+  ngOnDestroy() {
+    if (this.analysisInterval) {
+      clearInterval(this.analysisInterval);
+    }
+    if (this.tvWidget) {
+      this.tvWidget.remove();
+    }
+  }
+
+  loadTradingViewChart() {
+    if (typeof TradingView === 'undefined') {
+      this.loadTradingViewScript();
+      return;
+    }
+
+    this.tvWidget = new TradingView.widget({
+      width: '100%',
+      height: 500,
+      symbol: `BINANCE:${this.selectedSymbol}`,
+      interval: this.selectedTimeframe,
+      timezone: 'America/Argentina/Buenos_Aires',
+      theme: 'dark',
+      style: '1',
+      locale: 'es',
+      toolbar_bg: '#0d1117',
+      enable_publishing: false,
+      hide_legend: true,
+      hide_volume: true,
+      container_id: 'tradingview-chart',
+      studies: [
+        'RSI@tv-basicstudies',
+        'MACD@tv-basicstudies'
+      ],
+      disabled_features: [
+        'header_widget',
+        'header_symbol_search',
+        'symbol_search_hot_key'
+      ],
+      enabled_features: [
+        'study_templates'
+      ]
+    });
+
+    // Agregar nuestras líneas después de cargar el gráfico
+    setTimeout(() => this.addStageLines(), 2000);
+  }
+
+  addStageLines() {
+    this.clearStageLines();
+    
+    // Agregar líneas para cada etapa alcanzada
+    for (let i = 0; i < this.currentStage; i++) {
+      this.createVisualLine(this.stages[i]);
+    }
+  }
+
+  createVisualLine(stage: StageInfo) {
+    const chartContainer = document.getElementById('tradingview-chart');
+    if (!chartContainer) return;
+    
+    // Crear contenedor para las líneas si no existe
+    let linesContainer = chartContainer.querySelector('.custom-lines');
+    if (!linesContainer) {
+      linesContainer = document.createElement('div');
+      linesContainer.className = 'custom-lines position-absolute top-0 start-0 w-100 h-100 pointer-events-none';
+      chartContainer.appendChild(linesContainer);
+    }
+    
+    // Calcular posición Y basada en el precio
+    const positionY = this.calculateLinePosition(stage.price);
+    
+    // Crear la línea horizontal
+    const lineDiv = document.createElement('div');
+    lineDiv.className = 'stage-line position-absolute w-100';
+    lineDiv.style.borderTop = `2px solid ${stage.lineColor}`;
+    lineDiv.style.top = `${positionY}px`;
+    lineDiv.style.zIndex = '1000';
+    
+    // Crear etiqueta con precio
+    const labelDiv = document.createElement('div');
+    labelDiv.className = 'stage-label position-absolute px-2 py-1 rounded-end';
+    labelDiv.style.backgroundColor = '#0d1117';
+    labelDiv.style.borderLeft = `3px solid ${stage.lineColor}`;
+    labelDiv.style.top = `${positionY - 12}px`;
+    labelDiv.style.left = '10px';
+    labelDiv.style.zIndex = '1001';
+    
+    labelDiv.innerHTML = `
+      <div class="d-flex align-items-center gap-1">
+        <div class="rounded-circle" style="width: 8px; height: 8px; background-color: ${stage.lineColor}"></div>
+        <span class="text-white fs-7 fw-medium">${stage.label}: $${stage.price.toLocaleString('es-AR')}</span>
+      </div>
+    `;
+    
+    linesContainer.appendChild(lineDiv);
+    linesContainer.appendChild(labelDiv);
+  }
+
+  calculateLinePosition(price: number): number {
+    const chartHeight = 500;
+    const priceRange = this.chartPrices.max - this.chartPrices.min;
+    
+    // Convertir precio a posición Y (0 = top, 500 = bottom)
+    const priceDiff = price - this.chartPrices.min;
+    const position = chartHeight - (priceDiff / priceRange * chartHeight);
+    
+    // Limitar dentro del gráfico
+    return Math.max(20, Math.min(480, position));
+  }
+
+  clearStageLines() {
+    const chartContainer = document.getElementById('tradingview-chart');
+    if (!chartContainer) return;
+    
+    const linesContainer = chartContainer.querySelector('.custom-lines');
+    if (linesContainer) {
+      linesContainer.remove();
+    }
+  }
+
+  loadTradingViewScript() {
+    const script = document.createElement('script');
+    script.src = 'https://s3.tradingview.com/tv.js';
+    script.onload = () => {
+      setTimeout(() => this.loadTradingViewChart(), 500);
+    };
+    document.head.appendChild(script);
+  }
+
+  startAnalysisTimer() {
+    let seconds = 0;
+    this.analysisInterval = setInterval(() => {
+      seconds++;
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      const secs = seconds % 60;
+      
+      this.analysisTime = 
+        `${hours.toString().padStart(2, '0')}:` +
+        `${minutes.toString().padStart(2, '0')}:` +
+        `${secs.toString().padStart(2, '0')}`;
+      
+      // Simular progresión de etapas cada 30 segundos
+      if (seconds % 30 === 0 && this.currentStage < 4) {
+        this.currentStage++;
+        this.addStageLines();
+      }
+    }, 1000);
+  }
+
+  // Métodos de control
+  toggleAnalysis() {
+    this.isAnalyzing = !this.isAnalyzing;
+    if (this.isAnalyzing) {
+      this.startAnalysisTimer();
+    } else {
+      clearInterval(this.analysisInterval);
+    }
+  }
+
+  changeSymbol(symbol: string) {
+    this.selectedSymbol = symbol;
+    this.loadTradingViewChart();
+  }
+
+  changeTimeframe(timeframe: string) {
+    this.selectedTimeframe = timeframe;
+    this.loadTradingViewChart();
+  }
+
+  onBack() {
+    this.router.navigate(['/']);
+  }
+
+  onOpenAdvanced() {
+    this.router.navigate(['/dashboard-advanced']);
+  }
+
+  onExecuteTrade() {
+    console.log('Ejecutar trade rápido - Estado:', this.getCurrentStage().label);
+    
+    switch(this.currentStage) {
+      case 1:
+        console.log('Continuar cazando...');
+        break;
+      case 2:
+        console.log('Preparando entrada...');
+        // Avanzar al siguiente stage
+        this.currentStage = 3;
+        this.addStageLines();
+        break;
+      case 3:
+        console.log('Monitoreando trade...');
+        break;
+      case 4:
+        console.log('Cerrando ciclo...');
+        // Reiniciar ciclo
+        this.currentStage = 1;
+        this.clearStageLines();
+        this.addStageLines();
+        break;
+    }
+  }
+
+  // Métodos auxiliares
+  getCurrentStage(): StageInfo {
+    return this.stages[this.currentStage - 1] || this.stages[0];
+  }
+
+  getSignalColor(type: 'buy' | 'sell' | 'warning'): string {
+    switch(type) {
+      case 'buy': return 'success';
+      case 'sell': return 'danger';
+      case 'warning': return 'warning';
+      default: return 'primary';
+    }
+  }
+
+  getSignalIcon(type: 'buy' | 'sell' | 'warning'): string {
+    switch(type) {
+      case 'buy': return 'trending-up-outline';
+      case 'sell': return 'trending-down-outline';
+      case 'warning': return 'warning-outline';
+      default: return 'alert-circle-outline';
+    }
+  }
+
+  getDynamicCTA() {
+    return {
+      text: this.getCurrentStage().ctaText,
+      variant: this.getCurrentStage().ctaVariant
+    };
+  }
+
+  // Nuevo método para obtener la descripción según el stage
+  getCurrentDescription(): string {
+    switch(this.currentStage) {
+      case 1: return 'Buscando patrón ideal en el mercado...';
+      case 2: return 'Oportunidad detectada - Evaluando entrada...';
+      case 3: return 'Trade activo - Monitoreando posición...';
+      case 4: return 'Preparando salida - Objetivo cercano...';
+      default: return '';
+    }
+  }
+
+  // Método para obtener el progreso en porcentaje
+  getProgressPercentage(): number {
+    return (this.currentStage / 4) * 100;
+  }
+
+  // Método para verificar si un stage está activo
+  isStageActive(stageIndex: number): boolean {
+    return this.currentStage > stageIndex;
+  }
+
+  // Método para verificar si es el stage actual
+  isStageCurrent(stageIndex: number): boolean {
+    return this.currentStage === stageIndex + 1;
+  }
+}
