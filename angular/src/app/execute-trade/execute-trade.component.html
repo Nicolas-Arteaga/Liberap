@@ -1,0 +1,136 @@
+<div class="min-vh-100 pb-4">
+    <!-- Header con botón back y título -->
+    <header class="d-flex align-items-center gap-3 px-4 py-4">
+        <button class="btn p-0 border-0 bg-transparent" (click)="handleBack()">
+            <ion-icon name="arrow-back-outline" class="text-white fs-5"></ion-icon>
+        </button>
+        <h1 class="text-white fw-bold mt-0 fs-4 text-center w-100">
+            Ejecutar Trade
+        </h1>
+    </header>
+
+    <!-- Contenido principal -->
+    <main class="px-4">
+        <!-- Card 1: Detalles de la señal -->
+        <app-card-content class="mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="text-white fs-5 mb-0">Detalles de la Señal</h2>
+                <span [class]="'badge bg-' + getStatusColor()">
+                    {{ tradeDetails.confidence }}% Confianza
+                </span>
+            </div>
+
+            <app-card-icon [status]="getStatusColor()"
+                [icon]="tradeDetails.direction === 'LONG' ? 'trending-up-outline' : 'trending-down-outline'"
+                [useCardContentBg]="true">
+
+                <div class="flex flex-col py-2">
+                    <p class="text-white text-sm font-medium mb-0">{{ tradeDetails.symbol }}</p>
+                    <p class="text-white-50 text-xs mb-0">
+                        {{ tradeDetails.direction }} - Entrada: ${{ tradeDetails.entryPrice | number:'1.2-2' }}
+                    </p>
+                    <div class="d-flex justify-content-between mt-1">
+                        <span class="text-white-50 text-xs">Precio Actual:</span>
+                        <span class="text-white text-xs fw-medium">${{ tradeDetails.currentPrice | number:'1.2-2'
+                            }}</span>
+                    </div>
+                </div>
+            </app-card-icon>
+
+            <div class="row mt-3 text-white-50 small">
+                <div class="col-6">
+                    <p class="mb-1">Apalancamiento</p>
+                    <p class="text-white fw-bold mb-0">{{ tradeDetails.leverage }}x</p>
+                </div>
+                <div class="col-6 text-end">
+                    <p class="mb-1">Capital Sugerido</p>
+                    <p class="text-white fw-bold mb-0">${{ tradeDetails.suggestedAmount }} USDT</p>
+                </div>
+            </div>
+        </app-card-content>
+
+        <!-- Card 2: Configuración de trade -->
+        <app-card-content class="mb-4">
+            <h2 class="text-white fs-5 mb-3">Configuración de Trade</h2>
+
+            <div class="mb-3">
+                <app-label>Cantidad (USDT)</app-label>
+                <app-input type="number" [(ngModel)]="request.amount" placeholder="0.00" [min]="10">
+                </app-input>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-6">
+                    <app-label>Apalancamiento</app-label>
+                    <app-input type="number" [(ngModel)]="request.leverage" placeholder="5" [min]="1" [max]="10">
+                    </app-input>
+                </div>
+                <div class="col-6">
+                    <app-label>Tipo de Orden</app-label>
+                    <app-select [(ngModel)]="request.orderType">
+                        <option value="market">Market</option>
+                        <option value="limit">Limit</option>
+                    </app-select>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-6">
+                    <app-label>Take Profit (%)</app-label>
+                    <app-input type="number" [(ngModel)]="request.takeProfit" placeholder="5" [min]="1" [max]="50">
+                    </app-input>
+                </div>
+                <div class="col-6">
+                    <app-label>Stop Loss (%)</app-label>
+                    <app-input type="number" [(ngModel)]="request.stopLoss" placeholder="2" [min]="1" [max]="20">
+                    </app-input>
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-2 mt-3">
+                <input type="checkbox" id="confirm" class="form-check-input" checked>
+                <label for="confirm" class="text-white-50 small mb-0">
+                    Confirmo que entiendo los riesgos del trading con apalancamiento
+                </label>
+            </div>
+        </app-card-content>
+
+        <!-- Card 3: Resumen de riesgo -->
+        <app-card-content class="mb-4">
+            <h2 class="text-white fs-5 mb-3">Resumen de Riesgo</h2>
+
+            <div class="d-flex justify-content-between mb-2">
+                <span class="text-white-50">Margen requerido</span>
+                <span class="text-white">${{ getRiskSummary().margin | number:'1.2-2' }} USDT</span>
+            </div>
+            <div class="d-flex justify-content-between mb-2">
+                <span class="text-white-50 text-success">Ganancia estimada</span>
+                <span class="text-success">+${{ getRiskSummary().potentialProfit | number:'1.2-2' }} USDT</span>
+            </div>
+            <div class="d-flex justify-content-between">
+                <span class="text-white-50 text-danger">Pérdida máxima</span>
+                <span class="text-danger">-${{ getRiskSummary().potentialLoss | number:'1.2-2' }} USDT</span>
+            </div>
+        </app-card-content>
+
+        <!-- Botones -->
+        <div class="d-grid gap-3">
+            <app-glass-button variant="solid" class="w-full py-3" (click)="executeTrade()">
+                <div class="d-flex align-items-center justify-content-center gap-2">
+                    <ion-icon name="flash-outline"></ion-icon>
+                    <span>🚀 Ejecutar Trade</span>
+                </div>
+            </app-glass-button>
+            <app-glass-button variant="outline" class="w-full py-3" (click)="cancelTrade()">
+                Cancelar
+            </app-glass-button>
+        </div>
+
+        <!-- Info adicional -->
+        <div class="text-center text-white-50 text-xs mt-4">
+            <p class="mb-1">⚠️ Trading con apalancamiento implica alto riesgo</p>
+            <p class="mb-0">Máximo riesgo: {{ getRiskSummary().potentialLoss / request.amount * 100 | number:'1.1-1' }}%
+                del capital</p>
+        </div>
+    </main>
+</div>

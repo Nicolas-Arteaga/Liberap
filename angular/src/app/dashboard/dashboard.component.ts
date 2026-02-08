@@ -55,7 +55,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   // Configuración
   selectedSymbol = 'BTCUSDT';
   selectedTimeframe = '15';
-  
+
   symbols = [
     { value: 'BTCUSDT', label: 'BTC/USDT' },
     { value: 'ETHUSDT', label: 'ETH/USDT' },
@@ -75,30 +75,30 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
   // Señales activas (mock)
   activeSignals: TradingSignal[] = [
-    { 
-      id: 1, 
-      type: 'warning', 
-      price: 68500, 
-      confidence: 85, 
-      timestamp: '15:30', 
+    {
+      id: 1,
+      type: 'warning',
+      price: 68500,
+      confidence: 85,
+      timestamp: '15:30',
       message: 'BTC entrando en zona de interés',
       symbol: 'BTCUSDT'
     },
-    { 
-      id: 2, 
-      type: 'buy', 
-      price: 3850, 
-      confidence: 92, 
-      timestamp: '14:15', 
+    {
+      id: 2,
+      type: 'buy',
+      price: 3850,
+      confidence: 92,
+      timestamp: '14:15',
       message: '¡COMPRA CONFIRMADA! ETH',
       symbol: 'ETHUSDT'
     },
-    { 
-      id: 3, 
-      type: 'warning', 
-      price: 195, 
-      confidence: 78, 
-      timestamp: '13:45', 
+    {
+      id: 3,
+      type: 'warning',
+      price: 195,
+      confidence: 78,
+      timestamp: '13:45',
       message: 'Prepárate para vender SOL',
       symbol: 'SOLUSDT'
     }
@@ -106,43 +106,43 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
   // Sistema de alertas 1-2-3-4
   currentStage = 1;
-  
+
   // Stages con líneas de gráfico
   stages: StageInfo[] = [
-    { 
-      label: 'EVALUANDO', 
-      icon: 'search-outline', 
-      color: 'warning', 
+    {
+      label: 'EVALUANDO',
+      icon: 'search-outline',
+      color: 'warning',
       lineColor: '#fbbf24', // Amarillo
       description: 'Buscando patrón ideal en el mercado...',
       ctaText: '🔍 Seguir cazando',
       ctaVariant: 'primary',
       price: 68000
     },
-    { 
-      label: 'PREPARADO', 
-      icon: 'warning-outline', 
-      color: 'warning', 
+    {
+      label: 'PREPARADO',
+      icon: 'warning-outline',
+      color: 'warning',
       lineColor: '#f97316', // Naranja
       description: 'Oportunidad detectada - Evaluando entrada...',
       ctaText: '🎯 Preparar entrada',
       ctaVariant: 'warning',
       price: 68500
     },
-    { 
-      label: 'COMPRA', 
-      icon: 'trending-up-outline', 
-      color: 'success', 
+    {
+      label: 'COMPRA',
+      icon: 'trending-up-outline',
+      color: 'success',
       lineColor: '#22c55e', // Verde
       description: 'Trade activo - Monitoreando posición...',
       ctaText: '📊 Monitorear trade',
       ctaVariant: 'success',
       price: 68800
     },
-    { 
-      label: 'VENTA', 
-      icon: 'trending-down-outline', 
-      color: 'danger', 
+    {
+      label: 'VENTA',
+      icon: 'trending-down-outline',
+      color: 'danger',
       lineColor: '#ef4444', // Rojo
       description: 'Preparando salida - Objetivo cercano...',
       ctaText: '💰 Cerrar ciclo',
@@ -213,7 +213,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
   addStageLines() {
     this.clearStageLines();
-    
+
     // Agregar líneas para cada etapa alcanzada
     for (let i = 0; i < this.currentStage; i++) {
       this.createVisualLine(this.stages[i]);
@@ -223,7 +223,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   createVisualLine(stage: StageInfo) {
     const chartContainer = document.getElementById('tradingview-chart');
     if (!chartContainer) return;
-    
+
     // Crear contenedor para las líneas si no existe
     let linesContainer = chartContainer.querySelector('.custom-lines');
     if (!linesContainer) {
@@ -231,17 +231,17 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       linesContainer.className = 'custom-lines position-absolute top-0 start-0 w-100 h-100 pointer-events-none';
       chartContainer.appendChild(linesContainer);
     }
-    
+
     // Calcular posición Y basada en el precio
     const positionY = this.calculateLinePosition(stage.price);
-    
+
     // Crear la línea horizontal
     const lineDiv = document.createElement('div');
     lineDiv.className = 'stage-line position-absolute w-100';
     lineDiv.style.borderTop = `2px solid ${stage.lineColor}`;
     lineDiv.style.top = `${positionY}px`;
     lineDiv.style.zIndex = '1000';
-    
+
     // Crear etiqueta con precio
     const labelDiv = document.createElement('div');
     labelDiv.className = 'stage-label position-absolute px-2 py-1 rounded-end';
@@ -250,14 +250,14 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     labelDiv.style.top = `${positionY - 12}px`;
     labelDiv.style.left = '10px';
     labelDiv.style.zIndex = '1001';
-    
+
     labelDiv.innerHTML = `
       <div class="d-flex align-items-center gap-1">
         <div class="rounded-circle" style="width: 8px; height: 8px; background-color: ${stage.lineColor}"></div>
         <span class="text-white fs-7 fw-medium">${stage.label}: $${stage.price.toLocaleString('es-AR')}</span>
       </div>
     `;
-    
+
     linesContainer.appendChild(lineDiv);
     linesContainer.appendChild(labelDiv);
   }
@@ -265,11 +265,11 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   calculateLinePosition(price: number): number {
     const chartHeight = 500;
     const priceRange = this.chartPrices.max - this.chartPrices.min;
-    
+
     // Convertir precio a posición Y (0 = top, 500 = bottom)
     const priceDiff = price - this.chartPrices.min;
     const position = chartHeight - (priceDiff / priceRange * chartHeight);
-    
+
     // Limitar dentro del gráfico
     return Math.max(20, Math.min(480, position));
   }
@@ -277,7 +277,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   clearStageLines() {
     const chartContainer = document.getElementById('tradingview-chart');
     if (!chartContainer) return;
-    
+
     const linesContainer = chartContainer.querySelector('.custom-lines');
     if (linesContainer) {
       linesContainer.remove();
@@ -300,12 +300,12 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       const hours = Math.floor(seconds / 3600);
       const minutes = Math.floor((seconds % 3600) / 60);
       const secs = seconds % 60;
-      
-      this.analysisTime = 
+
+      this.analysisTime =
         `${hours.toString().padStart(2, '0')}:` +
         `${minutes.toString().padStart(2, '0')}:` +
         `${secs.toString().padStart(2, '0')}`;
-      
+
       // Simular progresión de etapas cada 30 segundos
       if (seconds % 30 === 0 && this.currentStage < 4) {
         this.currentStage++;
@@ -342,10 +342,14 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     this.router.navigate(['/dashboard-advanced']);
   }
 
+  onQuickTrade() {
+    this.router.navigate(['/execute-trade']);
+  }
+
   onExecuteTrade() {
     console.log('Ejecutar trade rápido - Estado:', this.getCurrentStage().label);
-    
-    switch(this.currentStage) {
+
+    switch (this.currentStage) {
       case 1:
         console.log('Continuar cazando...');
         break;
@@ -374,7 +378,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   }
 
   getSignalColor(type: 'buy' | 'sell' | 'warning'): string {
-    switch(type) {
+    switch (type) {
       case 'buy': return 'success';
       case 'sell': return 'danger';
       case 'warning': return 'warning';
@@ -383,7 +387,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   }
 
   getSignalIcon(type: 'buy' | 'sell' | 'warning'): string {
-    switch(type) {
+    switch (type) {
       case 'buy': return 'trending-up-outline';
       case 'sell': return 'trending-down-outline';
       case 'warning': return 'warning-outline';
@@ -400,7 +404,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
   // Nuevo método para obtener la descripción según el stage
   getCurrentDescription(): string {
-    switch(this.currentStage) {
+    switch (this.currentStage) {
       case 1: return 'Buscando patrón ideal en el mercado...';
       case 2: return 'Oportunidad detectada - Evaluando entrada...';
       case 3: return 'Trade activo - Monitoreando posición...';

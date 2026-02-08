@@ -1,0 +1,101 @@
+<div class="min-vh-100 pb-4">
+    <!-- Header con botón back y título -->
+    <header class="d-flex align-items-center gap-3 px-4 py-4">
+        <button class="btn p-0 border-0 bg-transparent" (click)="handleBack()">
+            <ion-icon name="arrow-back-outline" class="text-white fs-5"></ion-icon>
+        </button>
+        <h1 class="text-white fw-bold mt-0 fs-4 text-center w-100">
+            Sistema de Alertas
+        </h1>
+    </header>
+
+    <!-- Contenido principal -->
+    <main class="px-4">
+        <!-- Sección 1: Configuración por etapa -->
+        <app-card-content class="mb-4">
+            <h2 class="text-white fs-5 mb-3">Configuración de Etapas</h2>
+
+            <div class="d-flex flex-column gap-3">
+                <!-- Etapa 1 -->
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="text-white mb-0">Etapa 1: Preparación</p>
+                        <p class="text-white-50 small mb-0">Detección de patrones iniciales</p>
+                    </div>
+                    <app-toggle [value]="config.stage1.enabled" (valueChange)="toggleStage('stage1')"></app-toggle>
+                </div>
+
+                <!-- Etapa 2 -->
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="text-white mb-0">Etapa 2: Confirmación</p>
+                        <p class="text-white-50 small mb-0">Señal de entrada validada</p>
+                    </div>
+                    <app-toggle [value]="config.stage2.enabled" (valueChange)="toggleStage('stage2')"></app-toggle>
+                </div>
+
+                <!-- Etapa 3 -->
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="text-white mb-0">Etapa 3: Seguimiento</p>
+                        <p class="text-white-50 small mb-0">Monitoreo de volatilidad</p>
+                    </div>
+                    <app-toggle [value]="config.stage3.enabled" (valueChange)="toggleStage('stage3')"></app-toggle>
+                </div>
+
+                <!-- Etapa 4 -->
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="text-white mb-0">Etapa 4: Ejecución/Cierre</p>
+                        <p class="text-white-50 small mb-0">Objetivos alcanzados o salida</p>
+                    </div>
+                    <app-toggle [value]="config.stage4.enabled" (valueChange)="toggleStage('stage4')"></app-toggle>
+                </div>
+            </div>
+        </app-card-content>
+
+        <!-- Sección 2: Canales de notificación -->
+        <app-card-content class="mb-4">
+            <h2 class="text-white fs-5 mb-3">Canales de Notificación</h2>
+
+            <div class="d-flex flex-column gap-3">
+                <div *ngFor="let channel of channels" class="d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="bg-primary bg-opacity-10 p-2 rounded">
+                            <ion-icon [name]="channel.icon" class="text-primary fs-5"></ion-icon>
+                        </div>
+                        <p class="text-white mb-0">{{ channel.name }}</p>
+                    </div>
+                    <input type="checkbox" [(ngModel)]="channel.checked"
+                        class="form-check-input bg-transparent border-secondary">
+                </div>
+            </div>
+        </app-card-content>
+
+        <!-- Sección 3: Lista de alertas activas -->
+        <app-card-content class="mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="text-white fs-5 mb-0">Alertas Activas</h2>
+                <span class="text-white-50 small">{{ activeAlerts.length }} total</span>
+            </div>
+
+            <div class="d-flex flex-column gap-3">
+                <div *ngFor="let alert of activeAlerts" class="position-relative">
+                    <app-card-icon [title]="alert.crypto + ' - ' + alert.type.toUpperCase()"
+                        [subtitle]="alert.message + ' ($' + alert.price + ')'" [status]="getStatusColor(alert.type)"
+                        [icon]="getIconForType(alert.type)">
+                    </app-card-icon>
+                    <div class="position-absolute top-50 end-0 translate-middle-y pe-3">
+                        <app-toggle [value]="alert.active" (valueChange)="toggleAlert(alert.id)"></app-toggle>
+                    </div>
+                    <p class="text-white-50 smaller mt-1 px-2">{{ alert.timestamp }}</p>
+                </div>
+            </div>
+        </app-card-content>
+
+        <!-- Botón -->
+        <app-glass-button variant="solid" class="w-full py-3" (click)="createManualAlert()">
+            ➕ Crear Alerta Manual
+        </app-glass-button>
+    </main>
+</div>

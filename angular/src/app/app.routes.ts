@@ -6,7 +6,7 @@ export const APP_ROUTES: Routes = [
     path: 'login',
     loadComponent: () => import('./login/login.component').then(c => c.LoginComponent),
     data: {
-      layout: eLayoutType.empty,  
+      layout: eLayoutType.empty,
     },
   },
   {
@@ -25,7 +25,7 @@ export const APP_ROUTES: Routes = [
   {
     path: 'dashboard',
     loadComponent: () => import('./dashboard/dashboard.component').then(c => c.DashboardComponent),
-  }, 
+  },
   {
     path: 'dashboard-advanced',
     loadComponent: () => import('./dashboard-advanced/dashboard-advanced.component').then(c => c.DashboardAdvancedComponent),
@@ -41,6 +41,18 @@ export const APP_ROUTES: Routes = [
   {
     path: 'history',
     loadComponent: () => import('./history/history.component').then(c => c.HistoryComponent),
+  },
+  {
+    path: 'execute-trade',
+    loadComponent: () => import('./execute-trade/execute-trade.component').then(c => c.ExecuteTradeComponent),
+  },
+  {
+    path: 'alerts',
+    loadComponent: () => import('./alerts/alerts.component').then(c => c.AlertsSystemComponent),
+  },
+  {
+    path: 'backtesting',
+    loadComponent: () => import('./backtesting/backtesting.component').then(c => c.BacktestingComponent),
   },
   {
     path: 'account',

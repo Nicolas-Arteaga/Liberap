@@ -1,5 +1,5 @@
 <div class="min-vh-100">
-  
+
   <!-- Header limpio -->
   <header class="d-flex align-items-center gap-3 px-4 py-3">
     <button class="btn p-0 border-0 bg-transparent" (click)="onBack()">
@@ -9,21 +9,21 @@
   </header>
 
   <main class="px-4 pb-4">
-    
+
     <!-- Estado de análisis (ÚNICA sección de estado arriba) -->
     <app-card-content class="mb-3 p-3">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
           <p class="text-white-50 text-xs mb-1">🕒 Estado del análisis</p>
           <div class="d-flex align-items-center gap-2">
-            <div class="rounded-circle" [class]="isAnalyzing ? 'bg-success' : 'bg-secondary'" 
-                 style="width: 10px; height: 10px;"></div>
+            <div class="rounded-circle" [class]="isAnalyzing ? 'bg-success' : 'bg-secondary'"
+              style="width: 10px; height: 10px;"></div>
             <p class="text-white fw-medium mb-0">
               {{ isAnalyzing ? 'Analizando mercado...' : 'Análisis pausado' }}
             </p>
           </div>
         </div>
-        
+
         <div class="text-end">
           <p class="text-white-50 text-xs mb-1">Tiempo activo</p>
           <p class="text-white fw-bold mb-0">{{ analysisTime }}</p>
@@ -45,21 +45,17 @@
       <div class="row g-2">
         <div class="col-6">
           <label class="text-white-50 text-xs mb-1 d-block">Símbolo</label>
-          <select 
-            class="form-select bg-dark text-white border-dark" 
-            [(ngModel)]="selectedSymbol"
+          <select class="form-select bg-dark text-white border-dark" [(ngModel)]="selectedSymbol"
             (change)="changeSymbol(selectedSymbol)">
             <option *ngFor="let symbol of symbols" [value]="symbol.value">
               {{ symbol.label }}
             </option>
           </select>
         </div>
-        
+
         <div class="col-6">
           <label class="text-white-50 text-xs mb-1 d-block">Timeframe</label>
-          <select 
-            class="form-select bg-dark text-white border-dark" 
-            [(ngModel)]="selectedTimeframe"
+          <select class="form-select bg-dark text-white border-dark" [(ngModel)]="selectedTimeframe"
             (change)="changeTimeframe(selectedTimeframe)">
             <option *ngFor="let tf of timeframes" [value]="tf.value">
               {{ tf.label }}
@@ -71,28 +67,24 @@
 
     <!-- SUPER GRÁFICO TradingView con LÍNEAS INTEGRADAS -->
     <app-card-content class="mb-3 p-0 position-relative overflow-hidden bg-dark">
-      
+
       <!-- Gráfico TradingView -->
       <div id="tradingview-chart" class="w-100" style="height: 500px;"></div>
-      
+
       <!-- Leyenda de líneas (solo en desktop) -->
       <div class="position-absolute top-0 end-0 m-3 z-2 d-none d-md-block">
         <div class="bg-dark bg-opacity-90 rounded-3 p-3 border border-white-10 shadow">
           <p class="text-white fw-medium mb-2 fs-7">📊 Progreso del Trade</p>
-          
+
           <!-- Mini progress bar -->
           <div class="progress mb-2" style="height: 4px;">
-            <div [class]="'progress-bar bg-' + getCurrentStage().color"
-                 [style.width]="(currentStage * 25) + '%'">
+            <div [class]="'progress-bar bg-' + getCurrentStage().color" [style.width]="(currentStage * 25) + '%'">
             </div>
           </div>
-          
-          <div *ngFor="let stage of stages; let i = index" 
-               class="d-flex align-items-center gap-2 mb-1"
-               [class.text-white]="i < currentStage"
-               [class.text-white-50]="i >= currentStage">
-            <div class="rounded-circle" 
-                 [style]="'width: 8px; height: 8px; background-color: ' + stage.lineColor"></div>
+
+          <div *ngFor="let stage of stages; let i = index" class="d-flex align-items-center gap-2 mb-1"
+            [class.text-white]="i < currentStage" [class.text-white-50]="i >= currentStage">
+            <div class="rounded-circle" [style]="'width: 8px; height: 8px; background-color: ' + stage.lineColor"></div>
             <p class="mb-0 fs-7">{{ stage.label }}</p>
             <span *ngIf="stage.price" class="ms-auto fs-7">${{ stage.price.toLocaleString('es-AR') }}</span>
           </div>
@@ -102,10 +94,7 @@
 
     <!-- Controles de acción principales -->
     <div class="mb-3">
-      <app-glass-button
-        [variant]="getDynamicCTA().variant"
-        (click)="onExecuteTrade()"
-        class="w-full py-3 fw-bold mb-2">
+      <app-glass-button [variant]="getDynamicCTA().variant" (click)="onExecuteTrade()" class="w-full py-3 fw-bold mb-2">
         <div class="d-flex align-items-center justify-content-center gap-2">
           <ion-icon [name]="getCurrentStage().icon"></ion-icon>
           <span>{{ getDynamicCTA().text }}</span>
@@ -113,26 +102,30 @@
       </app-glass-button>
 
       <div class="row g-2">
-        <div class="col-6">
-          <app-glass-button
-            [variant]="isAnalyzing ? 'danger' : 'success'"
-            (click)="toggleAnalysis()"
-            class="w-full py-3">
-            <div class="d-flex align-items-center justify-content-center gap-2">
-              <ion-icon [name]="isAnalyzing ? 'pause-outline' : 'play-outline'"></ion-icon>
-              <span>{{ isAnalyzing ? '⏸️ Pausar' : '▶️ Reanudar' }}</span>
+        <div class="col-4">
+          <app-glass-button [variant]="isAnalyzing ? 'danger' : 'success'" (click)="toggleAnalysis()"
+            class="w-full py-3 px-1">
+            <div class="d-flex flex-column align-items-center justify-content-center gap-1">
+              <ion-icon [name]="isAnalyzing ? 'pause-outline' : 'play-outline'" class="fs-5"></ion-icon>
+              <span class="fs-7">{{ isAnalyzing ? 'Pausar' : 'Reanudar' }}</span>
             </div>
           </app-glass-button>
         </div>
-        
-        <div class="col-6">
-          <app-glass-button
-            variant="primary"
-            (click)="onOpenAdvanced()"
-            class="w-full py-3">
-            <div class="d-flex align-items-center justify-content-center gap-2">
-              <ion-icon name="stats-chart-outline"></ion-icon>
-              <span>📊 Avanzado</span>
+
+        <div class="col-4">
+          <app-glass-button variant="warning" (click)="onQuickTrade()" class="w-full py-3 px-1">
+            <div class="d-flex flex-column align-items-center justify-content-center gap-1">
+              <ion-icon name="flash-outline" class="fs-5"></ion-icon>
+              <span class="fs-7">⚡ Trade</span>
+            </div>
+          </app-glass-button>
+        </div>
+
+        <div class="col-4">
+          <app-glass-button variant="primary" (click)="onOpenAdvanced()" class="w-full py-3 px-1">
+            <div class="d-flex flex-column align-items-center justify-content-center gap-1">
+              <ion-icon name="stats-chart-outline" class="fs-5"></ion-icon>
+              <span class="fs-7">📊 Avanzado</span>
             </div>
           </app-glass-button>
         </div>
@@ -145,35 +138,34 @@
         <h3 class="text-white fw-bold mb-0">🔔 Señales Activas</h3>
         <span class="badge bg-dark text-white">{{ activeSignals.length }} activas</span>
       </div>
-      
+
       <div class="space-y-2">
-        <div *ngFor="let signal of activeSignals" 
-             [class]="'p-3 rounded-3 bg-' + getSignalColor(signal.type) + '-10 border-start border-' + getSignalColor(signal.type) + ' border-start-4'">
-          
+        <div *ngFor="let signal of activeSignals"
+          [class]="'p-3 rounded-3 bg-' + getSignalColor(signal.type) + '-10 border-start border-' + getSignalColor(signal.type) + ' border-start-4'">
+
           <div class="d-flex align-items-start gap-3">
             <div class="rounded-circle bg-dark bg-opacity-25 d-flex align-items-center justify-content-center"
-                 style="width: 36px; height: 36px;">
-              <ion-icon [name]="getSignalIcon(signal.type)" 
-                       [class]="'text-' + getSignalColor(signal.type)">
+              style="width: 36px; height: 36px;">
+              <ion-icon [name]="getSignalIcon(signal.type)" [class]="'text-' + getSignalColor(signal.type)">
               </ion-icon>
             </div>
-            
+
             <div class="flex-grow-1">
               <div class="d-flex justify-content-between align-items-start">
                 <div>
                   <p class="text-white fw-medium mb-0">{{ signal.message }}</p>
                   <p class="text-white-50 text-xs mb-0 mt-1">
-                    {{ signal.symbol?.replace('USDT', '/USDT') || selectedSymbol.replace('USDT', '/USDT') }} • 
-                    {{ signal.timestamp }} • 
+                    {{ signal.symbol?.replace('USDT', '/USDT') || selectedSymbol.replace('USDT', '/USDT') }} •
+                    {{ signal.timestamp }} •
                     {{ signal.confidence }}% confianza
                   </p>
                 </div>
-                
+
                 <div class="text-end">
                   <p class="text-white fw-bold mb-0">${{ signal.price.toLocaleString('es-AR') }}</p>
                   <span class="badge bg-dark text-white text-xs">
-                    {{ signal.type === 'buy' ? 'LONG' : 
-                       signal.type === 'sell' ? 'SHORT' : 'ALERTA' }}
+                    {{ signal.type === 'buy' ? 'LONG' :
+                    signal.type === 'sell' ? 'SHORT' : 'ALERTA' }}
                   </span>
                 </div>
               </div>
@@ -181,7 +173,7 @@
           </div>
         </div>
       </div>
-      
+
       <div *ngIf="activeSignals.length === 0" class="text-center py-4">
         <ion-icon name="notifications-off-outline" class="text-white-50 fs-1 mb-3"></ion-icon>
         <p class="text-white-50 mb-0">No hay señales activas en este momento</p>

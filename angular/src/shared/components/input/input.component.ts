@@ -23,6 +23,8 @@ export class InputComponent implements ControlValueAccessor {
   @Input() name: string = '';
   @Input() autocomplete: string = '';
   @Input() required: boolean = false;
+  @Input() min?: number;
+  @Input() max?: number;
   @Input() set showPasswordToggle(value: boolean | string) {
     // Convertir string a boolean si es necesario
     if (typeof value === 'string') {
@@ -60,8 +62,8 @@ export class InputComponent implements ControlValueAccessor {
   }
 
   /* ===== ControlValueAccessor ===== */
-  private onChange = (_: any) => {};
-  private onTouched = () => {};
+  private onChange = (_: any) => { };
+  private onTouched = () => { };
 
   writeValue(value: any): void {
     this.value = value ?? '';

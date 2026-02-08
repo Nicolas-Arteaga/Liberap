@@ -13,7 +13,8 @@
         <!-- Usuario nuevo: capital inicial -->
         <span *ngIf="!hasActiveStrategies">$1,000 USDT</span>
         <!-- Usuario con estrategias: ganancia -->
-        <span *ngIf="hasActiveStrategies" class="text-success">+${{ totalPotentialProfit.toLocaleString('es-AR') }} USDT</span>
+        <span *ngIf="hasActiveStrategies" class="text-success">+${{ totalPotentialProfit.toLocaleString('es-AR') }}
+          USDT</span>
       </p>
     </div>
 
@@ -33,9 +34,7 @@
 
     <!-- Botón principal -->
     <div class="mt-2">
-      <app-glass-button 
-        class="w-full" 
-        [routerLink]="hasActiveStrategies ? '/dashboard' : '/configure'">
+      <app-glass-button class="w-full" [routerLink]="hasActiveStrategies ? '/dashboard' : '/configure'">
         <span *ngIf="!hasActiveStrategies">🚀 Configurar Mi Primera Estrategia</span>
         <span *ngIf="hasActiveStrategies">📊 Ver Dashboard en Tiempo Real</span>
       </app-glass-button>
@@ -46,56 +45,33 @@
   <section class="space-y-4">
     <p class="text-white font-medium text-base px-2 mb-3 mt-3">Herramientas de Trading</p>
     <div class="actions-grid px-0">
-      <!-- Mantengo 3 íconos igual que antes -->
-      <app-card-icon
-        icon="analytics-outline"
-        variant="stacked"
-        [useCardContentBg]="true"
-        routerLink="/configure-strategy">
-        <p class="text-white text-sm">Configurar Estrategia</p>
+      <app-card-icon icon="flash-outline" variant="stacked" [useCardContentBg]="true" routerLink="/execute-trade">
+        <p class="text-white text-sm">Ejecutar Trade</p>
       </app-card-icon>
-      
-      <app-card-icon
-        icon="stats-chart-outline" 
-        variant="stacked"
-        [useCardContentBg]="true"
+
+      <app-card-icon icon="notifications-outline" variant="stacked" [useCardContentBg]="true" routerLink="/alerts">
+        <p class="text-white text-sm">Alertas</p>
+      </app-card-icon>
+
+      <app-card-icon icon="analytics-outline" variant="stacked" [useCardContentBg]="true" routerLink="/backtesting">
+        <p class="text-white text-sm">Backtesting</p>
+      </app-card-icon>
+    </div>
+
+    <!-- Otras Herramientas -->
+    <div class="actions-grid px-0 mt-3">
+      <app-card-icon icon="stats-chart-outline" variant="stacked" [useCardContentBg]="true"
         routerLink="/dashboard-advanced">
         <p class="text-white text-sm">Dashboard Avanzado</p>
       </app-card-icon>
-      
-      <app-card-icon
-        icon="time-outline"
-        variant="stacked"
-        [useCardContentBg]="true"
-        routerLink="/history">
-        <p class="text-white text-sm">Historial de Trades</p>
+
+      <app-card-icon icon="time-outline" variant="stacked" [useCardContentBg]="true" routerLink="/history">
+        <p class="text-white text-sm">Historial</p>
       </app-card-icon>
-    </div>
-    
-    <!-- Agrego una segunda fila de herramientas -->
-    <div class="actions-grid px-0 mt-3">
-      <app-card-icon
-        icon="notifications-outline"
-        variant="stacked"
-        [useCardContentBg]="true"
-        routerLink="/alerts">
-        <p class="text-white text-sm">Alertas en Vivo</p>
-      </app-card-icon>
-      
-      <app-card-icon
-        icon="book-outline" 
-        variant="stacked"
-        [useCardContentBg]="true"
-        routerLink="/backtesting">
-        <p class="text-white text-sm">Backtesting</p>
-      </app-card-icon>
-      
-      <app-card-icon
-        icon="wallet-outline"
-        variant="stacked"
-        [useCardContentBg]="true"
-        routerLink="/wallet">
-        <p class="text-white text-sm">Mi Wallet</p>
+
+      <app-card-icon icon="settings-outline" variant="stacked" [useCardContentBg]="true"
+        routerLink="/configure-strategy">
+        <p class="text-white text-sm">Estrategia</p>
       </app-card-icon>
     </div>
   </section>
@@ -114,73 +90,70 @@
 
     <div class="space-y-3">
       @for (signal of recentSignals; track signal.name) {
-        <div class="debt-card-wrapper">
-          <app-card-icon
-            [icon]="signal.icon"
-            [status]="getStatusColor(signal.status)"
-            [statusLabel]="getStatusLabel(signal.status)"
-            [useCardContentBg]="true">
-            <div class="flex flex-col py-2">
-              <p class="text-white text-sm font-medium mb-1">
-                {{ signal.name }}
-              </p>
-              <div class="flex items-center gap-2 mt-2">
-                <span class="text-success font-semibold">
-                  +${{ signal.amount.toLocaleString('es-AR') }}
-                </span>
-                <span class="text-white-50 text-xs" *ngIf="hasActiveStrategies">ganancia potencial</span>
-                <span class="text-white-50 text-xs" *ngIf="!hasActiveStrategies">ejemplo real</span>
-              </div>
+      <div class="debt-card-wrapper">
+        <app-card-icon [icon]="signal.icon" [status]="getStatusColor(signal.status)"
+          [statusLabel]="getStatusLabel(signal.status)" [useCardContentBg]="true">
+          <div class="flex flex-col py-2">
+            <p class="text-white text-sm font-medium mb-1">
+              {{ signal.name }}
+            </p>
+            <div class="flex items-center gap-2 mt-2">
+              <span class="text-success font-semibold">
+                +${{ signal.amount.toLocaleString('es-AR') }}
+              </span>
+              <span class="text-white-50 text-xs" *ngIf="hasActiveStrategies">ganancia potencial</span>
+              <span class="text-white-50 text-xs" *ngIf="!hasActiveStrategies">ejemplo real</span>
             </div>
-          </app-card-icon>
-        </div>
+          </div>
+        </app-card-icon>
+      </div>
       }
     </div>
   </section>
 
   <!-- Sección adicional: Stats rápidas -->
-<!-- Sección adicional: Stats rápidas -->
-<section class="space-y-4" *ngIf="hasActiveStrategies">
-  <div class="section-header">
-    <p class="text-white font-medium text-base">
-      📊 Métricas del Día
-    </p>
-  </div>
-  
-  <!-- 4 tarjetas en una línea con Bootstrap grid responsive -->
-  <div class="row g-2">
-    <!-- Precisión -->
-    <div class="col-3">
-      <app-card-content class="p-2 text-center h-100">
-        <p class="text-white text-lg font-bold mb-0">82%</p>
-        <p class="text-white-50 text-xs mt-1">Precisión</p>
-      </app-card-content>
+  <!-- Sección adicional: Stats rápidas -->
+  <section class="space-y-4" *ngIf="hasActiveStrategies">
+    <div class="section-header">
+      <p class="text-white font-medium text-base">
+        📊 Métricas del Día
+      </p>
     </div>
-    
-    <!-- Trades Ganadores -->
-    <div class="col-3">
-      <app-card-content class="p-2 text-center h-100">
-        <p class="text-white text-lg font-bold mb-0">5/6</p>
-        <p class="text-white-50 text-xs mt-1">Trades Ganadores</p>
-      </app-card-content>
+
+    <!-- 4 tarjetas en una línea con Bootstrap grid responsive -->
+    <div class="row g-2">
+      <!-- Precisión -->
+      <div class="col-3">
+        <app-card-content class="p-2 text-center h-100">
+          <p class="text-white text-lg font-bold mb-0">82%</p>
+          <p class="text-white-50 text-xs mt-1">Precisión</p>
+        </app-card-content>
+      </div>
+
+      <!-- Trades Ganadores -->
+      <div class="col-3">
+        <app-card-content class="p-2 text-center h-100">
+          <p class="text-white text-lg font-bold mb-0">5/6</p>
+          <p class="text-white-50 text-xs mt-1">Trades Ganadores</p>
+        </app-card-content>
+      </div>
+
+      <!-- ROI Diario -->
+      <div class="col-3">
+        <app-card-content class="p-2 text-center h-100">
+          <p class="text-white text-lg font-bold mb-0">+3.2%</p>
+          <p class="text-white-50 text-xs mt-1">ROI Diario</p>
+        </app-card-content>
+      </div>
+
+      <!-- Señales Hoy -->
+      <div class="col-3">
+        <app-card-content class="p-2 text-center h-100">
+          <p class="text-white text-lg font-bold mb-0">12</p>
+          <p class="text-white-50 text-xs mt-1">Señales Hoy</p>
+        </app-card-content>
+      </div>
     </div>
-    
-    <!-- ROI Diario -->
-    <div class="col-3">
-      <app-card-content class="p-2 text-center h-100">
-        <p class="text-white text-lg font-bold mb-0">+3.2%</p>
-        <p class="text-white-50 text-xs mt-1">ROI Diario</p>
-      </app-card-content>
-    </div>
-    
-    <!-- Señales Hoy -->
-    <div class="col-3">
-      <app-card-content class="p-2 text-center h-100">
-        <p class="text-white text-lg font-bold mb-0">12</p>
-        <p class="text-white-50 text-xs mt-1">Señales Hoy</p>
-      </app-card-content>
-    </div>
-  </div>
-</section>
+  </section>
 
 </main>

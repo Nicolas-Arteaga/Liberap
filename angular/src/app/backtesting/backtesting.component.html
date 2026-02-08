@@ -1,0 +1,123 @@
+<div class="min-vh-100 pb-4">
+    <!-- Header con botón back y título -->
+    <header class="d-flex align-items-center gap-3 px-4 py-4">
+        <button class="btn p-0 border-0 bg-transparent" (click)="handleBack()">
+            <ion-icon name="arrow-back-outline" class="text-white fs-5"></ion-icon>
+        </button>
+        <h1 class="text-white fw-bold mt-0 fs-4 text-center w-100">
+            Backtesting de Estrategias
+        </h1>
+    </header>
+
+    <!-- Contenido principal -->
+    <main class="px-4">
+        <!-- Card 1: Configuración del backtest -->
+        <app-card-content class="mb-4">
+            <h2 class="text-white fs-5 mb-3">Parámetros Históricos</h2>
+
+            <div class="row mb-3">
+                <div class="col-6">
+                    <app-label>Par de Trading</app-label>
+                    <app-select [(ngModel)]="config.symbol">
+                        <option *ngFor="let s of symbols" [value]="s">{{ s }}</option>
+                    </app-select>
+                </div>
+                <div class="col-6">
+                    <app-label>Timeframe</app-label>
+                    <app-select [(ngModel)]="config.timeframe">
+                        <option *ngFor="let t of timeframes" [value]="t">{{ t }}</option>
+                    </app-select>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-6">
+                    <app-label>Fecha Inicio</app-label>
+                    <app-input type="date" [(ngModel)]="config.startDate"></app-input>
+                </div>
+                <div class="col-6">
+                    <app-label>Fecha Fin</app-label>
+                    <app-input type="date" [(ngModel)]="config.endDate"></app-input>
+                </div>
+            </div>
+        </app-card-content>
+
+        <!-- Card 2: Configuración de estrategia (Versión simplificada de /configure-strategy) -->
+        <app-card-content class="mb-4">
+            <h2 class="text-white fs-5 mb-3">Configuración de Estrategia</h2>
+
+            <div class="mb-3">
+                <app-label>Dirección</app-label>
+                <app-select [(ngModel)]="config.strategy.direction">
+                    <option value="long">Solo LONG</option>
+                    <option value="short">Solo SHORT</option>
+                    <option value="auto">Automático (IA)</option>
+                </app-select>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-6">
+                    <app-label>Apalancamiento</app-label>
+                    <app-input type="number" [(ngModel)]="config.strategy.leverage"></app-input>
+                </div>
+                <div class="col-6">
+                    <app-label>Stop Loss (%)</app-label>
+                    <app-input type="number" [(ngModel)]="config.strategy.autoStopLoss"></app-input>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center">
+                <app-label class="mb-0">Riesgo: {{ config.strategy.riskLevel | uppercase }}</app-label>
+                <app-toggle [value]="config.strategy.autoStopLoss"></app-toggle>
+            </div>
+        </app-card-content>
+
+        <!-- Botón Ejecutar -->
+        <app-glass-button [variant]="isRunning ? 'outline' : 'solid'" class="w-full py-3 mb-4" (click)="runBacktest()"
+            [disabled]="isRunning">
+            {{ isRunning ? '⌛ Procesando Datos...' : '▶️ Ejecutar Backtest' }}
+        </app-glass-button>
+
+        <!-- Card 3: Resultados (Solo si hay resultados) -->
+        <div *ngIf="results" class="fade-in">
+            <app-card-content class="mb-4">
+                <h2 class="text-white fs-5 mb-3">Resultados de la Simulación</h2>
+
+                <div class="row g-3">
+                    <div class="col-6">
+                        <div class="bg-white bg-opacity-5 p-3 rounded">
+                            <p class="text-white-50 small mb-1">Total Trades</p>
+                            <p class="text-white fs-4 fw-bold mb-0">{{ results.totalTrades }}</p>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="bg-white bg-opacity-5 p-3 rounded">
+                            <p class="text-white-50 small mb-1">Win Rate</p>
+                            <p class="text-success fs-4 fw-bold mb-0">{{ results.winRate }}%</p>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="bg-white bg-opacity-5 p-3 rounded">
+                            <p class="text-white-50 small mb-1">Profit Total</p>
+                            <p class="text-success fs-4 fw-bold mb-0">+${{ results.totalProfit }}</p>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="bg-white bg-opacity-5 p-3 rounded">
+                            <p class="text-white-50 small mb-1">Max Drawdown</p>
+                            <p class="text-danger fs-4 fw-bold mb-0">-{{ results.maxDrawdown }}%</p>
+                        </div>
+                    </div>
+                </div>
+            </app-card-content>
+
+            <!-- Card 4: Gráfico de equity -->
+            <app-card-content class="mb-4">
+                <h2 class="text-white fs-5 mb-3">Curva de Crecimiento</h2>
+                <div style="height: 200px;">
+                    <app-payment-chart [data]="results.equityCurve"></app-payment-chart>
+                </div>
+            </app-card-content>
+        </div>
+    </main>
+</div>
