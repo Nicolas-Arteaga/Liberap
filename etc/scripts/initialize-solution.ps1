@@ -14,7 +14,7 @@ $jobs += Start-Job -Name "InstallLibs" -ScriptBlock {
 
 $jobs += Start-Job -Name "DbMigrator" -ScriptBlock {
     $ErrorActionPreference = "Stop"
-    Set-Location (Join-Path $using:scriptRoot "../../src/Liberap.DbMigrator")
+    Set-Location (Join-Path $using:scriptRoot "../../src/Verge.DbMigrator")
     dotnet run
 
     if ($LASTEXITCODE -ne 0) {
@@ -24,7 +24,7 @@ $jobs += Start-Job -Name "DbMigrator" -ScriptBlock {
 
 $jobs += Start-Job -Name "DevCert" -ScriptBlock {
     $ErrorActionPreference = "Stop"
-    Set-Location (Join-Path $using:scriptRoot "../../src/Liberap.HttpApi.Host")
+    Set-Location (Join-Path $using:scriptRoot "../../src/Verge.HttpApi.Host")
     dotnet dev-certs https -v -ep openiddict.pfx -p ee823766-18a2-4149-9779-32f24124ee2f
 
     if ($LASTEXITCODE -ne 0) {

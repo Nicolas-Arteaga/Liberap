@@ -1,0 +1,29 @@
+using System;
+using System.Collections.Generic;
+using Volo.Abp.Domain.Entities.Auditing;
+
+namespace Verge.Trading;
+
+public class TradingStrategy : FullAuditedAggregateRoot<Guid>
+{
+    public Guid TraderProfileId { get; set; }
+    public string Name { get; set; }
+    public SignalDirection DirectionPreference { get; set; } // Long, Short, Auto
+    public string SelectedCryptosJson { get; set; } // Serialized list of symbols
+    public int Leverage { get; set; }
+    public decimal Capital { get; set; }
+    public RiskTolerance RiskLevel { get; set; }
+    public bool AutoStopLoss { get; set; }
+    public decimal TakeProfitPercentage { get; set; }
+    public bool NotificationsEnabled { get; set; }
+    public bool IsActive { get; set; }
+
+    protected TradingStrategy() { }
+
+    public TradingStrategy(Guid id, Guid traderProfileId, string name) : base(id)
+    {
+        TraderProfileId = traderProfileId;
+        Name = name;
+        IsActive = true;
+    }
+}

@@ -254,17 +254,17 @@ paket-files/
 # ABP Studio
 **/.abpstudio/
 
-# Liberap
-src/Liberap.Web/Logs/*
-src/Liberap.Web.Host/Logs/*
-src/Liberap.Web.Public/Logs/*
-src/Liberap.Web.Public.Host/Logs/*
-src/Liberap.AuthServer/Logs/*
-src/Liberap.HttpApi.Host/Logs/*
-src/Liberap.HttpApi.Host/Logs/*
-src/Liberap.DbMigrator/Logs/*
-src/Liberap.Blazor.Server/Logs/*
-src/Liberap.Blazor.Server.Tiered/Logs/*
+# Verge
+src/Verge.Web/Logs/*
+src/Verge.Web.Host/Logs/*
+src/Verge.Web.Public/Logs/*
+src/Verge.Web.Public.Host/Logs/*
+src/Verge.AuthServer/Logs/*
+src/Verge.HttpApi.Host/Logs/*
+src/Verge.HttpApi.Host/Logs/*
+src/Verge.DbMigrator/Logs/*
+src/Verge.Blazor.Server/Logs/*
+src/Verge.Blazor.Server.Tiered/Logs/*
 
 # Use abp install-libs to restore.
 **/wwwroot/libs/*

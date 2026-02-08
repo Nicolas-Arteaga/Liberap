@@ -7,7 +7,7 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "Liberap": {
+    "Verge": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -22,7 +22,7 @@
           "builder": "@angular/build:application",
           "options": {
             "outputPath": {
-              "base": "dist/Liberap"
+              "base": "dist/Verge"
             },
             "index": "src/index.html",
             "polyfills": [
@@ -132,10 +132,10 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "Liberap:build:production"
+              "buildTarget": "Verge:build:production"
             },
             "development": {
-              "buildTarget": "Liberap:build:development"
+              "buildTarget": "Verge:build:development"
             }
           },
           "defaultConfiguration": "development"
@@ -143,7 +143,7 @@
         "extract-i18n": {
           "builder": "@angular/build:extract-i18n",
           "options": {
-            "buildTarget": "Liberap:build"
+            "buildTarget": "Verge:build"
           }
         },
         "test": {

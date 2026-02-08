@@ -5,9 +5,9 @@ const baseUrl = 'http://localhost:4200';
 const oAuthConfig = {
   issuer: 'https://localhost:44396/',
   redirectUri: baseUrl,
-  clientId: 'Liberap_App',
+  clientId: 'Verge_App',
   responseType: 'code',
-  scope: 'offline_access Liberap',
+  scope: 'offline_access Verge',
   requireHttps: true,
 };
 
@@ -15,13 +15,13 @@ export const environment = {
   production: true,
   application: {
     baseUrl,
-    name: 'Liberap',
+    name: 'Verge',
   },
   oAuthConfig,
   apis: {
     default: {
       url: 'https://localhost:44396',
-      rootNamespace: 'Liberap',
+      rootNamespace: 'Verge',
     },
     AbpAccountPublic: {
       url: oAuthConfig.issuer,

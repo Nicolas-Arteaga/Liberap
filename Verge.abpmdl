@@ -1,0 +1,109 @@
+{
+  "template": "app",
+  "imports": {
+    "Volo.Abp.BasicTheme": {
+      "version": "10.0.1",
+      "isInstalled": true,
+      "creationTime": "12/08/2025 22:56:08 +00:00"
+    },
+    "Volo.Abp.Account": {
+      "version": "10.0.1",
+      "isInstalled": true,
+      "creationTime": "12/08/2025 22:56:08 +00:00"
+    },
+    "Volo.Abp.OpenIddict": {
+      "version": "10.0.1",
+      "isInstalled": true,
+      "creationTime": "12/08/2025 22:56:08 +00:00"
+    },
+    "Volo.Abp.Identity": {
+      "version": "10.0.1",
+      "isInstalled": true,
+      "creationTime": "12/08/2025 22:56:08 +00:00"
+    },
+    "Volo.Abp.TenantManagement": {
+      "version": "10.0.1",
+      "isInstalled": true,
+      "creationTime": "12/08/2025 22:56:08 +00:00"
+    },
+    "Volo.Abp.SettingManagement": {
+      "version": "10.0.1",
+      "isInstalled": true,
+      "creationTime": "12/08/2025 22:56:08 +00:00"
+    },
+    "Volo.Abp.PermissionManagement": {
+      "version": "10.0.1",
+      "isInstalled": true,
+      "creationTime": "12/08/2025 22:56:08 +00:00"
+    },
+    "Volo.Abp.FeatureManagement": {
+      "version": "10.0.1",
+      "isInstalled": true,
+      "creationTime": "12/08/2025 22:56:08 +00:00"
+    }
+  },
+  "folders": {
+    "items": {
+      "src": {},
+      "test": {}
+    }
+  },
+  "packages": {
+    "Verge.Application": {
+      "path": "src/Verge.Application/Verge.Application.abppkg",
+      "folder": "src"
+    },
+    "Verge.Application.Tests": {
+      "path": "test/Verge.Application.Tests/Verge.Application.Tests.abppkg",
+      "folder": "test"
+    },
+    "Verge.Domain.Shared": {
+      "path": "src/Verge.Domain.Shared/Verge.Domain.Shared.abppkg",
+      "folder": "src"
+    },
+    "Verge.Application.Contracts": {
+      "path": "src/Verge.Application.Contracts/Verge.Application.Contracts.abppkg",
+      "folder": "src"
+    },
+    "Verge.HttpApi": {
+      "path": "src/Verge.HttpApi/Verge.HttpApi.abppkg",
+      "folder": "src"
+    },
+    "Verge.HttpApi.Client": {
+      "path": "src/Verge.HttpApi.Client/Verge.HttpApi.Client.abppkg",
+      "folder": "src"
+    },
+    "Verge.EntityFrameworkCore.Tests": {
+      "path": "test/Verge.EntityFrameworkCore.Tests/Verge.EntityFrameworkCore.Tests.abppkg",
+      "folder": "test"
+    },
+    "Verge.EntityFrameworkCore": {
+      "path": "src/Verge.EntityFrameworkCore/Verge.EntityFrameworkCore.abppkg",
+      "folder": "src"
+    },
+    "Verge.TestBase": {
+      "path": "test/Verge.TestBase/Verge.TestBase.abppkg",
+      "folder": "test"
+    },
+    "Verge.Domain.Tests": {
+      "path": "test/Verge.Domain.Tests/Verge.Domain.Tests.abppkg",
+      "folder": "test"
+    },
+    "Verge.HttpApi.Client.ConsoleTestApp": {
+      "path": "test/Verge.HttpApi.Client.ConsoleTestApp/Verge.HttpApi.Client.ConsoleTestApp.abppkg",
+      "folder": "test"
+    },
+    "Verge.DbMigrator": {
+      "path": "src/Verge.DbMigrator/Verge.DbMigrator.abppkg",
+      "folder": "src"
+    },
+    "Verge.HttpApi.Host": {
+      "path": "src/Verge.HttpApi.Host/Verge.HttpApi.Host.abppkg",
+      "folder": "src"
+    },
+    "Verge.Domain": {
+      "path": "src/Verge.Domain/Verge.Domain.abppkg",
+      "folder": "src"
+    }
+  }
+}

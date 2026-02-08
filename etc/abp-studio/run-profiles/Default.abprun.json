@@ -1,9 +1,9 @@
-﻿{
+{
   "applications": {
-    "Liberap.HttpApi.Host": {
+    "Verge.HttpApi.Host": {
       "type": "dotnet-project",
       "launchUrl": "https://localhost:44396",
-      "path": "../../../src/Liberap.HttpApi.Host/Liberap.HttpApi.Host.csproj",
+      "path": "../../../src/Verge.HttpApi.Host/Verge.HttpApi.Host.csproj",
       "kubernetesService": ".*-httpapihost$",
       "healthCheckEndpoint": "/health-status",
       "healthUiEndpoint": "/health-ui",
@@ -11,7 +11,7 @@
         "order": 4
       }
     },
-    "Liberap.Angular": {
+    "Verge.Angular": {
       "type": "cli",
       "workingDirectory": "../../../angular",
       "startCommand": "./start.ps1",
@@ -23,7 +23,7 @@
     }
   },
   "containers": {
-    "serviceName": "Liberap-Containers",
+    "serviceName": "Verge-Containers",
   },
   "tasks":{
     "Initialize Solution":{
