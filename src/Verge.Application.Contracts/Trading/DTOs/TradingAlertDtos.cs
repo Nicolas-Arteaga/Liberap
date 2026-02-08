@@ -6,19 +6,19 @@ namespace Verge.Trading;
 
 public class TradingAlertDto : FullAuditedEntityDto<Guid>
 {
-    public string Symbol { get; set; }
+    public string Symbol { get; set; } = string.Empty;
     public decimal TriggerPrice { get; set; }
-    public string Message { get; set; }
+    public string Message { get; set; } = string.Empty;
     public AlertType Type { get; set; }
     public bool IsActive { get; set; }
-    public List<string> Channels { get; set; }
+    public List<string> Channels { get; set; } = new();
 }
 
 public class CreateUpdateTradingAlertDto
 {
-    public string Symbol { get; set; }
+    public string Symbol { get; set; } = string.Empty;
     public decimal TriggerPrice { get; set; }
-    public string Message { get; set; }
+    public string Message { get; set; } = string.Empty;
     public AlertType Type { get; set; }
-    public List<string> Channels { get; set; }
+    public List<string> Channels { get; set; } = new();
 }

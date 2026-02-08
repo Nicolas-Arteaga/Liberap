@@ -6,12 +6,12 @@ namespace Verge.Trading;
 public class TradingAlert : FullAuditedAggregateRoot<Guid>
 {
     public Guid TraderProfileId { get; set; }
-    public string Symbol { get; set; }
+    public string Symbol { get; set; } = string.Empty;
     public decimal TriggerPrice { get; set; }
-    public string Message { get; set; }
+    public string Message { get; set; } = string.Empty;
     public AlertType Type { get; set; }
     public bool IsActive { get; set; }
-    public string ChannelsJson { get; set; } // Serialized list of channels (push, email, telegram)
+    public string ChannelsJson { get; set; } = string.Empty; // Serialized list of channels (push, email, telegram)
 
     protected TradingAlert() { }
 

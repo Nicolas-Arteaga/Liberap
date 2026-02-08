@@ -5,7 +5,7 @@ namespace Verge.Trading;
 
 public class TradingSignal : FullAuditedAggregateRoot<Guid>
 {
-    public string Symbol { get; set; }
+    public string Symbol { get; set; } = string.Empty;
     public SignalDirection Direction { get; set; }
     public decimal EntryPrice { get; set; }
     public decimal? TargetPrice { get; set; }

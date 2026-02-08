@@ -6,7 +6,7 @@ namespace Verge.Trading;
 public class TradeOrder : FullAuditedAggregateRoot<Guid>
 {
     public Guid TraderProfileId { get; set; }
-    public string Symbol { get; set; }
+    public string Symbol { get; set; } = string.Empty;
     public SignalDirection Direction { get; set; }
     public decimal Amount { get; set; }
     public int Leverage { get; set; }

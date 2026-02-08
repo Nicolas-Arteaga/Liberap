@@ -6,9 +6,9 @@ namespace Verge.Trading;
 public class ExchangeConnection : FullAuditedAggregateRoot<Guid>
 {
     public Guid TraderProfileId { get; set; }
-    public string ExchangeName { get; set; }
-    public string ApiKey { get; set; } // Should be encrypted
-    public string ApiSecret { get; set; } // Should be encrypted
+    public string ExchangeName { get; set; } = string.Empty;
+    public string ApiKey { get; set; } = string.Empty; // Should be encrypted
+    public string ApiSecret { get; set; } = string.Empty; // Should be encrypted
     public bool IsConnected { get; set; }
     public DateTime? LastSyncTime { get; set; }
 

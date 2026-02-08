@@ -6,8 +6,8 @@ namespace Verge.Trading;
 public class TraderProfile : FullAuditedAggregateRoot<Guid>
 {
     public Guid UserId { get; set; }
-    public string Name { get; set; }
-    public string Email { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
     public TradingLevel Level { get; set; }
     public RiskTolerance RiskTolerance { get; set; }
     public decimal TotalProfit { get; set; }

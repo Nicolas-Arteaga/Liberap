@@ -5,7 +5,7 @@ namespace Verge.Trading;
 
 public class TradingSignalDto : EntityDto<Guid>
 {
-    public string Symbol { get; set; }
+    public string Symbol { get; set; } = string.Empty;
     public SignalDirection Direction { get; set; }
     public decimal EntryPrice { get; set; }
     public SignalConfidence Confidence { get; set; }
@@ -16,7 +16,7 @@ public class TradingSignalDto : EntityDto<Guid>
 
 public class CreateTradingSignalDto
 {
-    public string Symbol { get; set; }
+    public string Symbol { get; set; } = string.Empty;
     public SignalDirection Direction { get; set; }
     public decimal EntryPrice { get; set; }
     public SignalConfidence Confidence { get; set; }

@@ -6,8 +6,8 @@ namespace Verge.Trading;
 public class TradingSession : FullAuditedAggregateRoot<Guid>
 {
     public Guid TraderProfileId { get; set; }
-    public string Symbol { get; set; }
-    public string Timeframe { get; set; }
+    public string Symbol { get; set; } = string.Empty;
+    public string Timeframe { get; set; } = string.Empty;
     public TradingStage CurrentStage { get; set; }
     public DateTime StartTime { get; set; }
     public DateTime? EndTime { get; set; }

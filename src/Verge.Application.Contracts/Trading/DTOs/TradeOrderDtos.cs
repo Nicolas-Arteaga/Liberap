@@ -5,7 +5,7 @@ namespace Verge.Trading;
 
 public class TradeOrderDto : FullAuditedEntityDto<Guid>
 {
-    public string Symbol { get; set; }
+    public string Symbol { get; set; } = string.Empty;
     public SignalDirection Direction { get; set; }
     public decimal Amount { get; set; }
     public int Leverage { get; set; }
@@ -22,7 +22,7 @@ public class TradeOrderDto : FullAuditedEntityDto<Guid>
 
 public class ExecuteTradeDto
 {
-    public string Symbol { get; set; }
+    public string Symbol { get; set; } = string.Empty;
     public SignalDirection Direction { get; set; }
     public decimal Amount { get; set; }
     public int Leverage { get; set; }

@@ -6,8 +6,8 @@ namespace Verge.Trading;
 public class BacktestResult : FullAuditedAggregateRoot<Guid>
 {
     public Guid TradingStrategyId { get; set; }
-    public string Symbol { get; set; }
-    public string Timeframe { get; set; }
+    public string Symbol { get; set; } = string.Empty;
+    public string Timeframe { get; set; } = string.Empty;
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
     public int TotalTrades { get; set; }
@@ -17,7 +17,7 @@ public class BacktestResult : FullAuditedAggregateRoot<Guid>
     public decimal TotalProfit { get; set; }
     public decimal MaxDrawdown { get; set; }
     public double SharpeRatio { get; set; }
-    public string EquityCurveJson { get; set; } // Serialized curve data
+    public string EquityCurveJson { get; set; } = string.Empty; // Serialized curve data
 
     protected BacktestResult() { }
 

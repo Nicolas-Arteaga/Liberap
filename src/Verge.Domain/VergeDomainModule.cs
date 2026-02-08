@@ -4,6 +4,7 @@ using Verge.Localization;
 using Verge.MultiTenancy;
 using System;
 using Volo.Abp.Localization;
+using Volo.Abp.Timing;
 using Volo.Abp.Modularity;
 using Volo.Abp.MultiTenancy;
 using Volo.Abp.PermissionManagement.Identity;
@@ -43,6 +44,11 @@ public class VergeDomainModule : AbpModule
         Configure<AbpMultiTenancyOptions>(options =>
         {
             options.IsEnabled = MultiTenancyConsts.IsEnabled;
+        });
+
+        Configure<AbpClockOptions>(options =>
+        {
+            options.Kind = DateTimeKind.Utc;
         });
 
 

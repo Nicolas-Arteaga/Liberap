@@ -81,7 +81,7 @@ public class VergeDbContext :
     {
         base.OnModelCreating(builder);
 
-        // Configura todas las propiedades DateTime para usar UTC
+        // CONVERSOR DE DATETIME A UTC (CRÍTICO)
         foreach (var entityType in builder.Model.GetEntityTypes())
         {
             foreach (var property in entityType.GetProperties())

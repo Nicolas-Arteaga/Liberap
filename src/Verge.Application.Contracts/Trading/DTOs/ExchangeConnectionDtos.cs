@@ -5,14 +5,14 @@ namespace Verge.Trading;
 
 public class ExchangeConnectionDto : FullAuditedEntityDto<Guid>
 {
-    public string ExchangeName { get; set; }
+    public string ExchangeName { get; set; } = string.Empty;
     public bool IsConnected { get; set; }
     public DateTime? LastSyncTime { get; set; }
 }
 
 public class ConnectExchangeDto
 {
-    public string ExchangeName { get; set; }
-    public string ApiKey { get; set; }
-    public string ApiSecret { get; set; }
+    public string ExchangeName { get; set; } = string.Empty;
+    public string ApiKey { get; set; } = string.Empty;
+    public string ApiSecret { get; set; } = string.Empty;
 }
