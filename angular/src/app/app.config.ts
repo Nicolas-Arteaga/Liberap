@@ -23,6 +23,8 @@ import { environment } from '../environments/environment';
 import { registerLocaleForEsBuild } from '@abp/ng.core/locale';
 
 import { provideIonicAngular } from '@ionic/angular/standalone';
+import { provideHttpClient, withInterceptorsFromDi, HTTP_INTERCEPTORS } from '@angular/common/http';
+import { JwtInterceptor } from './interceptors/jwt.interceptor';
 
 /* ======================================================
    IONICONS – REGISTRO MANUAL (OBLIGATORIO EN STANDALONE)
@@ -33,10 +35,10 @@ import {
   homeOutline,
   cardOutline,
   personOutline,
-  addCircleOutline,      
+  addCircleOutline,
   chatbubbleOutline,
   timeOutline,
-  cashOutline,    
+  cashOutline,
   businessOutline,
   notificationsOutline,
   lockClosedOutline,
@@ -50,27 +52,44 @@ import {
   close,
   logoUsd,
   peopleOutline,
-  analyticsOutline,      // Para "Analizar resumen"
-  mailOutline,          // Para "Generar carta" 
-  documentOutline,      // Alternativa
-  readerOutline,        // Alternativa
-  receiptOutline,       // Para resúmenes
-  calculatorOutline,    // Para cálculos
-  statsChartOutline,    // Para análisis
-  pricetagOutline       // Para ahorro 
-
-         
+  analyticsOutline,
+  mailOutline,
+  documentOutline,
+  readerOutline,
+  receiptOutline,
+  calculatorOutline,
+  statsChartOutline,
+  pricetagOutline,
+  // Iconos faltantes detectados:
+  flashOutline,
+  trendingUpOutline,
+  trendingDownOutline,
+  warningOutline,
+  searchOutline,
+  rocketOutline,
+  shieldOutline,
+  logOutOutline,
+  informationCircleOutline,
+  playOutline,
+  arrowUpOutline,
+  arrowDownOutline,
+  addOutline,
+  notificationsOffOutline,
+  closeCircleOutline,
+  saveOutline,
+  pauseOutline,
+  sparklesOutline
 } from 'ionicons/icons';
 
 addIcons({
-  'calendar-outline': calendarOutline,        
+  'calendar-outline': calendarOutline,
   'home-outline': homeOutline,
   'card-outline': cardOutline,
   'person-outline': personOutline,
-  'add-circle-outline': addCircleOutline,     
+  'add-circle-outline': addCircleOutline,
   'chatbubble-outline': chatbubbleOutline,
   'time-outline': timeOutline,
-  'cash-outline': cashOutline, 
+  'cash-outline': cashOutline,
   'business-outline': businessOutline,
   'notifications-outline': notificationsOutline,
   'lock-closed-outline': lockClosedOutline,
@@ -82,7 +101,7 @@ addIcons({
   'arrow-back-outline': arrowBackOutline,
   'checkmark': checkmark,
   'close': close,
-  'logo-usd': logoUsd,   
+  'logo-usd': logoUsd,
   'people-outline': peopleOutline,
   'analytics-outline': analyticsOutline,
   'mail-outline': mailOutline,
@@ -91,7 +110,25 @@ addIcons({
   'receipt-outline': receiptOutline,
   'calculator-outline': calculatorOutline,
   'stats-chart-outline': statsChartOutline,
-  'pricetag-outline': pricetagOutline,            
+  'pricetag-outline': pricetagOutline,
+  'flash-outline': flashOutline,
+  'trending-up-outline': trendingUpOutline,
+  'trending-down-outline': trendingDownOutline,
+  'warning-outline': warningOutline,
+  'search-outline': searchOutline,
+  'rocket-outline': rocketOutline,
+  'shield-outline': shieldOutline,
+  'log-out-outline': logOutOutline,
+  'information-circle-outline': informationCircleOutline,
+  'play-outline': playOutline,
+  'arrow-up-outline': arrowUpOutline,
+  'arrow-down-outline': arrowDownOutline,
+  'add-outline': addOutline,
+  'notifications-off-outline': notificationsOffOutline,
+  'close-circle-outline': closeCircleOutline,
+  'save-outline': saveOutline,
+  'pause-outline': pauseOutline,
+  'sparkles-outline': sparklesOutline
 });
 
 export const appConfig: ApplicationConfig = {
@@ -108,7 +145,7 @@ export const appConfig: ApplicationConfig = {
       })
     ),
 
-    provideAbpOAuth(),
+    provideAbpOAuth(), // Re-habilitado para silenciar advertencia de ABP
     provideSettingManagementConfig(),
     provideAccountConfig(),
     provideIdentityConfig(),
@@ -118,6 +155,13 @@ export const appConfig: ApplicationConfig = {
     importProvidersFrom(ThemeBasicModule, ThemeSharedModule),
     provideThemeBasicConfig(),
     provideAbpThemeShared(),
+
+    provideHttpClient(withInterceptorsFromDi()),
+    {
+      provide: HTTP_INTERCEPTORS,
+      useClass: JwtInterceptor,
+      multi: true
+    },
 
     /* IONIC STANDALONE */
     provideIonicAngular({
