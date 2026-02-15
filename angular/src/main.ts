@@ -1,3 +1,4 @@
+console.log('🚀 MAIN.TS - Reingreso a la app. Token en storage:', localStorage.getItem('verge_access_token') ? '✅ PRESENTE' : '❌ NO EXISTE');
 import { enableProdMode } from '@angular/core';
 import { bootstrapApplication } from '@angular/platform-browser';
 

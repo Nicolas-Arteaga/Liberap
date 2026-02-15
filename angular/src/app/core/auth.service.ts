@@ -6,15 +6,36 @@ import { Router } from '@angular/router';
 import { environment } from '../../environments/environment';
 import { LoginRequest } from './models/login-request.model';
 
+export const AUTH_TOKEN_KEY = 'verge_access_token';
+
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
   private apiUrl = environment.apis?.default?.url || 'https://localhost:44396';
-  private tokenKey = 'access_token';
+  private tokenKey = AUTH_TOKEN_KEY;
   private currentUserSubject = new BehaviorSubject<any>(null);
 
   public currentUser$ = this.currentUserSubject.asObservable();
+  public isAdmin$ = this.currentUser$.pipe(
+    map(user => {
+      if (!user) return false;
+
+      // Opción 1: Array de strings
+      if (user?.roles?.includes?.('admin') || user?.roles?.includes?.('Admin')) return true;
+
+      // Opción 2: Array de objetos con name
+      if (user?.roles?.some?.((r: any) => r.name === 'admin' || r.name === 'Admin')) return true;
+
+      // Opción 3: roleNames array
+      if (user?.roleNames?.includes?.('admin') || user?.roleNames?.includes?.('Admin')) return true;
+
+      // Opción 4: isInRole object (ABP)
+      if (user?.isInRole?.admin === true || user?.isInRole?.Admin === true) return true;
+
+      return false;
+    })
+  );
 
   private http = inject(HttpClient);
   private router = inject(Router);
@@ -72,11 +93,17 @@ export class AuthService {
   }
 
   getToken(): string | null {
-    return localStorage.getItem(this.tokenKey);
+    const token = localStorage.getItem(this.tokenKey);
+    console.log('🔍 Leyendo token de localStorage:', token ? 'EXISTE' : 'NO EXISTE');
+    return token;
   }
 
   private storeToken(token: string): void {
+    console.log('💾 Guardando token en localStorage');
     localStorage.setItem(this.tokenKey, token);
+    console.log('📦 localStorage después de guardar:', {
+      access_token: localStorage.getItem(this.tokenKey)
+    });
   }
 
   private loadInitialUser(): void {
@@ -100,9 +127,12 @@ export class AuthService {
         localStorage.setItem('user_profile', JSON.stringify(profile));
       },
       error: (err) => {
-        console.error('❌ Error cargando perfil:', err);
         if (err.status === 401) {
-          this.logout();
+          console.log('ℹ️ Token inválido o sesión expirada al cargar perfil.');
+          this.currentUserSubject.next(null);
+          localStorage.removeItem('user_profile');
+        } else {
+          console.error('❌ Error cargando perfil:', err);
         }
       }
     });

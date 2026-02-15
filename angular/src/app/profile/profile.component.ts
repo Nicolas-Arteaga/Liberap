@@ -5,7 +5,8 @@ import { CardIconComponent } from 'src/shared/components/card-icon/card-icon.com
 import { GlassButtonComponent } from 'src/shared/components/glass-button/glass-button.component';
 import { CardContentComponent } from 'src/shared/components/card-content/card-content.component';
 import { IonIcon } from "@ionic/angular/standalone";
-import { IconService } from 'src/shared/services/icon.service';  
+import { IconService } from 'src/shared/services/icon.service';
+import { AuthService } from '../core/auth.service';
 
 @Component({
   selector: 'app-profile',
@@ -21,9 +22,12 @@ import { IconService } from 'src/shared/services/icon.service';
   styleUrls: ['./profile.component.scss']
 })
 export class ProfileComponent implements AfterViewInit {
-  
+
   private router = inject(Router);
-  private iconService = inject(IconService);  
+  private iconService = inject(IconService);
+  private authService = inject(AuthService);
+
+  isAdmin$ = this.authService.isAdmin$;
 
   // Datos del trader (mock inicial)
   traderProfile = {
@@ -45,7 +49,7 @@ export class ProfileComponent implements AfterViewInit {
   ];
 
   ngAfterViewInit() {
-    this.iconService.fixMissingIcons();  
+    this.iconService.fixMissingIcons();
   }
 
   onEditProfile() {
@@ -88,6 +92,10 @@ export class ProfileComponent implements AfterViewInit {
     // Abrir documentación/soporte
   }
 
+  onManageUsers() {
+    this.router.navigate(['/admin/users/create']);
+  }
+
   onLogout() {
     if (confirm('¿Estás seguro que deseas cerrar sesión?')) {
       console.log('Sesión cerrada - Trader');
@@ -97,7 +105,7 @@ export class ProfileComponent implements AfterViewInit {
 
   // Métodos auxiliares
   getRiskColor(risk: 'Bajo' | 'Moderado' | 'Alto'): string {
-    switch(risk) {
+    switch (risk) {
       case 'Bajo': return 'text-success';
       case 'Moderado': return 'text-warning';
       case 'Alto': return 'text-danger';

@@ -1,0 +1,101 @@
+<ion-content class="ion-padding create-user-content">
+
+  <div class="create-user-container">
+    <div class="create-user-card">
+
+      <!-- Logo -->
+      <div class="logo-container d-flex justify-content-center mt-4">
+        <img src="assets/images/logo/logo-login.png" alt="Verge Logo" class="logo-image" height="140">
+      </div>
+
+      <!-- Title -->
+      <div class="text-center mb-4">
+        <h2 class="text-white fw-semibold mt-2">
+          Crear Nuevo Usuario
+        </h2>
+        <p class="text-white-50 mb-0">
+          Registrar un nuevo trader en la plataforma.
+        </p>
+      </div>
+
+      <!-- Error Message -->
+      <div *ngIf="errorMessage" class="alert alert-danger mb-4 rounded-4" role="alert">
+        {{ errorMessage }}
+      </div>
+
+      <!-- Success Message -->
+      <div *ngIf="successMessage" class="alert alert-success mb-4 rounded-4" role="alert">
+        {{ successMessage }}
+      </div>
+
+      <!-- Form -->
+      <form [formGroup]="userForm" (ngSubmit)="onSubmit()" class="d-flex flex-column gap-4">
+
+        <!-- Username -->
+        <div>
+          <app-label htmlFor="username" class="text-white mb-2">
+            Nombre de usuario
+          </app-label>
+          <app-input id="username" formControlName="userName" placeholder="Nombre de usuario" [required]="true" />
+          <div *ngIf="hasError('userName', 'required')" class="text-danger small mt-1">
+            El nombre de usuario es obligatorio
+          </div>
+        </div>
+
+        <!-- Name -->
+        <div>
+          <app-label htmlFor="name" class="text-white mb-2">
+            Nombre
+          </app-label>
+          <app-input id="name" formControlName="name" placeholder="Nombre real" [required]="true" />
+          <div *ngIf="hasError('name', 'required')" class="text-danger small mt-1">
+            El nombre es obligatorio
+          </div>
+        </div>
+
+        <!-- Email -->
+        <div>
+          <app-label htmlFor="email" class="text-white mb-2">
+            Email
+          </app-label>
+          <app-input id="email" formControlName="email" type="email" autocomplete="email"
+            placeholder="tu@email.com" [required]="true" />
+          <div *ngIf="hasError('email', 'required')" class="text-danger small mt-1">
+            El email es obligatorio
+          </div>
+          <div *ngIf="hasError('email', 'email')" class="text-danger small mt-1">
+            Formato de email inválido
+          </div>
+        </div>
+
+        <!-- Password -->
+        <div>
+          <app-label htmlFor="password" class="text-white mb-2">
+            Contraseña
+          </app-label>
+          <app-input id="password" formControlName="password" type="password" placeholder="••••••••" [required]="true"
+            autocomplete="new-password" showPasswordToggle></app-input>
+          <div *ngIf="hasError('password', 'required')" class="text-danger small mt-1">
+            La contraseña es obligatoria
+          </div>
+          <div *ngIf="hasError('password', 'minlength')" class="text-danger small mt-1">
+            Mínimo 6 caracteres
+          </div>
+        </div>
+
+        <!-- Submit -->
+        <app-glass-button variant="solid" type="submit" [disabled]="isLoading">
+          <span *ngIf="!isLoading">Crear Usuario</span>
+          <span *ngIf="isLoading">Creando…</span>
+        </app-glass-button>
+
+        <!-- Back -->
+        <button type="button" class="btn btn-outline-light btn-lg w-100 rounded-4" (click)="onBack()">
+          Volver
+        </button>
+
+      </form>
+    </div>
+  </div>
+
+</ion-content>

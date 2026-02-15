@@ -1,4 +1,4 @@
-import { Component, AfterViewInit, inject } from '@angular/core';
+import { Component, AfterViewInit, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CardContentComponent } from 'src/shared/components/card-content/card-content.component';
 import { CardIconComponent } from 'src/shared/components/card-icon/card-icon.component';
@@ -26,7 +26,7 @@ interface TradingSignal {
   ],
   templateUrl: './home.component.html'
 })
-export class HomeComponent implements AfterViewInit {
+export class HomeComponent implements OnInit, AfterViewInit {
   private iconService = inject(IconService);
 
   // Estado del usuario
@@ -41,9 +41,13 @@ export class HomeComponent implements AfterViewInit {
     { name: 'BNB/USDT - SHORT', amount: 620, icon: 'trending-down-outline', status: 'baja' },
   ];
 
+  ngOnInit() {
+    console.log('🏠 Dashboard cargado - usuario autenticado');
+    this.updateDashboard();
+  }
+
   ngAfterViewInit() {
     this.iconService.fixMissingIcons();
-    this.updateDashboard();
   }
 
   private updateDashboard() {
@@ -90,4 +94,3 @@ export class HomeComponent implements AfterViewInit {
 // 🔧 Cambios Mínimos Necesarios
 // En app-routing.module.ts:
 
- 

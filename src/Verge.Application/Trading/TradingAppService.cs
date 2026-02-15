@@ -10,7 +10,6 @@ using Volo.Abp.Users;
 
 namespace Verge.Trading;
 
-[Authorize]
 public class TradingAppService : ApplicationService, ITradingAppService
 {
     private readonly IRepository<TraderProfile, Guid> _profileRepository;

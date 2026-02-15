@@ -1,11 +1,13 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './guards/auth.guard';
+import { permissionGuard } from '@abp/ng.core';
 
 export const APP_ROUTES: Routes = [
   {
     path: 'login',
     loadComponent: () => import('./login/login.component').then(c => c.LoginComponent),
   },
+
   {
     path: '',
     canActivate: [authGuard],
@@ -62,32 +64,29 @@ export const APP_ROUTES: Routes = [
         loadComponent: () => import('./backtesting/backtesting.component')
           .then(c => c.BacktestingComponent),
       },
+      {
+        path: 'admin/users/create',
+        canActivate: [permissionGuard],
+        data: {
+          requiredPolicy: 'AbpIdentity.Users.Create',
+        },
+        loadComponent: () => import('./identity/create-user/create-user.component').then(c => c.CreateUserComponent),
+      },
       // Rutas de ABP modules integradas en el layout móvil
       {
         path: 'identity',
         loadChildren: () => import('@abp/ng.identity').then(c => c.createRoutes()),
       },
       {
-        path: 'tenant-management',
-        loadChildren: () => import('@abp/ng.tenant-management').then(c => c.createRoutes()),
-      },
-      {
         path: 'setting-management',
         loadChildren: () => import('@abp/ng.setting-management').then(c => c.createRoutes()),
       },
-      {
-        path: 'account/my-profile',
-        loadChildren: () => import('@abp/ng.account').then(c => c.createRoutes()),
-      },
     ]
   },
-  // Rutas de cuenta públicas (sin layout móvil, con layout propio de ABP)
+  // Rutas de cuenta (login, perfil, etc.)
   {
     path: 'account',
     loadChildren: () => import('@abp/ng.account').then(c => c.createRoutes()),
-    data: {
-      skipAuthGuard: true, // Esto evita que el authGuard se aplique
-    },
   },
   {
     path: '**',

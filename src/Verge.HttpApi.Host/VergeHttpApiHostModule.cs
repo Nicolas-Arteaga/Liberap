@@ -39,6 +39,7 @@ using Volo.Abp.OpenIddict;
 using Volo.Abp.Swashbuckle;
 using Volo.Abp.Studio.Client.AspNetCore;
 using Volo.Abp.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace Verge;
 
@@ -109,6 +110,9 @@ public class VergeHttpApiHostModule : AbpModule
                 options.ForwardedHeaders = ForwardedHeaders.XForwardedProto;
             });
         }
+
+        JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
+        JwtSecurityTokenHandler.DefaultOutboundClaimTypeMap.Clear();
 
         ConfigureAuthentication(context);
         ConfigureUrls(configuration);

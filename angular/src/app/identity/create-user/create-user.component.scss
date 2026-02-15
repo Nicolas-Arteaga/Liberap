@@ -1,0 +1,16 @@
+.create-user-content {
+  --background: linear-gradient(180deg, #0B0F1A 0%, #151925 100%);
+}
+
+.create-user-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1rem;
+}
+
+.create-user-card {
+  width: 100%;
+  max-width: 420px;
+}

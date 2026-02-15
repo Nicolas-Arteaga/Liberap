@@ -113,7 +113,5 @@ export class LoginComponent implements OnInit {
     this.router.navigate(['/account/forgot-password']);
   }
 
-  onCreateAccount(): void {
-    this.router.navigate(['/account/register']);
-  }
+
 }
