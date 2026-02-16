@@ -50,8 +50,7 @@ public class VergeDomainModule : AbpModule
         {
             options.Kind = DateTimeKind.Utc;
         });
-
-
+        context.Services.AddHttpClient();
 
 #if DEBUG
         context.Services.Replace(ServiceDescriptor.Singleton<IEmailSender, NullEmailSender>());

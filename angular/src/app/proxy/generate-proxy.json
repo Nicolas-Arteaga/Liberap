@@ -873,6 +873,102 @@
       "rootPath": "app",
       "remoteServiceName": "Default",
       "controllers": {
+        "Verge.Trading.MarketDataAppService": {
+          "controllerName": "MarketData",
+          "controllerGroupName": "MarketData",
+          "isRemoteService": true,
+          "isIntegrationService": false,
+          "apiVersion": null,
+          "type": "Verge.Trading.MarketDataAppService",
+          "interfaces": [
+            {
+              "type": "Verge.Trading.IMarketDataAppService",
+              "name": "IMarketDataAppService",
+              "methods": [
+                {
+                  "name": "GetCandlesAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "input",
+                      "typeAsString": "Verge.Trading.GetMarketCandlesInput, Verge.Application.Contracts",
+                      "type": "Verge.Trading.GetMarketCandlesInput",
+                      "typeSimple": "Verge.Trading.GetMarketCandlesInput",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "System.Collections.Generic.List<Verge.Trading.MarketCandleDto>",
+                    "typeSimple": "[Verge.Trading.MarketCandleDto]"
+                  }
+                }
+              ]
+            }
+          ],
+          "actions": {
+            "GetCandlesAsyncByInput": {
+              "uniqueName": "GetCandlesAsyncByInput",
+              "name": "GetCandlesAsync",
+              "httpMethod": "GET",
+              "url": "api/app/market-data/candles",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "input",
+                  "typeAsString": "Verge.Trading.GetMarketCandlesInput, Verge.Application.Contracts",
+                  "type": "Verge.Trading.GetMarketCandlesInput",
+                  "typeSimple": "Verge.Trading.GetMarketCandlesInput",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "input",
+                  "name": "Symbol",
+                  "jsonName": null,
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": "input"
+                },
+                {
+                  "nameOnMethod": "input",
+                  "name": "Interval",
+                  "jsonName": null,
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": "input"
+                },
+                {
+                  "nameOnMethod": "input",
+                  "name": "Limit",
+                  "jsonName": null,
+                  "type": "System.Int32",
+                  "typeSimple": "number",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": "input"
+                }
+              ],
+              "returnValue": {
+                "type": "System.Collections.Generic.List<Verge.Trading.MarketCandleDto>",
+                "typeSimple": "[Verge.Trading.MarketCandleDto]"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.IMarketDataAppService"
+            }
+          }
+        },
         "Verge.Trading.TradingAppService": {
           "controllerName": "Trading",
           "controllerGroupName": "Trading",
@@ -1170,7 +1266,7 @@
                 "type": "Verge.Trading.TraderProfileDto",
                 "typeSimple": "Verge.Trading.TraderProfileDto"
               },
-              "allowAnonymous": false,
+              "allowAnonymous": null,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "UpdateProfileAsyncByInput": {
@@ -1207,7 +1303,7 @@
                 "type": "Verge.Trading.TraderProfileDto",
                 "typeSimple": "Verge.Trading.TraderProfileDto"
               },
-              "allowAnonymous": false,
+              "allowAnonymous": null,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "GetSignalsAsyncByInput": {
@@ -1292,7 +1388,7 @@
                 "type": "Volo.Abp.Application.Dtos.PagedResultDto<Verge.Trading.TradingSignalDto>",
                 "typeSimple": "Volo.Abp.Application.Dtos.PagedResultDto<Verge.Trading.TradingSignalDto>"
               },
-              "allowAnonymous": false,
+              "allowAnonymous": null,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "GetStrategiesAsync": {
@@ -1307,7 +1403,7 @@
                 "type": "System.Collections.Generic.List<Verge.Trading.TradingStrategyDto>",
                 "typeSimple": "[Verge.Trading.TradingStrategyDto]"
               },
-              "allowAnonymous": false,
+              "allowAnonymous": null,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "CreateStrategyAsyncByInput": {
@@ -1344,7 +1440,7 @@
                 "type": "Verge.Trading.TradingStrategyDto",
                 "typeSimple": "Verge.Trading.TradingStrategyDto"
               },
-              "allowAnonymous": false,
+              "allowAnonymous": null,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "UpdateStrategyAsyncByIdAndInput": {
@@ -1401,7 +1497,7 @@
                 "type": "Verge.Trading.TradingStrategyDto",
                 "typeSimple": "Verge.Trading.TradingStrategyDto"
               },
-              "allowAnonymous": false,
+              "allowAnonymous": null,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "DeleteStrategyAsyncById": {
@@ -1438,7 +1534,7 @@
                 "type": "System.Void",
                 "typeSimple": "System.Void"
               },
-              "allowAnonymous": false,
+              "allowAnonymous": null,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "ExecuteTradeAsyncByInput": {
@@ -1475,7 +1571,7 @@
                 "type": "Verge.Trading.TradeOrderDto",
                 "typeSimple": "Verge.Trading.TradeOrderDto"
               },
-              "allowAnonymous": false,
+              "allowAnonymous": null,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "GetOrderHistoryAsyncByInput": {
@@ -1572,7 +1668,7 @@
                 "type": "Volo.Abp.Application.Dtos.PagedResultDto<Verge.Trading.TradeOrderDto>",
                 "typeSimple": "Volo.Abp.Application.Dtos.PagedResultDto<Verge.Trading.TradeOrderDto>"
               },
-              "allowAnonymous": false,
+              "allowAnonymous": null,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "StartSessionAsyncByInput": {
@@ -1609,7 +1705,7 @@
                 "type": "Verge.Trading.TradingSessionDto",
                 "typeSimple": "Verge.Trading.TradingSessionDto"
               },
-              "allowAnonymous": false,
+              "allowAnonymous": null,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "GetCurrentSessionAsync": {
@@ -1624,7 +1720,7 @@
                 "type": "Verge.Trading.TradingSessionDto",
                 "typeSimple": "Verge.Trading.TradingSessionDto"
               },
-              "allowAnonymous": false,
+              "allowAnonymous": null,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "AdvanceStageAsyncBySessionId": {
@@ -1661,7 +1757,7 @@
                 "type": "Verge.Trading.TradingSessionDto",
                 "typeSimple": "Verge.Trading.TradingSessionDto"
               },
-              "allowAnonymous": false,
+              "allowAnonymous": null,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "GetActiveAlertsAsync": {
@@ -1676,7 +1772,7 @@
                 "type": "System.Collections.Generic.List<Verge.Trading.TradingAlertDto>",
                 "typeSimple": "[Verge.Trading.TradingAlertDto]"
               },
-              "allowAnonymous": false,
+              "allowAnonymous": null,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "CreateAlertAsyncByInput": {
@@ -1713,7 +1809,7 @@
                 "type": "Verge.Trading.TradingAlertDto",
                 "typeSimple": "Verge.Trading.TradingAlertDto"
               },
-              "allowAnonymous": false,
+              "allowAnonymous": null,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "DeactivateAlertAsyncById": {
@@ -1750,7 +1846,7 @@
                 "type": "System.Void",
                 "typeSimple": "System.Void"
               },
-              "allowAnonymous": false,
+              "allowAnonymous": null,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "RunBacktestAsyncByInput": {
@@ -1787,7 +1883,7 @@
                 "type": "Verge.Trading.BacktestResultDto",
                 "typeSimple": "Verge.Trading.BacktestResultDto"
               },
-              "allowAnonymous": false,
+              "allowAnonymous": null,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "ConnectExchangeAsyncByInput": {
@@ -1824,7 +1920,7 @@
                 "type": "Verge.Trading.ExchangeConnectionDto",
                 "typeSimple": "Verge.Trading.ExchangeConnectionDto"
               },
-              "allowAnonymous": false,
+              "allowAnonymous": null,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "GetConnectionsAsync": {
@@ -1839,7 +1935,7 @@
                 "type": "System.Collections.Generic.List<Verge.Trading.ExchangeConnectionDto>",
                 "typeSimple": "[Verge.Trading.ExchangeConnectionDto]"
               },
-              "allowAnonymous": false,
+              "allowAnonymous": null,
               "implementFrom": "Verge.Trading.ITradingAppService"
             }
           }
@@ -5235,6 +5331,51 @@
         }
       ]
     },
+    "Verge.Trading.GetMarketCandlesInput": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Symbol",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Interval",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Limit",
+          "jsonName": null,
+          "type": "System.Int32",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
     "Verge.Trading.GetSignalsInput": {
       "baseType": "Volo.Abp.Application.Dtos.PagedAndSortedResultRequestDto",
       "isEnum": false,
@@ -5259,6 +5400,75 @@
           "jsonName": null,
           "type": "Verge.Trading.SignalConfidence?",
           "typeSimple": "enum?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.MarketCandleDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Time",
+          "jsonName": null,
+          "type": "System.Int64",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Open",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "High",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Low",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Close",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
           "isRequired": false,
           "minLength": null,
           "maxLength": null,

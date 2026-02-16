@@ -37,6 +37,7 @@
     "@ionic/angular": "^8.7.13",
     "@ionic/core": "^8.7.13",
     "ionicons": "^8.0.13",
+    "lightweight-charts": "^5.1.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.0.0",
     "zone.js": "~0.15.0"

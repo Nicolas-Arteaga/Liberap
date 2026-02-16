@@ -72,9 +72,23 @@ export interface GetHistoryInput extends PagedAndSortedResultRequestDto {
   endDate?: string;
 }
 
+export interface GetMarketCandlesInput {
+  symbol?: string;
+  interval?: string;
+  limit: number;
+}
+
 export interface GetSignalsInput extends PagedAndSortedResultRequestDto {
   status?: TradeStatus;
   confidence?: SignalConfidence;
+}
+
+export interface MarketCandleDto {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
 }
 
 export interface RunBacktestDto {

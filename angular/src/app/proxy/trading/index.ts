@@ -1,4 +1,5 @@
 export * from './alert-type.enum';
+export * from './market-data.service';
 export * from './models';
 export * from './order-type.enum';
 export * from './risk-tolerance.enum';

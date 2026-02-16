@@ -6,8 +6,8 @@ import { CardContentComponent } from 'src/shared/components/card-content/card-co
 import { GlassButtonComponent } from 'src/shared/components/glass-button/glass-button.component';
 import { IonIcon } from '@ionic/angular/standalone';
 import { IconService } from 'src/shared/services/icon.service';
-
-declare const TradingView: any;
+import { createChart, IChartApi, ISeriesApi, CandlestickData, CandlestickSeries } from 'lightweight-charts';
+import { MarketDataService } from '../proxy/trading/market-data.service';
 
 interface TradingSignal {
   id: number;
@@ -45,12 +45,17 @@ interface StageInfo {
 export class DashboardComponent implements AfterViewInit, OnDestroy {
   private iconService = inject(IconService);
   private router = inject(Router);
+  private marketDataService = inject(MarketDataService);
 
   // Estado del dashboard
   isAnalyzing = true;
   analysisTime = '00:00:00';
   private analysisInterval: any;
-  private tvWidget: any;
+  private refreshInterval: any;
+
+  // Lightweight Charts
+  private chart: IChartApi | null = null;
+  private candlestickSeries: ISeriesApi<'Candlestick'> | null = null;
 
   // Configuración
   selectedSymbol = 'BTCUSDT';
@@ -160,138 +165,90 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
   ngAfterViewInit() {
     this.iconService.fixMissingIcons();
-    this.loadTradingViewChart();
+    this.initChart();
+    this.loadData();
     this.startAnalysisTimer();
+    this.startRefreshTimer();
   }
 
   ngOnDestroy() {
     if (this.analysisInterval) {
       clearInterval(this.analysisInterval);
     }
-    if (this.tvWidget) {
-      this.tvWidget.remove();
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval);
+    }
+    if (this.chart) {
+      this.chart.remove();
     }
   }
 
-  loadTradingViewChart() {
-    if (typeof TradingView === 'undefined') {
-      this.loadTradingViewScript();
-      return;
-    }
+  initChart() {
+    const chartContainer = document.getElementById('tradingview-chart');
+    if (!chartContainer) return;
 
-    this.tvWidget = new TradingView.widget({
-      width: '100%',
+    this.chart = createChart(chartContainer, {
+      width: chartContainer.clientWidth,
       height: 500,
-      symbol: `BINANCE:${this.selectedSymbol}`,
-      interval: this.selectedTimeframe,
-      timezone: 'America/Argentina/Buenos_Aires',
-      theme: 'dark',
-      style: '1',
-      locale: 'es',
-      toolbar_bg: '#0d1117',
-      enable_publishing: false,
-      hide_legend: true,
-      hide_volume: true,
-      container_id: 'tradingview-chart',
-      studies: [
-        'RSI@tv-basicstudies',
-        'MACD@tv-basicstudies'
-      ],
-      disabled_features: [
-        'header_widget',
-        'header_symbol_search',
-        'symbol_search_hot_key'
-      ],
-      enabled_features: [
-        'study_templates'
-      ]
+      layout: {
+        background: { color: '#0d1117' },
+        textColor: '#d1d4dc',
+      },
+      grid: {
+        vertLines: { color: 'rgba(42, 46, 57, 0.5)' },
+        horzLines: { color: 'rgba(42, 46, 57, 0.5)' },
+      },
+      rightPriceScale: {
+        borderColor: 'rgba(197, 203, 206, 0.8)',
+      },
+      timeScale: {
+        borderColor: 'rgba(197, 203, 206, 0.8)',
+        timeVisible: true,
+        secondsVisible: false,
+      },
     });
 
-    // Agregar nuestras líneas después de cargar el gráfico
-    setTimeout(() => this.addStageLines(), 2000);
+    this.candlestickSeries = this.chart.addSeries(CandlestickSeries, {
+      upColor: '#26a69a',
+      downColor: '#ef5350',
+      borderVisible: false,
+      wickUpColor: '#26a69a',
+      wickDownColor: '#ef5350',
+    });
+
+    window.addEventListener('resize', () => {
+      this.chart?.applyOptions({ width: chartContainer.clientWidth });
+    });
   }
 
-  addStageLines() {
-    this.clearStageLines();
+  loadData() {
+    this.marketDataService.getCandles({
+      symbol: this.selectedSymbol,
+      interval: `${this.selectedTimeframe}m`,
+      limit: 100
+    }).subscribe({
+      next: (data) => {
+        if (this.candlestickSeries) {
+          // Sort data for lightweight-charts
+          const sortedData = [...data].sort((a, b) => a.time - b.time);
+          this.candlestickSeries.setData(sortedData as CandlestickData[]);
 
-    // Agregar líneas para cada etapa alcanzada
-    for (let i = 0; i < this.currentStage; i++) {
-      this.createVisualLine(this.stages[i]);
-    }
+          if (sortedData.length > 0) {
+            const lastCandle = sortedData[sortedData.length - 1];
+            this.chartPrices.current = Number(lastCandle.close);
+          }
+        }
+      },
+      error: (err) => console.error('Error fetching market data', err)
+    });
   }
 
-  createVisualLine(stage: StageInfo) {
-    const chartContainer = document.getElementById('tradingview-chart');
-    if (!chartContainer) return;
-
-    // Crear contenedor para las líneas si no existe
-    let linesContainer = chartContainer.querySelector('.custom-lines');
-    if (!linesContainer) {
-      linesContainer = document.createElement('div');
-      linesContainer.className = 'custom-lines position-absolute top-0 start-0 w-100 h-100 pointer-events-none';
-      chartContainer.appendChild(linesContainer);
-    }
-
-    // Calcular posición Y basada en el precio
-    const positionY = this.calculateLinePosition(stage.price);
-
-    // Crear la línea horizontal
-    const lineDiv = document.createElement('div');
-    lineDiv.className = 'stage-line position-absolute w-100';
-    lineDiv.style.borderTop = `2px solid ${stage.lineColor}`;
-    lineDiv.style.top = `${positionY}px`;
-    lineDiv.style.zIndex = '1000';
-
-    // Crear etiqueta con precio
-    const labelDiv = document.createElement('div');
-    labelDiv.className = 'stage-label position-absolute px-2 py-1 rounded-end';
-    labelDiv.style.backgroundColor = '#0d1117';
-    labelDiv.style.borderLeft = `3px solid ${stage.lineColor}`;
-    labelDiv.style.top = `${positionY - 12}px`;
-    labelDiv.style.left = '10px';
-    labelDiv.style.zIndex = '1001';
-
-    labelDiv.innerHTML = `
-      <div class="d-flex align-items-center gap-1">
-        <div class="rounded-circle" style="width: 8px; height: 8px; background-color: ${stage.lineColor}"></div>
-        <span class="text-white fs-7 fw-medium">${stage.label}: $${stage.price.toLocaleString('es-AR')}</span>
-      </div>
-    `;
-
-    linesContainer.appendChild(lineDiv);
-    linesContainer.appendChild(labelDiv);
+  startRefreshTimer() {
+    this.refreshInterval = setInterval(() => {
+      this.loadData();
+    }, 60000); // 1 minute
   }
 
-  calculateLinePosition(price: number): number {
-    const chartHeight = 500;
-    const priceRange = this.chartPrices.max - this.chartPrices.min;
-
-    // Convertir precio a posición Y (0 = top, 500 = bottom)
-    const priceDiff = price - this.chartPrices.min;
-    const position = chartHeight - (priceDiff / priceRange * chartHeight);
-
-    // Limitar dentro del gráfico
-    return Math.max(20, Math.min(480, position));
-  }
-
-  clearStageLines() {
-    const chartContainer = document.getElementById('tradingview-chart');
-    if (!chartContainer) return;
-
-    const linesContainer = chartContainer.querySelector('.custom-lines');
-    if (linesContainer) {
-      linesContainer.remove();
-    }
-  }
-
-  loadTradingViewScript() {
-    const script = document.createElement('script');
-    script.src = 'https://s3.tradingview.com/tv.js';
-    script.onload = () => {
-      setTimeout(() => this.loadTradingViewChart(), 500);
-    };
-    document.head.appendChild(script);
-  }
 
   startAnalysisTimer() {
     let seconds = 0;
@@ -309,7 +266,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       // Simular progresión de etapas cada 30 segundos
       if (seconds % 30 === 0 && this.currentStage < 4) {
         this.currentStage++;
-        this.addStageLines();
+        // this.addStageLines(); // Removed custom line logic for now
       }
     }, 1000);
   }
@@ -326,12 +283,12 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
 
   changeSymbol(symbol: string) {
     this.selectedSymbol = symbol;
-    this.loadTradingViewChart();
+    this.loadData();
   }
 
   changeTimeframe(timeframe: string) {
     this.selectedTimeframe = timeframe;
-    this.loadTradingViewChart();
+    this.loadData();
   }
 
   onBack() {
@@ -357,7 +314,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
         console.log('Preparando entrada...');
         // Avanzar al siguiente stage
         this.currentStage = 3;
-        this.addStageLines();
+        // this.addStageLines();
         break;
       case 3:
         console.log('Monitoreando trade...');
@@ -366,8 +323,8 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
         console.log('Cerrando ciclo...');
         // Reiniciar ciclo
         this.currentStage = 1;
-        this.clearStageLines();
-        this.addStageLines();
+        // this.clearStageLines();
+        // this.addStageLines();
         break;
     }
   }
