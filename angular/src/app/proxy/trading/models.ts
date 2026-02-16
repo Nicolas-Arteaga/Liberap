@@ -8,6 +8,13 @@ import type { SignalConfidence } from './signal-confidence.enum';
 import type { TradingLevel } from './trading-level.enum';
 import type { TradingStage } from './trading-stage.enum';
 
+export interface AnalysisLogDto {
+  message?: string;
+  level?: string;
+  timestamp?: string;
+  dataJson?: string;
+}
+
 export interface BacktestResultDto extends FullAuditedEntityDto<string> {
   tradingStrategyId?: string;
   symbol?: string;
@@ -47,6 +54,7 @@ export interface CreateUpdateTradingStrategyDto {
   riskLevel?: RiskTolerance;
   autoStopLoss: boolean;
   takeProfitPercentage: number;
+  stopLossPercentage: number;
   notificationsEnabled: boolean;
 }
 
@@ -146,6 +154,9 @@ export interface TradingSessionDto extends FullAuditedEntityDto<string> {
   currentStage?: TradingStage;
   startTime?: string;
   isActive: boolean;
+  entryPrice?: number;
+  takeProfitPrice?: number;
+  stopLossPrice?: number;
 }
 
 export interface TradingSignalDto extends EntityDto<string> {
@@ -168,6 +179,7 @@ export interface TradingStrategyDto extends FullAuditedEntityDto<string> {
   riskLevel?: RiskTolerance;
   autoStopLoss: boolean;
   takeProfitPercentage: number;
+  stopLossPercentage: number;
   notificationsEnabled: boolean;
   isActive: boolean;
 }

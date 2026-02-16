@@ -16,10 +16,10 @@
         <div>
           <p class="text-white-50 text-xs mb-1">🕒 Estado del análisis</p>
           <div class="d-flex align-items-center gap-2">
-            <div class="rounded-circle" [class]="isAnalyzing ? 'bg-success' : 'bg-secondary'"
+            <div class="rounded-circle" [class]="isHunting ? 'bg-success' : 'bg-secondary'"
               style="width: 10px; height: 10px;"></div>
             <p class="text-white fw-medium mb-0">
-              {{ isAnalyzing ? 'Analizando mercado...' : 'Análisis pausado' }}
+              {{ isHunting ? 'Cacería activa (' + currentSession?.symbol + ')' : 'Sistema en espera' }}
             </p>
           </div>
         </div>
@@ -94,7 +94,19 @@
 
     <!-- Controles de acción principales -->
     <div class="mb-3">
-      <app-glass-button [variant]="getDynamicCTA().variant" (click)="onExecuteTrade()" class="w-full py-3 fw-bold mb-2">
+      <!-- Botón INICIAR CAZA (Ya no se usa aquí, se reemplaza por mensaje de guía) -->
+      <app-card-content *ngIf="!isHunting" class="mb-3 p-4 text-center">
+        <ion-icon name="flash-outline" class="text-white-50 fs-1 mb-3"></ion-icon>
+        <h3 class="text-white mb-2">¡Preparado para cazar!</h3>
+        <p class="text-white-50 mb-3">Configurá tu trade en "Ejecutar Trade" para comenzar</p>
+        <app-glass-button variant="primary" (click)="onQuickTrade()" class="w-50 mx-auto">
+          ⚡ Configurar Trade
+        </app-glass-button>
+      </app-card-content>
+
+      <!-- Botón de Acción Dinámico (Cuando la sesión está activa) -->
+      <app-glass-button *ngIf="isHunting" [variant]="getDynamicCTA().variant" (click)="onExecuteTrade()"
+        class="w-full py-3 fw-bold mb-2">
         <div class="d-flex align-items-center justify-content-center gap-2">
           <ion-icon [name]="getCurrentStage().icon"></ion-icon>
           <span>{{ getDynamicCTA().text }}</span>
@@ -132,52 +144,36 @@
       </div>
     </div>
 
-    <!-- Señales activas -->
+    <!-- Consola de Análisis en Vivo -->
     <div class="mb-3">
       <div class="d-flex justify-content-between align-items-center mb-2 px-2">
-        <h3 class="text-white fw-bold mb-0">🔔 Señales Activas</h3>
-        <span class="badge bg-dark text-white">{{ activeSignals.length }} activas</span>
+        <h3 class="text-white fw-bold mb-0">🔍 Consola de Análisis</h3>
+        <span class="badge bg-dark text-white">{{ analysisLogs.length }} eventos</span>
       </div>
 
-      <div class="space-y-2">
-        <div *ngFor="let signal of activeSignals"
-          [class]="'p-3 rounded-3 bg-' + getSignalColor(signal.type) + '-10 border-start border-' + getSignalColor(signal.type) + ' border-start-4'">
+      <div class="bg-dark rounded-3 p-3 overflow-auto" style="max-height: 400px; font-family: monospace;">
+        <div *ngFor="let log of analysisLogs" class="mb-2 pb-2 border-bottom border-white-10"
+          [class.text-warning]="log.level === 'warning'" [class.text-success]="log.level === 'success'"
+          [class.text-danger]="log.level === 'danger'" [class.text-info]="log.level === 'info'">
 
-          <div class="d-flex align-items-start gap-3">
-            <div class="rounded-circle bg-dark bg-opacity-25 d-flex align-items-center justify-content-center"
-              style="width: 36px; height: 36px;">
-              <ion-icon [name]="getSignalIcon(signal.type)" [class]="'text-' + getSignalColor(signal.type)">
-              </ion-icon>
-            </div>
+          <div class="d-flex align-items-start gap-2">
+            <span class="text-white-50" style="min-width: 70px;">{{ log.timestamp | date:'HH:mm:ss' }}</span>
+            <span class="flex-grow-1">{{ log.message }}</span>
+          </div>
 
-            <div class="flex-grow-1">
-              <div class="d-flex justify-content-between align-items-start">
-                <div>
-                  <p class="text-white fw-medium mb-0">{{ signal.message }}</p>
-                  <p class="text-white-50 text-xs mb-0 mt-1">
-                    {{ signal.symbol?.replace('USDT', '/USDT') || selectedSymbol.replace('USDT', '/USDT') }} •
-                    {{ signal.timestamp }} •
-                    {{ signal.confidence }}% confianza
-                  </p>
-                </div>
-
-                <div class="text-end">
-                  <p class="text-white fw-bold mb-0">${{ signal.price.toLocaleString('es-AR') }}</p>
-                  <span class="badge bg-dark text-white text-xs">
-                    {{ signal.type === 'buy' ? 'LONG' :
-                    signal.type === 'sell' ? 'SHORT' : 'ALERTA' }}
-                  </span>
-                </div>
-              </div>
-            </div>
+          <!-- Mostrar datos adicionales si existen -->
+          <div *ngIf="log.dataJson" class="ms-5 text-white-50 small">
+            <span *ngFor="let entry of Object.entries(parseJson(log.dataJson) || {})" class="me-3">
+              {{ entry[0] | uppercase }}: {{ entry[1] }}
+            </span>
           </div>
         </div>
-      </div>
 
-      <div *ngIf="activeSignals.length === 0" class="text-center py-4">
-        <ion-icon name="notifications-off-outline" class="text-white-50 fs-1 mb-3"></ion-icon>
-        <p class="text-white-50 mb-0">No hay señales activas en este momento</p>
-        <p class="text-white-50 text-xs mb-0">El sistema está buscando nuevas oportunidades...</p>
+        <div *ngIf="analysisLogs.length === 0" class="text-white-50 text-center py-3">
+          <ion-icon name="scan-outline" class="fs-2 mb-2"></ion-icon>
+          <p class="mb-0">Esperando análisis del mercado...</p>
+          <p class="text-xs">El sistema evaluará RSI, volumen y noticias cada 1 minuto</p>
+        </div>
       </div>
     </div>
 

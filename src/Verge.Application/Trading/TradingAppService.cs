@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Logging;
 using Volo.Abp.Application.Dtos;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Domain.Repositories;
@@ -10,6 +11,7 @@ using Volo.Abp.Users;
 
 namespace Verge.Trading;
 
+[Authorize]
 public class TradingAppService : ApplicationService, ITradingAppService
 {
     private readonly IRepository<TraderProfile, Guid> _profileRepository;
@@ -20,6 +22,8 @@ public class TradingAppService : ApplicationService, ITradingAppService
     private readonly IRepository<TradingAlert, Guid> _alertRepository;
     private readonly IRepository<BacktestResult, Guid> _backtestRepository;
     private readonly IRepository<ExchangeConnection, Guid> _exchangeRepository;
+    private readonly IRepository<AnalysisLog, Guid> _analysisLogRepository;
+    private readonly ILogger<TradingAppService> _logger;
 
     public TradingAppService(
         IRepository<TraderProfile, Guid> profileRepository,
@@ -29,7 +33,9 @@ public class TradingAppService : ApplicationService, ITradingAppService
         IRepository<TradingSession, Guid> sessionRepository,
         IRepository<TradingAlert, Guid> alertRepository,
         IRepository<BacktestResult, Guid> backtestRepository,
-        IRepository<ExchangeConnection, Guid> exchangeRepository)
+        IRepository<ExchangeConnection, Guid> exchangeRepository,
+        IRepository<AnalysisLog, Guid> analysisLogRepository,
+        ILogger<TradingAppService> logger)
     {
         _profileRepository = profileRepository;
         _signalRepository = signalRepository;
@@ -39,6 +45,8 @@ public class TradingAppService : ApplicationService, ITradingAppService
         _alertRepository = alertRepository;
         _backtestRepository = backtestRepository;
         _exchangeRepository = exchangeRepository;
+        _analysisLogRepository = analysisLogRepository;
+        _logger = logger;
     }
 
     public async Task<TraderProfileDto> GetProfileAsync()
@@ -46,7 +54,14 @@ public class TradingAppService : ApplicationService, ITradingAppService
         var profile = await _profileRepository.FirstOrDefaultAsync(x => x.UserId == CurrentUser.GetId());
         if (profile == null)
         {
-            profile = new TraderProfile(GuidGenerator.Create(), CurrentUser.GetId(), CurrentUser.UserName, CurrentUser.Email, TradingLevel.Beginner, RiskTolerance.Medium);
+            profile = new TraderProfile(
+                GuidGenerator.Create(),
+                CurrentUser.GetId(),
+                CurrentUser.UserName ?? "Usuario", // Added null check
+                CurrentUser.Email ?? "email@ejemplo.com", // Added null check
+                TradingLevel.Beginner,
+                RiskTolerance.Medium
+            );
             await _profileRepository.InsertAsync(profile);
         }
         return ObjectMapper.Map<TraderProfile, TraderProfileDto>(profile);
@@ -88,8 +103,17 @@ public class TradingAppService : ApplicationService, ITradingAppService
     public async Task<TradingStrategyDto> CreateStrategyAsync(CreateUpdateTradingStrategyDto input)
     {
         var profile = await GetProfileAsync();
+        
+        _logger.LogInformation("Creating strategy for profile {profileId} with cryptos: {cryptos}", 
+            profile.Id, string.Join(",", input.SelectedCryptos ?? new List<string>()));
+
         var strategy = ObjectMapper.Map<CreateUpdateTradingStrategyDto, TradingStrategy>(input);
         strategy.TraderProfileId = profile.Id;
+        
+        // Ensure serialization
+        strategy.SelectedCryptosJson = System.Text.Json.JsonSerializer.Serialize(input.SelectedCryptos);
+        strategy.IsActive = true; // Aseguramos que se cree activa
+        
         await _strategyRepository.InsertAsync(strategy);
         return ObjectMapper.Map<TradingStrategy, TradingStrategyDto>(strategy);
     }
@@ -110,6 +134,7 @@ public class TradingAppService : ApplicationService, ITradingAppService
         strategy.RiskLevel = input.RiskLevel;
         strategy.AutoStopLoss = input.AutoStopLoss;
         strategy.TakeProfitPercentage = input.TakeProfitPercentage;
+        strategy.StopLossPercentage = input.StopLossPercentage;
         strategy.NotificationsEnabled = input.NotificationsEnabled;
 
         await _strategyRepository.UpdateAsync(strategy);
@@ -195,6 +220,15 @@ public class TradingAppService : ApplicationService, ITradingAppService
             // pero el usuario pidió ELIMINAR todo lo manual.
         }
         return ObjectMapper.Map<TradingSession, TradingSessionDto>(session);
+    }
+
+    public async Task<List<AnalysisLogDto>> GetAnalysisLogsAsync(Guid sessionId, int limit = 50)
+    {
+        var logs = await _analysisLogRepository.GetListAsync(x => x.TradingSessionId == sessionId);
+        return logs.OrderByDescending(x => x.Timestamp)
+                   .Take(limit)
+                   .Select(x => ObjectMapper.Map<AnalysisLog, AnalysisLogDto>(x))
+                   .ToList();
     }
 
     public async Task<List<TradingAlertDto>> GetActiveAlertsAsync()

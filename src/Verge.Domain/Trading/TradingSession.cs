@@ -12,6 +12,9 @@ public class TradingSession : FullAuditedAggregateRoot<Guid>
     public DateTime StartTime { get; set; }
     public DateTime? EndTime { get; set; }
     public bool IsActive { get; set; }
+    public decimal? EntryPrice { get; set; }
+    public decimal? TakeProfitPrice { get; set; }
+    public decimal? StopLossPrice { get; set; }
 
     protected TradingSession() { }
 

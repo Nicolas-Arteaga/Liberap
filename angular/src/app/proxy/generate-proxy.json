@@ -1167,6 +1167,31 @@
                   }
                 },
                 {
+                  "name": "GetAnalysisLogsAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "sessionId",
+                      "typeAsString": "System.Guid, System.Private.CoreLib",
+                      "type": "System.Guid",
+                      "typeSimple": "string",
+                      "isOptional": false,
+                      "defaultValue": null
+                    },
+                    {
+                      "name": "limit",
+                      "typeAsString": "System.Int32, System.Private.CoreLib",
+                      "type": "System.Int32",
+                      "typeSimple": "number",
+                      "isOptional": true,
+                      "defaultValue": 50
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "System.Collections.Generic.List<Verge.Trading.AnalysisLogDto>",
+                    "typeSimple": "[Verge.Trading.AnalysisLogDto]"
+                  }
+                },
+                {
                   "name": "GetActiveAlertsAsync",
                   "parametersOnMethod": [],
                   "returnValue": {
@@ -1266,7 +1291,7 @@
                 "type": "Verge.Trading.TraderProfileDto",
                 "typeSimple": "Verge.Trading.TraderProfileDto"
               },
-              "allowAnonymous": null,
+              "allowAnonymous": false,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "UpdateProfileAsyncByInput": {
@@ -1303,7 +1328,7 @@
                 "type": "Verge.Trading.TraderProfileDto",
                 "typeSimple": "Verge.Trading.TraderProfileDto"
               },
-              "allowAnonymous": null,
+              "allowAnonymous": false,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "GetSignalsAsyncByInput": {
@@ -1388,7 +1413,7 @@
                 "type": "Volo.Abp.Application.Dtos.PagedResultDto<Verge.Trading.TradingSignalDto>",
                 "typeSimple": "Volo.Abp.Application.Dtos.PagedResultDto<Verge.Trading.TradingSignalDto>"
               },
-              "allowAnonymous": null,
+              "allowAnonymous": false,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "GetStrategiesAsync": {
@@ -1403,7 +1428,7 @@
                 "type": "System.Collections.Generic.List<Verge.Trading.TradingStrategyDto>",
                 "typeSimple": "[Verge.Trading.TradingStrategyDto]"
               },
-              "allowAnonymous": null,
+              "allowAnonymous": false,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "CreateStrategyAsyncByInput": {
@@ -1440,7 +1465,7 @@
                 "type": "Verge.Trading.TradingStrategyDto",
                 "typeSimple": "Verge.Trading.TradingStrategyDto"
               },
-              "allowAnonymous": null,
+              "allowAnonymous": false,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "UpdateStrategyAsyncByIdAndInput": {
@@ -1497,7 +1522,7 @@
                 "type": "Verge.Trading.TradingStrategyDto",
                 "typeSimple": "Verge.Trading.TradingStrategyDto"
               },
-              "allowAnonymous": null,
+              "allowAnonymous": false,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "DeleteStrategyAsyncById": {
@@ -1534,7 +1559,7 @@
                 "type": "System.Void",
                 "typeSimple": "System.Void"
               },
-              "allowAnonymous": null,
+              "allowAnonymous": false,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "ExecuteTradeAsyncByInput": {
@@ -1571,7 +1596,7 @@
                 "type": "Verge.Trading.TradeOrderDto",
                 "typeSimple": "Verge.Trading.TradeOrderDto"
               },
-              "allowAnonymous": null,
+              "allowAnonymous": false,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "GetOrderHistoryAsyncByInput": {
@@ -1668,7 +1693,7 @@
                 "type": "Volo.Abp.Application.Dtos.PagedResultDto<Verge.Trading.TradeOrderDto>",
                 "typeSimple": "Volo.Abp.Application.Dtos.PagedResultDto<Verge.Trading.TradeOrderDto>"
               },
-              "allowAnonymous": null,
+              "allowAnonymous": false,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "StartSessionAsyncByInput": {
@@ -1705,7 +1730,7 @@
                 "type": "Verge.Trading.TradingSessionDto",
                 "typeSimple": "Verge.Trading.TradingSessionDto"
               },
-              "allowAnonymous": null,
+              "allowAnonymous": false,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "GetCurrentSessionAsync": {
@@ -1720,7 +1745,7 @@
                 "type": "Verge.Trading.TradingSessionDto",
                 "typeSimple": "Verge.Trading.TradingSessionDto"
               },
-              "allowAnonymous": null,
+              "allowAnonymous": false,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "AdvanceStageAsyncBySessionId": {
@@ -1757,7 +1782,64 @@
                 "type": "Verge.Trading.TradingSessionDto",
                 "typeSimple": "Verge.Trading.TradingSessionDto"
               },
-              "allowAnonymous": null,
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Trading.ITradingAppService"
+            },
+            "GetAnalysisLogsAsyncBySessionIdAndLimit": {
+              "uniqueName": "GetAnalysisLogsAsyncBySessionIdAndLimit",
+              "name": "GetAnalysisLogsAsync",
+              "httpMethod": "GET",
+              "url": "api/app/trading/analysis-logs/{sessionId}",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "sessionId",
+                  "typeAsString": "System.Guid, System.Private.CoreLib",
+                  "type": "System.Guid",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null
+                },
+                {
+                  "name": "limit",
+                  "typeAsString": "System.Int32, System.Private.CoreLib",
+                  "type": "System.Int32",
+                  "typeSimple": "number",
+                  "isOptional": true,
+                  "defaultValue": 50
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "sessionId",
+                  "name": "sessionId",
+                  "jsonName": null,
+                  "type": "System.Guid",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": [],
+                  "bindingSourceId": "Path",
+                  "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "limit",
+                  "name": "limit",
+                  "jsonName": null,
+                  "type": "System.Int32",
+                  "typeSimple": "number",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "System.Collections.Generic.List<Verge.Trading.AnalysisLogDto>",
+                "typeSimple": "[Verge.Trading.AnalysisLogDto]"
+              },
+              "allowAnonymous": false,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "GetActiveAlertsAsync": {
@@ -1772,7 +1854,7 @@
                 "type": "System.Collections.Generic.List<Verge.Trading.TradingAlertDto>",
                 "typeSimple": "[Verge.Trading.TradingAlertDto]"
               },
-              "allowAnonymous": null,
+              "allowAnonymous": false,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "CreateAlertAsyncByInput": {
@@ -1809,7 +1891,7 @@
                 "type": "Verge.Trading.TradingAlertDto",
                 "typeSimple": "Verge.Trading.TradingAlertDto"
               },
-              "allowAnonymous": null,
+              "allowAnonymous": false,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "DeactivateAlertAsyncById": {
@@ -1846,7 +1928,7 @@
                 "type": "System.Void",
                 "typeSimple": "System.Void"
               },
-              "allowAnonymous": null,
+              "allowAnonymous": false,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "RunBacktestAsyncByInput": {
@@ -1883,7 +1965,7 @@
                 "type": "Verge.Trading.BacktestResultDto",
                 "typeSimple": "Verge.Trading.BacktestResultDto"
               },
-              "allowAnonymous": null,
+              "allowAnonymous": false,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "ConnectExchangeAsyncByInput": {
@@ -1920,7 +2002,7 @@
                 "type": "Verge.Trading.ExchangeConnectionDto",
                 "typeSimple": "Verge.Trading.ExchangeConnectionDto"
               },
-              "allowAnonymous": null,
+              "allowAnonymous": false,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
             "GetConnectionsAsync": {
@@ -1935,7 +2017,7 @@
                 "type": "System.Collections.Generic.List<Verge.Trading.ExchangeConnectionDto>",
                 "typeSimple": "[Verge.Trading.ExchangeConnectionDto]"
               },
-              "allowAnonymous": null,
+              "allowAnonymous": false,
               "implementFrom": "Verge.Trading.ITradingAppService"
             }
           }
@@ -4752,6 +4834,63 @@
       "genericArguments": null,
       "properties": null
     },
+    "Verge.Trading.AnalysisLogDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Message",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Level",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Timestamp",
+          "jsonName": null,
+          "type": "System.DateTime",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "DataJson",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
     "Verge.Trading.BacktestResultDto": {
       "baseType": "Volo.Abp.Application.Dtos.FullAuditedEntityDto<System.Guid>",
       "isEnum": false,
@@ -5124,6 +5263,18 @@
         },
         {
           "name": "TakeProfitPercentage",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "StopLossPercentage",
           "jsonName": null,
           "type": "System.Decimal",
           "typeSimple": "number",
@@ -6097,6 +6248,42 @@
           "minimum": null,
           "maximum": null,
           "regex": null
+        },
+        {
+          "name": "EntryPrice",
+          "jsonName": null,
+          "type": "System.Decimal?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "TakeProfitPrice",
+          "jsonName": null,
+          "type": "System.Decimal?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "StopLossPrice",
+          "jsonName": null,
+          "type": "System.Decimal?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
         }
       ]
     },
@@ -6316,6 +6503,18 @@
         },
         {
           "name": "TakeProfitPercentage",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "StopLossPercentage",
           "jsonName": null,
           "type": "System.Decimal",
           "typeSimple": "number",

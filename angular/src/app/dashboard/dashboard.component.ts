@@ -8,6 +8,10 @@ import { IonIcon } from '@ionic/angular/standalone';
 import { IconService } from 'src/shared/services/icon.service';
 import { createChart, IChartApi, ISeriesApi, CandlestickData, CandlestickSeries } from 'lightweight-charts';
 import { MarketDataService } from '../proxy/trading/market-data.service';
+import { TradingService } from '../proxy/trading/trading.service';
+import { TradingSessionDto, AnalysisLogDto } from '../proxy/trading/models';
+import { TradingStage } from '../proxy/trading/trading-stage.enum';
+import { SignalDirection } from '../proxy/trading/signal-direction.enum';
 
 interface TradingSignal {
   id: number;
@@ -46,10 +50,15 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   private iconService = inject(IconService);
   private router = inject(Router);
   private marketDataService = inject(MarketDataService);
+  private tradingService = inject(TradingService);
 
   // Estado del dashboard
-  isAnalyzing = true;
+  isAnalyzing = false;
+  isHunting = false;
+  currentSession: TradingSessionDto | null = null;
   analysisTime = '00:00:00';
+  analysisLogs: AnalysisLogDto[] = [];
+  Object = Object; // Make Object available in template
   private analysisInterval: any;
   private refreshInterval: any;
 
@@ -129,7 +138,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       icon: 'warning-outline',
       color: 'warning',
       lineColor: '#f97316', // Naranja
-      description: 'Oportunidad detectada - Evaluando entrada...',
+      description: '⚠️ OPORTUNIDAD INMINENTE - Zona de interés. Prepárate.',
       ctaText: '🎯 Preparar entrada',
       ctaVariant: 'warning',
       price: 68500
@@ -139,7 +148,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       icon: 'trending-up-outline',
       color: 'success',
       lineColor: '#22c55e', // Verde
-      description: 'Trade activo - Monitoreando posición...',
+      description: '🚀 ¡COMPRA AHORA! Objetivo: +4% | Apalancamiento: 3x',
       ctaText: '📊 Monitorear trade',
       ctaVariant: 'success',
       price: 68800
@@ -149,7 +158,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
       icon: 'trending-down-outline',
       color: 'danger',
       lineColor: '#ef4444', // Rojo
-      description: 'Preparando salida - Objetivo cercano...',
+      description: '💰 ¡VENDE YA! Objetivo alcanzado. ¿Nuevo trade?',
       ctaText: '💰 Cerrar ciclo',
       ctaVariant: 'danger',
       price: 69500
@@ -167,7 +176,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     this.iconService.fixMissingIcons();
     this.initChart();
     this.loadData();
-    this.startAnalysisTimer();
+    this.checkActiveSession();
     this.startRefreshTimer();
   }
 
@@ -246,12 +255,33 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   startRefreshTimer() {
     this.refreshInterval = setInterval(() => {
       this.loadData();
+      this.checkActiveSession();
+      this.loadAnalysisLogs();
     }, 60000); // 1 minute
+  }
+
+  loadAnalysisLogs() {
+    if (this.currentSession?.id) {
+      this.tradingService.getAnalysisLogs(this.currentSession.id).subscribe({
+        next: (logs) => {
+          this.analysisLogs = logs;
+        },
+        error: (err) => console.error('Error fetching analysis logs', err)
+      });
+    }
   }
 
 
   startAnalysisTimer() {
+    if (this.analysisInterval) clearInterval(this.analysisInterval);
+
     let seconds = 0;
+    // Si ya hay una sesión activa, calculamos el tiempo desde que inició
+    if (this.currentSession?.startTime) {
+      const startTime = new Date(this.currentSession.startTime).getTime();
+      seconds = Math.floor((Date.now() - startTime) / 1000);
+    }
+
     this.analysisInterval = setInterval(() => {
       seconds++;
       const hours = Math.floor(seconds / 3600);
@@ -262,14 +292,33 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
         `${hours.toString().padStart(2, '0')}:` +
         `${minutes.toString().padStart(2, '0')}:` +
         `${secs.toString().padStart(2, '0')}`;
-
-      // Simular progresión de etapas cada 30 segundos
-      if (seconds % 30 === 0 && this.currentStage < 4) {
-        this.currentStage++;
-        // this.addStageLines(); // Removed custom line logic for now
-      }
     }, 1000);
   }
+
+  checkActiveSession() {
+    this.tradingService.getCurrentSession().subscribe({
+      next: (session) => {
+        if (session) {
+          this.currentSession = session;
+          this.currentStage = session.currentStage || 1;
+          this.isHunting = true;
+          this.isAnalyzing = true;
+          this.startAnalysisTimer();
+          this.loadAnalysisLogs(); // Load initially
+        } else {
+          this.isHunting = false;
+          this.isAnalyzing = false;
+          this.currentSession = null;
+          this.analysisLogs = [];
+          clearInterval(this.analysisInterval);
+          this.analysisTime = '00:00:00';
+        }
+      },
+      error: (err) => console.error('Error checking active session', err)
+    });
+  }
+
+  // startHunt() removed - now handled in ExecuteTradeComponent
 
   // Métodos de control
   toggleAnalysis() {
@@ -306,26 +355,17 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   onExecuteTrade() {
     console.log('Ejecutar trade rápido - Estado:', this.getCurrentStage().label);
 
-    switch (this.currentStage) {
-      case 1:
-        console.log('Continuar cazando...');
-        break;
-      case 2:
-        console.log('Preparando entrada...');
-        // Avanzar al siguiente stage
-        this.currentStage = 3;
-        // this.addStageLines();
-        break;
-      case 3:
-        console.log('Monitoreando trade...');
-        break;
-      case 4:
-        console.log('Cerrando ciclo...');
-        // Reiniciar ciclo
-        this.currentStage = 1;
-        // this.clearStageLines();
-        // this.addStageLines();
-        break;
+    if (this.currentSession) {
+      this.tradingService.advanceStage(this.currentSession.id).subscribe({
+        next: (session) => {
+          console.log('Etapa avanzada:', session);
+          this.checkActiveSession(); // Actualizar UI
+        },
+        error: (err) => console.error('Error advancing stage', err)
+      });
+    } else {
+      // Si por alguna razón no hay sesión, redirigir a configuración
+      this.onQuickTrade();
     }
   }
 
@@ -383,5 +423,14 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   // Método para verificar si es el stage actual
   isStageCurrent(stageIndex: number): boolean {
     return this.currentStage === stageIndex + 1;
+  }
+
+  parseJson(json: string): any {
+    if (!json) return null;
+    try {
+      return JSON.parse(json);
+    } catch (e) {
+      return null;
+    }
   }
 }

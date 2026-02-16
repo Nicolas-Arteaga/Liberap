@@ -53,37 +53,62 @@
         <app-card-content class="mb-4">
             <h2 class="text-white fs-5 mb-3">Configuración de Trade</h2>
 
+            <div class="row mb-3">
+                <div class="col-12">
+                    <app-label>Criptomoneda</app-label>
+                    <select class="form-select bg-dark text-white border-secondary" [(ngModel)]="request.symbol">
+                        <option *ngFor="let s of symbols" [value]="s.value">{{ s.label }}</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-12">
+                    <app-label>Dirección</app-label>
+                    <div class="d-flex gap-2">
+                        <app-glass-button [variant]="request.direction === 'buy' ? 'success' : 'outline'"
+                            class="flex-1 py-2" (click)="request.direction = 'buy'">
+                            Compra (LONG)
+                        </app-glass-button>
+                        <app-glass-button [variant]="request.direction === 'sell' ? 'danger' : 'outline'"
+                            class="flex-1 py-2" (click)="request.direction = 'sell'">
+                            Venta (SHORT)
+                        </app-glass-button>
+                    </div>
+                </div>
+            </div>
+
             <div class="mb-3">
                 <app-label>Cantidad (USDT)</app-label>
-                <app-input type="number" [(ngModel)]="request.amount" placeholder="0.00" [min]="10">
-                </app-input>
+                <input type="number" class="form-control bg-dark text-white border-secondary"
+                    [(ngModel)]="request.amount" placeholder="0.00" [min]="10">
             </div>
 
             <div class="row mb-3">
                 <div class="col-6">
                     <app-label>Apalancamiento</app-label>
-                    <app-input type="number" [(ngModel)]="request.leverage" placeholder="5" [min]="1" [max]="10">
-                    </app-input>
+                    <input type="number" class="form-control bg-dark text-white border-secondary"
+                        [(ngModel)]="request.leverage" placeholder="5" [min]="1" [max]="50">
                 </div>
                 <div class="col-6">
                     <app-label>Tipo de Orden</app-label>
-                    <app-select [(ngModel)]="request.orderType">
+                    <select class="form-select bg-dark text-white border-secondary" [(ngModel)]="request.orderType">
                         <option value="market">Market</option>
                         <option value="limit">Limit</option>
-                    </app-select>
+                    </select>
                 </div>
             </div>
 
             <div class="row mb-3">
                 <div class="col-6">
                     <app-label>Take Profit (%)</app-label>
-                    <app-input type="number" [(ngModel)]="request.takeProfit" placeholder="5" [min]="1" [max]="50">
-                    </app-input>
+                    <input type="number" class="form-control bg-dark text-white border-secondary"
+                        [(ngModel)]="request.takeProfit" placeholder="5" [min]="1" [max]="50">
                 </div>
                 <div class="col-6">
                     <app-label>Stop Loss (%)</app-label>
-                    <app-input type="number" [(ngModel)]="request.stopLoss" placeholder="2" [min]="1" [max]="20">
-                    </app-input>
+                    <input type="number" class="form-control bg-dark text-white border-secondary"
+                        [(ngModel)]="request.stopLoss" placeholder="2" [min]="1" [max]="20">
                 </div>
             </div>
 

@@ -68,6 +68,7 @@ public class VergeDbContext :
     public DbSet<TradingAlert> TradingAlerts { get; set; }
     public DbSet<BacktestResult> BacktestResults { get; set; }
     public DbSet<ExchangeConnection> ExchangeConnections { get; set; }
+    public DbSet<AnalysisLog> AnalysisLogs { get; set; }
 
     #endregion
 

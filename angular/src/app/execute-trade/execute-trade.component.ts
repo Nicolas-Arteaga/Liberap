@@ -1,18 +1,20 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { CardContentComponent } from 'src/shared/components/card-content/card-content.component';
 import { CardIconComponent } from 'src/shared/components/card-icon/card-icon.component';
 import { GlassButtonComponent } from 'src/shared/components/glass-button/glass-button.component';
-import { InputComponent } from 'src/shared/components/input/input.component';
 import { LabelComponent } from 'src/shared/components/label/label.component';
-import { SelectComponent } from 'src/shared/components/select/select.component';
 import { IconService } from 'src/shared/services/icon.service';
 import { IonIcon } from '@ionic/angular/standalone';
+import { MarketDataService } from '../proxy/trading/market-data.service';
+import { TradingService } from '../proxy/trading/trading.service';
+import { SignalDirection } from '../proxy/trading/signal-direction.enum';
+import { RiskTolerance } from '../proxy/trading/risk-tolerance.enum';
 
 interface TradeDetails {
-  symbol: string;           
+  symbol: string;
   direction: 'LONG' | 'SHORT';
   entryPrice: number;
   currentPrice: number;
@@ -20,7 +22,7 @@ interface TradeDetails {
   suggestedAmount: number;
   takeProfit?: number;
   stopLoss?: number;
-  confidence: number;       
+  confidence: number;
 }
 
 interface ExecuteTradeRequest {
@@ -28,8 +30,8 @@ interface ExecuteTradeRequest {
   direction: 'buy' | 'sell';
   amount: number;
   leverage: number;
-  takeProfit: number;       
-  stopLoss: number;         
+  takeProfit: number;
+  stopLoss: number;
   orderType: 'market' | 'limit';
 }
 
@@ -42,16 +44,18 @@ interface ExecuteTradeRequest {
     CardContentComponent,
     CardIconComponent,
     GlassButtonComponent,
-    InputComponent,
     LabelComponent,
-    SelectComponent,
     IonIcon
   ],
   templateUrl: './execute-trade.component.html'
 })
-export class ExecuteTradeComponent {
+export class ExecuteTradeComponent implements OnInit {
   private iconService = inject(IconService);
   private router = inject(Router);
+  private marketDataService = inject(MarketDataService);
+  private tradingService = inject(TradingService);
+
+  symbols: { label: string, value: string }[] = [];
 
   // Mock de detalles de la señal
   tradeDetails: TradeDetails = {
@@ -77,8 +81,23 @@ export class ExecuteTradeComponent {
     orderType: 'market'
   };
 
+  ngOnInit() {
+    this.loadSymbols();
+  }
+
   ngAfterViewInit() {
     this.iconService.fixMissingIcons();
+  }
+
+  loadSymbols() {
+    // Sincronizado con DashboardComponent
+    this.symbols = [
+      { label: 'BTC/USDT', value: 'BTCUSDT' },
+      { label: 'ETH/USDT', value: 'ETHUSDT' },
+      { label: 'SOL/USDT', value: 'SOLUSDT' },
+      { label: 'BNB/USDT', value: 'BNBUSDT' },
+      { label: 'XRP/USDT', value: 'XRPUSDT' },
+    ];
   }
 
   handleBack() {
@@ -86,9 +105,37 @@ export class ExecuteTradeComponent {
   }
 
   executeTrade() {
-    console.log('🚀 Ejecutando Trade:', this.request);
-    alert('Trade ejecutado con éxito (Simulación)');
-    this.router.navigate(['/dashboard']);
+    console.log('🚀 Iniciando Cacería:', this.request);
+
+    // 1. Crear Estrategia Real
+    this.tradingService.createStrategy({
+      name: `Cacería ${this.request.symbol} - ${new Date().toLocaleString()}`,
+      directionPreference: this.request.direction === 'buy' ? SignalDirection.Long : SignalDirection.Short,
+      selectedCryptos: [this.request.symbol],
+      leverage: this.request.leverage,
+      capital: this.request.amount,
+      riskLevel: RiskTolerance.Medium,
+      autoStopLoss: true,
+      takeProfitPercentage: this.request.takeProfit,
+      stopLossPercentage: this.request.stopLoss,
+      notificationsEnabled: true
+    }).subscribe({
+      next: (strategy) => {
+        console.log('Estrategia creada:', strategy);
+        // 2. Iniciar Sesión Automatically
+        this.tradingService.startSession({
+          symbol: this.request.symbol,
+          timeframe: '1m' // Por defecto
+        }).subscribe({
+          next: () => {
+            console.log('Cacería iniciada con éxito');
+            this.router.navigate(['/dashboard']);
+          },
+          error: (err) => console.error('Error al iniciar sesión', err)
+        });
+      },
+      error: (err) => console.error('Error al crear estrategia', err)
+    });
   }
 
   cancelTrade() {
@@ -105,7 +152,7 @@ export class ExecuteTradeComponent {
     const margin = this.request.amount / this.request.leverage;
     const potentialProfit = this.request.amount * (this.request.takeProfit / 100);
     const potentialLoss = this.request.amount * (this.request.stopLoss / 100);
-    
+
     return {
       margin,
       potentialProfit,

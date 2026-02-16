@@ -67,5 +67,16 @@ public static class TradingModelBuilderExtensions
             b.ConfigureByConvention();
             b.Property(x => x.ExchangeName).IsRequired().HasMaxLength(64);
         });
+
+        builder.Entity<AnalysisLog>(b =>
+        {
+            b.ToTable("AnalysisLogs");
+            b.ConfigureByConvention();
+            b.Property(x => x.Symbol).IsRequired().HasMaxLength(20);
+            b.Property(x => x.Message).IsRequired().HasMaxLength(512);
+            b.Property(x => x.Level).IsRequired().HasMaxLength(20);
+            b.HasIndex(x => x.TradingSessionId);
+            b.HasIndex(x => x.TraderProfileId);
+        });
     }
 }

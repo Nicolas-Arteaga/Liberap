@@ -19,11 +19,9 @@
 
 /* Ionic base overrides */
 ion-app {
-  background: linear-gradient(
-    180deg,
-    var(--deudaso-dark) 0%,
-    var(--deudaso-dark-lighter) 100%
-  );
+  background: linear-gradient(180deg,
+      var(--deudaso-dark) 0%,
+      var(--deudaso-dark-lighter) 100%);
   color: var(--text-primary);
 }
 
@@ -69,6 +67,7 @@ ion-app {
   gap: 12px;
   width: 100%;
   overflow: visible;
+
   @media (max-width: 360px) {
     gap: 8px;
   }
@@ -103,20 +102,18 @@ ion-app {
 /* Divisor con gradiente elegante */
 .profile-divider {
   height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255,255,255,.15),
-    transparent
-  );
+  background: linear-gradient(90deg,
+      transparent,
+      rgba(255, 255, 255, .15),
+      transparent);
   margin: 0.5rem 0;
 }
 
 /* Ajustes de espaciado para el historial */
-.space-y-1 > * + * {
+.space-y-1>*+* {
   margin-top: 0.25rem;
 }
- 
+
 /* Confirmation message style */
 .confirmation-message {
   background: rgba(0, 196, 125, 0.1);
@@ -132,17 +129,20 @@ ion-app {
 
 /* Info Box azulado */
 .info-message {
-  background: rgba(59, 130, 246, 0.1) !important; /* Azul suave */
+  background: rgba(59, 130, 246, 0.1) !important;
+  /* Azul suave */
   border: 1px solid rgba(59, 130, 246, 0.2) !important;
   border-radius: var(--radius-lg);
   padding: 1rem;
-  
+
   .info-icon {
-    color: #3b82f6 !important; /* Azul más brillante */
+    color: #3b82f6 !important;
+    /* Azul más brillante */
   }
-  
+
   .info-text {
-    color: #60a5fa !important; /* Azul claro */
+    color: #60a5fa !important;
+    /* Azul claro */
   }
 }
 
@@ -164,4 +164,25 @@ input[type="number"]::-webkit-outer-spin-button {
 
 input[type="number"] {
   -moz-appearance: textfield;
+}
+
+@keyframes pulse-animation {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(25, 135, 84, 0.7);
+  }
+
+  70% {
+    transform: scale(1.02);
+    box-shadow: 0 0 0 10px rgba(25, 135, 84, 0);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(25, 135, 84, 0);
+  }
+}
+
+.pulse-animation {
+  animation: pulse-animation 2s infinite;
 }

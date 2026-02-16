@@ -15,6 +15,7 @@ using OpenIddict.Validation.AspNetCore;
 using OpenIddict.Server.AspNetCore;
 using Verge.EntityFrameworkCore;
 using Verge.MultiTenancy;
+using Verge.Trading;
 using Verge.HealthChecks;
 using Microsoft.OpenApi.Models;
 using Volo.Abp;
@@ -122,6 +123,8 @@ public class VergeHttpApiHostModule : AbpModule
         ConfigureSwagger(context, configuration);
         ConfigureVirtualFileSystem(context);
         ConfigureCors(context, configuration);
+        
+        context.Services.AddHostedService<TradingSessionMonitorJob>();
     }
 
     private void ConfigureAuthentication(ServiceConfigurationContext context)
