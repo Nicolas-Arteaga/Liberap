@@ -20,20 +20,11 @@ export class AuthService {
   public isAdmin$ = this.currentUser$.pipe(
     map(user => {
       if (!user) return false;
-
-      // Opción 1: Array de strings
-      if (user?.roles?.includes?.('admin') || user?.roles?.includes?.('Admin')) return true;
-
-      // Opción 2: Array de objetos con name
-      if (user?.roles?.some?.((r: any) => r.name === 'admin' || r.name === 'Admin')) return true;
-
-      // Opción 3: roleNames array
-      if (user?.roleNames?.includes?.('admin') || user?.roleNames?.includes?.('Admin')) return true;
-
-      // Opción 4: isInRole object (ABP)
-      if (user?.isInRole?.admin === true || user?.isInRole?.Admin === true) return true;
-
-      return false;
+      const roles = user.roleNames || user.roles || [];
+      return roles.some((r: any) => {
+        const roleName = typeof r === 'string' ? r : (r?.name || '');
+        return roleName.toLowerCase() === 'admin';
+      });
     })
   );
 
@@ -47,7 +38,6 @@ export class AuthService {
   login(request: LoginRequest): Observable<any> {
     const url = `${this.apiUrl}/connect/token`;
 
-    // El endpoint /connect/token requiere x-www-form-urlencoded
     const body = new HttpParams()
       .set('grant_type', 'password')
       .set('username', request.userNameOrEmailAddress)
@@ -106,13 +96,48 @@ export class AuthService {
     });
   }
 
+  private decodeToken(token: string): any {
+    try {
+      const payload = token.split('.')[1];
+      const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map((c) => {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      return JSON.parse(jsonPayload);
+    } catch (e) {
+      console.error('❌ Error decodificando JWT:', e);
+      return null;
+    }
+  }
+
+  private getRolesFromToken(token: string): string[] {
+    const decoded = this.decodeToken(token);
+    if (!decoded) return [];
+
+    // Diferentes proveedores usan diferentes nombres de claims para roles
+    const roles = decoded.role ||
+      decoded.roles ||
+      decoded['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] ||
+      [];
+
+    return Array.isArray(roles) ? roles : [roles];
+  }
+
   private loadInitialUser(): void {
     const token = this.getToken();
     if (token) {
-      // Intentar cargar perfil persistido primero para mayor velocidad
       const savedProfile = localStorage.getItem('user_profile');
       if (savedProfile) {
-        this.currentUserSubject.next(JSON.parse(savedProfile));
+        const profile = JSON.parse(savedProfile);
+        const tokenRoles = this.getRolesFromToken(token);
+
+        // Combinar roles del token con el perfil guardado
+        const enrichedProfile = {
+          ...profile,
+          roleNames: Array.from(new Set([...(profile.roleNames || []), ...tokenRoles]))
+        };
+
+        this.currentUserSubject.next(enrichedProfile);
       }
       this.loadUserProfile();
     }
@@ -120,19 +145,43 @@ export class AuthService {
 
   private loadUserProfile(): void {
     const url = `${this.apiUrl}/api/account/my-profile`;
+    const token = this.getToken();
+
+    if (!token) return;
+
+    const tokenData = this.decodeToken(token);
+    const tokenRoles = this.getRolesFromToken(token);
+    console.log('🔑 [AuthService] JWT Decodificado:', tokenData);
+    console.log('🛡️ [AuthService] Roles del Token:', tokenRoles);
+
     this.http.get(url).subscribe({
       next: (profile: any) => {
-        console.log('👤 Perfil cargado:', profile);
-        this.currentUserSubject.next(profile);
-        localStorage.setItem('user_profile', JSON.stringify(profile));
+        const enrichedProfile = {
+          ...profile,
+          roleNames: Array.from(new Set([...(profile.roleNames || []), ...tokenRoles]))
+        };
+
+        console.log('👤 [AuthService] Perfil API Enriquecido:', enrichedProfile);
+        this.currentUserSubject.next(enrichedProfile);
+        localStorage.setItem('user_profile', JSON.stringify(enrichedProfile));
       },
       error: (err) => {
         if (err.status === 401) {
-          console.log('ℹ️ Token inválido o sesión expirada al cargar perfil.');
-          this.currentUserSubject.next(null);
-          localStorage.removeItem('user_profile');
+          console.warn('ℹ️ [AuthService] 401 detectado en Perfil API. Usando datos del Token como respaldo.');
+
+          if (tokenData) {
+            const partialProfile = {
+              userName: tokenData.unique_name || tokenData.name || tokenData.sub || 'Admin(Offline)',
+              email: tokenData.email || '',
+              roleNames: tokenRoles
+            };
+            this.currentUserSubject.next(partialProfile);
+          } else {
+            this.currentUserSubject.next(null);
+            localStorage.removeItem('user_profile');
+          }
         } else {
-          console.error('❌ Error cargando perfil:', err);
+          console.error('❌ [AuthService] Error cargando perfil:', err);
         }
       }
     });

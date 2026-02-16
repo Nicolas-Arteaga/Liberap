@@ -15,7 +15,6 @@ import { RestService } from '@abp/ng.core';
         CommonModule,
         FormsModule,
         ReactiveFormsModule,
-        IonContent,
         GlassButtonComponent,
         LabelComponent,
         InputComponent
@@ -113,6 +112,6 @@ export class CreateUserComponent implements OnInit {
     }
 
     onBack(): void {
-        this.router.navigate(['/login']);
+        this.router.navigate(['/profile']);
     }
 }

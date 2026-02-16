@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './guards/auth.guard';
-import { permissionGuard } from '@abp/ng.core';
+import { adminGuard } from './guards/admin.guard';
 
 export const APP_ROUTES: Routes = [
   {
@@ -66,10 +66,7 @@ export const APP_ROUTES: Routes = [
       },
       {
         path: 'admin/users/create',
-        canActivate: [permissionGuard],
-        data: {
-          requiredPolicy: 'AbpIdentity.Users.Create',
-        },
+        canActivate: [adminGuard],
         loadComponent: () => import('./identity/create-user/create-user.component').then(c => c.CreateUserComponent),
       },
       // Rutas de ABP modules integradas en el layout móvil

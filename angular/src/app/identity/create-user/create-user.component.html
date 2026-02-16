@@ -1,12 +1,7 @@
-<ion-content class="ion-padding create-user-content">
+<main class="px-4 pt-4 create-user-content">
 
   <div class="create-user-container">
     <div class="create-user-card">
-
-      <!-- Logo -->
-      <div class="logo-container d-flex justify-content-center mt-4">
-        <img src="assets/images/logo/logo-login.png" alt="Verge Logo" class="logo-image" height="140">
-      </div>
 
       <!-- Title -->
       <div class="text-center mb-4">
@@ -58,8 +53,8 @@
           <app-label htmlFor="email" class="text-white mb-2">
             Email
           </app-label>
-          <app-input id="email" formControlName="email" type="email" autocomplete="email"
-            placeholder="tu@email.com" [required]="true" />
+          <app-input id="email" formControlName="email" type="email" autocomplete="email" placeholder="tu@email.com"
+            [required]="true" />
           <div *ngIf="hasError('email', 'required')" class="text-danger small mt-1">
             El email es obligatorio
           </div>
@@ -98,4 +93,4 @@
     </div>
   </div>
 
-</ion-content>
+</main>

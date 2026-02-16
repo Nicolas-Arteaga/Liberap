@@ -78,7 +78,11 @@ import {
   closeCircleOutline,
   saveOutline,
   pauseOutline,
-  sparklesOutline
+  sparklesOutline,
+  keyOutline,
+  linkOutline,
+  cloudDownloadOutline,
+  helpCircleOutline
 } from 'ionicons/icons';
 
 addIcons({
@@ -128,7 +132,11 @@ addIcons({
   'close-circle-outline': closeCircleOutline,
   'save-outline': saveOutline,
   'pause-outline': pauseOutline,
-  'sparkles-outline': sparklesOutline
+  'sparkles-outline': sparklesOutline,
+  'key-outline': keyOutline,
+  'link-outline': linkOutline,
+  'cloud-download-outline': cloudDownloadOutline,
+  'help-circle-outline': helpCircleOutline
 });
 
 export const appConfig: ApplicationConfig = {

@@ -29,6 +29,12 @@ export class ProfileComponent implements AfterViewInit {
 
   isAdmin$ = this.authService.isAdmin$;
 
+  constructor() {
+    this.isAdmin$.subscribe(isAdmin => {
+      console.log('🛡️ [ProfileComponent] isAdmin status:', isAdmin);
+    });
+  }
+
   // Datos del trader (mock inicial)
   traderProfile = {
     name: 'Nicolás Arteaga',
