@@ -125,6 +125,7 @@ public class VergeHttpApiHostModule : AbpModule
         ConfigureCors(context, configuration);
         
         context.Services.AddHostedService<TradingSessionMonitorJob>();
+        context.Services.AddHostedService<MarketScannerService>();
     }
 
     private void ConfigureAuthentication(ServiceConfigurationContext context)

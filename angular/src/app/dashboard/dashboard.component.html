@@ -1,149 +1,132 @@
-<div class="min-vh-100">
+<div class="min-vh-100 pb-5 dashboard-vision">
 
-  <!-- Header limpio -->
-  <header class="d-flex align-items-center gap-3 px-4 py-3">
-    <button class="btn p-0 border-0 bg-transparent" (click)="onBack()">
-      <ion-icon name="arrow-back-outline" class="text-white fs-5"></ion-icon>
-    </button>
-    <h1 class="text-white fw-bold mt-0 fs-4 text-center w-100">📈 VERGE Trading</h1>
+  <!-- Header Branding -->
+  <header class="d-flex align-items-center justify-content-between px-4 py-3 border-bottom border-white-10">
+    <div class="d-flex align-items-center gap-2">
+      <ion-icon name="settings-outline" class="text-primary fs-4"></ion-icon>
+      <h1 class="text-white fw-medium mb-0 fs-5">Análisis Inteligente en Curso</h1>
+    </div>
+    <div class="user-profile">
+      <ion-icon name="person-circle-outline" class="text-success fs-3"></ion-icon>
+    </div>
   </header>
 
-  <main class="px-4 pb-4">
+  <main class="container-fluid px-4 py-3">
 
-    <!-- Estado de análisis (ÚNICA sección de estado arriba) -->
-    <app-card-content class="mb-3 p-3">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-          <p class="text-white-50 text-xs mb-1">🕒 Estado del análisis</p>
-          <div class="d-flex align-items-center gap-2">
-            <div class="rounded-circle" [class]="isHunting ? 'bg-success' : 'bg-secondary'"
-              style="width: 10px; height: 10px;"></div>
-            <p class="text-white fw-medium mb-0">
-              {{ isHunting ? 'Cacería activa (' + currentSession?.symbol + ')' : 'Sistema en espera' }}
-            </p>
-          </div>
-        </div>
-
-        <div class="text-end">
-          <p class="text-white-50 text-xs mb-1">Tiempo activo</p>
-          <p class="text-white fw-bold mb-0">{{ analysisTime }}</p>
+    <!-- Status Bar -->
+    <div class="d-flex align-items-center gap-4 mb-4">
+      <div class="d-flex align-items-center gap-2">
+        <span class="text-white-50 text-sm fw-bold">Estado:</span>
+        <div class="status-indicator d-flex align-items-center gap-2">
+          <div class="status-dot pulsing"></div>
+          <span class="text-success fw-bold text-sm">ACTIVO</span>
+          <span class="text-white-50 text-sm">(Multi-crypto scanning)</span>
         </div>
       </div>
-
-      <!-- Indicador visual del stage actual (mini) -->
-      <div class="d-flex align-items-center gap-2 mt-3 pt-3 border-top border-white-10">
-        <span [class]="'badge bg-' + getCurrentStage().color + ' px-2 py-1'">
-          {{ getCurrentStage().label }}
-        </span>
-        <span class="text-white-50 text-xs">•</span>
-        <p class="text-white mb-0 text-xs">{{ getCurrentStage().description }}</p>
+      <div class="d-flex align-items-center gap-2">
+        <span class="text-white-50 text-sm">Tiempo activo</span>
+        <span class="text-white fw-bold text-sm">{{ analysisTime }}</span>
       </div>
-    </app-card-content>
+    </div>
 
-    <!-- Controles del gráfico -->
-    <app-card-content class="mb-3 p-3">
-      <div class="row g-2">
-        <div class="col-6">
-          <label class="text-white-50 text-xs mb-1 d-block">Símbolo</label>
-          <select class="form-select bg-dark text-white border-dark" [(ngModel)]="selectedSymbol"
-            (change)="changeSymbol(selectedSymbol)">
-            <option *ngFor="let symbol of symbols" [value]="symbol.value">
-              {{ symbol.label }}
-            </option>
-          </select>
+    <!-- Info Boxes -->
+    <div class="service-box bg-dark-soft border border-white-10 rounded-3 p-4 mb-3 position-relative">
+      <div class="mb-4">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <ion-icon name="checkbox-outline" class="text-success"></ion-icon>
+          <span class="text-white fw-bold text-sm">Última señal del motor:</span>
         </div>
-
-        <div class="col-6">
-          <label class="text-white-50 text-xs mb-1 d-block">Timeframe</label>
-          <select class="form-select bg-dark text-white border-dark" [(ngModel)]="selectedTimeframe"
-            (change)="changeTimeframe(selectedTimeframe)">
-            <option *ngFor="let tf of timeframes" [value]="tf.value">
-              {{ tf.label }}
-            </option>
-          </select>
-        </div>
+        <ul class="list-unstyled ms-4 mb-0">
+          <li class="text-white-50 text-sm d-flex align-items-start gap-2">
+            <span class="text-white">•</span>
+            <span>{{ lastMotorSignal || 'Esperando confirmación del motor...' }}</span>
+          </li>
+        </ul>
       </div>
-    </app-card-content>
 
-    <!-- SUPER GRÁFICO TradingView con LÍNEAS INTEGRADAS -->
-    <app-card-content class="mb-3 p-0 position-relative overflow-hidden bg-dark">
-
-      <!-- Gráfico TradingView -->
-      <div id="tradingview-chart" class="w-100" style="height: 500px;"></div>
-
-      <!-- Leyenda de líneas (solo en desktop) -->
-      <div class="position-absolute top-0 end-0 m-3 z-2 d-none d-md-block">
-        <div class="bg-dark bg-opacity-90 rounded-3 p-3 border border-white-10 shadow">
-          <p class="text-white fw-medium mb-2 fs-7">📊 Progreso del Trade</p>
-
-          <!-- Mini progress bar -->
-          <div class="progress mb-2" style="height: 4px;">
-            <div [class]="'progress-bar bg-' + getCurrentStage().color" [style.width]="(currentStage * 25) + '%'">
-            </div>
-          </div>
-
-          <div *ngFor="let stage of stages; let i = index" class="d-flex align-items-center gap-2 mb-1"
-            [class.text-white]="i < currentStage" [class.text-white-50]="i >= currentStage">
-            <div class="rounded-circle" [style]="'width: 8px; height: 8px; background-color: ' + stage.lineColor"></div>
-            <p class="mb-0 fs-7">{{ stage.label }}</p>
-            <span *ngIf="stage.price" class="ms-auto fs-7">${{ stage.price.toLocaleString('es-AR') }}</span>
-          </div>
-        </div>
-      </div>
-    </app-card-content>
-
-    <!-- Controles de acción principales -->
-    <div class="mb-3">
-      <!-- Botón INICIAR CAZA (Ya no se usa aquí, se reemplaza por mensaje de guía) -->
-      <app-card-content *ngIf="!isHunting" class="mb-3 p-4 text-center">
-        <ion-icon name="flash-outline" class="text-white-50 fs-1 mb-3"></ion-icon>
-        <h3 class="text-white mb-2">¡Preparado para cazar!</h3>
-        <p class="text-white-50 mb-3">Configurá tu trade en "Ejecutar Trade" para comenzar</p>
-        <app-glass-button variant="primary" (click)="onQuickTrade()" class="w-50 mx-auto">
-          ⚡ Configurar Trade
-        </app-glass-button>
-      </app-card-content>
-
-      <!-- Botón de Acción Dinámico (Cuando la sesión está activa) -->
-      <app-glass-button *ngIf="isHunting" [variant]="getDynamicCTA().variant" (click)="onExecuteTrade()"
-        class="w-full py-3 fw-bold mb-2">
-        <div class="d-flex align-items-center justify-content-center gap-2">
-          <ion-icon [name]="getCurrentStage().icon"></ion-icon>
-          <span>{{ getDynamicCTA().text }}</span>
-        </div>
-      </app-glass-button>
-
-      <div class="row g-2">
-        <div class="col-4">
-          <app-glass-button [variant]="isAnalyzing ? 'danger' : 'success'" (click)="toggleAnalysis()"
-            class="w-full py-3 px-1">
-            <div class="d-flex flex-column align-items-center justify-content-center gap-1">
-              <ion-icon [name]="isAnalyzing ? 'pause-outline' : 'play-outline'" class="fs-5"></ion-icon>
-              <span class="fs-7">{{ isAnalyzing ? 'Pausar' : 'Reanudar' }}</span>
-            </div>
-          </app-glass-button>
-        </div>
-
-        <div class="col-4">
-          <app-glass-button variant="warning" (click)="onQuickTrade()" class="w-full py-3 px-1">
-            <div class="d-flex flex-column align-items-center justify-content-center gap-1">
-              <ion-icon name="flash-outline" class="fs-5"></ion-icon>
-              <span class="fs-7">⚡ Trade</span>
-            </div>
-          </app-glass-button>
-        </div>
-
-        <div class="col-4">
-          <app-glass-button variant="primary" (click)="onOpenAdvanced()" class="w-full py-3 px-1">
-            <div class="d-flex flex-column align-items-center justify-content-center gap-1">
-              <ion-icon name="stats-chart-outline" class="fs-5"></ion-icon>
-              <span class="fs-7">📊 Avanzado</span>
-            </div>
-          </app-glass-button>
+      <div class="d-flex align-items-center gap-2">
+        <ion-icon name="earth-outline" class="text-info"></ion-icon>
+        <span class="text-white fw-bold text-sm">Última noticia relevante:</span>
+        <div
+          class="news-badge d-inline-flex align-items-center gap-2 px-2 py-1 bg-dark-accent border border-white-10 rounded-2 ms-2">
+          <ion-icon name="newspaper-outline" class="text-white-50 fs-xs"></ion-icon>
+          <span class="text-white text-xs fw-bold">{{ lastNewsTitle || 'Gasnede' }}</span>
         </div>
       </div>
     </div>
 
+    <!-- Scanner List -->
+    <div class="market-scanner-section mb-4">
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <ion-icon name="search-outline" class="text-white-50"></ion-icon>
+        <span class="text-white-50 text-sm fw-bold">Analizando mercado en tiempo real</span>
+      </div>
+
+      <div class="scanner-list ps-3 border-start border-white-10">
+        <!-- Renderizado dinámico real -->
+        <div *ngFor="let m of marketAnalyses" class="scanner-item d-flex align-items-center gap-2 mb-1">
+          <span class="text-warning">•</span>
+          <span class="text-primary fw-bold text-sm">{{ m.symbol }}</span>
+          <span class="text-white-50 text-sm">→</span>
+          <span class="text-primary fw-bold text-sm">RSI {{ m.rsi }}</span>
+          <span class="text-white-50 text-sm">| {{ m.description }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chart Overlay Area -->
+    <div class="chart-container-vision position-relative rounded-3 overflow-hidden border border-white-10 bg-dark-deep"
+      style="min-height: 500px;">
+      <div id="tradingview-chart" class="w-100 h-100"></div>
+
+      <!-- Oportunidad Overlay (FLOTANTE sobre el gráfico, no modal bloqueante) -->
+      <div *ngIf="currentOpportunity"
+        class="opportunity-alert-box position-absolute top-50 start-50 translate-middle p-4 rounded-4 shadow-xl glow-primary">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div class="d-flex align-items-center gap-2">
+            <ion-icon name="radio-button-on-outline" class="text-danger-custom"></ion-icon>
+            <span class="text-white fw-bold text-xs tracking-widest">OPORTUNIDAD DETECTADA</span>
+          </div>
+          <ion-icon name="close-outline" class="text-white-50 pointer" (click)="dismissOpportunity()"></ion-icon>
+        </div>
+
+        <div class="text-center py-2">
+          <h2 class="text-white fw-bold mb-3 d-flex align-items-center justify-content-center gap-2">
+            <ion-icon name="checkmark-circle" class="text-success fs-1"></ion-icon>
+            COMPRA AQUÍ!
+          </h2>
+          <p class="text-white fw-medium mb-4">
+            {{ currentOpportunity.symbol }} <span class="text-white-50 fw-normal ms-1">(confianza {{
+              currentOpportunity.confidence }}%)</span>
+          </p>
+
+          <button class="btn btn-success-vision w-100 py-2 rounded-3 fw-bold fs-6" (click)="goToTrade()">
+            Ir al Mercado
+          </button>
+        </div>
+      </div>
+
+      <!-- Decoración Visual Sugerida en la Imagen -->
+      <div *ngIf="currentOpportunity"
+        class="floating-buy-hint position-absolute bottom-0 end-0 m-5 d-flex flex-column align-items-center">
+        <div
+          class="hint-text bg-success bg-opacity-10 border border-success text-success px-4 py-2 rounded-pill fw-bold mb-2">
+          COMPRA AQUÍ!
+        </div>
+        <ion-icon name="arrow-undo" class="text-success fs-1 rotate-270"></ion-icon>
+      </div>
+
+    </div>
+
+    <!-- Botonera Inferior (Opcional pero útil) -->
+    <div class="d-flex gap-3 mt-4">
+      <app-glass-button variant="primary" class="flex-grow-1 py-3" (click)="onQuickTrade()">
+        ⚡ CONFIGURAR TRADE
+      </app-glass-button>
+      <app-glass-button variant="outline" class="flex-grow-1 py-3" (click)="onOpenAdvanced()">
+        📊 AVANZADO
+      </app-glass-button>
+    </div>
     <!-- Consola de Análisis en Vivo -->
     <div class="mb-3">
       <div class="d-flex justify-content-between align-items-center mb-2 px-2">
@@ -176,12 +159,5 @@
         </div>
       </div>
     </div>
-
-    <!-- Info footer -->
-    <div class="text-center text-white-50 text-xs mt-4">
-      <p class="mb-1">📊 Gráfico por TradingView • Datos en tiempo real de Binance</p>
-      <p class="mb-0">🚀 VERGE Trading System • Sistema de líneas integradas 1-2-3-4</p>
-    </div>
-
   </main>
 </div>

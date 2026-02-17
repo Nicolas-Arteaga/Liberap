@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -16,6 +17,43 @@ public class MarketDataManager : DomainService
     public MarketDataManager(IHttpClientFactory httpClientFactory)
     {
         _httpClientFactory = httpClientFactory;
+    }
+
+    public async Task<List<string>> GetTopSymbolsAsync(int limit = 30)
+    {
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            // Para obtener el TOP por volumen, usamos ticker/24hr
+            var url = $"{BinanceBaseUrl}/api/v3/ticker/24hr";
+            var response = await client.GetAsync(url);
+            
+            if (!response.IsSuccessStatusCode) return new List<string> { "BTCUSDT", "ETHUSDT", "SOLUSDT" };
+
+            var content = await response.Content.ReadAsStringAsync();
+            var tickers = JsonSerializer.Deserialize<List<JsonElement>>(content);
+
+            if (tickers == null) return new List<string> { "BTCUSDT", "ETHUSDT", "SOLUSDT" };
+
+            // Filtrar solo USDT y ordenar por quoteVolume (volumen en USDT)
+            var topSymbols = tickers
+                .Where(x => x.GetProperty("symbol").GetString()!.EndsWith("USDT"))
+                .Select(x => new {
+                    Symbol = x.GetProperty("symbol").GetString(),
+                    Volume = decimal.Parse(x.GetProperty("quoteVolume").GetString()!, System.Globalization.CultureInfo.InvariantCulture)
+                })
+                .OrderByDescending(x => x.Volume)
+                .Take(limit)
+                .Select(x => x.Symbol!)
+                .ToList();
+
+            return topSymbols;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"💥 Error al obtener top symbols: {ex.Message}");
+            return new List<string> { "BTCUSDT", "ETHUSDT", "SOLUSDT" };
+        }
     }
 
     public async Task<List<MarketCandleModel>> GetCandlesAsync(string symbol, string interval, int limit = 100)

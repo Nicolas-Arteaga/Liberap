@@ -1400,6 +1400,22 @@
                     "type": "System.Collections.Generic.List<Verge.Trading.ExchangeConnectionDto>",
                     "typeSimple": "[Verge.Trading.ExchangeConnectionDto]"
                   }
+                },
+                {
+                  "name": "GetMarketAnalysisDummyAsync",
+                  "parametersOnMethod": [],
+                  "returnValue": {
+                    "type": "Verge.Trading.MarketAnalysisDto",
+                    "typeSimple": "Verge.Trading.MarketAnalysisDto"
+                  }
+                },
+                {
+                  "name": "GetOpportunityDummyAsync",
+                  "parametersOnMethod": [],
+                  "returnValue": {
+                    "type": "Verge.Trading.OpportunityDto",
+                    "typeSimple": "Verge.Trading.OpportunityDto"
+                  }
                 }
               ]
             }
@@ -2142,6 +2158,36 @@
               "returnValue": {
                 "type": "System.Collections.Generic.List<Verge.Trading.ExchangeConnectionDto>",
                 "typeSimple": "[Verge.Trading.ExchangeConnectionDto]"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Trading.ITradingAppService"
+            },
+            "GetMarketAnalysisDummyAsync": {
+              "uniqueName": "GetMarketAnalysisDummyAsync",
+              "name": "GetMarketAnalysisDummyAsync",
+              "httpMethod": "GET",
+              "url": "api/app/trading/market-analysis-dummy",
+              "supportedVersions": [],
+              "parametersOnMethod": [],
+              "parameters": [],
+              "returnValue": {
+                "type": "Verge.Trading.MarketAnalysisDto",
+                "typeSimple": "Verge.Trading.MarketAnalysisDto"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Trading.ITradingAppService"
+            },
+            "GetOpportunityDummyAsync": {
+              "uniqueName": "GetOpportunityDummyAsync",
+              "name": "GetOpportunityDummyAsync",
+              "httpMethod": "GET",
+              "url": "api/app/trading/opportunity-dummy",
+              "supportedVersions": [],
+              "parametersOnMethod": [],
+              "parameters": [],
+              "returnValue": {
+                "type": "Verge.Trading.OpportunityDto",
+                "typeSimple": "Verge.Trading.OpportunityDto"
               },
               "allowAnonymous": false,
               "implementFrom": "Verge.Trading.ITradingAppService"
@@ -5422,6 +5468,30 @@
           "minimum": null,
           "maximum": null,
           "regex": null
+        },
+        {
+          "name": "IsAutoMode",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "CustomSymbols",
+          "jsonName": null,
+          "type": "[System.String]",
+          "typeSimple": "[string]",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
         }
       ]
     },
@@ -5788,6 +5858,111 @@
         }
       ]
     },
+    "Verge.Trading.MarketAnalysisDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Symbol",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Rsi",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Trend",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Confidence",
+          "jsonName": null,
+          "type": "System.Int32",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Signal",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Sentiment",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Timestamp",
+          "jsonName": null,
+          "type": "System.DateTime",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Description",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
     "Verge.Trading.MarketCandleDto": {
       "baseType": null,
       "isEnum": false,
@@ -5848,6 +6023,63 @@
           "jsonName": null,
           "type": "System.Decimal",
           "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.OpportunityDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Symbol",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Confidence",
+          "jsonName": null,
+          "type": "System.Int32",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Signal",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Reason",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
           "isRequired": false,
           "minLength": null,
           "maxLength": null,
@@ -5977,11 +6209,13 @@
       "isEnum": true,
       "enumNames": [
         "Long",
-        "Short"
+        "Short",
+        "Auto"
       ],
       "enumValues": [
         0,
-        1
+        1,
+        2
       ],
       "genericArguments": null,
       "properties": null
@@ -6766,10 +7000,22 @@
           "regex": null
         },
         {
-          "name": "IsActive",
+          "name": "IsAutoMode",
           "jsonName": null,
           "type": "System.Boolean",
           "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "CustomSymbols",
+          "jsonName": null,
+          "type": "[System.String]",
+          "typeSimple": "[string]",
           "isRequired": false,
           "minLength": null,
           "maxLength": null,

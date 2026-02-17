@@ -18,6 +18,8 @@ public class TradingStrategy : FullAuditedAggregateRoot<Guid>
     public decimal StopLossPercentage { get; set; }
     public bool NotificationsEnabled { get; set; }
     public bool IsActive { get; set; }
+    public bool IsAutoMode { get; set; }
+    public string? CustomSymbolsJson { get; set; } // Opcional: lista de símbolos cuando no es auto-full
 
     protected TradingStrategy() { }
 

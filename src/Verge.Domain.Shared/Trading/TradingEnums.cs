@@ -20,7 +20,8 @@ public enum RiskTolerance
 public enum SignalDirection
 {
     Long,
-    Short
+    Short,
+    Auto
 }
 
 public enum SignalConfidence

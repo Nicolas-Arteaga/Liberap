@@ -42,6 +42,10 @@ public interface ITradingAppService : IApplicationService
     // Exchange Connections
     Task<ExchangeConnectionDto> ConnectExchangeAsync(ConnectExchangeDto input);
     Task<List<ExchangeConnectionDto>> GetConnectionsAsync();
+
+    // Forced Proxies
+    Task<MarketAnalysisDto> GetMarketAnalysisDummyAsync();
+    Task<OpportunityDto> GetOpportunityDummyAsync();
 }
 
 public class GetSignalsInput : PagedAndSortedResultRequestDto

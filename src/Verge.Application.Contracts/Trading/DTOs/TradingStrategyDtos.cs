@@ -17,7 +17,8 @@ public class TradingStrategyDto : FullAuditedEntityDto<Guid>
     public decimal TakeProfitPercentage { get; set; }
     public decimal StopLossPercentage { get; set; }
     public bool NotificationsEnabled { get; set; }
-    public bool IsActive { get; set; }
+    public bool IsAutoMode { get; set; }
+    public List<string>? CustomSymbols { get; set; }
 }
 
 public class CreateUpdateTradingStrategyDto
@@ -32,4 +33,6 @@ public class CreateUpdateTradingStrategyDto
     public decimal TakeProfitPercentage { get; set; }
     public decimal StopLossPercentage { get; set; }
     public bool NotificationsEnabled { get; set; }
+    public bool IsAutoMode { get; set; }
+    public List<string>? CustomSymbols { get; set; }
 }

@@ -56,6 +56,8 @@ export interface CreateUpdateTradingStrategyDto {
   takeProfitPercentage: number;
   stopLossPercentage: number;
   notificationsEnabled: boolean;
+  isAutoMode: boolean;
+  customSymbols: string[];
 }
 
 export interface ExchangeConnectionDto extends FullAuditedEntityDto<string> {
@@ -91,12 +93,30 @@ export interface GetSignalsInput extends PagedAndSortedResultRequestDto {
   confidence?: SignalConfidence;
 }
 
+export interface MarketAnalysisDto {
+  symbol?: string;
+  rsi: number;
+  trend?: string;
+  confidence: number;
+  signal?: string;
+  sentiment?: string;
+  timestamp?: string;
+  description?: string;
+}
+
 export interface MarketCandleDto {
   time: number;
   open: number;
   high: number;
   low: number;
   close: number;
+}
+
+export interface OpportunityDto {
+  symbol?: string;
+  confidence: number;
+  signal?: string;
+  reason?: string;
 }
 
 export interface RunBacktestDto {
@@ -181,7 +201,8 @@ export interface TradingStrategyDto extends FullAuditedEntityDto<string> {
   takeProfitPercentage: number;
   stopLossPercentage: number;
   notificationsEnabled: boolean;
-  isActive: boolean;
+  isAutoMode: boolean;
+  customSymbols: string[];
 }
 
 export interface UpdateTraderProfileDto {

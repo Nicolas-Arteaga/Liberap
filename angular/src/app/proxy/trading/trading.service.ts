@@ -1,4 +1,4 @@
-import type { AnalysisLogDto, BacktestResultDto, ConnectExchangeDto, CreateUpdateTradingAlertDto, CreateUpdateTradingStrategyDto, ExchangeConnectionDto, ExecuteTradeDto, GetHistoryInput, GetSignalsInput, RunBacktestDto, StartSessionDto, TradeOrderDto, TraderProfileDto, TradingAlertDto, TradingSessionDto, TradingSignalDto, TradingStrategyDto, UpdateTraderProfileDto } from './models';
+import type { AnalysisLogDto, BacktestResultDto, ConnectExchangeDto, CreateUpdateTradingAlertDto, CreateUpdateTradingStrategyDto, ExchangeConnectionDto, ExecuteTradeDto, GetHistoryInput, GetSignalsInput, MarketAnalysisDto, OpportunityDto, RunBacktestDto, StartSessionDto, TradeOrderDto, TraderProfileDto, TradingAlertDto, TradingSessionDto, TradingSignalDto, TradingStrategyDto, UpdateTraderProfileDto } from './models';
 import { RestService, Rest } from '@abp/ng.core';
 import type { PagedResultDto } from '@abp/ng.core';
 import { Injectable, inject } from '@angular/core';
@@ -100,6 +100,22 @@ export class TradingService {
     this.restService.request<any, TradingSessionDto>({
       method: 'GET',
       url: '/api/app/trading/current-session',
+    },
+    { apiName: this.apiName,...config });
+  
+
+  getMarketAnalysisDummy = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, MarketAnalysisDto>({
+      method: 'GET',
+      url: '/api/app/trading/market-analysis-dummy',
+    },
+    { apiName: this.apiName,...config });
+  
+
+  getOpportunityDummy = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, OpportunityDto>({
+      method: 'GET',
+      url: '/api/app/trading/opportunity-dummy',
     },
     { apiName: this.apiName,...config });
   

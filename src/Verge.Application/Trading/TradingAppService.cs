@@ -102,20 +102,40 @@ public class TradingAppService : ApplicationService, ITradingAppService
 
     public async Task<TradingStrategyDto> CreateStrategyAsync(CreateUpdateTradingStrategyDto input)
     {
-        var profile = await GetProfileAsync();
-        
-        _logger.LogInformation("Creating strategy for profile {profileId} with cryptos: {cryptos}", 
-            profile.Id, string.Join(",", input.SelectedCryptos ?? new List<string>()));
+        try
+        {
+            var profile = await GetProfileAsync();
+            
+            _logger.LogInformation("🚀 [VERGE] Creando estrategia: {Name} | User: {User} | Profile: {ProfileId}", 
+                input.Name, CurrentUser.UserName, profile.Id);
+            
+            _logger.LogInformation("📊 Datos: Leverage={Leverage}, Capital={Capital}, Cryptos={Cryptos}", 
+                input.Leverage, input.Capital, string.Join(",", input.SelectedCryptos ?? new List<string>()));
 
-        var strategy = ObjectMapper.Map<CreateUpdateTradingStrategyDto, TradingStrategy>(input);
-        strategy.TraderProfileId = profile.Id;
-        
-        // Ensure serialization
-        strategy.SelectedCryptosJson = System.Text.Json.JsonSerializer.Serialize(input.SelectedCryptos);
-        strategy.IsActive = true; // Aseguramos que se cree activa
-        
-        await _strategyRepository.InsertAsync(strategy);
-        return ObjectMapper.Map<TradingStrategy, TradingStrategyDto>(strategy);
+            var strategy = ObjectMapper.Map<CreateUpdateTradingStrategyDto, TradingStrategy>(input);
+            strategy.TraderProfileId = profile.Id;
+            
+            // Ensure serialization
+            strategy.SelectedCryptosJson = System.Text.Json.JsonSerializer.Serialize(input.SelectedCryptos ?? new List<string>());
+            strategy.IsActive = true; 
+            strategy.IsAutoMode = input.IsAutoMode;
+            
+            // Handle CustomSymbolsJson safely
+            strategy.CustomSymbolsJson = input.CustomSymbols != null && input.CustomSymbols.Count > 0 
+                ? System.Text.Json.JsonSerializer.Serialize(input.CustomSymbols) 
+                : "[]";
+            
+            _logger.LogInformation("💾 Guardando estrategia en DB...");
+            await _strategyRepository.InsertAsync(strategy);
+            
+            _logger.LogInformation("✅ Estrategia creada con ID: {Id}", strategy.Id);
+            return ObjectMapper.Map<TradingStrategy, TradingStrategyDto>(strategy);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ ERROR CRÍTICO al crear estrategia: {Message}", ex.Message);
+            throw; // Re-throw to allow ABP handle the 500 but now with logs
+        }
     }
 
     public async Task<TradingStrategyDto> UpdateStrategyAsync(Guid id, CreateUpdateTradingStrategyDto input)
@@ -136,6 +156,8 @@ public class TradingAppService : ApplicationService, ITradingAppService
         strategy.TakeProfitPercentage = input.TakeProfitPercentage;
         strategy.StopLossPercentage = input.StopLossPercentage;
         strategy.NotificationsEnabled = input.NotificationsEnabled;
+        strategy.IsAutoMode = input.IsAutoMode;
+        strategy.CustomSymbolsJson = input.CustomSymbols != null ? System.Text.Json.JsonSerializer.Serialize(input.CustomSymbols) : null;
 
         await _strategyRepository.UpdateAsync(strategy);
         return ObjectMapper.Map<TradingStrategy, TradingStrategyDto>(strategy);
@@ -224,11 +246,21 @@ public class TradingAppService : ApplicationService, ITradingAppService
 
     public async Task<List<AnalysisLogDto>> GetAnalysisLogsAsync(Guid sessionId, int limit = 50)
     {
-        var logs = await _analysisLogRepository.GetListAsync(x => x.TradingSessionId == sessionId);
-        return logs.OrderByDescending(x => x.Timestamp)
-                   .Take(limit)
-                   .Select(x => ObjectMapper.Map<AnalysisLog, AnalysisLogDto>(x))
-                   .ToList();
+        var query = await _analysisLogRepository.GetQueryableAsync();
+        
+        // Si sessionId NO es vacío, filtrar por sesión
+        // Si es vacío (0000...), traer TODOS los logs
+        if (sessionId != Guid.Empty)
+        {
+            query = query.Where(x => x.TradingSessionId == sessionId);
+        }
+        
+        var logs = await AsyncExecuter.ToListAsync(
+            query.OrderByDescending(x => x.Timestamp)
+                 .Take(limit)
+        );
+        
+        return ObjectMapper.Map<List<AnalysisLog>, List<AnalysisLogDto>>(logs);
     }
 
     public async Task<List<TradingAlertDto>> GetActiveAlertsAsync()
@@ -288,5 +320,15 @@ public class TradingAppService : ApplicationService, ITradingAppService
         var profile = await GetProfileAsync();
         var connections = await _exchangeRepository.GetListAsync(x => x.TraderProfileId == profile.Id);
         return ObjectMapper.Map<List<ExchangeConnection>, List<ExchangeConnectionDto>>(connections);
+    }
+
+    public Task<MarketAnalysisDto> GetMarketAnalysisDummyAsync()
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<OpportunityDto> GetOpportunityDummyAsync()
+    {
+        throw new NotImplementedException();
     }
 }

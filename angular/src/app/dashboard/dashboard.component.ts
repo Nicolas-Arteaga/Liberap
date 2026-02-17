@@ -2,16 +2,14 @@ import { Component, AfterViewInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { CardContentComponent } from 'src/shared/components/card-content/card-content.component';
 import { GlassButtonComponent } from 'src/shared/components/glass-button/glass-button.component';
 import { IonIcon } from '@ionic/angular/standalone';
 import { IconService } from 'src/shared/services/icon.service';
 import { createChart, IChartApi, ISeriesApi, CandlestickData, CandlestickSeries } from 'lightweight-charts';
 import { MarketDataService } from '../proxy/trading/market-data.service';
 import { TradingService } from '../proxy/trading/trading.service';
-import { TradingSessionDto, AnalysisLogDto } from '../proxy/trading/models';
-import { TradingStage } from '../proxy/trading/trading-stage.enum';
-import { SignalDirection } from '../proxy/trading/signal-direction.enum';
+import { TradingSessionDto, AnalysisLogDto, MarketAnalysisDto, OpportunityDto } from '../proxy/trading/models';
+import { CardContentComponent } from "src/shared/components/card-content/card-content.component";
 
 interface TradingSignal {
   id: number;
@@ -40,11 +38,11 @@ interface StageInfo {
   imports: [
     CommonModule,
     FormsModule,
-    CardContentComponent,
     GlassButtonComponent,
     IonIcon
   ],
-  templateUrl: './dashboard.component.html'
+  templateUrl: './dashboard.component.html',
+  styleUrls: ['./dashboard.component.scss']
 })
 export class DashboardComponent implements AfterViewInit, OnDestroy {
   private iconService = inject(IconService);
@@ -58,6 +56,11 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   currentSession: TradingSessionDto | null = null;
   analysisTime = '00:00:00';
   analysisLogs: AnalysisLogDto[] = [];
+  marketAnalyses: MarketAnalysisDto[] = [];
+  lastMotorSignal: string = '';
+  lastNewsTitle: string = '';
+  currentOpportunity: OpportunityDto | null = null;
+
   Object = Object; // Make Object available in template
   private analysisInterval: any;
   private refreshInterval: any;
@@ -253,21 +256,94 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   }
 
   startRefreshTimer() {
+    // Carga inicial rápida
+    this.loadAnalysisLogs();
+
     this.refreshInterval = setInterval(() => {
       this.loadData();
       this.checkActiveSession();
       this.loadAnalysisLogs();
-    }, 60000); // 1 minute
+    }, 10000); // 10 segundos para ver logs en tiempo real
   }
 
   loadAnalysisLogs() {
-    if (this.currentSession?.id) {
-      this.tradingService.getAnalysisLogs(this.currentSession.id).subscribe({
-        next: (logs) => {
+    // SIEMPRE traer logs globales (usando Guid vacío)
+    const sessionId = '00000000-0000-0000-0000-000000000000';
+
+    this.tradingService.getAnalysisLogs(sessionId).subscribe({
+      next: (logs) => {
+        // Solo actualizamos si hay cambios o si es la primera carga
+        if (logs.length !== this.analysisLogs.length) {
           this.analysisLogs = logs;
-        },
-        error: (err) => console.error('Error fetching analysis logs', err)
+          this.processScannerLogs(logs);
+        }
+      },
+      error: (err) => console.error('Error fetching analysis logs', err)
+    });
+  }
+
+  processScannerLogs(logs: AnalysisLogDto[]) {
+    this.marketAnalyses = [];
+    logs.forEach(log => {
+      // Detectar logs de scanner normales
+      if (log.message?.startsWith('Scanner:') && log.dataJson) {
+        const data = this.parseJson(log.dataJson) as MarketAnalysisDto;
+        if (data && !this.marketAnalyses.some(a => a.symbol === data.symbol)) {
+          this.marketAnalyses.push(data);
+
+          if (data.confidence >= 80 && !this.currentOpportunity) {
+            this.currentOpportunity = {
+              symbol: data.symbol,
+              confidence: data.confidence,
+              signal: data.signal,
+              reason: data.description
+            };
+          }
+        }
+      }
+
+      // Detectar logs de OPORTUNIDAD (para el modal)
+      if (log.message?.includes('� OPORTUNIDAD DETECTADA') && log.dataJson) {
+        const data = this.parseJson(log.dataJson) as OpportunityDto;
+        if (data && !this.currentOpportunity) {
+          this.currentOpportunity = data;
+        }
+      }
+
+      if (log.level === 'success' || log.level === 'warning') {
+        if (!log.message?.startsWith('Scanner:')) {
+          this.lastMotorSignal = log.message;
+        } else if (this.marketAnalyses.length > 0) {
+          // Si es del scanner, formateamos como la imagen
+          const m = this.marketAnalyses[0];
+          this.lastMotorSignal = `RSI en ${m.symbol} recuperándose desde zona de sobreventa (${m.rsi - 9} → ${m.rsi}). Volumen +18%. Posible reversión alcista en formación.`;
+        }
+      }
+    });
+  }
+
+  generateMarketDescription(data: MarketAnalysisDto): string {
+    const rsi = data.rsi;
+    if (rsi < 30) return 'sobreventa extrema | divergencia alcista';
+    if (rsi < 45) return 'posible reversión alcista';
+    if (rsi > 70) return 'sobrecompra | riesgo de corrección';
+    if (rsi > 55) return 'fuerza alcista confirmada';
+    return `${data.trend} | volumen normal`;
+  }
+
+  dismissOpportunity() {
+    this.currentOpportunity = null;
+  }
+
+  goToTrade() {
+    if (this.currentOpportunity) {
+      this.router.navigate(['/execute-trade'], {
+        queryParams: {
+          symbol: this.currentOpportunity.symbol,
+          direction: this.currentOpportunity.signal
+        }
       });
+      this.currentOpportunity = null;
     }
   }
 

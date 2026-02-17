@@ -56,13 +56,14 @@
             <div class="row mb-3">
                 <div class="col-12">
                     <app-label>Criptomoneda</app-label>
-                    <select class="form-select bg-dark text-white border-secondary" [(ngModel)]="request.symbol">
+                    <select class="form-select bg-dark text-white border-secondary" [(ngModel)]="request.symbol"
+                        (change)="onSymbolChange()">
                         <option *ngFor="let s of symbols" [value]="s.value">{{ s.label }}</option>
                     </select>
                 </div>
             </div>
 
-            <div class="row mb-3">
+            <div class="row mb-3" *ngIf="!isAutoSelected">
                 <div class="col-12">
                     <app-label>Dirección</app-label>
                     <div class="d-flex gap-2">
@@ -75,6 +76,15 @@
                             Venta (SHORT)
                         </app-glass-button>
                     </div>
+                </div>
+            </div>
+
+            <div class="row mb-3 text-center" *ngIf="isAutoSelected">
+                <div class="col-12">
+                    <p class="text-primary-emphasis small mb-0 mt-2">
+                        🤖 En modo automático, la IA decidirá la dirección y el activo ideal basándose en el análisis
+                        del mercado.
+                    </p>
                 </div>
             </div>
 

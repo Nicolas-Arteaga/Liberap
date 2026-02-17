@@ -1,0 +1,96 @@
+.dashboard-vision {
+      background-color: #0d1218;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .text-primary {
+      color: #5bc0de !important;
+    }
+
+    .bg-dark-soft {
+      background-color: #1a232e;
+    }
+
+    .bg-dark-deep {
+      background-color: #0b0f14;
+    }
+
+    .bg-dark-accent {
+      background-color: #242f3d;
+    }
+
+    .border-white-10 {
+      border-color: rgba(255, 255, 255, 0.08) !important;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: #10b981;
+    }
+
+    .status-dot.pulsing {
+      box-shadow: 0 0 10px #10b981;
+      animation: pulse-green 2s infinite;
+    }
+
+    @keyframes pulse-green {
+      0% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      50% {
+        opacity: 0.5;
+        transform: scale(1.1);
+      }
+
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .service-box {
+      border-radius: 12px;
+    }
+
+    .opportunity-alert-box {
+      background-color: rgba(20, 31, 42, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      min-width: 320px;
+      z-index: 1000;
+      backdrop-filter: blur(12px);
+    }
+
+    .glow-primary {
+      box-shadow: 0 0 40px rgba(16, 185, 129, 0.15);
+    }
+
+    .btn-success-vision {
+      background: #10b981;
+      color: white;
+      border: none;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+    }
+
+    .text-danger-custom {
+      color: #ff4d4d;
+    }
+
+    .text-xs {
+      font-size: 0.7rem;
+    }
+
+    .text-sm {
+      font-size: 0.9rem;
+    }
+
+    .tracking-widest {
+      letter-spacing: 0.2em;
+    }
+
+    .rotate-270 {
+      transform: rotate(270deg);
+    }
