@@ -9,6 +9,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Uow;
+using Verge.Trading.DTOs;
 
 namespace Verge.Trading;
 
@@ -131,16 +132,27 @@ public class TradingSessionMonitorJob : BackgroundService
                         message = $"📈 {session.Symbol} acercándose a sobrecompra (RSI: {rsi:F2}) - Monitoreando...";
                 }
 
-                // Si hay noticias (simulado)
-                if (DateTime.UtcNow.Minute % 3 == 0) // Cada 3 minutos simular noticias
+                // IA: Análisis de sentimiento cada 5 minutos
+                bool checkAI = DateTime.UtcNow.Minute % 5 == 0;
+                SentimentAnalysisDto sentiment = null;
+                
+                if (checkAI)
                 {
-                    var news = new[] {
-                        "Analizando sentimiento de noticias...",
-                        "Volumen anormal detectado",
-                        "Tendencia alcista en redes sociales",
-                        "Noticias positivas para el sector"
-                    };
-                    message = $"📰 {news[DateTime.UtcNow.Minute % 4]} - {message}";
+                    try
+                    {
+                        var analysisAppService = scope.ServiceProvider.GetRequiredService<ICryptoAnalysisAppService>();
+                        sentiment = await analysisAppService.GetSentimentForSymbolAsync(session.Symbol);
+                        
+                        if (sentiment != null)
+                        {
+                            string sentimentEmoji = sentiment.Sentiment == "positive" ? "🚀" : (sentiment.Sentiment == "negative" ? "⚠️" : "⚖️");
+                            message = $"📰 {sentimentEmoji} Sentimiento {sentiment.Sentiment} ({sentiment.Confidence:P0}) - {message}";
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning($"⚠️ No se pudo obtener análisis de IA: {ex.Message}");
+                    }
                 }
 
                 if (advanced)

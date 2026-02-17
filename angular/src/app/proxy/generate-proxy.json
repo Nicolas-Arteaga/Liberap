@@ -873,6 +873,132 @@
       "rootPath": "app",
       "remoteServiceName": "Default",
       "controllers": {
+        "Verge.Trading.CryptoAnalysisAppService": {
+          "controllerName": "CryptoAnalysis",
+          "controllerGroupName": "CryptoAnalysis",
+          "isRemoteService": true,
+          "isIntegrationService": false,
+          "apiVersion": null,
+          "type": "Verge.Trading.CryptoAnalysisAppService",
+          "interfaces": [
+            {
+              "type": "Verge.Trading.ICryptoAnalysisAppService",
+              "name": "ICryptoAnalysisAppService",
+              "methods": [
+                {
+                  "name": "GetSentimentForSymbolAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "symbol",
+                      "typeAsString": "System.String, System.Private.CoreLib",
+                      "type": "System.String",
+                      "typeSimple": "string",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "Verge.Trading.DTOs.SentimentAnalysisDto",
+                    "typeSimple": "Verge.Trading.DTOs.SentimentAnalysisDto"
+                  }
+                },
+                {
+                  "name": "GetEnhancedAnalysisAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "sessionId",
+                      "typeAsString": "System.Guid, System.Private.CoreLib",
+                      "type": "System.Guid",
+                      "typeSimple": "string",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "Verge.Trading.DTOs.EnhancedAnalysisDto",
+                    "typeSimple": "Verge.Trading.DTOs.EnhancedAnalysisDto"
+                  }
+                }
+              ]
+            }
+          ],
+          "actions": {
+            "GetSentimentForSymbolAsyncBySymbol": {
+              "uniqueName": "GetSentimentForSymbolAsyncBySymbol",
+              "name": "GetSentimentForSymbolAsync",
+              "httpMethod": "GET",
+              "url": "api/app/crypto-analysis/sentiment-for-symbol",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "symbol",
+                  "typeAsString": "System.String, System.Private.CoreLib",
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "symbol",
+                  "name": "symbol",
+                  "jsonName": null,
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "Verge.Trading.DTOs.SentimentAnalysisDto",
+                "typeSimple": "Verge.Trading.DTOs.SentimentAnalysisDto"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.ICryptoAnalysisAppService"
+            },
+            "GetEnhancedAnalysisAsyncBySessionId": {
+              "uniqueName": "GetEnhancedAnalysisAsyncBySessionId",
+              "name": "GetEnhancedAnalysisAsync",
+              "httpMethod": "GET",
+              "url": "api/app/crypto-analysis/enhanced-analysis/{sessionId}",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "sessionId",
+                  "typeAsString": "System.Guid, System.Private.CoreLib",
+                  "type": "System.Guid",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "sessionId",
+                  "name": "sessionId",
+                  "jsonName": null,
+                  "type": "System.Guid",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": [],
+                  "bindingSourceId": "Path",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "Verge.Trading.DTOs.EnhancedAnalysisDto",
+                "typeSimple": "Verge.Trading.DTOs.EnhancedAnalysisDto"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.ICryptoAnalysisAppService"
+            }
+          }
+        },
         "Verge.Trading.MarketDataAppService": {
           "controllerName": "MarketData",
           "controllerGroupName": "MarketData",
@@ -5290,6 +5416,108 @@
           "jsonName": null,
           "type": "System.Boolean",
           "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.DTOs.EnhancedAnalysisDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Rsi",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Sentiment",
+          "jsonName": null,
+          "type": "Verge.Trading.DTOs.SentimentAnalysisDto",
+          "typeSimple": "Verge.Trading.DTOs.SentimentAnalysisDto",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Summary",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Recommendation",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.DTOs.SentimentAnalysisDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Sentiment",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Confidence",
+          "jsonName": null,
+          "type": "System.Single",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Scores",
+          "jsonName": null,
+          "type": "{System.String:System.Single}",
+          "typeSimple": "{string:number}",
           "isRequired": false,
           "minLength": null,
           "maxLength": null,

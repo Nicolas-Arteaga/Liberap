@@ -1,4 +1,6 @@
+import * as Dtos from './dtos';
 export * from './alert-type.enum';
+export * from './crypto-analysis.service';
 export * from './market-data.service';
 export * from './models';
 export * from './order-type.enum';
@@ -9,3 +11,4 @@ export * from './trade-status.enum';
 export * from './trading-level.enum';
 export * from './trading-stage.enum';
 export * from './trading.service';
+export { Dtos };
