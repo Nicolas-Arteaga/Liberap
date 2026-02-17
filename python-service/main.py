@@ -70,7 +70,7 @@ async def analyze_sentiment(request: SentimentRequest):
         logger.info(f"🔍 Analyzing text: {request.text[:50]}...")
         
         # Llamar a la API de HuggingFace
-        response = requests.post(API_URL, headers=headers, json={"inputs": request.text}, timeout=10)
+        response = requests.post(API_URL, headers=headers, json={"inputs": request.text}, timeout=30)
         
         if response.status_code == 200:
             result = response.json()
@@ -88,7 +88,7 @@ async def analyze_sentiment(request: SentimentRequest):
             
             scores = { labels_map.get(p['label'], p['label']): p['score'] for p in predictions }
             
-            logger.info(f"✅ Success: {sentiment} ({confidence:P0})")
+            logger.info(f"✅ Success: {sentiment} ({confidence:.0%})")
             return SentimentResponse(sentiment=sentiment, confidence=confidence, scores=scores)
         
         logger.error(f"❌ HF API Error {response.status_code}: {response.text}")
