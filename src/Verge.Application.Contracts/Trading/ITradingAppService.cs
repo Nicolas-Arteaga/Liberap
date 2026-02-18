@@ -29,6 +29,7 @@ public interface ITradingAppService : IApplicationService
     Task<TradingSessionDto> StartSessionAsync(StartSessionDto input);
     Task<TradingSessionDto> GetCurrentSessionAsync();
     Task<TradingSessionDto> AdvanceStageAsync(Guid sessionId);
+    Task<TradingSessionDto> FinalizeHuntAsync(Guid sessionId);
     Task<List<AnalysisLogDto>> GetAnalysisLogsAsync(Guid sessionId, int limit = 50);
 
     // Alerts

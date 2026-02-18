@@ -12,6 +12,9 @@ import { MarketDataService } from '../proxy/trading/market-data.service';
 import { TradingService } from '../proxy/trading/trading.service';
 import { SignalDirection } from '../proxy/trading/signal-direction.enum';
 import { RiskTolerance } from '../proxy/trading/risk-tolerance.enum';
+import { DialogComponent } from 'src/shared/components/dialog/dialog.component';
+import { TradingSignalrService } from '../services/trading-signalr.service';
+import { Subject, takeUntil } from 'rxjs';
 
 interface TradeDetails {
   symbol: string;
@@ -45,7 +48,8 @@ interface ExecuteTradeRequest {
     CardIconComponent,
     GlassButtonComponent,
     LabelComponent,
-    IonIcon
+    IonIcon,
+    DialogComponent
   ],
   templateUrl: './execute-trade.component.html'
 })
@@ -55,9 +59,14 @@ export class ExecuteTradeComponent implements OnInit {
   private marketDataService = inject(MarketDataService);
   private tradingService = inject(TradingService);
   private route = inject(ActivatedRoute);
+  private signalrService = inject(TradingSignalrService);
+  private destroy$ = new Subject<void>();
 
   symbols: { label: string, value: string }[] = [];
   isAutoSelected = false;
+  hasActiveHunt = false;
+  showBlockingDialog = false;
+  isExecuting = false;
 
   // Mock de detalles de la señal
   tradeDetails: TradeDetails = {
@@ -93,6 +102,24 @@ export class ExecuteTradeComponent implements OnInit {
         this.request.direction = params['direction'] === 'SHORT' ? 'sell' : 'buy';
       }
     });
+    this.checkActiveHunt();
+  }
+
+
+  checkActiveHunt() {
+    this.tradingService.getCurrentSession().subscribe({
+      next: (session) => {
+        this.hasActiveHunt = !!session;
+        if (this.hasActiveHunt) {
+          this.showBlockingDialog = true;
+        }
+      }
+    });
+  }
+
+  closeBlockingDialog() {
+    this.showBlockingDialog = false;
+    this.router.navigate(['/dashboard']);
   }
 
   ngAfterViewInit() {
@@ -120,7 +147,10 @@ export class ExecuteTradeComponent implements OnInit {
   }
 
   executeTrade() {
-    console.log('🚀 Iniciando Cacería:', this.request);
+    if (this.isExecuting) return;
+
+    this.isExecuting = true;
+    console.log('🚀 Iniciando Cacería (Navegación Inmediata):', this.request);
 
     // 1. Crear Estrategia Real
     this.tradingService.createStrategy({
@@ -138,27 +168,36 @@ export class ExecuteTradeComponent implements OnInit {
       isAutoMode: this.isAutoSelected
     }).subscribe({
       next: (strategy) => {
-        console.log('Estrategia creada:', strategy);
+        console.log('✅ Estrategia creada:', strategy);
 
-        // 2. Iniciar Sesión Automatically (solo si NO es auto mode global, ya que el scanner inicia esas)
+        // 2. Iniciar Sesión Automatically (solo si NO es auto mode global)
         if (!this.isAutoSelected) {
           this.tradingService.startSession({
             symbol: this.request.symbol,
-            timeframe: '1m' // Por defecto
+            timeframe: '1m'
           }).subscribe({
             next: () => {
-              console.log('Cacería iniciada con éxito');
+              console.log('✅ Sesión iniciada. Navegando al dashboard...');
               this.router.navigate(['/dashboard']);
             },
-            error: (err) => console.error('Error al iniciar sesión', err)
+            error: (err) => {
+              console.error('❌ Error al iniciar sesión', err);
+              this.isExecuting = false;
+            }
           });
         } else {
+          // En modo auto, navegamos igual ya que el scanner se encargará del resto
+          console.log('✅ Estrategia auto creada. Navegando al dashboard...');
           this.router.navigate(['/dashboard']);
         }
       },
-      error: (err) => console.error('Error al crear estrategia', err)
+      error: (err) => {
+        console.error('❌ Error al crear estrategia', err);
+        this.isExecuting = false;
+      }
     });
   }
+
 
   cancelTrade() {
     this.router.navigate(['/signals']);

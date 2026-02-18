@@ -71,6 +71,14 @@ export class TradingService {
     { apiName: this.apiName,...config });
   
 
+  finalizeHunt = (sessionId: string, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, TradingSessionDto>({
+      method: 'POST',
+      url: `/api/app/trading/finalize-hunt/${sessionId}`,
+    },
+    { apiName: this.apiName,...config });
+  
+
   getActiveAlerts = (config?: Partial<Rest.Config>) =>
     this.restService.request<any, TradingAlertDto[]>({
       method: 'GET',

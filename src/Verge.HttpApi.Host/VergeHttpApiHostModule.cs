@@ -16,6 +16,7 @@ using OpenIddict.Server.AspNetCore;
 using Verge.EntityFrameworkCore;
 using Verge.MultiTenancy;
 using Verge.Trading;
+using Microsoft.AspNetCore.SignalR;
 using Verge.HealthChecks;
 using Microsoft.OpenApi.Models;
 using Volo.Abp;
@@ -41,6 +42,7 @@ using Volo.Abp.Swashbuckle;
 using Volo.Abp.Studio.Client.AspNetCore;
 using Volo.Abp.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
+using Volo.Abp.AspNetCore.SignalR;
 
 namespace Verge;
 
@@ -54,7 +56,8 @@ namespace Verge;
     typeof(VergeEntityFrameworkCoreModule),
     typeof(AbpAccountWebOpenIddictModule),
     typeof(AbpSwashbuckleModule),
-    typeof(AbpAspNetCoreSerilogModule)
+    typeof(AbpAspNetCoreSerilogModule),
+    typeof(AbpAspNetCoreSignalRModule)
     )]
 public class VergeHttpApiHostModule : AbpModule
 {
@@ -124,6 +127,7 @@ public class VergeHttpApiHostModule : AbpModule
         ConfigureVirtualFileSystem(context);
         ConfigureCors(context, configuration);
         
+        context.Services.AddSignalR();
         context.Services.AddHostedService<TradingSessionMonitorJob>();
         context.Services.AddHostedService<MarketScannerService>();
     }
@@ -227,7 +231,7 @@ public class VergeHttpApiHostModule : AbpModule
                     .SetIsOriginAllowedToAllowWildcardSubdomains()
                     .AllowAnyHeader()
                     .AllowAnyMethod()
-                    .AllowCredentials();
+                    .AllowCredentials(); // Habilitar credenciales para SignalR
             });
         });
     }
@@ -283,6 +287,9 @@ public class VergeHttpApiHostModule : AbpModule
         });
         app.UseAuditing();
         app.UseAbpSerilogEnrichers();
-        app.UseConfiguredEndpoints();
+        app.UseConfiguredEndpoints(endpoints =>
+        {
+            endpoints.MapHub<TradingHub>("/signalr-hubs/trading");
+        });
     }
 }

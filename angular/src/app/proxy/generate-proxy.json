@@ -1293,6 +1293,23 @@
                   }
                 },
                 {
+                  "name": "FinalizeHuntAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "sessionId",
+                      "typeAsString": "System.Guid, System.Private.CoreLib",
+                      "type": "System.Guid",
+                      "typeSimple": "string",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "Verge.Trading.TradingSessionDto",
+                    "typeSimple": "Verge.Trading.TradingSessionDto"
+                  }
+                },
+                {
                   "name": "GetAnalysisLogsAsync",
                   "parametersOnMethod": [
                     {
@@ -1895,6 +1912,43 @@
               "name": "AdvanceStageAsync",
               "httpMethod": "POST",
               "url": "api/app/trading/advance-stage/{sessionId}",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "sessionId",
+                  "typeAsString": "System.Guid, System.Private.CoreLib",
+                  "type": "System.Guid",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "sessionId",
+                  "name": "sessionId",
+                  "jsonName": null,
+                  "type": "System.Guid",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": [],
+                  "bindingSourceId": "Path",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "Verge.Trading.TradingSessionDto",
+                "typeSimple": "Verge.Trading.TradingSessionDto"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Trading.ITradingAppService"
+            },
+            "FinalizeHuntAsyncBySessionId": {
+              "uniqueName": "FinalizeHuntAsyncBySessionId",
+              "name": "FinalizeHuntAsync",
+              "httpMethod": "POST",
+              "url": "api/app/trading/finalize-hunt/{sessionId}",
               "supportedVersions": [],
               "parametersOnMethod": [
                 {

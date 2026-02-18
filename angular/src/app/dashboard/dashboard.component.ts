@@ -1,4 +1,5 @@
-import { Component, AfterViewInit, OnDestroy, inject } from '@angular/core';
+import { Component, AfterViewInit, OnDestroy, inject, OnInit, ViewChild, ElementRef } from '@angular/core';
+import { Subject, takeUntil } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -9,7 +10,9 @@ import { createChart, IChartApi, ISeriesApi, CandlestickData, CandlestickSeries 
 import { MarketDataService } from '../proxy/trading/market-data.service';
 import { TradingService } from '../proxy/trading/trading.service';
 import { TradingSessionDto, AnalysisLogDto, MarketAnalysisDto, OpportunityDto } from '../proxy/trading/models';
+import { DialogComponent } from 'src/shared/components/dialog/dialog.component';
 import { CardContentComponent } from "src/shared/components/card-content/card-content.component";
+import { TradingSignalrService } from '../services/trading-signalr.service';
 
 interface TradingSignal {
   id: number;
@@ -39,16 +42,27 @@ interface StageInfo {
     CommonModule,
     FormsModule,
     GlassButtonComponent,
-    IonIcon
+    IonIcon,
+    DialogComponent
   ],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss']
 })
-export class DashboardComponent implements AfterViewInit, OnDestroy {
+export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
+  @ViewChild('chartContainer') set chartContainer(content: ElementRef) {
+    if (content) {
+      // Si el contenedor aparece (por el *ngIf), inicializamos el gráfico
+      this.initChart(content.nativeElement);
+      this.loadData();
+    }
+  }
+
   private iconService = inject(IconService);
   private router = inject(Router);
   private marketDataService = inject(MarketDataService);
   private tradingService = inject(TradingService);
+  private signalrService = inject(TradingSignalrService);
+  private destroy$ = new Subject<void>();
 
   // Estado del dashboard
   isAnalyzing = false;
@@ -60,6 +74,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   lastMotorSignal: string = '';
   lastNewsTitle: string = '';
   currentOpportunity: OpportunityDto | null = null;
+  showConfirmationDialog = false;
 
   Object = Object; // Make Object available in template
   private analysisInterval: any;
@@ -90,36 +105,8 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     { value: '1D', label: '1 día' }
   ];
 
-  // Señales activas (mock)
-  activeSignals: TradingSignal[] = [
-    {
-      id: 1,
-      type: 'warning',
-      price: 68500,
-      confidence: 85,
-      timestamp: '15:30',
-      message: 'BTC entrando en zona de interés',
-      symbol: 'BTCUSDT'
-    },
-    {
-      id: 2,
-      type: 'buy',
-      price: 3850,
-      confidence: 92,
-      timestamp: '14:15',
-      message: '¡COMPRA CONFIRMADA! ETH',
-      symbol: 'ETHUSDT'
-    },
-    {
-      id: 3,
-      type: 'warning',
-      price: 195,
-      confidence: 78,
-      timestamp: '13:45',
-      message: 'Prepárate para vender SOL',
-      symbol: 'SOLUSDT'
-    }
-  ];
+  // Señales activas (reemplazado por logs reales)
+  activeSignals: TradingSignal[] = [];
 
   // Sistema de alertas 1-2-3-4
   currentStage = 1;
@@ -175,11 +162,53 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     current: 68500
   };
 
+  ngOnInit() {
+    console.log('[Dashboard] 🚀 ngOnInit ejecutado');
+    this.checkActiveSession();
+
+    // Secuencia de reintentos en cascada para asegurar la captura de la sesión
+    const retryIntervals = [1000, 3000, 6000];
+    retryIntervals.forEach(ms => {
+      setTimeout(() => {
+        if (!this.currentSession) {
+          console.log(`[Dashboard] 🔄 Reintento en ${ms}ms...`);
+          this.checkActiveSession();
+        }
+      }, ms);
+    });
+
+    this.subscribeToNotifications();
+  }
+
+  private subscribeToNotifications() {
+    this.signalrService.sessionStarted$.pipe(takeUntil(this.destroy$)).subscribe(session => {
+      console.log('[Dashboard] Recibido SessionStarted vía SignalR');
+      this.handleSessionUpdate(session);
+    });
+
+    this.signalrService.sessionEnded$.pipe(takeUntil(this.destroy$)).subscribe(() => {
+      console.log('[Dashboard] Recibido SessionEnded vía SignalR');
+      this.cleanupDashboard();
+    });
+
+    this.signalrService.stageAdvanced$.pipe(takeUntil(this.destroy$)).subscribe(session => {
+      console.log('[Dashboard] Recibido StageAdvanced vía SignalR');
+      this.currentStage = session.currentStage || 1;
+      this.currentSession = session;
+    });
+  }
+
+  private handleSessionUpdate(session: any) {
+    this.currentSession = session;
+    this.currentStage = session.currentStage || 1;
+    this.isHunting = true;
+    this.isAnalyzing = true;
+    this.startAnalysisTimer();
+    this.loadAnalysisLogs();
+  }
+
   ngAfterViewInit() {
     this.iconService.fixMissingIcons();
-    this.initChart();
-    this.loadData();
-    this.checkActiveSession();
     this.startRefreshTimer();
   }
 
@@ -193,14 +222,17 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     if (this.chart) {
       this.chart.remove();
     }
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
-  initChart() {
-    const chartContainer = document.getElementById('tradingview-chart');
-    if (!chartContainer) return;
+  initChart(container: HTMLElement) {
+    if (this.chart) {
+      this.chart.remove();
+    }
 
-    this.chart = createChart(chartContainer, {
-      width: chartContainer.clientWidth,
+    this.chart = createChart(container, {
+      width: container.clientWidth,
       height: 500,
       layout: {
         background: { color: '#0d1117' },
@@ -229,7 +261,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     });
 
     window.addEventListener('resize', () => {
-      this.chart?.applyOptions({ width: chartContainer.clientWidth });
+      this.chart?.applyOptions({ width: container.clientWidth });
     });
   }
 
@@ -260,10 +292,14 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     this.loadAnalysisLogs();
 
     this.refreshInterval = setInterval(() => {
-      this.loadData();
-      this.checkActiveSession();
-      this.loadAnalysisLogs();
-    }, 10000); // 10 segundos para ver logs en tiempo real
+      // Ya NO llamamos a checkActiveSession() incondicionalmente cada 10s
+      // porque SignalR nos avisa de los cambios de estado.
+      // Solo refrescamos los logs y datos si estamos en cacería.
+      if (this.isHunting) {
+        this.loadData();
+        this.loadAnalysisLogs();
+      }
+    }, 10000);
   }
 
   loadAnalysisLogs() {
@@ -372,9 +408,12 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
   }
 
   checkActiveSession() {
+    console.log('[Dashboard] 🔍 Verificando sesión activa en:', new Date().toISOString());
     this.tradingService.getCurrentSession().subscribe({
       next: (session) => {
+        console.log('[Dashboard] 📦 Respuesta de sesión:', session ? `Sesión encontrada (${session.id})` : 'Sesión NO encontrada');
         if (session) {
+          console.log('[Dashboard] ✅ Sesión encontrada:', session.id);
           this.currentSession = session;
           this.currentStage = session.currentStage || 1;
           this.isHunting = true;
@@ -382,6 +421,9 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
           this.startAnalysisTimer();
           this.loadAnalysisLogs(); // Load initially
         } else {
+          if (this.isHunting) {
+            console.log('[Dashboard] ℹ️ La sesión ha finalizado externamente.');
+          }
           this.isHunting = false;
           this.isAnalyzing = false;
           this.currentSession = null;
@@ -390,7 +432,7 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
           this.analysisTime = '00:00:00';
         }
       },
-      error: (err) => console.error('Error checking active session', err)
+      error: (err) => console.error('[Dashboard] ❌ Error verificando sesión', err)
     });
   }
 
@@ -434,15 +476,55 @@ export class DashboardComponent implements AfterViewInit, OnDestroy {
     if (this.currentSession) {
       this.tradingService.advanceStage(this.currentSession.id).subscribe({
         next: (session) => {
-          console.log('Etapa avanzada:', session);
-          this.checkActiveSession(); // Actualizar UI
+          console.log('✅ Etapa avanzada en backend. Actualizando UI localmente...');
+          this.currentStage = session.currentStage || 1;
+          this.currentSession = session;
+          // SignalR también enviará el evento, pero ya lo actualizamos aquí
         },
-        error: (err) => console.error('Error advancing stage', err)
+        error: (err) => console.error('❌ Error advancing stage', err)
       });
     } else {
       // Si por alguna razón no hay sesión, redirigir a configuración
       this.onQuickTrade();
     }
+  }
+
+  finalizeHunt() {
+    if (!this.currentSession) return;
+    this.showConfirmationDialog = true;
+  }
+
+  confirmEndHunt() {
+    if (!this.currentSession) return;
+
+    this.tradingService.finalizeHunt(this.currentSession.id).subscribe({
+      next: () => {
+        console.log('✅ Cacería finalizada en backend. Limpiando UI inmediatamente...');
+        this.showConfirmationDialog = false;
+        this.cleanupDashboard(); // Limpieza inmediata local
+      },
+      error: (err) => {
+        console.error('❌ Error finalizing hunt', err);
+        this.showConfirmationDialog = false;
+      }
+    });
+  }
+
+  private cleanupDashboard() {
+    this.isHunting = false;
+    this.isAnalyzing = false;
+    this.currentSession = null;
+    this.analysisLogs = [];
+    this.marketAnalyses = [];
+    this.currentOpportunity = null;
+    this.lastMotorSignal = '';
+    this.lastNewsTitle = '';
+    this.analysisTime = '00:00:00';
+    if (this.analysisInterval) {
+      clearInterval(this.analysisInterval);
+    }
+    // Volver al estado inicial de stages
+    this.currentStage = 1;
   }
 
   // Métodos auxiliares

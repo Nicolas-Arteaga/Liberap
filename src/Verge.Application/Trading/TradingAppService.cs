@@ -4,10 +4,12 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Mvc;
 using Volo.Abp.Application.Dtos;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Users;
+using Microsoft.AspNetCore.SignalR;
 
 namespace Verge.Trading;
 
@@ -24,6 +26,7 @@ public class TradingAppService : ApplicationService, ITradingAppService
     private readonly IRepository<ExchangeConnection, Guid> _exchangeRepository;
     private readonly IRepository<AnalysisLog, Guid> _analysisLogRepository;
     private readonly ILogger<TradingAppService> _logger;
+    private readonly IHubContext<TradingHub> _hubContext;
 
     public TradingAppService(
         IRepository<TraderProfile, Guid> profileRepository,
@@ -35,7 +38,8 @@ public class TradingAppService : ApplicationService, ITradingAppService
         IRepository<BacktestResult, Guid> backtestRepository,
         IRepository<ExchangeConnection, Guid> exchangeRepository,
         IRepository<AnalysisLog, Guid> analysisLogRepository,
-        ILogger<TradingAppService> logger)
+        ILogger<TradingAppService> logger,
+        IHubContext<TradingHub> hubContext)
     {
         _profileRepository = profileRepository;
         _signalRepository = signalRepository;
@@ -47,6 +51,7 @@ public class TradingAppService : ApplicationService, ITradingAppService
         _exchangeRepository = exchangeRepository;
         _analysisLogRepository = analysisLogRepository;
         _logger = logger;
+        _hubContext = hubContext;
     }
 
     public async Task<TraderProfileDto> GetProfileAsync()
@@ -106,6 +111,13 @@ public class TradingAppService : ApplicationService, ITradingAppService
         {
             var profile = await GetProfileAsync();
             
+            // Check for active hunt/session
+            var activeSession = await _sessionRepository.FirstOrDefaultAsync(x => x.TraderProfileId == profile.Id && x.IsActive);
+            if (activeSession != null)
+            {
+                throw new Volo.Abp.UserFriendlyException("Ya tenés una cacería activa. Finalizala desde el dashboard antes de crear una nueva");
+            }
+
             _logger.LogInformation("🚀 [VERGE] Creando estrategia: {Name} | User: {User} | Profile: {ProfileId}", 
                 input.Name, CurrentUser.UserName, profile.Id);
             
@@ -126,7 +138,7 @@ public class TradingAppService : ApplicationService, ITradingAppService
                 : "[]";
             
             _logger.LogInformation("💾 Guardando estrategia en DB...");
-            await _strategyRepository.InsertAsync(strategy);
+            await _strategyRepository.InsertAsync(strategy, autoSave: true);
             
             _logger.LogInformation("✅ Estrategia creada con ID: {Id}", strategy.Id);
             return ObjectMapper.Map<TradingStrategy, TradingStrategyDto>(strategy);
@@ -211,7 +223,7 @@ public class TradingAppService : ApplicationService, ITradingAppService
     {
         var profile = await GetProfileAsync();
         // Deactivate previous active sessions
-        var activeSessions = await _sessionRepository.GetListAsync(x => x.TraderProfileId == profile.Id && x.IsActive);
+        var activeSessions = await _sessionRepository.GetListAsync(x => x.TraderProfileId == profile.Id && x.IsActive && !x.IsDeleted);
         foreach (var s in activeSessions)
         {
             s.IsActive = false;
@@ -219,14 +231,36 @@ public class TradingAppService : ApplicationService, ITradingAppService
         }
 
         var session = new TradingSession(GuidGenerator.Create(), profile.Id, input.Symbol, input.Timeframe);
-        await _sessionRepository.InsertAsync(session);
+        session.IsActive = true;
+        await _sessionRepository.InsertAsync(session, autoSave: true);
+
+        // Notificar inicio de sesión por SignalR
+        await _hubContext.Clients.All.SendAsync("SessionStarted", ObjectMapper.Map<TradingSession, TradingSessionDto>(session));
+
         return ObjectMapper.Map<TradingSession, TradingSessionDto>(session);
     }
 
     public async Task<TradingSessionDto> GetCurrentSessionAsync()
     {
         var profile = await GetProfileAsync();
-        var session = await _sessionRepository.FirstOrDefaultAsync(x => x.TraderProfileId == profile.Id && x.IsActive);
+        _logger.LogInformation("🔍 [GetCurrentSession] Buscando sesión para perfil {ProfileId}", profile.Id);
+        
+        var session = await _sessionRepository.FirstOrDefaultAsync(
+            x => x.TraderProfileId == profile.Id && 
+                 x.IsActive && 
+                 !x.IsDeleted
+        );
+        
+        if (session == null)
+        {
+            _logger.LogWarning("⚠️ [GetCurrentSession] NO se encontró sesión activa para perfil {ProfileId}", profile.Id);
+        }
+        else
+        {
+            _logger.LogInformation("✅ [GetCurrentSession] Sesión encontrada: {Id}, Activa: {IsActive}, Eliminada: {IsDeleted}", 
+                session.Id, session.IsActive, session.IsDeleted);
+        }
+        
         return session != null ? ObjectMapper.Map<TradingSession, TradingSessionDto>(session) : null;
     }
 
@@ -238,9 +272,51 @@ public class TradingAppService : ApplicationService, ITradingAppService
             session.CurrentStage = (TradingStage)((int)session.CurrentStage + 1);
             await _sessionRepository.UpdateAsync(session);
             
-            // ABP expone servicios automáticamente, SignalR para tiempo real se configura diferente en ABP (Hubs) 
-            // pero el usuario pidió ELIMINAR todo lo manual.
+            // Notificar avance de etapa
+            await _hubContext.Clients.All.SendAsync("StageAdvanced", ObjectMapper.Map<TradingSession, TradingSessionDto>(session));
         }
+        return ObjectMapper.Map<TradingSession, TradingSessionDto>(session);
+    }
+
+    [HttpPost("api/app/trading/finalize-hunt/{sessionId}")]
+    public async Task<TradingSessionDto> FinalizeHuntAsync(Guid sessionId)
+    {
+        var session = await _sessionRepository.GetAsync(sessionId);
+        var profile = await GetProfileAsync();
+
+        if (session.TraderProfileId != profile.Id)
+        {
+            throw new UnauthorizedAccessException("La sesión no pertenece al usuario actual.");
+        }
+
+        _logger.LogInformation("🏁 Finalizando cacería para la sesión {SessionId}", sessionId);
+
+        session.IsActive = false;
+        session.EndTime = DateTime.UtcNow;
+        await _sessionRepository.UpdateAsync(session, autoSave: true);
+        await _sessionRepository.DeleteAsync(session, autoSave: true); 
+
+        // Borrar la estrategia activa asociada
+        var strategy = await _strategyRepository.FirstOrDefaultAsync(x => x.TraderProfileId == profile.Id && x.IsActive);
+        if (strategy != null)
+        {
+            strategy.IsActive = false;
+            await _strategyRepository.UpdateAsync(strategy, autoSave: true);
+            await _strategyRepository.DeleteAsync(strategy.Id, autoSave: true); 
+            _logger.LogInformation("🗑️ Estrategia {StrategyId} eliminada físicamente", strategy.Id);
+        }
+
+        // Limpiar registros de análisis asociados a ESTA sesión
+        var logs = await _analysisLogRepository.GetListAsync(x => x.TradingSessionId == sessionId);
+        foreach (var log in logs)
+        {
+            await _analysisLogRepository.DeleteAsync(log.Id);
+        }
+        _logger.LogInformation("🧹 {Count} registros de análisis eliminados para la sesión {SessionId}", logs.Count, sessionId);
+
+        // Notificar fin de sesión
+        await _hubContext.Clients.All.SendAsync("SessionEnded", sessionId);
+
         return ObjectMapper.Map<TradingSession, TradingSessionDto>(session);
     }
 

@@ -150,16 +150,34 @@
 
         <!-- Botones -->
         <div class="d-grid gap-3">
-            <app-glass-button variant="solid" class="w-full py-3" (click)="executeTrade()">
+            <app-glass-button [variant]="(hasActiveHunt || isExecuting) ? 'outline' : 'solid'"
+                [disabled]="hasActiveHunt || isExecuting" class="w-full py-3"
+                (click)="(!hasActiveHunt && !isExecuting) && executeTrade()">
                 <div class="d-flex align-items-center justify-content-center gap-2">
-                    <ion-icon name="flash-outline"></ion-icon>
-                    <span>🚀 Ejecutar Trade</span>
+                    <ion-icon *ngIf="!isExecuting" name="flash-outline"></ion-icon>
+                    <div *ngIf="isExecuting" class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                    <span>
+                        {{ isExecuting ? 'Creando cacería...' : (hasActiveHunt ? 'Cacería en curso' : '🚀 Ejecutar Trade') }}
+                    </span>
                 </div>
             </app-glass-button>
-            <app-glass-button variant="outline" class="w-full py-3" (click)="cancelTrade()">
+            <app-glass-button variant="outline" class="w-full py-3" [disabled]="isExecuting"
+                (click)="!isExecuting && cancelTrade()">
                 Cancelar
             </app-glass-button>
         </div>
+
+        <!-- Diálogo Bloqueante -->
+        <app-dialog *ngIf="showBlockingDialog" title="Cacería Activa" variant="warning"
+            (dismiss)="closeBlockingDialog()">
+            <p class="text-white">Ya tenés una cacería activa. Finalizala desde el dashboard antes de crear una nueva.
+            </p>
+            <div actions class="w-100 mt-3">
+                <app-glass-button variant="primary" class="w-100" (click)="closeBlockingDialog()">
+                    Ir al Dashboard
+                </app-glass-button>
+            </div>
+        </app-dialog>
 
         <!-- Info adicional -->
         <div class="text-center text-white-50 text-xs mt-4">

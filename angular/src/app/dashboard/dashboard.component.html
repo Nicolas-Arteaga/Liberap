@@ -12,152 +12,170 @@
   </header>
 
   <main class="container-fluid px-4 py-3">
-
-    <!-- Status Bar -->
-    <div class="d-flex align-items-center gap-4 mb-4">
-      <div class="d-flex align-items-center gap-2">
-        <span class="text-white-50 text-sm fw-bold">Estado:</span>
-        <div class="status-indicator d-flex align-items-center gap-2">
-          <div class="status-dot pulsing"></div>
-          <span class="text-success fw-bold text-sm">ACTIVO</span>
-          <span class="text-white-50 text-sm">(Multi-crypto scanning)</span>
-        </div>
-      </div>
-      <div class="d-flex align-items-center gap-2">
-        <span class="text-white-50 text-sm">Tiempo activo</span>
-        <span class="text-white fw-bold text-sm">{{ analysisTime }}</span>
-      </div>
-    </div>
-
-    <!-- Info Boxes -->
-    <div class="service-box bg-dark-soft border border-white-10 rounded-3 p-4 mb-3 position-relative">
-      <div class="mb-4">
-        <div class="d-flex align-items-center gap-2 mb-2">
-          <ion-icon name="checkbox-outline" class="text-success"></ion-icon>
-          <span class="text-white fw-bold text-sm">Última señal del motor:</span>
-        </div>
-        <ul class="list-unstyled ms-4 mb-0">
-          <li class="text-white-50 text-sm d-flex align-items-start gap-2">
-            <span class="text-white">•</span>
-            <span>{{ lastMotorSignal || 'Esperando confirmación del motor...' }}</span>
-          </li>
-        </ul>
-      </div>
-
-      <div class="d-flex align-items-center gap-2">
-        <ion-icon name="earth-outline" class="text-info"></ion-icon>
-        <span class="text-white fw-bold text-sm">Última noticia relevante:</span>
-        <div
-          class="news-badge d-inline-flex align-items-center gap-2 px-2 py-1 bg-dark-accent border border-white-10 rounded-2 ms-2">
-          <ion-icon name="newspaper-outline" class="text-white-50 fs-xs"></ion-icon>
-          <span class="text-white text-xs fw-bold">{{ lastNewsTitle || 'Gasnede' }}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Scanner List -->
-    <div class="market-scanner-section mb-4">
-      <div class="d-flex align-items-center gap-2 mb-3">
-        <ion-icon name="search-outline" class="text-white-50"></ion-icon>
-        <span class="text-white-50 text-sm fw-bold">Analizando mercado en tiempo real</span>
-      </div>
-
-      <div class="scanner-list ps-3 border-start border-white-10">
-        <!-- Renderizado dinámico real -->
-        <div *ngFor="let m of marketAnalyses" class="scanner-item d-flex align-items-center gap-2 mb-1">
-          <span class="text-warning">•</span>
-          <span class="text-primary fw-bold text-sm">{{ m.symbol }}</span>
-          <span class="text-white-50 text-sm">→</span>
-          <span class="text-primary fw-bold text-sm">RSI {{ m.rsi }}</span>
-          <span class="text-white-50 text-sm">| {{ m.description }}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Chart Overlay Area -->
-    <div class="chart-container-vision position-relative rounded-3 overflow-hidden border border-white-10 bg-dark-deep"
-      style="min-height: 500px;">
-      <div id="tradingview-chart" class="w-100 h-100"></div>
-
-      <!-- Oportunidad Overlay (FLOTANTE sobre el gráfico, no modal bloqueante) -->
-      <div *ngIf="currentOpportunity"
-        class="opportunity-alert-box position-absolute top-50 start-50 translate-middle p-4 rounded-4 shadow-xl glow-primary">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <div class="d-flex align-items-center gap-2">
-            <ion-icon name="radio-button-on-outline" class="text-danger-custom"></ion-icon>
-            <span class="text-white fw-bold text-xs tracking-widest">OPORTUNIDAD DETECTADA</span>
+    <ng-container *ngIf="isHunting; else noHunt">
+      <!-- Status Bar -->
+      <div class="d-flex align-items-center gap-4 mb-4">
+        <div class="d-flex align-items-center gap-2">
+          <span class="text-white-50 text-sm fw-bold">Estado:</span>
+          <div class="status-indicator d-flex align-items-center gap-2">
+            <div class="status-dot pulsing"></div>
+            <span class="text-success fw-bold text-sm">ACTIVO</span>
+            <span class="text-white-50 text-sm">(Multi-crypto scanning)</span>
           </div>
-          <ion-icon name="close-outline" class="text-white-50 pointer" (click)="dismissOpportunity()"></ion-icon>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="text-white-50 text-sm">Tiempo activo</span>
+          <span class="text-white fw-bold text-sm">{{ analysisTime }}</span>
         </div>
 
-        <div class="text-center py-2">
-          <h2 class="text-white fw-bold mb-3 d-flex align-items-center justify-content-center gap-2">
-            <ion-icon name="checkmark-circle" class="text-success fs-1"></ion-icon>
-            COMPRA AQUÍ!
-          </h2>
-          <p class="text-white fw-medium mb-4">
-            {{ currentOpportunity.symbol }} <span class="text-white-50 fw-normal ms-1">(confianza {{
-              currentOpportunity.confidence }}%)</span>
-          </p>
+        <button *ngIf="currentSession" class="btn btn-danger-vision btn-sm px-3 rounded-pill ms-auto"
+          (click)="finalizeHunt()">
+          <ion-icon name="stop-circle-outline" class="me-1"></ion-icon>
+          Finalizar cacería
+        </button>
+      </div>
 
-          <button class="btn btn-success-vision w-100 py-2 rounded-3 fw-bold fs-6" (click)="goToTrade()">
-            Ir al Mercado
-          </button>
+      <!-- Info Boxes -->
+      <div class="service-box bg-dark-soft border border-white-10 rounded-3 p-4 mb-3 position-relative">
+        <div class="mb-4">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <ion-icon name="checkbox-outline" class="text-success"></ion-icon>
+            <span class="text-white fw-bold text-sm">Última señal del motor:</span>
+          </div>
+          <ul class="list-unstyled ms-4 mb-0">
+            <li class="text-white-50 text-sm d-flex align-items-start gap-2">
+              <span class="text-white">•</span>
+              <span>{{ lastMotorSignal || 'Esperando confirmación del motor...' }}</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+          <ion-icon name="earth-outline" class="text-info"></ion-icon>
+          <span class="text-white fw-bold text-sm">Última noticia relevante:</span>
+          <div
+            class="news-badge d-inline-flex align-items-center gap-2 px-2 py-1 bg-dark-accent border border-white-10 rounded-2 ms-2">
+            <ion-icon name="newspaper-outline" class="text-white-50 fs-xs"></ion-icon>
+            <span class="text-white text-xs fw-bold">{{ lastNewsTitle || 'No hay noticias recientes' }}</span>
+          </div>
         </div>
       </div>
 
-      <!-- Decoración Visual Sugerida en la Imagen -->
-      <div *ngIf="currentOpportunity"
-        class="floating-buy-hint position-absolute bottom-0 end-0 m-5 d-flex flex-column align-items-center">
-        <div
-          class="hint-text bg-success bg-opacity-10 border border-success text-success px-4 py-2 rounded-pill fw-bold mb-2">
-          COMPRA AQUÍ!
+      <!-- Scanner List -->
+      <div class="market-scanner-section mb-4">
+        <div class="d-flex align-items-center gap-2 mb-3">
+          <ion-icon name="search-outline" class="text-white-50"></ion-icon>
+          <span class="text-white-50 text-sm fw-bold">Analizando mercado en tiempo real</span>
         </div>
-        <ion-icon name="arrow-undo" class="text-success fs-1 rotate-270"></ion-icon>
+
+        <div class="scanner-list ps-3 border-start border-white-10">
+          <!-- Renderizado dinámico real -->
+          <div *ngFor="let m of marketAnalyses" class="scanner-item d-flex align-items-center gap-2 mb-1">
+            <span class="text-warning">•</span>
+            <span class="text-primary fw-bold text-sm">{{ m.symbol }}</span>
+            <span class="text-white-50 text-sm">→</span>
+            <span class="text-primary fw-bold text-sm">RSI {{ m.rsi }}</span>
+            <span class="text-white-50 text-sm">| {{ m.description }}</span>
+          </div>
+        </div>
       </div>
 
-    </div>
+      <!-- Chart Overlay Area -->
+      <div
+        class="chart-container-vision position-relative rounded-3 overflow-hidden border border-white-10 bg-dark-deep"
+        style="min-height: 500px;">
+        <div #chartContainer id="tradingview-chart" class="w-100 h-100"></div>
 
-    <!-- Botonera Inferior (Opcional pero útil) -->
+        <!-- Oportunidad Overlay -->
+        <div *ngIf="currentOpportunity"
+          class="opportunity-alert-box position-absolute top-50 start-50 translate-middle p-4 rounded-4 shadow-xl glow-primary">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="d-flex align-items-center gap-2">
+              <ion-icon name="radio-button-on-outline" class="text-danger-custom"></ion-icon>
+              <span class="text-white fw-bold text-xs tracking-widest">OPORTUNIDAD DETECTADA</span>
+            </div>
+            <ion-icon name="close-outline" class="text-white-50 pointer" (click)="dismissOpportunity()"></ion-icon>
+          </div>
+
+          <div class="text-center py-2">
+            <h2 class="text-white fw-bold mb-3 d-flex align-items-center justify-content-center gap-2">
+              <ion-icon name="checkmark-circle" class="text-success fs-1"></ion-icon>
+              COMPRA AQUÍ!
+            </h2>
+            <p class="text-white fw-medium mb-4">
+              {{ currentOpportunity.symbol }} <span class="text-white-50 fw-normal ms-1">(confianza {{
+                currentOpportunity.confidence }}%)</span>
+            </p>
+
+            <button class="btn btn-success-vision w-100 py-2 rounded-3 fw-bold fs-6" (click)="goToTrade()">
+              Ir al Mercado
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Consola de Análisis -->
+      <div class="mb-3 mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-2 px-2">
+          <h3 class="text-white fw-bold mb-0">🔍 Consola de Análisis</h3>
+          <span class="badge bg-dark text-white">{{ analysisLogs.length }} eventos</span>
+        </div>
+
+        <div class="bg-dark rounded-3 p-3 overflow-auto" style="max-height: 400px; font-family: monospace;">
+          <div *ngFor="let log of analysisLogs" class="mb-2 pb-2 border-bottom border-white-10"
+            [class.text-warning]="log.level === 'warning'" [class.text-success]="log.level === 'success'"
+            [class.text-danger]="log.level === 'danger'" [class.text-info]="log.level === 'info'">
+
+            <div class="d-flex align-items-start gap-2">
+              <span class="text-white-50" style="min-width: 70px;">{{ log.timestamp | date:'HH:mm:ss' }}</span>
+              <span class="flex-grow-1">{{ log.message }}</span>
+            </div>
+          </div>
+
+          <div *ngIf="analysisLogs.length === 0" class="text-white-50 text-center py-3">
+            <ion-icon name="scan-outline" class="fs-2 mb-2"></ion-icon>
+            <p class="mb-0">Esperando análisis del mercado...</p>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+
+    <ng-template #noHunt>
+      <div class="empty-state-vision text-center py-5">
+        <div class="icon-circle mb-4 mx-auto glow-warning">
+          <ion-icon name="eye-off-outline" class="text-warning fs-1"></ion-icon>
+        </div>
+        <h2 class="text-white fw-bold mb-3">Sin estrategia activa</h2>
+        <p class="text-white-50 mb-4 mx-auto" style="max-width: 400px;">
+          Configurá una nueva estrategia de cacería para comenzar el análisis en tiempo real y detectar oportunidades de
+          mercado.
+        </p>
+        <app-glass-button variant="warning" class="px-5 py-3" (click)="onQuickTrade()">
+          🚀 COMENZAR CACERÍA
+        </app-glass-button>
+      </div>
+    </ng-template>
+
+    <!-- Botonera Inferior -->
     <div class="d-flex gap-3 mt-4">
-      <app-glass-button variant="primary" class="flex-grow-1 py-3" (click)="onQuickTrade()">
+      <app-glass-button variant="primary" class="flex-grow-1 py-3" (click)="onQuickTrade()" *ngIf="!isHunting">
         ⚡ CONFIGURAR TRADE
       </app-glass-button>
       <app-glass-button variant="outline" class="flex-grow-1 py-3" (click)="onOpenAdvanced()">
         📊 AVANZADO
       </app-glass-button>
     </div>
-    <!-- Consola de Análisis en Vivo -->
-    <div class="mb-3">
-      <div class="d-flex justify-content-between align-items-center mb-2 px-2">
-        <h3 class="text-white fw-bold mb-0">🔍 Consola de Análisis</h3>
-        <span class="badge bg-dark text-white">{{ analysisLogs.length }} eventos</span>
-      </div>
-
-      <div class="bg-dark rounded-3 p-3 overflow-auto" style="max-height: 400px; font-family: monospace;">
-        <div *ngFor="let log of analysisLogs" class="mb-2 pb-2 border-bottom border-white-10"
-          [class.text-warning]="log.level === 'warning'" [class.text-success]="log.level === 'success'"
-          [class.text-danger]="log.level === 'danger'" [class.text-info]="log.level === 'info'">
-
-          <div class="d-flex align-items-start gap-2">
-            <span class="text-white-50" style="min-width: 70px;">{{ log.timestamp | date:'HH:mm:ss' }}</span>
-            <span class="flex-grow-1">{{ log.message }}</span>
-          </div>
-
-          <!-- Mostrar datos adicionales si existen -->
-          <div *ngIf="log.dataJson" class="ms-5 text-white-50 small">
-            <span *ngFor="let entry of Object.entries(parseJson(log.dataJson) || {})" class="me-3">
-              {{ entry[0] | uppercase }}: {{ entry[1] }}
-            </span>
-          </div>
-        </div>
-
-        <div *ngIf="analysisLogs.length === 0" class="text-white-50 text-center py-3">
-          <ion-icon name="scan-outline" class="fs-2 mb-2"></ion-icon>
-          <p class="mb-0">Esperando análisis del mercado...</p>
-          <p class="text-xs">El sistema evaluará RSI, volumen y noticias cada 1 minuto</p>
-        </div>
-      </div>
-    </div>
   </main>
+
+  <!-- Diálogo de Confirmación -->
+  <app-dialog *ngIf="showConfirmationDialog" title="Finalizar cacería" variant="warning"
+    (dismiss)="showConfirmationDialog = false">
+    <p class="text-white">¿Estás seguro? Al finalizar la cacería se eliminará físicamente la estrategia actual y sus
+      registros.</p>
+    <div actions class="d-flex gap-2 w-100 mt-3">
+      <app-glass-button variant="danger" class="flex-grow-1" (click)="confirmEndHunt()">
+        Sí, finalizar
+      </app-glass-button>
+    </div>
+  </app-dialog>
 </div>
