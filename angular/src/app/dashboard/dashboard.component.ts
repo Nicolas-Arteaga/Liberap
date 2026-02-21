@@ -75,6 +75,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   lastNewsTitle: string = '';
   currentOpportunity: OpportunityDto | null = null;
   showConfirmationDialog = false;
+  sessionChecked = false;
 
   Object = Object; // Make Object available in template
   private analysisInterval: any;
@@ -170,7 +171,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     const retryIntervals = [1000, 3000, 6000];
     retryIntervals.forEach(ms => {
       setTimeout(() => {
-        if (!this.currentSession) {
+        if (!this.currentSession && !this.sessionChecked) {
           console.log(`[Dashboard] 🔄 Reintento en ${ms}ms...`);
           this.checkActiveSession();
         }
@@ -411,6 +412,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     console.log('[Dashboard] 🔍 Verificando sesión activa en:', new Date().toISOString());
     this.tradingService.getCurrentSession().subscribe({
       next: (session) => {
+        this.sessionChecked = true;
         console.log('[Dashboard] 📦 Respuesta de sesión:', session ? `Sesión encontrada (${session.id})` : 'Sesión NO encontrada');
         if (session) {
           console.log('[Dashboard] ✅ Sesión encontrada:', session.id);

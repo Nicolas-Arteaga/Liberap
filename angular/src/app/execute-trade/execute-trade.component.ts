@@ -1,4 +1,4 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnInit, LOCALE_ID, Inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -54,6 +54,8 @@ interface ExecuteTradeRequest {
   templateUrl: './execute-trade.component.html'
 })
 export class ExecuteTradeComponent implements OnInit {
+  constructor(@Inject(LOCALE_ID) public locale: string) { }
+
   private iconService = inject(IconService);
   private router = inject(Router);
   private marketDataService = inject(MarketDataService);

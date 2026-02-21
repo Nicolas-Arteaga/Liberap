@@ -1,4 +1,9 @@
-import { ApplicationConfig, importProvidersFrom } from '@angular/core';
+import { ApplicationConfig, importProvidersFrom, LOCALE_ID } from '@angular/core';
+import localeEs from '@angular/common/locales/es';
+import { registerLocaleData } from '@angular/common';
+
+registerLocaleData(localeEs);
+
 import { provideRouter } from '@angular/router';
 import { provideAnimations } from '@angular/platform-browser/animations';
 import { APP_ROUTES } from './app.routes';
@@ -82,7 +87,16 @@ import {
   keyOutline,
   linkOutline,
   cloudDownloadOutline,
-  helpCircleOutline
+  helpCircleOutline,
+  personCircleOutline,
+  stopCircleOutline,
+  checkboxOutline,
+  earthOutline,
+  newspaperOutline,
+  radioButtonOnOutline,
+  closeOutline,
+  scanOutline,
+  eyeOffOutline
 } from 'ionicons/icons';
 
 addIcons({
@@ -136,7 +150,16 @@ addIcons({
   'key-outline': keyOutline,
   'link-outline': linkOutline,
   'cloud-download-outline': cloudDownloadOutline,
-  'help-circle-outline': helpCircleOutline
+  'help-circle-outline': helpCircleOutline,
+  'person-circle-outline': personCircleOutline,
+  'stop-circle-outline': stopCircleOutline,
+  'checkbox-outline': checkboxOutline,
+  'earth-outline': earthOutline,
+  'newspaper-outline': newspaperOutline,
+  'radio-button-on-outline': radioButtonOnOutline,
+  'close-outline': closeOutline,
+  'scan-outline': scanOutline,
+  'eye-off-outline': eyeOffOutline
 });
 
 export const appConfig: ApplicationConfig = {
@@ -165,6 +188,7 @@ export const appConfig: ApplicationConfig = {
     provideAbpThemeShared(),
 
     provideHttpClient(withInterceptorsFromDi()),
+    { provide: LOCALE_ID, useValue: 'es-AR' },
     {
       provide: HTTP_INTERCEPTORS,
       useClass: JwtInterceptor,
