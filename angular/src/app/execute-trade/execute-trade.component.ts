@@ -172,26 +172,21 @@ export class ExecuteTradeComponent implements OnInit {
       next: (strategy) => {
         console.log('✅ Estrategia creada:', strategy);
 
-        // 2. Iniciar Sesión Automatically (solo si NO es auto mode global)
-        if (!this.isAutoSelected) {
-          this.tradingService.startSession({
-            symbol: this.request.symbol,
-            timeframe: '1m'
-          }).subscribe({
-            next: () => {
-              console.log('✅ Sesión iniciada. Navegando al dashboard...');
-              this.router.navigate(['/dashboard']);
-            },
-            error: (err) => {
-              console.error('❌ Error al iniciar sesión', err);
-              this.isExecuting = false;
-            }
-          });
-        } else {
-          // En modo auto, navegamos igual ya que el scanner se encargará del resto
-          console.log('✅ Estrategia auto creada. Navegando al dashboard...');
-          this.router.navigate(['/dashboard']);
-        }
+        // 2. Iniciar Sesión (siempre, auto o no)
+        const sessionSymbol = this.isAutoSelected ? 'AUTO' : this.request.symbol;
+        this.tradingService.startSession({
+          symbol: sessionSymbol,
+          timeframe: '1m'
+        }).subscribe({
+          next: () => {
+            console.log('✅ Sesión iniciada. Navegando al dashboard...');
+            this.router.navigate(['/dashboard']);
+          },
+          error: (err) => {
+            console.error('❌ Error al iniciar sesión', err);
+            this.isExecuting = false;
+          }
+        });
       },
       error: (err) => {
         console.error('❌ Error al crear estrategia', err);

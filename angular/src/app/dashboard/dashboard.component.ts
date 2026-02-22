@@ -1,5 +1,5 @@
 import { Component, AfterViewInit, OnDestroy, inject, OnInit, ViewChild, ElementRef } from '@angular/core';
-import { Subject, takeUntil, timeout } from 'rxjs';
+import { Subject, takeUntil, timeout, filter } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -168,11 +168,21 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     console.log('[Dashboard] 🚀 ngOnInit ejecutado');
     this.checkActiveSession();
 
+    // Verificar si hay sesión cacheada en SignalR (para el caso donde el evento ya llegó)
+    const cachedSession = this.signalrService.getLastSession();
+    if (cachedSession && !this.currentSession) {
+      console.log('[Dashboard] 📦 Usando sesión cacheada de SignalR:', cachedSession.id);
+      this.handleSessionUpdate(cachedSession);
+    }
+
     this.subscribeToNotifications();
   }
 
   private subscribeToNotifications() {
-    this.signalrService.sessionStarted$.pipe(takeUntil(this.destroy$)).subscribe(session => {
+    this.signalrService.sessionStarted$.pipe(
+      takeUntil(this.destroy$),
+      filter(session => session !== null)
+    ).subscribe(session => {
       console.log('[Dashboard] Recibido SessionStarted vía SignalR');
       this.handleSessionUpdate(session);
     });

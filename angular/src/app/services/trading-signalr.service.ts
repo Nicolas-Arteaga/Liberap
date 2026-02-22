@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { Subject } from 'rxjs';
+import { Subject, BehaviorSubject } from 'rxjs';
 import { TradingSessionDto } from '../proxy/trading/models';
 import * as signalR from '@microsoft/signalr';
 import { OAuthService } from 'angular-oauth2-oidc';
@@ -12,7 +12,8 @@ import { environment } from '../../environments/environment'; // 👈 MEJOR USAR
 export class TradingSignalrService {
     private oAuthService = inject(OAuthService);
 
-    private sessionStartedSource = new Subject<TradingSessionDto>();
+    // BehaviorSubject cachea el último evento para componentes que montan tarde
+    private sessionStartedSource = new BehaviorSubject<TradingSessionDto | null>(null);
     private sessionEndedSource = new Subject<string>();
     private stageAdvancedSource = new Subject<TradingSessionDto>();
 
@@ -21,6 +22,11 @@ export class TradingSignalrService {
     stageAdvanced$ = this.stageAdvancedSource.asObservable();
 
     private connection: signalR.HubConnection | null = null;
+
+    // Obtiene el último valor cacheado sincrónicamente
+    getLastSession(): TradingSessionDto | null {
+        return this.sessionStartedSource.getValue();
+    }
 
     constructor() {
         this.startConnection();
@@ -38,8 +44,17 @@ export class TradingSignalrService {
             .withUrl(hubUrl, {
                 accessTokenFactory: () => this.oAuthService.getAccessToken()
             })
-            .withAutomaticReconnect()
+            .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
+            .configureLogging(signalR.LogLevel.Information)
             .build();
+
+        this.connection.onreconnecting(error => {
+            console.log('[SignalR] Reconectando...', error);
+        });
+
+        this.connection.onreconnected(connectionId => {
+            console.log('[SignalR] Reconectado!', connectionId);
+        });
 
         this.connection.on('SessionStarted', (session: TradingSessionDto) => {
             console.log('[SignalR] 🚀 Sesión Iniciada:', session);

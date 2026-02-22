@@ -223,7 +223,7 @@ public class TradingAppService : ApplicationService, ITradingAppService
     {
         var profile = await GetProfileAsync();
         // Deactivate previous active sessions
-        var activeSessions = await _sessionRepository.GetListAsync(x => x.TraderProfileId == profile.Id && x.IsActive && !x.IsDeleted);
+        var activeSessions = await _sessionRepository.GetListAsync(x => x.TraderProfileId == profile.Id && x.IsActive);
         foreach (var s in activeSessions)
         {
             s.IsActive = false;
@@ -247,8 +247,7 @@ public class TradingAppService : ApplicationService, ITradingAppService
         
         var session = await _sessionRepository.FirstOrDefaultAsync(
             x => x.TraderProfileId == profile.Id && 
-                 x.IsActive && 
-                 !x.IsDeleted
+                 x.IsActive
         );
         
         if (session == null)
@@ -257,8 +256,8 @@ public class TradingAppService : ApplicationService, ITradingAppService
         }
         else
         {
-            _logger.LogInformation("✅ [GetCurrentSession] Sesión encontrada: {Id}, Activa: {IsActive}, Eliminada: {IsDeleted}", 
-                session.Id, session.IsActive, session.IsDeleted);
+            _logger.LogInformation("✅ [GetCurrentSession] Sesión encontrada: {Id}, Activa: {IsActive}", 
+                session.Id, session.IsActive);
         }
         
         return session != null ? ObjectMapper.Map<TradingSession, TradingSessionDto>(session) : null;
