@@ -1,5 +1,5 @@
 import { Component, AfterViewInit, OnDestroy, inject, OnInit, ViewChild, ElementRef } from '@angular/core';
-import { Subject, takeUntil } from 'rxjs';
+import { Subject, takeUntil, timeout } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -13,6 +13,7 @@ import { TradingSessionDto, AnalysisLogDto, MarketAnalysisDto, OpportunityDto } 
 import { DialogComponent } from 'src/shared/components/dialog/dialog.component';
 import { CardContentComponent } from "src/shared/components/card-content/card-content.component";
 import { TradingSignalrService } from '../services/trading-signalr.service';
+import { AUTH_TOKEN_KEY } from '../core/auth.service';
 
 interface TradingSignal {
   id: number;
@@ -167,17 +168,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     console.log('[Dashboard] 🚀 ngOnInit ejecutado');
     this.checkActiveSession();
 
-    // Secuencia de reintentos en cascada para asegurar la captura de la sesión
-    const retryIntervals = [1000, 3000, 6000];
-    retryIntervals.forEach(ms => {
-      setTimeout(() => {
-        if (!this.currentSession && !this.sessionChecked) {
-          console.log(`[Dashboard] 🔄 Reintento en ${ms}ms...`);
-          this.checkActiveSession();
-        }
-      }, ms);
-    });
-
     this.subscribeToNotifications();
   }
 
@@ -304,8 +294,17 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   loadAnalysisLogs() {
-    // SIEMPRE traer logs globales (usando Guid vacío)
-    const sessionId = '00000000-0000-0000-0000-000000000000';
+    // Evitar consultar logs si no hay sesión activa (GUID vacío causa 500)
+    if (!this.currentSession ||
+      !this.currentSession.id ||
+      this.currentSession.id === '00000000-0000-0000-0000-000000000000' ||
+      this.currentSession.id === '00000000-0000-0000-0000-000000000001') {
+      console.warn('[Dashboard] ⛔ No hay sessionId válido. Ignorando consulta de logs.');
+      return;
+    }
+
+    const sessionId = this.currentSession.id;
+    console.log('[Dashboard] 📊 Cargando logs para sesión:', sessionId);
 
     this.tradingService.getAnalysisLogs(sessionId).subscribe({
       next: (logs) => {
@@ -315,7 +314,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
           this.processScannerLogs(logs);
         }
       },
-      error: (err) => console.error('Error fetching analysis logs', err)
+      error: (err) => console.error('[Dashboard] Error fetching analysis logs', err)
     });
   }
 
@@ -409,33 +408,37 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   checkActiveSession() {
-    console.log('[Dashboard] 🔍 Verificando sesión activa en:', new Date().toISOString());
-    this.tradingService.getCurrentSession().subscribe({
-      next: (session) => {
-        this.sessionChecked = true;
-        console.log('[Dashboard] 📦 Respuesta de sesión:', session ? `Sesión encontrada (${session.id})` : 'Sesión NO encontrada');
-        if (session) {
-          console.log('[Dashboard] ✅ Sesión encontrada:', session.id);
-          this.currentSession = session;
-          this.currentStage = session.currentStage || 1;
-          this.isHunting = true;
-          this.isAnalyzing = true;
-          this.startAnalysisTimer();
-          this.loadAnalysisLogs(); // Load initially
-        } else {
-          if (this.isHunting) {
-            console.log('[Dashboard] ℹ️ La sesión ha finalizado externamente.');
+    console.log('[Dashboard] 🔍 Verificando sesión activa...');
+
+    this.tradingService.getCurrentSession()
+      .pipe(
+        timeout(10000)
+      )
+      .subscribe({
+        next: (session: TradingSessionDto) => {
+          if (session && session.id && session.id !== '00000000-0000-0000-0000-000000000000' && session.id !== '00000000-0000-0000-0000-000000000001') {
+            console.log('[Dashboard] ✅ Sesión encontrada:', session.id);
+            this.sessionChecked = true;
+            this.currentSession = session;
+            this.currentStage = session.currentStage || 1;
+            this.isHunting = true;
+            this.isAnalyzing = true;
+            this.startAnalysisTimer();
+            this.loadAnalysisLogs(); // Load initially
+          } else {
+            console.log('[Dashboard] ℹ️ No hay sesión activa válida');
+            this.sessionChecked = true;
+            this.cleanupDashboard();
           }
-          this.isHunting = false;
-          this.isAnalyzing = false;
-          this.currentSession = null;
-          this.analysisLogs = [];
-          clearInterval(this.analysisInterval);
-          this.analysisTime = '00:00:00';
+        },
+        error: (error) => {
+          console.error('[Dashboard] ❌ Error verificando sesión:', {
+            status: error.status,
+            message: error.message
+          });
+          this.sessionChecked = true; // Set to true to stop spinners
         }
-      },
-      error: (err) => console.error('[Dashboard] ❌ Error verificando sesión', err)
-    });
+      });
   }
 
   // startHunt() removed - now handled in ExecuteTradeComponent

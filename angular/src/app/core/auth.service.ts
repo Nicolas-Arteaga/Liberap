@@ -166,22 +166,10 @@ export class AuthService {
         localStorage.setItem('user_profile', JSON.stringify(enrichedProfile));
       },
       error: (err) => {
+        console.error('❌ [AuthService] Error cargando perfil:', err);
         if (err.status === 401) {
-          console.warn('ℹ️ [AuthService] 401 detectado en Perfil API. Usando datos del Token como respaldo.');
-
-          if (tokenData) {
-            const partialProfile = {
-              userName: tokenData.unique_name || tokenData.name || tokenData.sub || 'Admin(Offline)',
-              email: tokenData.email || '',
-              roleNames: tokenRoles
-            };
-            this.currentUserSubject.next(partialProfile);
-          } else {
-            this.currentUserSubject.next(null);
-            localStorage.removeItem('user_profile');
-          }
-        } else {
-          console.error('❌ [AuthService] Error cargando perfil:', err);
+          this.currentUserSubject.next(null);
+          localStorage.removeItem('user_profile');
         }
       }
     });
