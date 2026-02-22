@@ -4,24 +4,25 @@ using System.Linq;
 using System.Threading.Tasks;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Domain.Repositories;
+using Verge.Trading.Integrations;
 using Verge.Trading.DTOs;
 
 namespace Verge.Trading;
 
 public class CryptoAnalysisAppService : ApplicationService, ICryptoAnalysisAppService
 {
-    private readonly IPythonIntegrationService _pythonIntegrationService;
+    private readonly IFreeCryptoNewsService _freeNewsService;
     private readonly CryptoAnalysisService _cryptoAnalysisService;
     private readonly MarketDataManager _marketDataManager;
     private readonly IRepository<TradingSession, Guid> _sessionRepository;
 
     public CryptoAnalysisAppService(
-        IPythonIntegrationService pythonIntegrationService,
+        IFreeCryptoNewsService freeNewsService,
         CryptoAnalysisService cryptoAnalysisService,
         MarketDataManager marketDataManager,
         IRepository<TradingSession, Guid> sessionRepository)
     {
-        _pythonIntegrationService = pythonIntegrationService;
+        _freeNewsService = freeNewsService;
         _cryptoAnalysisService = cryptoAnalysisService;
         _marketDataManager = marketDataManager;
         _sessionRepository = sessionRepository;
@@ -29,19 +30,15 @@ public class CryptoAnalysisAppService : ApplicationService, ICryptoAnalysisAppSe
 
     public async Task<SentimentAnalysisDto> GetSentimentForSymbolAsync(string symbol)
     {
-        // Simulación de noticias para el símbolo
-        var simulatedNews = GetSimulatedNews(symbol);
-        var combinedText = string.Join(". ", simulatedNews);
-
-        var result = await _pythonIntegrationService.AnalyzeSentimentAsync(combinedText);
+        var result = await _freeNewsService.GetSentimentAsync(symbol);
 
         if (result == null) return null;
 
         return new SentimentAnalysisDto
         {
-            Sentiment = result.Sentiment,
-            Confidence = result.Confidence,
-            Scores = result.Scores
+            Sentiment = result.Label,
+            Confidence = (float)result.Score,
+            Scores = new Dictionary<string, float> { { result.Label, (float)result.Score } }
         };
     }
 

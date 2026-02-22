@@ -10,6 +10,8 @@ using Microsoft.Extensions.Logging;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Uow;
 using Verge.Trading.DTOs;
+using Verge.Trading.Integrations;
+using Verge.Trading.DecisionEngine;
 
 namespace Verge.Trading;
 
@@ -47,196 +49,266 @@ public class TradingSessionMonitorJob : BackgroundService
 
     private async Task MonitorActiveSessionsAsync()
     {
-        _logger.LogInformation("🔍 MonitorActiveSessionsAsync() called");
+        _logger.LogInformation("🔍 MonitorActiveSessionsAsync() (Phase 2) starting...");
 
         using var scope = _serviceProvider.CreateScope();
         var sessionRepository = scope.ServiceProvider.GetRequiredService<IRepository<TradingSession, Guid>>();
         var strategyRepository = scope.ServiceProvider.GetRequiredService<IRepository<TradingStrategy, Guid>>();
         var marketDataManager = scope.ServiceProvider.GetRequiredService<MarketDataManager>();
-        var analysisService = scope.ServiceProvider.GetRequiredService<CryptoAnalysisService>();
+        var pythonService = scope.ServiceProvider.GetRequiredService<IPythonIntegrationService>();
+        var fngService = scope.ServiceProvider.GetRequiredService<IFearAndGreedService>();
+        var freeNewsService = scope.ServiceProvider.GetRequiredService<IFreeCryptoNewsService>();
+        var geckoService = scope.ServiceProvider.GetRequiredService<ICoinGeckoService>();
+        var decisionEngine = scope.ServiceProvider.GetRequiredService<ITradingDecisionEngine>();
         var analysisLogRepo = scope.ServiceProvider.GetRequiredService<IRepository<AnalysisLog, Guid>>();
         var unitOfWorkManager = scope.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
 
         using var uow = unitOfWorkManager.Begin();
 
         var activeSessions = await sessionRepository.GetListAsync(x => x.IsActive && x.CurrentStage < TradingStage.SellActive);
-        _logger.LogInformation("📊 Found {count} active sessions", activeSessions.Count);
-
         if (!activeSessions.Any())
         {
-            _logger.LogInformation("ℹ️ No hay sesiones activas para monitorear.");
+            _logger.LogInformation("ℹ️ No active sessions found.");
             return;
         }
 
+        // 1. Fetch GLOBAL Macro Data (Once per cycle)
+        _logger.LogInformation("🌍 Fetching Global Macro Data...");
+        var fng = await fngService.GetCurrentFearAndGreedAsync();
+        
+        // 2. Discovery: Identify all required Symbol/Timeframe pairs
+        var requiredGroups = new HashSet<(string symbol, string timeframe)>();
+        var sessionStrategies = new Dictionary<Guid, TradingStrategy>(); // SessionId -> Strategy
+
         foreach (var session in activeSessions)
+        {
+            var strategy = await strategyRepository.FirstOrDefaultAsync(x => x.TraderProfileId == session.TraderProfileId && x.IsActive);
+            if (strategy == null) continue;
+            sessionStrategies[session.Id] = strategy;
+
+            if (session.Symbol != "AUTO")
+            {
+                requiredGroups.Add((session.Symbol, session.Timeframe));
+            }
+            else
+            {
+                var candidates = strategy.GetSelectedCryptos();
+                if (candidates == null || !candidates.Any()) candidates = new List<string> { "BTCUSDT" };
+                
+                foreach (var symbol in candidates)
+                {
+                    requiredGroups.Add((symbol, session.Timeframe));
+                }
+            }
+        }
+
+        // 3. Batch Fetching: Fetch data for all required groups
+        var groupDataCache = new Dictionary<(string symbol, string timeframe), (List<MarketCandleModel> candles, DecisionEngine.MarketContext context)>();
+
+        foreach (var group in requiredGroups)
         {
             try
             {
-                var profileId = session.TraderProfileId;
-                var strategy = await strategyRepository.FirstOrDefaultAsync(x => x.TraderProfileId == profileId && x.IsActive);
+                var symbol = group.symbol;
+                var timeframe = group.timeframe;
+
+                var candles = await marketDataManager.GetCandlesAsync(symbol, timeframe, 100);
+                if (candles == null || !candles.Any()) continue;
+
+                var oi = await marketDataManager.GetOpenInterestAsync(symbol);
+                var gecko = await geckoService.GetTokenDataAsync(symbol);
+                var newsResult = await freeNewsService.GetNewsAsync(symbol);
+                var news = newsResult?.News ?? new List<CryptoNewsItem>();
                 
-                if (strategy == null)
+                var sentiment = await freeNewsService.GetSentimentAsync(symbol);
+
+                var regime = await pythonService.DetectMarketRegimeAsync(symbol, timeframe, candles);
+                var technicals = await pythonService.AnalyzeTechnicalsAsync(symbol, timeframe, candles);
+
+                var context = new DecisionEngine.MarketContext
                 {
-                    _logger.LogWarning($"⚠️ No se encontró estrategia activa para el perfil {profileId}. Desactivando sesión {session.Id}");
-                    session.IsActive = false;
-                    session.EndTime = DateTime.UtcNow;
-                    await sessionRepository.UpdateAsync(session);
-                    continue;
-                }
-
-                // Resolver el símbolo: si es AUTO, tomar el primer crypto de la estrategia
-                var resolvedSymbol = session.Symbol;
-                if (resolvedSymbol == "AUTO" || string.IsNullOrEmpty(resolvedSymbol))
-                {
-                    var cryptos = strategy.GetSelectedCryptos();
-                    resolvedSymbol = cryptos?.FirstOrDefault() ?? "BTCUSDT";
-                    _logger.LogInformation($"🤖 Modo AUTO: usando símbolo {resolvedSymbol} de la estrategia");
-                }
-
-                _logger.LogInformation($"📊 Obteniendo datos de mercado para {resolvedSymbol} ({session.Timeframe})...");
-                var marketData = await marketDataManager.GetCandlesAsync(resolvedSymbol, session.Timeframe, 30);
-                
-                if (marketData == null || !marketData.Any())
-                {
-                    _logger.LogWarning($"⚠️ No se obtuvieron velas para {resolvedSymbol}");
-                    continue;
-                }
-
-                // Datos básicos para el log
-                var currentPrice = marketData.Last().Close;
-                var prices = marketData.Select(x => x.Close).ToList();
-                var rsi = analysisService.CalculateRSI(prices);
-                
-                string reason;
-                bool advanced = analysisService.ShouldAdvanceStage(session, strategy, marketData, out reason);
-                
-                string logLevel = "info";
-                string message = "";
-
-                // MEJORAR MENSAJES DE LA CONSOLA (UX)
-                // Si es el primer minuto
-                if (session.CreationTime > DateTime.UtcNow.AddMinutes(-2))
-                {
-                    message = $"🔄 Iniciando análisis de {session.Symbol} - Calibrando indicadores...";
-                }
-                // Análisis normal
-                else
-                {
-                    message = $"📊 Analizando {session.Symbol} - RSI: {rsi:F2} | Precio: ${currentPrice:F2}";
-                    
-                    // Mensajes según el RSI
-                    if (rsi < 30)
-                    {
-                        message = $"🔥 {session.Symbol} en SOBREVENTA (RSI: {rsi:F2}) - Posible oportunidad de COMPRA";
-                        logLevel = "warning";
-                    }
-                    else if (rsi > 70)
-                    {
-                        message = $"⚠️ {session.Symbol} en SOBRECOMPRA (RSI: {rsi:F2}) - Posible oportunidad de VENTA";
-                        logLevel = "warning";
-                    }
-                    else if (rsi < 40)
-                        message = $"📉 {session.Symbol} acercándose a sobreventa (RSI: {rsi:F2}) - Monitoreando...";
-                    else if (rsi > 60)
-                        message = $"📈 {session.Symbol} acercándose a sobrecompra (RSI: {rsi:F2}) - Monitoreando...";
-                }
-
-                // IA: Análisis de sentimiento cada 5 minutos
-                bool checkAI = DateTime.UtcNow.Minute % 5 == 0;
-                SentimentAnalysisDto sentiment = null;
-                
-                if (checkAI)
-                {
-                    try
-                    {
-                        var analysisAppService = scope.ServiceProvider.GetRequiredService<ICryptoAnalysisAppService>();
-                        sentiment = await analysisAppService.GetSentimentForSymbolAsync(session.Symbol);
-                        
-                        if (sentiment != null)
-                        {
-                            string sentimentEmoji = sentiment.Sentiment == "positive" ? "🚀" : (sentiment.Sentiment == "negative" ? "⚠️" : "⚖️");
-                            message = $"📰 {sentimentEmoji} Sentimiento {sentiment.Sentiment} ({sentiment.Confidence:P0}) - {message}";
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning($"⚠️ No se pudo obtener análisis de IA: {ex.Message}");
-                    }
-                }
-
-                if (advanced)
-                {
-                    _logger.LogInformation($"✅ AVANCE DETECTADO! Sesión {session.Id} ({session.Symbol}): {reason}");
-                    
-                    var oldStage = session.CurrentStage;
-                    session.CurrentStage = (TradingStage)((int)session.CurrentStage + 1);
-                    _logger.LogInformation($"🚀 Stage actualizado: {oldStage} -> {session.CurrentStage}");
-                    
-                    logLevel = "success";
-                    message = $"🚀 {reason} | RSI: {rsi:F2} | Precio: ${currentPrice:F2} | Nuevo Stage: {session.CurrentStage}";
-
-                    if (session.CurrentStage == TradingStage.BuyActive)
-                    {
-                        session.EntryPrice = currentPrice;
-                        bool isLong = strategy.DirectionPreference == SignalDirection.Long;
-                        decimal tpFactor = strategy.TakeProfitPercentage / 100;
-                        decimal slFactor = strategy.StopLossPercentage / 100;
-
-                        if (isLong)
-                        {
-                            session.TakeProfitPrice = currentPrice * (1 + tpFactor);
-                            session.StopLossPrice = currentPrice * (1 - slFactor);
-                        }
-                        else
-                        {
-                            session.TakeProfitPrice = currentPrice * (1 - tpFactor);
-                            session.StopLossPrice = currentPrice * (1 + slFactor);
-                        }
-                        _logger.LogInformation($"🎯 Targets configurados: Entrada {session.EntryPrice}, TP {session.TakeProfitPrice}, SL {session.StopLossPrice}");
-                    }
-
-                    if (session.CurrentStage == TradingStage.SellActive)
-                    {
-                        _logger.LogInformation($"🏁 Cacería completa para {session.Symbol}. Desactivando sesión.");
-                        session.EndTime = DateTime.UtcNow;
-                        session.IsActive = false;
-                    }
-
-                    await sessionRepository.UpdateAsync(session);
-                }
-
-                // LOG OBLIGATORIO CADA MINUTO (unificado)
-                var logData = new 
-                { 
-                    rsi = Math.Round(rsi, 2), 
-                    precio = currentPrice,
-                    stage = session.CurrentStage.ToString(),
-                    advanced = advanced,
-                    tendencia = rsi > 50 ? "alcista" : "bajista",
-                    volumen_relativo = "normal" // Podrías calcularlo si tenés datos
+                    FearAndGreed = fng,
+                    News = news,
+                    GlobalSentiment = sentiment,
+                    CoinGeckoData = gecko,
+                    OpenInterest = oi,
+                    MarketRegime = regime,
+                    Technicals = technicals
                 };
 
-                var log = new AnalysisLog(
-                    Guid.NewGuid(),
-                    session.TraderProfileId,
-                    session.Id,
-                    session.Symbol,
-                    message,
-                    logLevel,
-                    DateTime.UtcNow,
-                    System.Text.Json.JsonSerializer.Serialize(logData)
-                );
-                
-                await analysisLogRepo.InsertAsync(log);
-                _logger.LogInformation($"✅ LOG CREADO: {log.Message}");
+                groupDataCache[group] = (candles, context);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"❌ Error procesando sesión {session.Id}");
+                _logger.LogWarning($"⚠️ Failed to fetch data for {group.symbol} {group.timeframe}: {ex.Message}");
+            }
+        }
+
+        // 4. Evaluation: Process each session
+        foreach (var session in activeSessions)
+        {
+            if (!sessionStrategies.TryGetValue(session.Id, out var strategy)) continue;
+
+            try
+            {
+                if (session.Symbol != "AUTO")
+                {
+                    var groupKey = (session.Symbol, session.Timeframe);
+                    if (!groupDataCache.TryGetValue(groupKey, out var data)) continue;
+
+                    var evalResult = decisionEngine.Evaluate(session, strategy.Style, data.context);
+                    bool stageChanged = ProcessDecision(session, evalResult, strategy, data.candles.Last().Close);
+                    await CreateAnalysisLogAsync(analysisLogRepo, session, evalResult, data.candles.Last().Close, data.context);
+
+                    if (stageChanged) await sessionRepository.UpdateAsync(session);
+                }
+                else
+                {
+                    // AUTO MODE: Evaluate all candidates and pick the best one
+                    var candidates = strategy.GetSelectedCryptos();
+                    if (candidates == null || !candidates.Any()) candidates = new List<string> { "BTCUSDT" };
+
+                    (string symbol, DecisionEngine.DecisionResult result, List<MarketCandleModel> candles, DecisionEngine.MarketContext context)? bestEvaluation = null;
+
+                    foreach (var symbol in candidates)
+                    {
+                        var groupKey = (symbol, session.Timeframe);
+                        if (!groupDataCache.TryGetValue(groupKey, out var data)) continue;
+
+                        // Create a temporary clone or just update symbol for evaluation
+                        var originalSymbol = session.Symbol;
+                        session.Symbol = symbol; 
+                        var result = decisionEngine.Evaluate(session, strategy.Style, data.context);
+                        session.Symbol = originalSymbol; // Restore
+
+                        if (bestEvaluation == null || result.Score > bestEvaluation.Value.result.Score)
+                        {
+                            bestEvaluation = (symbol, result, data.candles, data.context);
+                        }
+                    }
+
+                    if (bestEvaluation != null)
+                    {
+                        var best = bestEvaluation.Value;
+                        _logger.LogInformation("🤖 AUTO session {Id}: Top candidate {Symbol} with score {Score}", session.Id, best.symbol, best.result.Score);
+
+                        // If the best one triggers an entry or prepare, we take it
+                        if (best.result.Decision != DecisionEngine.TradingDecision.Context)
+                        {
+                            session.Symbol = best.symbol; // Permanently assign the best symbol
+                            bool stageChanged = ProcessDecision(session, best.result, strategy, best.candles.Last().Close);
+                            await CreateAnalysisLogAsync(analysisLogRepo, session, best.result, best.candles.Last().Close, best.context);
+
+                            if (stageChanged) await sessionRepository.UpdateAsync(session);
+                        }
+                        else
+                        {
+                            // Just log the best context for visualization in dashboard
+                            await CreateAnalysisLogAsync(analysisLogRepo, session, best.result, best.candles.Last().Close, best.context);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Error evaluating session {Id} ({Symbol})", session.Id, session.Symbol);
             }
         }
 
         await uow.CompleteAsync();
-        _logger.LogInformation("🏁 Ciclo de monitoreo finalizado.");
+        _logger.LogInformation("🏁 Monitoring cycle completed.");
+    }
+
+    private bool ProcessDecision(TradingSession session, DecisionEngine.DecisionResult result, TradingStrategy strategy, decimal currentPrice)
+    {
+        var oldStage = session.CurrentStage;
+        bool changed = false;
+
+        switch (result.Decision)
+        {
+            case DecisionEngine.TradingDecision.Entry:
+                if (session.CurrentStage == TradingStage.Evaluating || session.CurrentStage == TradingStage.Prepared)
+                {
+                    session.CurrentStage = TradingStage.BuyActive;
+                    session.EntryPrice = currentPrice;
+                    CalculateTargets(session, strategy, currentPrice);
+                    changed = true;
+                }
+                break;
+
+            case DecisionEngine.TradingDecision.Prepare:
+                if (session.CurrentStage == TradingStage.Evaluating)
+                {
+                    session.CurrentStage = TradingStage.Prepared;
+                    changed = true;
+                }
+                break;
+        }
+
+        if (changed)
+        {
+            _logger.LogInformation("🚀 Stage Advanced for {Symbol}: {Old} -> {New} (Score: {Score})", 
+                session.Symbol, oldStage, session.CurrentStage, result.Score);
+        }
+
+        return changed;
+    }
+
+    private void CalculateTargets(TradingSession session, TradingStrategy strategy, decimal currentPrice)
+    {
+        bool isLong = strategy.DirectionPreference == SignalDirection.Long;
+        decimal tpFactor = strategy.TakeProfitPercentage / 100;
+        decimal slFactor = strategy.StopLossPercentage / 100;
+
+        if (isLong)
+        {
+            session.TakeProfitPrice = currentPrice * (1 + tpFactor);
+            session.StopLossPrice = currentPrice * (1 - slFactor);
+        }
+        else
+        {
+            session.TakeProfitPrice = currentPrice * (1 - tpFactor);
+            session.StopLossPrice = currentPrice * (1 + slFactor);
+        }
+    }
+
+    private async Task CreateAnalysisLogAsync(
+        IRepository<AnalysisLog, Guid> repo, 
+        TradingSession session, 
+        DecisionEngine.DecisionResult result,
+        decimal price,
+        DecisionEngine.MarketContext context)
+    {
+        string emoji = result.Decision switch {
+            DecisionEngine.TradingDecision.Entry => "🚀",
+            DecisionEngine.TradingDecision.Prepare => "⚡",
+            DecisionEngine.TradingDecision.Context => "🔍",
+            _ => "💤"
+        };
+
+        string message = $"{emoji} [{result.Decision}] Score: {result.Score}/100 | Regimen: {context.MarketRegime?.Regime ?? "N/A"} | RSI: {context.Technicals?.Rsi:F1} | Price: ${price:N2}";
+        
+        var logData = new {
+            score = result.Score,
+            decision = result.Decision.ToString(),
+            regime = context.MarketRegime?.Regime,
+            rsi = context.Technicals?.Rsi,
+            fng = context.FearAndGreed?.Value,
+            reason = result.Reason,
+            weighted = result.WeightedScores
+        };
+
+        var log = new AnalysisLog(
+            Guid.NewGuid(),
+            session.TraderProfileId,
+            session.Id,
+            session.Symbol,
+            message,
+            result.Score >= 70 ? "success" : (result.Score >= 50 ? "warning" : "info"),
+            DateTime.UtcNow,
+            JsonSerializer.Serialize(logData)
+        );
+
+        await repo.InsertAsync(log);
     }
 }

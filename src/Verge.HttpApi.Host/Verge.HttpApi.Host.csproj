@@ -8,13 +8,14 @@
     <AspNetCoreHostingModel>InProcess</AspNetCoreHostingModel>
     <RootNamespace>Verge</RootNamespace>
     <PreserveCompilationReferences>true</PreserveCompilationReferences>
+    <UserSecretsId>5808e8ab-5156-42b2-8f30-57dac505c46e</UserSecretsId>
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(RunConfiguration)' == 'Verge.HttpApi.Host' " />
 
   <ItemGroup>
     <PackageReference Include="AspNetCore.HealthChecks.UI" Version="9.0.0" />
-    <PackageReference Include="KubernetesClient" Version="18.0.5"/>
+    <PackageReference Include="KubernetesClient" Version="18.0.5" />
     <PackageReference Include="IdentityModel" Version="7.0.0" />
     <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.0.0" />
     <PackageReference Include="AspNetCore.HealthChecks.UI.InMemory.Storage" Version="9.0.0" />

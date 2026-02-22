@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
@@ -26,23 +27,71 @@ public class PythonIntegrationService : DomainService, IPythonIntegrationService
         _baseUrl = _configuration["PythonService:Url"] ?? "http://localhost:8000";
     }
 
-    public async Task<SentimentResponseModel> AnalyzeSentimentAsync(string text)
+
+    public async Task<RegimeResponseModel?> DetectMarketRegimeAsync(string symbol, string timeframe, System.Collections.Generic.List<MarketCandleModel> data)
     {
         try
         {
-            var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/analyze-sentiment", new { text });
+            var payload = new 
+            { 
+                symbol, 
+                timeframe, 
+                data = data.Select(c => new {
+                    timestamp = c.Timestamp.ToString(),
+                    open = c.Open,
+                    high = c.High,
+                    low = c.Low,
+                    close = c.Close,
+                    volume = c.Volume
+                })
+            };
+            var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/detect-regime", payload);
             
             if (response.IsSuccessStatusCode)
             {
-                return await response.Content.ReadFromJsonAsync<SentimentResponseModel>();
+                return await response.Content.ReadFromJsonAsync<RegimeResponseModel>();
             }
 
-            _logger.LogWarning($"⚠️ Python service returned error: {response.StatusCode}");
+            _logger.LogWarning($"⚠️ Python service returned error for detect-regime: {response.StatusCode}");
             return null;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ Error connecting to Python AI service");
+            _logger.LogError(ex, "❌ Error connecting to Python AI service for detect-regime");
+            return null;
+        }
+    }
+
+    public async Task<TechnicalsResponseModel?> AnalyzeTechnicalsAsync(string symbol, string timeframe, System.Collections.Generic.List<MarketCandleModel> data)
+    {
+        try
+        {
+            var payload = new 
+            { 
+                symbol, 
+                timeframe, 
+                data = data.Select(c => new {
+                    timestamp = c.Timestamp.ToString(),
+                    open = c.Open,
+                    high = c.High,
+                    low = c.Low,
+                    close = c.Close,
+                    volume = c.Volume
+                })
+            };
+            var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/analyze-technicals", payload);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                return await response.Content.ReadFromJsonAsync<TechnicalsResponseModel>();
+            }
+
+            _logger.LogWarning($"⚠️ Python service returned error for analyze-technicals: {response.StatusCode}");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ Error connecting to Python AI service for analyze-technicals");
             return null;
         }
     }

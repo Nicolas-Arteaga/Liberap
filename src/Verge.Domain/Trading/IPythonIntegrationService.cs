@@ -5,13 +5,23 @@ namespace Verge.Trading;
 
 public interface IPythonIntegrationService
 {
-    Task<SentimentResponseModel> AnalyzeSentimentAsync(string text);
+    Task<RegimeResponseModel?> DetectMarketRegimeAsync(string symbol, string timeframe, List<MarketCandleModel> data);
+    Task<TechnicalsResponseModel?> AnalyzeTechnicalsAsync(string symbol, string timeframe, List<MarketCandleModel> data);
     Task<bool> IsHealthyAsync();
 }
 
-public class SentimentResponseModel
+
+public class RegimeResponseModel
 {
-    public string Sentiment { get; set; }
-    public float Confidence { get; set; }
-    public Dictionary<string, float> Scores { get; set; }
+    public string Regime { get; set; } = string.Empty;
+    public float VolatilityScore { get; set; }
+    public float TrendStrength { get; set; }
+}
+
+public class TechnicalsResponseModel
+{
+    public float MacdHistogram { get; set; }
+    public float BbWidth { get; set; }
+    public float Adx { get; set; }
+    public float Rsi { get; set; }
 }

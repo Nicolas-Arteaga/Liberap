@@ -1,0 +1,40 @@
+using System.Collections.Generic;
+using Verge.Trading.Integrations;
+
+namespace Verge.Trading.DecisionEngine;
+
+public class MarketContext
+{
+    // Macro
+    public FearAndGreedResult? FearAndGreed { get; set; }
+    
+    // Sentiment (FreeCryptoNews + AI)
+    public List<CryptoNewsItem> News { get; set; } = new();
+    public SentimentAnalysis? GlobalSentiment { get; set; }
+    
+    // Fundaments (CoinGecko)
+    public CoinGeckoResult? CoinGeckoData { get; set; }
+    
+    // Advanced Metrics
+    public MarketOpenInterestModel? OpenInterest { get; set; }
+    
+    // AI / Data Science (Python)
+    public RegimeResponseModel? MarketRegime { get; set; }
+    public TechnicalsResponseModel? Technicals { get; set; }
+}
+
+public class DecisionResult
+{
+    public TradingDecision Decision { get; set; }
+    public int Score { get; set; } // 0-100
+    public string Reason { get; set; } = string.Empty;
+    public Dictionary<string, float> WeightedScores { get; set; } = new();
+}
+
+public enum TradingDecision
+{
+    Ignore,     // Score < 30
+    Context,    // Score 30-49 (Stay in Evaluating)
+    Prepare,    // Score 50-69 (Advance to Prepared)
+    Entry       // Score >= 70 (Advance to BuyActive)
+}

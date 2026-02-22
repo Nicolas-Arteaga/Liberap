@@ -13,10 +13,41 @@ public class MarketDataManager : DomainService
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private const string BinanceBaseUrl = "https://api.binance.com";
+    private const string FuturesBaseUrl = "https://fapi.binance.com";
 
     public MarketDataManager(IHttpClientFactory httpClientFactory)
     {
         _httpClientFactory = httpClientFactory;
+    }
+
+    public async Task<MarketOpenInterestModel?> GetOpenInterestAsync(string symbol)
+    {
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            symbol = symbol.ToUpper().Replace("/", "").Replace("-", "").Trim();
+            
+            var url = $"{FuturesBaseUrl}/fapi/v1/openInterest?symbol={symbol}";
+            var response = await client.GetAsync(url);
+            
+            if (!response.IsSuccessStatusCode) return null;
+
+            var content = await response.Content.ReadAsStringAsync();
+            var doc = JsonDocument.Parse(content);
+            var root = doc.RootElement;
+
+            return new MarketOpenInterestModel
+            {
+                Symbol = root.GetProperty("symbol").GetString() ?? symbol,
+                OpenInterest = decimal.Parse(root.GetProperty("openInterest").GetString()!, System.Globalization.CultureInfo.InvariantCulture),
+                Timestamp = root.GetProperty("time").GetInt64()
+            };
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"💥 Error al obtener Open Interest para {symbol}: {ex.Message}");
+            return null;
+        }
     }
 
     public async Task<List<string>> GetTopSymbolsAsync(int limit = 30)
@@ -137,4 +168,11 @@ public class MarketCandleModel
     public decimal Low { get; set; }
     public decimal Close { get; set; }
     public decimal Volume { get; set; }
+}
+
+public class MarketOpenInterestModel
+{
+    public string Symbol { get; set; } = string.Empty;
+    public decimal OpenInterest { get; set; }
+    public long Timestamp { get; set; }
 }

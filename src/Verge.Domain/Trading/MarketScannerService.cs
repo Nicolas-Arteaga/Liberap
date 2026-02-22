@@ -10,6 +10,8 @@ using Microsoft.Extensions.Logging;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Uow;
 
+using Verge.Trading.Integrations;
+
 namespace Verge.Trading;
 
 public class MarketScannerService : BackgroundService
@@ -50,6 +52,7 @@ public class MarketScannerService : BackgroundService
         using var scope = _serviceProvider.CreateScope();
         var marketDataManager = scope.ServiceProvider.GetRequiredService<MarketDataManager>();
         var analysisService = scope.ServiceProvider.GetRequiredService<CryptoAnalysisService>();
+        var freeNewsService = scope.ServiceProvider.GetRequiredService<IFreeCryptoNewsService>();
         var pythonService = scope.ServiceProvider.GetRequiredService<IPythonIntegrationService>();
         var strategyRepository = scope.ServiceProvider.GetRequiredService<IRepository<TradingStrategy, Guid>>();
         var sessionRepository = scope.ServiceProvider.GetRequiredService<IRepository<TradingSession, Guid>>();
@@ -88,13 +91,13 @@ public class MarketScannerService : BackgroundService
                 int sentimentBonus = 0;
                 string sentimentText = "Neutral/Unknown";
                 try {
-                    var sentiment = await pythonService.AnalyzeSentimentAsync(symbol);
+                    var sentiment = await freeNewsService.GetSentimentAsync(symbol);
                     if (sentiment != null) {
-                        sentimentText = sentiment.Sentiment;
-                        if (sentiment.Sentiment == "positive") sentimentBonus = 20;
-                        else if (sentiment.Sentiment == "negative") sentimentBonus = -20;
+                        sentimentText = sentiment.Label;
+                        if (sentiment.Label == "positive") sentimentBonus = 20;
+                        else if (sentiment.Label == "negative") sentimentBonus = -20;
                     }
-                } catch { /* Ignorar error de IA */ }
+                } catch { /* Ignorar error de Noticias */ }
 
                 // 4. Calcular Confianza
                 int confidence = 0;

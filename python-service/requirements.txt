@@ -3,3 +3,5 @@ uvicorn
 requests
 pydantic
 python-dotenv
+pandas
+ta
