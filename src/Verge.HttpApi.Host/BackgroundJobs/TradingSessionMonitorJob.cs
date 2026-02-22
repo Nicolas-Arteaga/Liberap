@@ -40,8 +40,8 @@ public class TradingSessionMonitorJob : BackgroundService
                 _logger.LogError(ex, "❌ Error in job cycle");
             }
 
-            _logger.LogInformation("😴 Job sleeping for 1 minute...");
-            await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
+            _logger.LogInformation("😴 Job sleeping for 30 seconds...");
+            await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
         }
     }
 
@@ -84,12 +84,21 @@ public class TradingSessionMonitorJob : BackgroundService
                     continue;
                 }
 
-                _logger.LogInformation($"📊 Obteniendo datos de mercado para {session.Symbol} ({session.Timeframe})...");
-                var marketData = await marketDataManager.GetCandlesAsync(session.Symbol, session.Timeframe, 30);
+                // Resolver el símbolo: si es AUTO, tomar el primer crypto de la estrategia
+                var resolvedSymbol = session.Symbol;
+                if (resolvedSymbol == "AUTO" || string.IsNullOrEmpty(resolvedSymbol))
+                {
+                    var cryptos = strategy.GetSelectedCryptos();
+                    resolvedSymbol = cryptos?.FirstOrDefault() ?? "BTCUSDT";
+                    _logger.LogInformation($"🤖 Modo AUTO: usando símbolo {resolvedSymbol} de la estrategia");
+                }
+
+                _logger.LogInformation($"📊 Obteniendo datos de mercado para {resolvedSymbol} ({session.Timeframe})...");
+                var marketData = await marketDataManager.GetCandlesAsync(resolvedSymbol, session.Timeframe, 30);
                 
                 if (marketData == null || !marketData.Any())
                 {
-                    _logger.LogWarning($"⚠️ No se obtuvieron velas para {session.Symbol}");
+                    _logger.LogWarning($"⚠️ No se obtuvieron velas para {resolvedSymbol}");
                     continue;
                 }
 

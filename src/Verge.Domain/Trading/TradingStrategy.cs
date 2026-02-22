@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using Volo.Abp.Domain.Entities.Auditing;
 
 namespace Verge.Trading;
@@ -28,5 +29,12 @@ public class TradingStrategy : FullAuditedAggregateRoot<Guid>
         TraderProfileId = traderProfileId;
         Name = name;
         IsActive = true;
+    }
+
+    public List<string> GetSelectedCryptos()
+    {
+        if (string.IsNullOrEmpty(SelectedCryptosJson)) return new List<string>();
+        try { return JsonSerializer.Deserialize<List<string>>(SelectedCryptosJson) ?? new List<string>(); }
+        catch { return new List<string>(); }
     }
 }

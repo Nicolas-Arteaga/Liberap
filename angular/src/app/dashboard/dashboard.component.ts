@@ -318,11 +318,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.tradingService.getAnalysisLogs(sessionId).subscribe({
       next: (logs) => {
-        // Solo actualizamos si hay cambios o si es la primera carga
-        if (logs.length !== this.analysisLogs.length) {
-          this.analysisLogs = logs;
-          this.processScannerLogs(logs);
-        }
+        this.analysisLogs = logs;
+        this.processScannerLogs(logs);
       },
       error: (err) => console.error('[Dashboard] Error fetching analysis logs', err)
     });
