@@ -78,6 +78,10 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   showConfirmationDialog = false;
   sessionChecked = false;
 
+  // Toast de notificación de stage
+  stageNotification: { message: string; icon: string; color: string; visible: boolean } | null = null;
+  private toastTimeout: any;
+
   Object = Object; // Make Object available in template
   private analysisInterval: any;
   private refreshInterval: any;
@@ -194,8 +198,13 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.signalrService.stageAdvanced$.pipe(takeUntil(this.destroy$)).subscribe(session => {
       console.log('[Dashboard] Recibido StageAdvanced vía SignalR');
+      const prevStage = this.currentStage;
       this.currentStage = session.currentStage || 1;
       this.currentSession = session;
+      this.updateStagePrices(session);
+      if (this.currentStage !== prevStage) {
+        this.showStageToast(this.currentStage);
+      }
     });
   }
 
@@ -204,8 +213,45 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.currentStage = session.currentStage || 1;
     this.isHunting = true;
     this.isAnalyzing = true;
+    this.updateStagePrices(session);
     this.startAnalysisTimer();
     this.loadAnalysisLogs();
+  }
+
+  private updateStagePrices(session: TradingSessionDto) {
+    // Stage 1: Evaluando → precio de entrada si existe, o dejar en blanco
+    if (session.entryPrice) {
+      this.stages[0].price = session.entryPrice;
+    }
+    // Stage 2: Preparado → precio de entrada real
+    if (session.entryPrice) {
+      this.stages[1].price = session.entryPrice;
+      this.stages[1].description = `⚠️ OPORTUNIDAD INMINENTE - Entrada estimada: $${session.entryPrice.toLocaleString()}`;
+    }
+    // Stage 3: Compra → precio de entrada + TP + SL
+    if (session.entryPrice && session.takeProfitPrice && session.stopLossPrice) {
+      this.stages[2].price = session.entryPrice;
+      this.stages[2].description = `🚀 ¡COMPRA! Entrada: $${session.entryPrice.toLocaleString()} | TP: $${session.takeProfitPrice.toLocaleString()} | SL: $${session.stopLossPrice.toLocaleString()}`;
+    }
+    // Stage 4: Venta → precio de TP
+    if (session.takeProfitPrice) {
+      this.stages[3].price = session.takeProfitPrice;
+      this.stages[3].description = `💰 ¡VENDE! Objetivo: $${session.takeProfitPrice.toLocaleString()} alcanzado`;
+    }
+  }
+
+  private showStageToast(stage: number) {
+    if (this.toastTimeout) clearTimeout(this.toastTimeout);
+    const stageMap: Record<number, { message: string; icon: string; color: string }> = {
+      1: { message: '🔍 Evaluando mercado...', icon: 'search-outline', color: 'warning' },
+      2: { message: '⚠️ OPORTUNIDAD DETECTADA — Prepara tu entrada', icon: 'warning-outline', color: 'warning' },
+      3: { message: '🚀 ¡COMPRA AHORA! El motor confirmó la señal', icon: 'trending-up-outline', color: 'success' },
+      4: { message: '💰 ¡OBJETIVO ALCANZADO! Considerá cerrar la posición', icon: 'checkmark-circle-outline', color: 'danger' },
+    };
+    this.stageNotification = { ...(stageMap[stage] ?? stageMap[1]), visible: true };
+    this.toastTimeout = setTimeout(() => {
+      if (this.stageNotification) this.stageNotification.visible = false;
+    }, 6000);
   }
 
   ngAfterViewInit() {

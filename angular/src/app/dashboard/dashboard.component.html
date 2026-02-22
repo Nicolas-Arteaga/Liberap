@@ -1,5 +1,20 @@
 <div class="min-vh-100 pb-5 dashboard-vision">
 
+  <!-- Toast de Notificación de Stage -->
+  <div *ngIf="stageNotification?.visible"
+    class="stage-toast position-fixed top-0 end-0 m-3 p-3 rounded-3 shadow-lg d-flex align-items-center gap-3"
+    [class.toast-warning]="stageNotification?.color === 'warning'"
+    [class.toast-success]="stageNotification?.color === 'success'"
+    [class.toast-danger]="stageNotification?.color === 'danger'"
+    style="z-index: 9999; min-width: 320px; backdrop-filter: blur(12px); animation: slideInRight 0.4s ease-out;">
+    <ion-icon [name]="stageNotification?.icon" class="fs-3 flex-shrink-0"></ion-icon>
+    <div class="flex-grow-1">
+      <div class="fw-bold text-sm">Motor de Análisis</div>
+      <div class="text-sm opacity-90">{{ stageNotification?.message }}</div>
+    </div>
+    <ion-icon name="close-outline" class="pointer opacity-50" (click)="stageNotification = null"></ion-icon>
+  </div>
+
   <!-- Header Branding -->
   <header class="d-flex align-items-center justify-content-between px-4 py-3 border-bottom border-white-10">
     <div class="d-flex align-items-center gap-2">
