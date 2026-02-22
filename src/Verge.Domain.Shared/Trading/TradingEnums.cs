@@ -64,3 +64,16 @@ public enum OrderType
     Market,
     Limit
 }
+
+public enum TradingStyle
+{
+    Scalping,
+    DayTrading,
+    SwingTrading,
+    PositionTrading,
+    HODL,
+    GridTrading,
+    Arbitrage,
+    Algorithmic,
+    Auto
+}

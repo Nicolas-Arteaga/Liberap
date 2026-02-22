@@ -1433,6 +1433,23 @@
                     "type": "Verge.Trading.OpportunityDto",
                     "typeSimple": "Verge.Trading.OpportunityDto"
                   }
+                },
+                {
+                  "name": "RecommendTradingStyleAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "symbol",
+                      "typeAsString": "System.String, System.Private.CoreLib",
+                      "type": "System.String",
+                      "typeSimple": "string",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "Verge.Trading.RecommendedStyleDto",
+                    "typeSimple": "Verge.Trading.RecommendedStyleDto"
+                  }
                 }
               ]
             }
@@ -2212,6 +2229,43 @@
               "returnValue": {
                 "type": "System.Collections.Generic.List<Verge.Trading.ExchangeConnectionDto>",
                 "typeSimple": "[Verge.Trading.ExchangeConnectionDto]"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Trading.ITradingAppService"
+            },
+            "RecommendTradingStyleAsyncBySymbol": {
+              "uniqueName": "RecommendTradingStyleAsyncBySymbol",
+              "name": "RecommendTradingStyleAsync",
+              "httpMethod": "POST",
+              "url": "api/app/trading/recommend-trading-style",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "symbol",
+                  "typeAsString": "System.String, System.Private.CoreLib",
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "symbol",
+                  "name": "symbol",
+                  "jsonName": null,
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "Verge.Trading.RecommendedStyleDto",
+                "typeSimple": "Verge.Trading.RecommendedStyleDto"
               },
               "allowAnonymous": false,
               "implementFrom": "Verge.Trading.ITradingAppService"
@@ -5546,6 +5600,30 @@
           "minimum": null,
           "maximum": null,
           "regex": null
+        },
+        {
+          "name": "Style",
+          "jsonName": null,
+          "type": "Verge.Trading.TradingStyle",
+          "typeSimple": "enum",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "StyleParametersJson",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
         }
       ]
     },
@@ -6156,6 +6234,39 @@
       ],
       "genericArguments": null,
       "properties": null
+    },
+    "Verge.Trading.RecommendedStyleDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Style",
+          "jsonName": null,
+          "type": "Verge.Trading.TradingStyle",
+          "typeSimple": "enum",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Reason",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
     },
     "Verge.Trading.RiskTolerance": {
       "baseType": "System.Enum",
@@ -7076,8 +7187,60 @@
           "minimum": null,
           "maximum": null,
           "regex": null
+        },
+        {
+          "name": "Style",
+          "jsonName": null,
+          "type": "Verge.Trading.TradingStyle",
+          "typeSimple": "enum",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "StyleParametersJson",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
         }
       ]
+    },
+    "Verge.Trading.TradingStyle": {
+      "baseType": "System.Enum",
+      "isEnum": true,
+      "enumNames": [
+        "Scalping",
+        "DayTrading",
+        "SwingTrading",
+        "PositionTrading",
+        "HODL",
+        "GridTrading",
+        "Arbitrage",
+        "Algorithmic",
+        "Auto"
+      ],
+      "enumValues": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "genericArguments": null,
+      "properties": null
     },
     "Verge.Trading.UpdateTraderProfileDto": {
       "baseType": null,

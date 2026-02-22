@@ -25,6 +25,8 @@ public class TradingAppService : ApplicationService, ITradingAppService
     private readonly IRepository<BacktestResult, Guid> _backtestRepository;
     private readonly IRepository<ExchangeConnection, Guid> _exchangeRepository;
     private readonly IRepository<AnalysisLog, Guid> _analysisLogRepository;
+    private readonly MarketDataManager _marketDataManager;
+    private readonly CryptoAnalysisService _analysisService;
     private readonly ILogger<TradingAppService> _logger;
     private readonly IHubContext<TradingHub> _hubContext;
 
@@ -38,6 +40,8 @@ public class TradingAppService : ApplicationService, ITradingAppService
         IRepository<BacktestResult, Guid> backtestRepository,
         IRepository<ExchangeConnection, Guid> exchangeRepository,
         IRepository<AnalysisLog, Guid> analysisLogRepository,
+        MarketDataManager marketDataManager,
+        CryptoAnalysisService analysisService,
         ILogger<TradingAppService> logger,
         IHubContext<TradingHub> hubContext)
     {
@@ -50,6 +54,8 @@ public class TradingAppService : ApplicationService, ITradingAppService
         _backtestRepository = backtestRepository;
         _exchangeRepository = exchangeRepository;
         _analysisLogRepository = analysisLogRepository;
+        _marketDataManager = marketDataManager;
+        _analysisService = analysisService;
         _logger = logger;
         _hubContext = hubContext;
     }
@@ -395,6 +401,24 @@ public class TradingAppService : ApplicationService, ITradingAppService
         var profile = await GetProfileAsync();
         var connections = await _exchangeRepository.GetListAsync(x => x.TraderProfileId == profile.Id);
         return ObjectMapper.Map<List<ExchangeConnection>, List<ExchangeConnectionDto>>(connections);
+    }
+
+    public async Task<RecommendedStyleDto> RecommendTradingStyleAsync(string symbol)
+    {
+        _logger.LogInformation("🔍 Evaluando estilo recomendado para {Symbol}", symbol);
+        
+        // Obtenemos velas de 1h como base para la volatilidad y tendencia macro
+        var candles = await _marketDataManager.GetCandlesAsync(symbol, "1h", 50);
+        
+        var (style, reason) = _analysisService.RecommendTradingStyle(candles);
+        
+        _logger.LogInformation("💡 Estilo recomendado para {Symbol}: {Style} - {Reason}", symbol, style, reason);
+        
+        return new RecommendedStyleDto
+        {
+            Style = style,
+            Reason = reason
+        };
     }
 
     public Task<MarketAnalysisDto> GetMarketAnalysisDummyAsync()

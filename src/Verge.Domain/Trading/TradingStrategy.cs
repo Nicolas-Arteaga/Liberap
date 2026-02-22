@@ -21,6 +21,8 @@ public class TradingStrategy : FullAuditedAggregateRoot<Guid>
     public bool IsActive { get; set; }
     public bool IsAutoMode { get; set; }
     public string? CustomSymbolsJson { get; set; } // Opcional: lista de símbolos cuando no es auto-full
+    public TradingStyle Style { get; set; }
+    public string? StyleParametersJson { get; set; }
 
     protected TradingStrategy() { }
 

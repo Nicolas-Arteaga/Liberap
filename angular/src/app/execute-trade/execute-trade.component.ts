@@ -11,6 +11,7 @@ import { IonIcon } from '@ionic/angular/standalone';
 import { MarketDataService } from '../proxy/trading/market-data.service';
 import { TradingService } from '../proxy/trading/trading.service';
 import { SignalDirection } from '../proxy/trading/signal-direction.enum';
+import { TradingStyle } from '../proxy/trading/trading-style.enum';
 import { RiskTolerance } from '../proxy/trading/risk-tolerance.enum';
 import { DialogComponent } from 'src/shared/components/dialog/dialog.component';
 import { TradingSignalrService } from '../services/trading-signalr.service';
@@ -36,6 +37,7 @@ interface ExecuteTradeRequest {
   takeProfit: number;
   stopLoss: number;
   orderType: 'market' | 'limit';
+  style: TradingStyle;
 }
 
 @Component({
@@ -65,12 +67,27 @@ export class ExecuteTradeComponent implements OnInit {
   private destroy$ = new Subject<void>();
 
   symbols: { label: string, value: string }[] = [];
+
+  TradingStyle = TradingStyle; // For template
+  tradingStyles = [
+    { label: 'Scalping', icon: 'flash-outline', value: TradingStyle.Scalping, desc: '1m | 5-10x | TP 1-2%' },
+    { label: 'Day Trading', icon: 'sunny-outline', value: TradingStyle.DayTrading, desc: '15m | 3-5x | TP 3-5%' },
+    { label: 'Swing', icon: 'calendar-outline', value: TradingStyle.SwingTrading, desc: '4h | 2-3x | TP 8-15%' },
+    { label: 'Position', icon: 'trending-up-outline', value: TradingStyle.PositionTrading, desc: '1d | 1-2x | TP 20-30%' },
+    { label: 'HODL', icon: 'diamond-outline', value: TradingStyle.HODL, desc: '1w | 1x | Spot' },
+    { label: 'Grid Trading', icon: 'grid-outline', value: TradingStyle.GridTrading, desc: 'Rango | Múltiples órdenes' },
+    { label: 'Arbitraje', icon: 'swap-horizontal-outline', value: TradingStyle.Arbitrage, desc: 'Entre exchanges' },
+    { label: 'Algorítmico', icon: 'code-outline', value: TradingStyle.Algorithmic, desc: 'Bots automáticos' }
+  ];
+
   isAutoSelected = false;
+  isRecommending = false;
+  recommendationReason = '';
+
   hasActiveHunt = false;
   showBlockingDialog = false;
   isExecuting = false;
 
-  // Mock de detalles de la señal
   tradeDetails: TradeDetails = {
     symbol: 'BTC/USDT',
     direction: 'LONG',
@@ -83,15 +100,15 @@ export class ExecuteTradeComponent implements OnInit {
     confidence: 85
   };
 
-  // Datos del formulario
   request: ExecuteTradeRequest = {
-    symbol: 'BTC/USDT',
+    symbol: 'BTCUSDT',
     direction: 'buy',
     amount: 500,
     leverage: 5,
     takeProfit: 5,
     stopLoss: 2,
-    orderType: 'market'
+    orderType: 'market',
+    style: TradingStyle.DayTrading
   };
 
   ngOnInit() {
@@ -144,8 +161,99 @@ export class ExecuteTradeComponent implements OnInit {
     this.isAutoSelected = this.request.symbol === 'AUTO';
   }
 
+  onStyleSelect(style: TradingStyle) {
+    if (this.isAutoSelected && this.isRecommending) return;
+    this.request.style = style;
+    this.isAutoSelected = false; // Turn off auto if manual selection is made
+    this.applyStyleDefaults(style);
+  }
+
+  applyStyleDefaults(style: TradingStyle) {
+    switch (style) {
+      case TradingStyle.Scalping:
+        this.request.leverage = 10;
+        this.request.takeProfit = 2;
+        this.request.stopLoss = 1;
+        break;
+      case TradingStyle.DayTrading:
+        this.request.leverage = 5;
+        this.request.takeProfit = 5;
+        this.request.stopLoss = 2;
+        break;
+      case TradingStyle.SwingTrading:
+        this.request.leverage = 3;
+        this.request.takeProfit = 15;
+        this.request.stopLoss = 5;
+        break;
+      case TradingStyle.PositionTrading:
+        this.request.leverage = 2;
+        this.request.takeProfit = 30;
+        this.request.stopLoss = 10;
+        break;
+      case TradingStyle.HODL:
+        this.request.leverage = 1;
+        this.request.takeProfit = 0;
+        this.request.stopLoss = 0;
+        break;
+      case TradingStyle.GridTrading:
+        this.request.leverage = 3;
+        this.request.takeProfit = 1;
+        this.request.stopLoss = 1;
+        break;
+      case TradingStyle.Arbitrage:
+        this.request.leverage = 1;
+        this.request.takeProfit = 0.5;
+        this.request.stopLoss = 0.3;
+        break;
+      case TradingStyle.Algorithmic:
+        this.request.leverage = 5;
+        this.request.takeProfit = 5;
+        this.request.stopLoss = 2;
+        break;
+    }
+  }
+
+  recommendStyle() {
+    let targetSymbol = this.request.symbol;
+    if (targetSymbol === 'AUTO') {
+      targetSymbol = 'BTCUSDT'; // Default to BTCUSDT for analysis if symbol is AUTO
+    }
+
+    this.isRecommending = true;
+    this.recommendationReason = 'Analizando mercado en tiempo real...';
+
+    this.tradingService.recommendTradingStyle(targetSymbol).subscribe({
+      next: (res) => {
+        this.request.style = res.style;
+        this.recommendationReason = res.reason;
+        this.applyStyleDefaults(res.style);
+        this.isRecommending = false;
+        this.isAutoSelected = true;
+      },
+      error: (err) => {
+        console.error('Error recommending style', err);
+        this.recommendationReason = 'Error al analizar el mercado. Intente de nuevo.';
+        this.isRecommending = false;
+      }
+    });
+  }
+
   handleBack() {
     this.router.navigate(['/signals']);
+  }
+
+  getTimeframeForStyle(style: TradingStyle): string {
+    switch (style) {
+      case TradingStyle.Scalping: return '1m';
+      case TradingStyle.DayTrading: return '15m';
+      case TradingStyle.SwingTrading: return '4h';
+      case TradingStyle.PositionTrading: return '1d';
+      case TradingStyle.HODL: return '1w';
+      case TradingStyle.GridTrading: return '15m';
+      case TradingStyle.Arbitrage: return '1m';
+      case TradingStyle.Algorithmic: return '15m'; // Por defecto
+      default: return '15m'; // Default safer timeframe
+    }
   }
 
   executeTrade() {
@@ -167,16 +275,20 @@ export class ExecuteTradeComponent implements OnInit {
       takeProfitPercentage: this.request.takeProfit,
       stopLossPercentage: this.request.stopLoss,
       notificationsEnabled: true,
-      isAutoMode: this.isAutoSelected
+      isAutoMode: this.isAutoSelected,
+      style: this.request.style,
+      styleParametersJson: null
     }).subscribe({
       next: (strategy) => {
         console.log('✅ Estrategia creada:', strategy);
 
         // 2. Iniciar Sesión (siempre, auto o no)
         const sessionSymbol = this.isAutoSelected ? 'AUTO' : this.request.symbol;
+        const timeframe = this.getTimeframeForStyle(this.request.style);
+
         this.tradingService.startSession({
           symbol: sessionSymbol,
-          timeframe: '1m'
+          timeframe: timeframe
         }).subscribe({
           next: () => {
             console.log('✅ Sesión iniciada. Navegando al dashboard...');

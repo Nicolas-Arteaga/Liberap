@@ -19,6 +19,8 @@ public class TradingStrategyDto : FullAuditedEntityDto<Guid>
     public bool NotificationsEnabled { get; set; }
     public bool IsAutoMode { get; set; }
     public List<string>? CustomSymbols { get; set; }
+    public TradingStyle Style { get; set; }
+    public string? StyleParametersJson { get; set; }
 }
 
 public class CreateUpdateTradingStrategyDto
@@ -35,4 +37,12 @@ public class CreateUpdateTradingStrategyDto
     public bool NotificationsEnabled { get; set; }
     public bool IsAutoMode { get; set; }
     public List<string>? CustomSymbols { get; set; }
+    public TradingStyle Style { get; set; }
+    public string? StyleParametersJson { get; set; }
+}
+
+public class RecommendedStyleDto
+{
+    public TradingStyle Style { get; set; }
+    public string Reason { get; set; } = string.Empty;
 }

@@ -2,6 +2,7 @@ import type { EntityDto, FullAuditedEntityDto, PagedAndSortedResultRequestDto } 
 import type { AlertType } from './alert-type.enum';
 import type { SignalDirection } from './signal-direction.enum';
 import type { RiskTolerance } from './risk-tolerance.enum';
+import type { TradingStyle } from './trading-style.enum';
 import type { OrderType } from './order-type.enum';
 import type { TradeStatus } from './trade-status.enum';
 import type { SignalConfidence } from './signal-confidence.enum';
@@ -58,6 +59,8 @@ export interface CreateUpdateTradingStrategyDto {
   notificationsEnabled: boolean;
   isAutoMode: boolean;
   customSymbols: string[];
+  style?: TradingStyle;
+  styleParametersJson?: string;
 }
 
 export interface ExchangeConnectionDto extends FullAuditedEntityDto<string> {
@@ -116,6 +119,11 @@ export interface OpportunityDto {
   symbol?: string;
   confidence: number;
   signal?: string;
+  reason?: string;
+}
+
+export interface RecommendedStyleDto {
+  style?: TradingStyle;
   reason?: string;
 }
 
@@ -203,6 +211,8 @@ export interface TradingStrategyDto extends FullAuditedEntityDto<string> {
   notificationsEnabled: boolean;
   isAutoMode: boolean;
   customSymbols: string[];
+  style?: TradingStyle;
+  styleParametersJson?: string;
 }
 
 export interface UpdateTraderProfileDto {

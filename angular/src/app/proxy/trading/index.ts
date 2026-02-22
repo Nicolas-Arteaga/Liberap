@@ -10,5 +10,6 @@ export * from './signal-direction.enum';
 export * from './trade-status.enum';
 export * from './trading-level.enum';
 export * from './trading-stage.enum';
+export * from './trading-style.enum';
 export * from './trading.service';
 export { Dtos };

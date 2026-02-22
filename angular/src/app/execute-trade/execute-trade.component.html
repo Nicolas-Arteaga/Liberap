@@ -53,6 +53,57 @@
         <app-card-content class="mb-4">
             <h2 class="text-white fs-5 mb-3">Configuración de Trade</h2>
 
+            <!-- Selector de Estilo de Trading -->
+            <div class="mb-4">
+                <app-label>Estilo de Trading</app-label>
+
+                <!-- Botón IA Recomendación -->
+                <div class="mb-3">
+                    <app-glass-button variant="primary" class="w-100 py-2 border-primary" (click)="recommendStyle()"
+                        [disabled]="isRecommending" [style.--bs-bg-opacity]="isAutoSelected ? '0.3' : '1'">
+                        <div class="d-flex align-items-center justify-content-center gap-2">
+                            <span *ngIf="isRecommending" class="spinner-border spinner-border-sm" role="status"></span>
+                            <ion-icon *ngIf="!isRecommending" name="color-wand-outline"></ion-icon>
+                            <span>{{ isRecommending ? 'Analizando mercado...' : '🤖 AUTO (Sugerir el mejor estilo)'
+                                }}</span>
+                        </div>
+                    </app-glass-button>
+                    <div *ngIf="isAutoSelected && recommendationReason"
+                        class="text-success small mt-2 d-flex align-items-start gap-1 p-2 bg-success bg-opacity-10 rounded border border-success border-opacity-25">
+                        <ion-icon name="checkmark-circle-outline" class="mt-1 flex-shrink-0"></ion-icon>
+                        <span>{{ recommendationReason }}</span>
+                    </div>
+                    <div *ngIf="!isAutoSelected && recommendationReason && isRecommending"
+                        class="text-info small mt-2 d-flex align-items-start gap-1">
+                        <ion-icon name="information-circle-outline" class="mt-1 flex-shrink-0"></ion-icon>
+                        <span>{{ recommendationReason }}</span>
+                    </div>
+                </div>
+
+                <!-- Grid de estilos -->
+                <div class="row g-2">
+                    <div class="col-6 mb-2" *ngFor="let s of tradingStyles">
+                        <div class="card bg-dark border h-100 transition-all" style="cursor: pointer;"
+                            [class.border-primary]="request.style === s.value && !isAutoSelected"
+                            [class.border-success]="request.style === s.value && isAutoSelected"
+                            [class.border-secondary]="request.style !== s.value"
+                            [class.bg-primary]="request.style === s.value && !isAutoSelected"
+                            [style.--bs-bg-opacity]="request.style === s.value ? '0.2' : '1'"
+                            (click)="onStyleSelect(s.value)">
+                            <div
+                                class="card-body p-2 text-center d-flex flex-column align-items-center justify-content-center">
+                                <ion-icon [name]="s.icon" class="fs-4 mb-1"
+                                    [class.text-primary]="request.style === s.value && !isAutoSelected"
+                                    [class.text-success]="request.style === s.value && isAutoSelected"
+                                    [class.text-white-50]="request.style !== s.value"></ion-icon>
+                                <span class="text-white small fw-medium mb-0">{{ s.label }}</span>
+                                <span class="text-white-50" style="font-size: 0.65rem;">{{ s.desc }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="row mb-3">
                 <div class="col-12">
                     <app-label>Criptomoneda</app-label>
@@ -157,7 +208,8 @@
                     <ion-icon *ngIf="!isExecuting" name="flash-outline"></ion-icon>
                     <div *ngIf="isExecuting" class="spinner-border spinner-border-sm text-primary" role="status"></div>
                     <span>
-                        {{ isExecuting ? 'Creando cacería...' : (hasActiveHunt ? 'Cacería en curso' : '🚀 Ejecutar Trade') }}
+                        {{ isExecuting ? 'Creando cacería...' : (hasActiveHunt ? 'Cacería en curso' : '🚀 Ejecutar
+                        Trade') }}
                     </span>
                 </div>
             </app-glass-button>

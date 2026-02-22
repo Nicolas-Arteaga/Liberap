@@ -47,6 +47,9 @@ public interface ITradingAppService : IApplicationService
     // Forced Proxies
     Task<MarketAnalysisDto> GetMarketAnalysisDummyAsync();
     Task<OpportunityDto> GetOpportunityDummyAsync();
+
+    // Recommendation
+    Task<RecommendedStyleDto> RecommendTradingStyleAsync(string symbol);
 }
 
 public class GetSignalsInput : PagedAndSortedResultRequestDto
