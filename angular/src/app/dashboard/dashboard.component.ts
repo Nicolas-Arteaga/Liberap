@@ -327,42 +327,74 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   processScannerLogs(logs: AnalysisLogDto[]) {
     this.marketAnalyses = [];
+
     logs.forEach(log => {
-      // Detectar logs de scanner normales
-      if (log.message?.startsWith('Scanner:') && log.dataJson) {
-        const data = this.parseJson(log.dataJson) as MarketAnalysisDto;
-        if (data && !this.marketAnalyses.some(a => a.symbol === data.symbol)) {
-          this.marketAnalyses.push(data);
+      if (!log.message) return;
 
-          if (data.confidence >= 80 && !this.currentOpportunity) {
-            this.currentOpportunity = {
-              symbol: data.symbol,
-              confidence: data.confidence,
-              signal: data.signal,
-              reason: data.description
-            };
-          }
+      const msg = log.message;
+
+      // Parsear logs de análisis normal: "📊 Analizando SYMBOL - RSI: X | Precio: $Y"
+      // y variaciones de sentiment: "📰 ... - 📊 Analizando SYMBOL - RSI: X | Precio: $Y"
+      const analysisMatch = msg.match(/Analizando\s+(\S+)\s+-\s+RSI:\s*([\d,\.]+)\s*\|\s*Precio:\s*\$([\d,\.]+)/);
+      if (analysisMatch) {
+        const symbol = analysisMatch[1];
+        const rsi = parseFloat(analysisMatch[2].replace(',', '.'));
+        const price = parseFloat(analysisMatch[3].replace(',', '.'));
+        const existing = this.marketAnalyses.find(a => a.symbol === symbol);
+        if (existing) {
+          existing.rsi = rsi;
+          existing.description = this.getRsiDescription(rsi);
+          existing.signal = rsi > 55 ? 'LONG' : (rsi < 45 ? 'SHORT' : 'NEUTRAL');
+        } else {
+          this.marketAnalyses.push({
+            symbol,
+            rsi,
+            description: this.getRsiDescription(rsi),
+            signal: rsi > 55 ? 'LONG' : (rsi < 45 ? 'SHORT' : 'NEUTRAL'),
+            confidence: 0,
+            trend: rsi > 50 ? 'alcista' : 'bajista'
+          });
         }
       }
 
-      // Detectar logs de OPORTUNIDAD (para el modal)
-      if (log.message?.includes('� OPORTUNIDAD DETECTADA') && log.dataJson) {
-        const data = this.parseJson(log.dataJson) as OpportunityDto;
-        if (data && !this.currentOpportunity) {
-          this.currentOpportunity = data;
+      // Última señal del motor: logs de warning/success o con emojis de señal
+      if (log.level === 'warning' || log.level === 'success') {
+        this.lastMotorSignal = msg;
+      } else if (!this.lastMotorSignal && analysisMatch) {
+        // Usar el primer log de análisis como señal inicial
+        this.lastMotorSignal = msg;
+      }
+
+      // Última noticia: logs que contienen sentimiento (📰)
+      if (msg.includes('📰') && msg.includes('Sentimiento')) {
+        const sentimentMatch = msg.match(/Sentimiento\s+(\w+)\s+\(([\d]+)\s*%\)/);
+        if (sentimentMatch) {
+          this.lastNewsTitle = `Sentimiento ${sentimentMatch[1]} (${sentimentMatch[2]}%)`;
         }
       }
 
-      if (log.level === 'success' || log.level === 'warning') {
-        if (!log.message?.startsWith('Scanner:')) {
-          this.lastMotorSignal = log.message;
-        } else if (this.marketAnalyses.length > 0) {
-          // Si es del scanner, formateamos como la imagen
-          const m = this.marketAnalyses[0];
-          this.lastMotorSignal = `RSI en ${m.symbol} recuperándose desde zona de sobreventa (${m.rsi - 9} → ${m.rsi}). Volumen +18%. Posible reversión alcista en formación.`;
+      // Oportunidad detectada: logs con nivel success o RSI extremo
+      if (log.level === 'success' && !this.currentOpportunity && analysisMatch) {
+        const symbol = analysisMatch[1];
+        const rsi = parseFloat(analysisMatch[2].replace(',', '.'));
+        if (rsi < 30 || rsi > 70) {
+          this.currentOpportunity = {
+            symbol,
+            confidence: rsi < 30 ? 85 : 80,
+            signal: rsi < 30 ? 'LONG' : 'SHORT',
+            reason: msg
+          };
         }
       }
     });
+  }
+
+  getRsiDescription(rsi: number): string {
+    if (rsi < 30) return 'sobreventa extrema | posible reversión alcista';
+    if (rsi < 45) return 'acercándose a sobreventa | monitoreando';
+    if (rsi > 70) return 'sobrecompra | posible corrección';
+    if (rsi > 55) return 'fuerza alcista confirmada';
+    return 'zona neutral | sin señal clara';
   }
 
   generateMarketDescription(data: MarketAnalysisDto): string {
