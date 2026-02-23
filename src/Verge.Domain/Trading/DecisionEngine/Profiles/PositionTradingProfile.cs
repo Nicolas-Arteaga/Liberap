@@ -19,6 +19,28 @@ public class PositionTradingProfile : ITradingStyleProfile
         MarketRegimeType.BearTrend 
     };
 
+    public int RequiredConfirmations => 4;
+
+    public string GetConfirmationTimeframe(string primaryTimeframe) => "1d";
+
+    public bool IsInvalidated(MarketContext context, out string reason)
+    {
+        reason = string.Empty;
+        if (context.MarketRegime?.Regime == MarketRegimeType.Ranging)
+        {
+            reason = "Market changed to Ranging (unsuitable for Position)";
+            return true;
+        }
+
+        if (context.FearAndGreed != null && (context.FearAndGreed.Value < 40 || context.FearAndGreed.Value > 75))
+        {
+            reason = $"F&G {context.FearAndGreed.Value} exited stable range (40-75)";
+            return true;
+        }
+
+        return false;
+    }
+
     public bool ValidateEntry(MarketContext context, out string reason)
     {
         reason = string.Empty;

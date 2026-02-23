@@ -22,6 +22,16 @@ public class HodlProfile : ITradingStyleProfile
         MarketRegimeType.LowVolatility
     };
 
+    public int RequiredConfirmations => 1;
+
+    public string GetConfirmationTimeframe(string primaryTimeframe) => primaryTimeframe; // No HTF for HODL
+
+    public bool IsInvalidated(MarketContext context, out string reason)
+    {
+        reason = string.Empty;
+        return false; // HODL never invalidates
+    }
+
     public bool ValidateEntry(MarketContext context, out string reason)
     {
         reason = string.Empty;

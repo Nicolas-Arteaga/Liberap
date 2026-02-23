@@ -14,13 +14,30 @@ public class SwingTradingProfile : ITradingStyleProfile
     public int EntryThreshold => 70;
     public int PrepareThreshold => 50;
     public int ContextThreshold => 35;
-
     public List<MarketRegimeType> ValidRegimes => new List<MarketRegimeType> 
     { 
         MarketRegimeType.BullTrend, 
         MarketRegimeType.BearTrend,
         MarketRegimeType.Ranging
     };
+
+    public int RequiredConfirmations => 3;
+
+    public string GetConfirmationTimeframe(string primaryTimeframe) => "4h";
+
+    public bool IsInvalidated(MarketContext context, out string reason)
+    {
+        reason = string.Empty;
+        if (context.Technicals == null) return false;
+
+        if (context.Technicals.Adx < 20)
+        {
+            reason = $"ADX {context.Technicals.Adx:F1} fell below 20 (no trend)";
+            return true;
+        }
+
+        return false;
+    }
 
     public bool ValidateEntry(MarketContext context, out string reason)
     {

@@ -15,6 +15,7 @@ public class TradingSession : FullAuditedAggregateRoot<Guid>
     public decimal? EntryPrice { get; set; }
     public decimal? TakeProfitPrice { get; set; }
     public decimal? StopLossPrice { get; set; }
+    public string? EvaluationHistoryJson { get; set; } // Circular buffer of last N evaluations
 
     protected TradingSession() { }
 

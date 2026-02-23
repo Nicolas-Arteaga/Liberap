@@ -23,8 +23,24 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
 
         // 1. Get corresponding Profile
         var profile = TradingStyleProfileFactory.GetProfile(style);
+
+        // 2. Setup Invalidation Check (Phase 2)
+        if (session.CurrentStage == TradingStage.Prepared)
+        {
+            if (profile.IsInvalidated(context, out string invalidReason))
+            {
+                var invalidResult = new DecisionResult
+                {
+                    Decision = TradingDecision.Ignore,
+                    Score = 0,
+                    Reason = $"⚠️ SETUP INVALIDATED: {invalidReason}"
+                };
+                _logger.LogWarning("❌ Session {SessionId} invalidated: {Reason}", session.Id, invalidResult.Reason);
+                return invalidResult;
+            }
+        }
         
-        // 2. Validate Market Regime
+        // 3. Validate Market Regime
         var currentRegime = context.MarketRegime?.Regime ?? MarketRegimeType.Ranging;
         if (!profile.ValidRegimes.Contains(currentRegime))
         {
@@ -62,17 +78,41 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
                            (quantitativeScore * profile.QuantitativeWeight) +
                            (sentimentScore * profile.SentimentWeight) +
                            (fundamentalScore * profile.FundamentalWeight);
-
         // 6. Apply Profile Penalties
         finalScore = profile.ApplyPenalties(context, finalScore, out string penaltyReason);
 
-        // 7. Decision Mapping based on Profile Thresholds
+        // 7. Decision Mapping based on Profile Thresholds (Phase 2.0 Base)
         int roundedScore = (int)Math.Clamp(finalScore, 0, 100);
         var decision = GetDecisionFromProfile(roundedScore, profile);
+
+        // 7.1 Multi-Timeframe Confirmation (Phase 2)
+        if (decision == TradingDecision.Entry)
+        {
+            if (!ValidateHTFConfirmation(context, session, style, profile, out string htfReason))
+            {
+                decision = TradingDecision.Prepare;
+                roundedScore = Math.Min(roundedScore, profile.EntryThreshold - 1);
+                penaltyReason += $" [HTF Conflict: {htfReason}]";
+            }
+        }
+
+        // 8. Confidence Calculation (Phase 2)
+        var confidence = CalculateConfidence(context, style);
+
+        // 9. Temporal Persistence Check (Phase 2.1)
+        if (decision == TradingDecision.Entry)
+        {
+            if (!CheckTemporalPersistence(session, profile, roundedScore, out string persistenceReason))
+            {
+                decision = TradingDecision.Prepare;
+                penaltyReason += $" {persistenceReason}";
+            }
+        }
 
         var result = new DecisionResult
         {
             Decision = decision,
+            Confidence = confidence,
             Score = roundedScore,
             Reason = $"Score: {roundedScore}. Style: {style}. {penaltyReason}".Trim(),
             WeightedScores = new Dictionary<string, float>
@@ -146,6 +186,93 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
     private float CalculateFundamentalScore(MarketContext context)
     {
         return 50f; // Standardized fundamental base
+    }
+    #endregion
+
+    #region Phase 2: Intelligence Helpers
+    private SignalConfidence CalculateConfidence(MarketContext context, TradingStyle style)
+    {
+        // 1. RSI Stability (Check recent variance if possible, otherwise look at ADX as proxy for trend quality)
+        var adx = context.Technicals?.Adx ?? 0;
+        var score = 0;
+
+        if (adx > 30) score += 40; // High trend strength = high confidence in trend-following
+        else if (adx > 20) score += 20;
+
+        // 2. Regime Consistency
+        if (context.MarketRegime != null && context.MarketRegime.TrendStrength > 60) score += 30;
+
+        // 3. Sentiment Alignment
+        if (context.GlobalSentiment?.Label == "positive" && context.MarketRegime?.Regime == MarketRegimeType.BullTrend) score += 30;
+        if (context.GlobalSentiment?.Label == "negative" && context.MarketRegime?.Regime == MarketRegimeType.BearTrend) score += 30;
+
+        if (score >= 80) return SignalConfidence.High;
+        if (score >= 40) return SignalConfidence.Medium;
+        return SignalConfidence.Low;
+    }
+
+    private bool CheckTemporalPersistence(TradingSession session, ITradingStyleProfile profile, int currentScore, out string reason)
+    {
+        reason = string.Empty;
+        var requiredCount = profile.RequiredConfirmations;
+        if (requiredCount <= 1) return true;
+
+        // Persistence logic: Parse History
+        var history = ParseHistory(session.EvaluationHistoryJson);
+        history.Add(currentScore);
+        
+        // Keep last 10
+        if (history.Count > 10) history = history.Skip(history.Count - 10).ToList();
+        
+        // Save back to session (Transiently)
+        session.EvaluationHistoryJson = System.Text.Json.JsonSerializer.Serialize(history);
+
+        // Check last N
+        if (history.Count < requiredCount)
+        {
+            reason = $"[WAITING: Needs {requiredCount} cycles, have {history.Count}]";
+            return false;
+        }
+
+        var lastN = history.TakeLast(requiredCount).ToList();
+        bool allAbove = lastN.All(s => s >= profile.EntryThreshold);
+
+        if (!allAbove)
+        {
+            reason = $"[CONSISTENCY: Latest sequence failed stability check]";
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool ValidateHTFConfirmation(MarketContext context, TradingSession session, TradingStyle style, ITradingStyleProfile profile, out string reason)
+    {
+        reason = string.Empty;
+        var htfContext = context.HigherTimeframeContext;
+        if (htfContext == null) return true; // Cannot validate if not present (log as warning in monitor)
+
+        var htfRegime = htfContext.MarketRegime?.Regime ?? MarketRegimeType.Ranging;
+
+        // Simple Contradiction Rules
+        // 1. Long on lower TF while higher TF is BearTrend
+        if (htfRegime == MarketRegimeType.BearTrend && style != TradingStyle.GridTrading)
+        {
+            reason = $"HTF contradiction: Cannot Long while HTF is in BearTrend";
+            return false;
+        }
+
+        // 2. Short on lower TF while higher TF is BullTrend
+        // (Assuming session direction logic exists elsewhere or we check RSI/MACD of HTF)
+
+        return true;
+    }
+
+    private List<int> ParseHistory(string? json)
+    {
+        if (string.IsNullOrEmpty(json)) return new List<int>();
+        try { return System.Text.Json.JsonSerializer.Deserialize<List<int>>(json) ?? new List<int>(); }
+        catch { return new List<int>(); }
     }
     #endregion
 }

@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using Verge.Trading.Integrations;
 using Verge.Trading;
 
@@ -25,11 +27,22 @@ public class MarketContext
     
     // Raw Data for internal calculations
     public List<MarketCandleModel> Candles { get; set; } = new();
+
+    // Multi-Timeframe Confirmation
+    public MarketContext? HigherTimeframeContext { get; set; }
+
+    public DateTime GetLastUpdated()
+    {
+        if (Candles == null || !Candles.Any()) return DateTime.MinValue;
+        var maxTimestamp = Candles.Max(c => c.Timestamp);
+        return DateTimeOffset.FromUnixTimeSeconds(maxTimestamp).DateTime;
+    }
 }
 
 public class DecisionResult
 {
     public TradingDecision Decision { get; set; }
+    public SignalConfidence Confidence { get; set; }
     public int Score { get; set; } // 0-100
     public string Reason { get; set; } = string.Empty;
     public Dictionary<string, float> WeightedScores { get; set; } = new();

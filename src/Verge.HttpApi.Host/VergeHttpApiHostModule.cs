@@ -127,9 +127,9 @@ public class VergeHttpApiHostModule : AbpModule
         ConfigureVirtualFileSystem(context);
         ConfigureCors(context, configuration);
         
-        context.Services.AddSignalR();
         context.Services.AddHostedService<TradingSessionMonitorJob>();
         context.Services.AddHostedService<MarketScannerService>();
+
     }
 
     private void ConfigureAuthentication(ServiceConfigurationContext context)
@@ -226,7 +226,16 @@ public class VergeHttpApiHostModule : AbpModule
                     .SetIsOriginAllowedToAllowWildcardSubdomains()
                     .AllowAnyHeader()
                     .AllowAnyMethod()
-                    .AllowCredentials(); // Habilitar credenciales para SignalR
+                    .AllowCredentials();
+            });
+            // Named policy specifically for SignalR (MapHub.RequireCors needs a named policy)
+            options.AddPolicy("SignalRCors", builder =>
+            {
+                builder
+                    .WithOrigins("http://localhost:4200", "https://localhost:4200")
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials();
             });
         });
     }
@@ -255,11 +264,11 @@ public class VergeHttpApiHostModule : AbpModule
             app.UseErrorPage();
         }
 
+        app.UseCors();
         app.UseRouting();
         app.MapAbpStaticAssets();
         app.UseAbpStudioLink();
         app.UseAbpSecurityHeaders();
-        app.UseCors();
         app.UseAuthentication();
         app.UseAbpOpenIddictValidation();
 
@@ -282,9 +291,7 @@ public class VergeHttpApiHostModule : AbpModule
         });
         app.UseAuditing();
         app.UseAbpSerilogEnrichers();
-        app.UseConfiguredEndpoints(endpoints =>
-        {
-            endpoints.MapHub<TradingHub>("/signalr-hubs/trading");
-        });
+        app.UseConfiguredEndpoints();
+
     }
 }

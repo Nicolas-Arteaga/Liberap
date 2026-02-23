@@ -19,6 +19,24 @@ public class GridTradingProfile : ITradingStyleProfile
         MarketRegimeType.LowVolatility 
     };
 
+    public int RequiredConfirmations => 2;
+
+    public string GetConfirmationTimeframe(string primaryTimeframe) => "1h";
+
+    public bool IsInvalidated(MarketContext context, out string reason)
+    {
+        reason = string.Empty;
+        if (context.Technicals == null) return false;
+
+        if (context.Technicals.Adx > 20)
+        {
+            reason = $"ADX {context.Technicals.Adx:F1} rose above 20 (potential trend break)";
+            return true;
+        }
+
+        return false;
+    }
+
     public bool ValidateEntry(MarketContext context, out string reason)
     {
         reason = string.Empty;

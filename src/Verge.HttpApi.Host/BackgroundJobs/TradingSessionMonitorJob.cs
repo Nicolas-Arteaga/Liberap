@@ -12,6 +12,8 @@ using Volo.Abp.Uow;
 using Verge.Trading.DTOs;
 using Verge.Trading.Integrations;
 using Verge.Trading.DecisionEngine;
+using Verge.Trading.DecisionEngine.Cache;
+using Verge.Trading.DecisionEngine.Factory;
 
 namespace Verge.Trading;
 
@@ -60,6 +62,8 @@ public class TradingSessionMonitorJob : BackgroundService
         var freeNewsService = scope.ServiceProvider.GetRequiredService<IFreeCryptoNewsService>();
         var geckoService = scope.ServiceProvider.GetRequiredService<ICoinGeckoService>();
         var decisionEngine = scope.ServiceProvider.GetRequiredService<ITradingDecisionEngine>();
+        var autoEvaluator = scope.ServiceProvider.GetRequiredService<AutoEvaluatorService>();
+        var snapshotCache = scope.ServiceProvider.GetRequiredService<MarketSnapshotCache>();
         var analysisLogRepo = scope.ServiceProvider.GetRequiredService<IRepository<AnalysisLog, Guid>>();
         var unitOfWorkManager = scope.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
 
@@ -93,12 +97,32 @@ public class TradingSessionMonitorJob : BackgroundService
             else
             {
                 var candidates = strategy.GetSelectedCryptos();
-                if (candidates == null || !candidates.Any()) candidates = new List<string> { "BTCUSDT" };
+                if (candidates == null || !candidates.Any())
+                {
+                    _logger.LogWarning("⚠️ AUTO session {Id} for TraderProfile {ProfileId} has no portfolio coins configured.", session.Id, strategy.TraderProfileId);
+                    continue;
+                }
                 
                 foreach (var symbol in candidates)
                 {
                     requiredGroups.Add((symbol, session.Timeframe));
+                    
+                    // Discover HTF for AUTO candidates
+                    var profile = TradingStyleProfileFactory.GetProfile(strategy.Style);
+                    var htf = profile.GetConfirmationTimeframe(session.Timeframe);
+                    if (!string.IsNullOrEmpty(htf) && htf != session.Timeframe)
+                    {
+                        requiredGroups.Add((symbol, htf));
+                    }
                 }
+            }
+
+            // Identify HTF for non-AUTO sessions
+            var sessionProfile = TradingStyleProfileFactory.GetProfile(strategy.Style);
+            var sessionHtf = sessionProfile.GetConfirmationTimeframe(session.Timeframe);
+            if (!string.IsNullOrEmpty(sessionHtf) && sessionHtf != session.Timeframe && session.Symbol != "AUTO")
+            {
+                requiredGroups.Add((session.Symbol, sessionHtf));
             }
         }
 
@@ -112,9 +136,21 @@ public class TradingSessionMonitorJob : BackgroundService
                 var symbol = group.symbol;
                 var timeframe = group.timeframe;
 
+                // 3.1 Check Cache First (Optimizations)
                 var candles = await marketDataManager.GetCandlesAsync(symbol, timeframe, 100);
                 if (candles == null || !candles.Any()) continue;
 
+                var lastCandleTimestamp = candles.Max(c => c.Timestamp);
+                var cachedContext = await snapshotCache.GetAsync(symbol, timeframe, lastCandleTimestamp);
+                
+                if (cachedContext != null)
+                {
+                    groupDataCache[group] = (candles, cachedContext);
+                    _logger.LogDebug("📦 Cache hit for {Symbol} {Timeframe}", symbol, timeframe);
+                    continue;
+                }
+
+                _logger.LogInformation("📉 Fetching Fresh Data for {Symbol} {Timeframe}...", symbol, timeframe);
                 var oi = await marketDataManager.GetOpenInterestAsync(symbol);
                 var gecko = await geckoService.GetTokenDataAsync(symbol);
                 var newsResult = await freeNewsService.GetNewsAsync(symbol);
@@ -137,6 +173,8 @@ public class TradingSessionMonitorJob : BackgroundService
                     Candles = candles
                 };
 
+                // Store in Cache
+                await snapshotCache.SetAsync(symbol, timeframe, lastCandleTimestamp, context);
                 groupDataCache[group] = (candles, context);
             }
             catch (Exception ex)
@@ -152,61 +190,62 @@ public class TradingSessionMonitorJob : BackgroundService
 
             try
             {
-                if (session.Symbol != "AUTO")
+                // 4.1 Evaluation Logic: Multidimensional AUTO or Generic
+                bool isAutoMode = session.Symbol == "AUTO" || 
+                                  strategy.Style == TradingStyle.Auto || 
+                                  strategy.DirectionPreference == SignalDirection.Auto;
+
+                if (!isAutoMode)
                 {
                     var groupKey = (session.Symbol, session.Timeframe);
                     if (!groupDataCache.TryGetValue(groupKey, out var data)) continue;
+
+                    // Attach HTF Context if exists
+                    var profile = TradingStyleProfileFactory.GetProfile(strategy.Style);
+                    var htfName = profile.GetConfirmationTimeframe(session.Timeframe);
+                    var htfKey = (session.Symbol, htfName);
+                    
+                    if (groupDataCache.TryGetValue(htfKey, out var htfData))
+                    {
+                        data.context.HigherTimeframeContext = htfData.context;
+                    }
 
                     var evalResult = decisionEngine.Evaluate(session, strategy.Style, data.context);
                     bool stageChanged = ProcessDecision(session, evalResult, strategy, data.candles.Last().Close);
                     await CreateAnalysisLogAsync(analysisLogRepo, session, evalResult, data.candles.Last().Close, data.context);
 
-                    if (stageChanged) await sessionRepository.UpdateAsync(session);
+                    // Always update session to persist History (Phase 2)
+                    await sessionRepository.UpdateAsync(session);
                 }
                 else
                 {
-                    // AUTO MODE: Evaluate all candidates and pick the best one
-                    var candidates = strategy.GetSelectedCryptos();
-                    if (candidates == null || !candidates.Any()) candidates = new List<string> { "BTCUSDT" };
+                    // NEW: Multidimensional AUTO Evaluator
+                    var contextsOnly = groupDataCache.ToDictionary(k => k.Key, v => v.Value.context);
+                    var bestOpportunity = await autoEvaluator.FindBestOpportunityAsync(session, strategy, contextsOnly);
 
-                    (string symbol, DecisionEngine.DecisionResult result, List<MarketCandleModel> candles, DecisionEngine.MarketContext context)? bestEvaluation = null;
-
-                    foreach (var symbol in candidates)
+                    if (bestOpportunity != null)
                     {
-                        var groupKey = (symbol, session.Timeframe);
-                        if (!groupDataCache.TryGetValue(groupKey, out var data)) continue;
+                        var best = bestOpportunity;
+                        _logger.LogInformation("🤖 AUTO winner for Session {Id}: {Symbol} | Style: {Style} | Score: {Score}", 
+                            session.Id, best.Symbol, best.Style, best.Result.Score);
 
-                        // Create a temporary clone or just update symbol for evaluation
-                        var originalSymbol = session.Symbol;
-                        session.Symbol = symbol; 
-                        var result = decisionEngine.Evaluate(session, strategy.Style, data.context);
-                        session.Symbol = originalSymbol; // Restore
+                        // ALWAYS persist the analysis log for the best opportunity (consistent with fixed-symbol behavior)
+                        await CreateAnalysisLogAsync(analysisLogRepo, session, best.Result, best.Context.Candles.Last().Close, best.Context);
 
-                        if (bestEvaluation == null || result.Score > bestEvaluation.Value.result.Score)
+                        // Update session if it's a candidate for action
+                        if (best.Result.Decision != DecisionEngine.TradingDecision.Ignore)
                         {
-                            bestEvaluation = (symbol, result, data.candles, data.context);
-                        }
-                    }
+                            // If we enter or prepare, we adopt the winning symbol
+                            if (best.Result.Decision >= DecisionEngine.TradingDecision.Prepare)
+                            {
+                                session.Symbol = best.Symbol;
+                            }
 
-                    if (bestEvaluation != null)
-                    {
-                        var best = bestEvaluation.Value;
-                        _logger.LogInformation("🤖 AUTO session {Id}: Top candidate {Symbol} with score {Score}", session.Id, best.symbol, best.result.Score);
-
-                        // If the best one triggers an entry or prepare, we take it
-                        if (best.result.Decision != DecisionEngine.TradingDecision.Context)
-                        {
-                            session.Symbol = best.symbol; // Permanently assign the best symbol
-                            bool stageChanged = ProcessDecision(session, best.result, strategy, best.candles.Last().Close);
-                            await CreateAnalysisLogAsync(analysisLogRepo, session, best.result, best.candles.Last().Close, best.context);
-
-                            if (stageChanged) await sessionRepository.UpdateAsync(session);
+                            bool stageChanged = ProcessDecision(session, best.Result, strategy, best.Context.Candles.Last().Close);
                         }
-                        else
-                        {
-                            // Just log the best context for visualization in dashboard
-                            await CreateAnalysisLogAsync(analysisLogRepo, session, best.result, best.candles.Last().Close, best.context);
-                        }
+
+                        // Always update session (persist history and EvaluationHistoryJson)
+                        await sessionRepository.UpdateAsync(session);
                     }
                 }
             }
@@ -287,10 +326,18 @@ public class TradingSessionMonitorJob : BackgroundService
             _ => "💤"
         };
 
-        string message = $"{emoji} [{result.Decision}] Score: {result.Score}/100 | Regimen: {context.MarketRegime?.Regime.ToString() ?? "N/A"} | RSI: {context.Technicals?.Rsi:F1} | Price: ${price:N2}";
+        string confidenceLabel = result.Confidence.ToString().ToUpper();
+        string message = $"{emoji} [{result.Decision}] Score: {result.Score}/100 | Confianza: {confidenceLabel} | Regimen: {context.MarketRegime?.Regime.ToString() ?? "N/A"} | Price: ${price:N2}";
+
+        if (result.Reason.Contains("INVALIDATED"))
+        {
+            message = result.Reason; // Keep the alert clear
+        }
+
         var logData = new {
             score = result.Score,
             decision = result.Decision.ToString(),
+            confidence = result.Confidence.ToString(),
             regime = context.MarketRegime?.Regime,
             rsi = context.Technicals?.Rsi,
             fng = context.FearAndGreed?.Value,

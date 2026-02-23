@@ -21,6 +21,16 @@ public class DefaultProfile : ITradingStyleProfile
         MarketRegimeType.Ranging 
     };
 
+    public int RequiredConfirmations => 1;
+
+    public string GetConfirmationTimeframe(string primaryTimeframe) => primaryTimeframe;
+
+    public bool IsInvalidated(MarketContext context, out string reason)
+    {
+        reason = string.Empty;
+        return false;
+    }
+
     public bool ValidateEntry(MarketContext context, out string reason)
     {
         reason = string.Empty;

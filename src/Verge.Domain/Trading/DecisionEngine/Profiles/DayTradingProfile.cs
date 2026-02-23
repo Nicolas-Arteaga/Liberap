@@ -19,6 +19,36 @@ public class DayTradingProfile : ITradingStyleProfile
         MarketRegimeType.BearTrend 
     };
 
+    public int RequiredConfirmations => 2;
+
+    public string GetConfirmationTimeframe(string primaryTimeframe) => "1h";
+
+    public bool IsInvalidated(MarketContext context, out string reason)
+    {
+        reason = string.Empty;
+        if (context.Technicals == null) return false;
+
+        if (context.Technicals.Rsi < 50 || context.Technicals.Rsi > 70)
+        {
+            reason = $"RSI {context.Technicals.Rsi:F1} exited stable zone (50-70)";
+            return true;
+        }
+
+        if (context.Technicals.Adx < 25)
+        {
+            reason = $"ADX {context.Technicals.Adx:F1} dropped below 25";
+            return true;
+        }
+
+        if (context.MarketRegime?.Regime == MarketRegimeType.Ranging)
+        {
+            reason = "Market structure changed to Ranging";
+            return true;
+        }
+
+        return false;
+    }
+
     public bool ValidateEntry(MarketContext context, out string reason)
     {
         reason = string.Empty;

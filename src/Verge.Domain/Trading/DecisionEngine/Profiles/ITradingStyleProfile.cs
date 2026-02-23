@@ -18,6 +18,11 @@ public interface ITradingStyleProfile
     // Valid Market Regimes for this style
     List<MarketRegimeType> ValidRegimes { get; }
     
+    // Phase 2: Signal Quality
+    int RequiredConfirmations { get; }
+    string GetConfirmationTimeframe(string primaryTimeframe);
+    bool IsInvalidated(MarketContext context, out string reason);
+    
     // Hard entry validation (setups)
     bool ValidateEntry(MarketContext context, out string reason);
     

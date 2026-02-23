@@ -263,10 +263,16 @@ export class ExecuteTradeComponent implements OnInit {
     console.log('🚀 Iniciando Cacería (Navegación Inmediata):', this.request);
 
     // 1. Crear Estrategia Real
+    // Portfolio completo para AUTO: top monedas que el scanner analiza
+    const autoPortfolio = [
+      'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT',
+      'ADAUSDT', 'DOTUSDT', 'MATICUSDT', 'LINKUSDT', 'AVAXUSDT'
+    ];
+
     this.tradingService.createStrategy({
       name: `Cacería ${this.request.symbol} - ${new Date().toLocaleString()}`,
       directionPreference: this.isAutoSelected ? SignalDirection.Auto : (this.request.direction === 'buy' ? SignalDirection.Long : SignalDirection.Short),
-      selectedCryptos: this.isAutoSelected ? [] : [this.request.symbol],
+      selectedCryptos: this.isAutoSelected ? autoPortfolio : [this.request.symbol],
       customSymbols: this.isAutoSelected ? [] : [],
       leverage: this.request.leverage,
       capital: this.request.amount,

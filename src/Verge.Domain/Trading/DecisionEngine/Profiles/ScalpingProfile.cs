@@ -20,6 +20,36 @@ public class ScalpingProfile : ITradingStyleProfile
         MarketRegimeType.HighVolatility 
     };
 
+    public int RequiredConfirmations => 2;
+
+    public string GetConfirmationTimeframe(string primaryTimeframe) => "15m";
+
+    public bool IsInvalidated(MarketContext context, out string reason)
+    {
+        reason = string.Empty;
+        if (context.Technicals == null) return false;
+
+        if (context.Technicals.Rsi < 55)
+        {
+            reason = $"RSI fell to {context.Technicals.Rsi:F1} (below 55)";
+            return true;
+        }
+
+        if (context.Technicals.Adx < 20)
+        {
+            reason = $"ADX dropped to {context.Technicals.Adx:F1} (trend lost)";
+            return true;
+        }
+
+        if (context.MarketRegime?.Regime == MarketRegimeType.Ranging)
+        {
+            reason = "Market changed to Ranging regime";
+            return true;
+        }
+
+        return false;
+    }
+
     public bool ValidateEntry(MarketContext context, out string reason)
     {
         reason = string.Empty;
