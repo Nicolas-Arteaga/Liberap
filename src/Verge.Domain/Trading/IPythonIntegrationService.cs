@@ -1,5 +1,7 @@
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using Verge.Trading;
+using System.Text.Json.Serialization;
 
 namespace Verge.Trading;
 
@@ -13,7 +15,8 @@ public interface IPythonIntegrationService
 
 public class RegimeResponseModel
 {
-    public string Regime { get; set; } = string.Empty;
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public MarketRegimeType Regime { get; set; }
     public float VolatilityScore { get; set; }
     public float TrendStrength { get; set; }
 }

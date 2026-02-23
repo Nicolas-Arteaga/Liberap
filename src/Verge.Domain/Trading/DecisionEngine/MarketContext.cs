@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Verge.Trading.Integrations;
+using Verge.Trading;
 
 namespace Verge.Trading.DecisionEngine;
 
@@ -21,6 +22,9 @@ public class MarketContext
     // AI / Data Science (Python)
     public RegimeResponseModel? MarketRegime { get; set; }
     public TechnicalsResponseModel? Technicals { get; set; }
+    
+    // Raw Data for internal calculations
+    public List<MarketCandleModel> Candles { get; set; } = new();
 }
 
 public class DecisionResult

@@ -133,7 +133,8 @@ public class TradingSessionMonitorJob : BackgroundService
                     CoinGeckoData = gecko,
                     OpenInterest = oi,
                     MarketRegime = regime,
-                    Technicals = technicals
+                    Technicals = technicals,
+                    Candles = candles
                 };
 
                 groupDataCache[group] = (candles, context);
@@ -286,8 +287,7 @@ public class TradingSessionMonitorJob : BackgroundService
             _ => "💤"
         };
 
-        string message = $"{emoji} [{result.Decision}] Score: {result.Score}/100 | Regimen: {context.MarketRegime?.Regime ?? "N/A"} | RSI: {context.Technicals?.Rsi:F1} | Price: ${price:N2}";
-        
+        string message = $"{emoji} [{result.Decision}] Score: {result.Score}/100 | Regimen: {context.MarketRegime?.Regime.ToString() ?? "N/A"} | RSI: {context.Technicals?.Rsi:F1} | Price: ${price:N2}";
         var logData = new {
             score = result.Score,
             decision = result.Decision.ToString(),
