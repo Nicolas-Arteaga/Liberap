@@ -50,28 +50,58 @@
         </button>
       </div>
 
-      <!-- Info Boxes -->
       <div class="service-box bg-dark-soft border border-white-10 rounded-3 p-4 mb-3 position-relative">
-        <div class="mb-4">
-          <div class="d-flex align-items-center gap-2 mb-2">
-            <ion-icon name="checkbox-outline" class="text-success"></ion-icon>
-            <span class="text-white fw-bold text-sm">Última señal del motor:</span>
+        <div class="row align-items-center">
+          <div class="col-md-6 border-end border-white-10">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <ion-icon name="checkbox-outline" class="text-success"></ion-icon>
+              <span class="text-white fw-bold text-sm">Última señal del motor:</span>
+            </div>
+            <ul class="list-unstyled ms-4 mb-0">
+              <li class="text-white-50 text-sm d-flex align-items-start gap-2">
+                <span class="text-white">•</span>
+                <span class="fw-medium text-white">{{ lastMotorSignal || 'Esperando confirmación del motor...' }}</span>
+              </li>
+            </ul>
           </div>
-          <ul class="list-unstyled ms-4 mb-0">
-            <li class="text-white-50 text-sm d-flex align-items-start gap-2">
-              <span class="text-white">•</span>
-              <span>{{ lastMotorSignal || 'Esperando confirmación del motor...' }}</span>
-            </li>
-          </ul>
+          <div class="col-md-6 ps-4">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <ion-icon name="earth-outline" class="text-info"></ion-icon>
+              <span class="text-white fw-bold text-sm">Última noticia relevante:</span>
+            </div>
+            <div
+              class="news-badge d-inline-flex align-items-center gap-2 px-2 py-1 bg-dark-accent border border-white-10 rounded-2 ms-4">
+              <ion-icon name="newspaper-outline" class="text-white-50 fs-xs"></ion-icon>
+              <span class="text-white text-xs fw-bold">{{ lastNewsTitle || 'No hay noticias recientes' }}</span>
+            </div>
+          </div>
         </div>
+      </div>
 
-        <div class="d-flex align-items-center gap-2">
-          <ion-icon name="earth-outline" class="text-info"></ion-icon>
-          <span class="text-white fw-bold text-sm">Última noticia relevante:</span>
-          <div
-            class="news-badge d-inline-flex align-items-center gap-2 px-2 py-1 bg-dark-accent border border-white-10 rounded-2 ms-2">
-            <ion-icon name="newspaper-outline" class="text-white-50 fs-xs"></ion-icon>
-            <span class="text-white text-xs fw-bold">{{ lastNewsTitle || 'No hay noticias recientes' }}</span>
+      <!-- Ranking Panel (Phase 3) -->
+      <div *ngIf="topOpportunities.length > 0" class="ranking-panel mb-4">
+        <div class="d-flex align-items-center gap-2 mb-3">
+          <ion-icon name="trophy-outline" class="text-warning"></ion-icon>
+          <span class="text-white fw-bold text-sm">🏆 TOP OPORTUNIDADES (RANKING REAL-TIME)</span>
+        </div>
+        <div class="row g-2">
+          <div *ngFor="let opp of topOpportunities; let i = index" class="col-6 col-md-4">
+            <div class="opp-card p-3 rounded-3 border border-white-10 bg-dark-deep h-100 glow-on-hover">
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <span class="badge" [class.bg-success]="opp.direction === 'LONG'"
+                  [class.bg-danger]="opp.direction === 'SHORT'" style="font-size: 10px; padding: 2px 6px;">
+                  {{ opp.direction }}
+                </span>
+                <span class="text-white-50" style="font-size: 10px;">#{{ i + 1 }}</span>
+              </div>
+              <div class="d-flex align-items-baseline gap-2 mb-1">
+                <h4 class="text-white fw-bold mb-0" style="font-size: 1rem;">{{ opp.symbol }}</h4>
+                <span class="text-success fw-bold" style="font-size: 0.8rem;">{{ opp.score }} pts</span>
+              </div>
+              <div class="text-white-50 mb-2" style="font-size: 0.75rem;">$ {{ opp.price | number:'1.2-8' }}</div>
+              <div class="text-white opacity-75 line-clamp-2" style="font-size: 0.7rem; line-height: 1.2;">{{ opp.reason
+                }}</div>
+            </div>
           </div>
         </div>
       </div>
@@ -137,13 +167,45 @@
         </div>
 
         <div class="bg-dark rounded-3 p-3 overflow-auto" style="max-height: 400px; font-family: monospace;">
-          <div *ngFor="let log of analysisLogs" class="mb-2 pb-2 border-bottom border-white-10"
-            [class.text-warning]="log.level === 'warning'" [class.text-success]="log.level === 'success'"
-            [class.text-danger]="log.level === 'danger'" [class.text-info]="log.level === 'info'">
-
+          <div *ngFor="let log of analysisLogs" class="mb-2 pb-2 border-bottom border-white-10 log-entry">
             <div class="d-flex align-items-start gap-2">
-              <span class="text-white-50" style="min-width: 70px;">{{ log.timestamp | date:'HH:mm:ss' }}</span>
-              <span class="flex-grow-1">{{ log.message }}</span>
+              <span class="text-white-50 text-xs mt-1" style="min-width: 65px;">{{ log.timestamp | date:'HH:mm:ss'
+                }}</span>
+
+              <div
+                class="log-icon-wrapper rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center"
+                [style.background-color]="getLogColor(log) + '22'"
+                [style.border]="'1px solid ' + getLogColor(log) + '44'" style="width: 24px; height: 24px;">
+                <ion-icon [name]="getSignalIcon(log)" [style.color]="getLogColor(log)"
+                  style="font-size: 14px;"></ion-icon>
+              </div>
+
+              <div class="flex-grow-1">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                  <span *ngIf="log.symbol"
+                    class="badge bg-dark-accent border border-white-10 text-primary-light text-xs">{{ log.symbol
+                    }}</span>
+                  <span class="text-sm fw-medium" [style.color]="getLogColor(log)">{{ log.message }}</span>
+                </div>
+
+                <!-- Technical Metadata (Phase 3) -->
+                <div *ngIf="log.dataJson" class="metadata-row d-flex flex-wrap gap-3 mt-1 opacity-60">
+                  <ng-container *ngLet="parseJson(log.dataJson) as data">
+                    <span *ngIf="data?.rsi" class="text-xs d-flex align-items-center gap-1">
+                      <ion-icon name="pulse-outline"></ion-icon> RSI: {{ data.rsi | number:'1.1-1' }}
+                    </span>
+                    <span *ngIf="data?.adx" class="text-xs d-flex align-items-center gap-1">
+                      <ion-icon name="trending-up-outline"></ion-icon> ADX: {{ data.adx | number:'1.1-1' }}
+                    </span>
+                    <span *ngIf="data?.regime" class="text-xs d-flex align-items-center gap-1 text-info">
+                      <ion-icon name="layers-outline"></ion-icon> {{ data.regime }}
+                    </span>
+                    <span *ngIf="data?.reason" class="text-xs italic opacity-75">
+                      {{ data.reason }}
+                    </span>
+                  </ng-container>
+                </div>
+              </div>
             </div>
           </div>
 

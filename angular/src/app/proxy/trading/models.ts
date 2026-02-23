@@ -1,3 +1,4 @@
+import type { AnalysisLogType } from './analysis-log-type.enum';
 import type { EntityDto, FullAuditedEntityDto, PagedAndSortedResultRequestDto } from '@abp/ng.core';
 import type { AlertType } from './alert-type.enum';
 import type { SignalDirection } from './signal-direction.enum';
@@ -14,6 +15,7 @@ export interface AnalysisLogDto {
   message?: string;
   level?: string;
   timestamp?: string;
+  logType?: AnalysisLogType;
   dataJson?: string;
 }
 

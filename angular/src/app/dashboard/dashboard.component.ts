@@ -10,6 +10,7 @@ import { createChart, IChartApi, ISeriesApi, CandlestickData, CandlestickSeries 
 import { MarketDataService } from '../proxy/trading/market-data.service';
 import { TradingService } from '../proxy/trading/trading.service';
 import { TradingSessionDto, AnalysisLogDto, MarketAnalysisDto, OpportunityDto } from '../proxy/trading/models';
+import { AnalysisLogType } from '../proxy/trading/analysis-log-type.enum';
 import { DialogComponent } from 'src/shared/components/dialog/dialog.component';
 import { CardContentComponent } from "src/shared/components/card-content/card-content.component";
 import { TradingSignalrService } from '../services/trading-signalr.service';
@@ -75,8 +76,10 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   lastMotorSignal: string = '';
   lastNewsTitle: string = '';
   currentOpportunity: OpportunityDto | null = null;
+  topOpportunities: any[] = [];
   showConfirmationDialog = false;
   sessionChecked = false;
+  AnalysisLogType = AnalysisLogType; // Expose enum to template
 
   // Toast de notificación de stage
   stageNotification: { message: string; icon: string; color: string; visible: boolean } | null = null;
@@ -383,6 +386,15 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     for (const log of sortedLogs) {
       if (!log.message) continue;
 
+      // Handle Opportunity Ranking (Phase 3)
+      if (log.logType === AnalysisLogType.OpportunityRanking) {
+        const data = this.parseJson(log.dataJson);
+        if (data?.rankings && this.topOpportunities.length === 0) {
+          this.topOpportunities = data.rankings;
+        }
+        continue; // Don't process ranking logs as market signals
+      }
+
       // Parse structured data from dataJson field (set by backend CreateAnalysisLogAsync)
       let data: any = null;
       if (log.dataJson) {
@@ -395,7 +407,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       }
 
       // Prefer warning/success level as the "motor signal"
-      if (log.level === 'warning' || log.level === 'success') {
+      if (log.level === 'warning' || log.level === 'success' ||
+        log.logType === AnalysisLogType.AlertEntry ||
+        log.logType === AnalysisLogType.AlertPrepare) {
         this.lastMotorSignal = log.message;
       }
 
@@ -428,11 +442,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
       // --- Detect opportunity (score >= 70 or Entry decision) ---
       if (!this.currentOpportunity && data) {
-        if (data.decision === 'Entry' || Number(data.score) >= 70) {
+        if (data.decision === 'Entry' || log.logType === AnalysisLogType.AlertEntry || Number(data.score) >= 70) {
           this.currentOpportunity = {
             symbol: log.symbol || 'AUTO',
             confidence: Number(data.score) || 70,
-            signal: data.decision === 'Entry' ? 'LONG' : 'NEUTRAL',
+            signal: (data.decision === 'Entry' || log.logType === AnalysisLogType.AlertEntry) ? 'LONG' : 'NEUTRAL',
             reason: log.message
           };
         }
@@ -627,21 +641,32 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.stages[this.currentStage - 1] || this.stages[0];
   }
 
-  getSignalColor(type: 'buy' | 'sell' | 'warning'): string {
-    switch (type) {
-      case 'buy': return 'success';
-      case 'sell': return 'danger';
-      case 'warning': return 'warning';
-      default: return 'primary';
+  getSignalIcon(log: AnalysisLogDto): string {
+    if (log.logType === AnalysisLogType.AlertEntry) return 'rocket-outline';
+    if (log.logType === AnalysisLogType.AlertPrepare) return 'timer-outline';
+    if (log.logType === AnalysisLogType.AlertInvalidated) return 'close-circle-outline';
+    if (log.logType === AnalysisLogType.AlertExit) return 'exit-outline';
+
+    switch (log.level) {
+      case 'success': return 'trending-up-outline';
+      case 'danger': return 'trending-down-outline';
+      case 'warning': return 'warning-outline';
+      default: return 'alert-circle-outline';
     }
   }
 
-  getSignalIcon(type: 'buy' | 'sell' | 'warning'): string {
-    switch (type) {
-      case 'buy': return 'trending-up-outline';
-      case 'sell': return 'trending-down-outline';
-      case 'warning': return 'warning-outline';
-      default: return 'alert-circle-outline';
+  getLogColor(log: AnalysisLogDto): string {
+    if (log.logType === AnalysisLogType.AlertEntry) return '#10b981'; // Emerald
+    if (log.logType === AnalysisLogType.AlertPrepare) return '#f59e0b'; // Amber
+    if (log.logType === AnalysisLogType.AlertInvalidated) return '#94a3b8'; // Slate
+    if (log.logType === AnalysisLogType.AlertExit) return '#ef4444'; // Red
+
+    switch (log.level) {
+      case 'success': return '#10b981';
+      case 'danger': return '#ef4444';
+      case 'warning': return '#f59e0b';
+      case 'info': return '#3b82f6';
+      default: return '#94a3b8';
     }
   }
 

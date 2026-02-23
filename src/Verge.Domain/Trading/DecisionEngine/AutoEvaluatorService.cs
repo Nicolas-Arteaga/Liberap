@@ -31,6 +31,16 @@ public class AutoEvaluatorService : ITransientDependency
         TradingStrategy strategy, 
         Dictionary<(string symbol, string timeframe), MarketContext> dataCache)
     {
+        var opportunities = await FindTopOpportunitiesAsync(session, strategy, dataCache, 1);
+        return opportunities.FirstOrDefault();
+    }
+
+    public async Task<List<AutoEvaluationResult>> FindTopOpportunitiesAsync(
+        TradingSession session, 
+        TradingStrategy strategy, 
+        Dictionary<(string symbol, string timeframe), MarketContext> dataCache,
+        int limit = 3)
+    {
         var symbols = strategy.IsAutoMode || session.Symbol == "AUTO" 
             ? strategy.GetSelectedCryptos() 
             : new List<string> { session.Symbol };
@@ -45,7 +55,7 @@ public class AutoEvaluatorService : ITransientDependency
             ? new[] { SignalDirection.Long, SignalDirection.Short }
             : new[] { strategy.DirectionPreference };
 
-        AutoEvaluationResult? best = null;
+        var results = new List<AutoEvaluationResult>();
         var timeframe = session.Timeframe;
 
         foreach (var symbol in symbols)
@@ -55,8 +65,6 @@ public class AutoEvaluatorService : ITransientDependency
             foreach (var style in styles)
             {
                 var profile = TradingStyleProfileFactory.GetProfile(style);
-                
-                // Temporary Symbol switch for evaluation (DecisionEngine uses session.Symbol in logs/reasons)
                 var originalSymbol = session.Symbol;
                 session.Symbol = symbol;
 
@@ -64,31 +72,31 @@ public class AutoEvaluatorService : ITransientDependency
                 {
                     var evalResult = _engine.Evaluate(session, style, context);
                     
-                    if (best == null || evalResult.Score > best.Result.Score)
+                    if (evalResult.Score > 0)
                     {
-                        best = new AutoEvaluationResult
+                        results.Add(new AutoEvaluationResult
                         {
                             Symbol = symbol,
                             Style = style,
                             Direction = direction,
                             Result = evalResult,
                             Context = context
-                        };
+                        });
 
-                        // Early Exit: If we found a very strong entry (> Threshold + 10), we stop searching
-                        if (evalResult.Decision == TradingDecision.Entry && evalResult.Score >= profile.EntryThreshold + 10)
+                        // Early Exit: Only if we are looking for the absolute best (limit=1)
+                        if (limit == 1 && evalResult.Decision == TradingDecision.Entry && evalResult.Score >= profile.EntryThreshold + 10)
                         {
                             _logger.LogInformation("🚀 Early exit triggered for AUTO session {Id}: Found excellent setup on {Symbol} with {Style}", session.Id, symbol, style);
-                            session.Symbol = originalSymbol; // Restore before exit
-                            return best;
+                            session.Symbol = originalSymbol;
+                            return results;
                         }
                     }
                 }
-                session.Symbol = originalSymbol; // Restore
+                session.Symbol = originalSymbol;
             }
         }
 
-        return best;
+        return results.OrderByDescending(r => r.Result.Score).Take(limit).ToList();
     }
 }
 

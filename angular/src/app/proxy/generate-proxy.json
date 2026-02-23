@@ -5170,6 +5170,18 @@
           "regex": null
         },
         {
+          "name": "LogType",
+          "jsonName": null,
+          "type": "Verge.Trading.AnalysisLogType",
+          "typeSimple": "enum",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
           "name": "DataJson",
           "jsonName": null,
           "type": "System.String",
@@ -5182,6 +5194,30 @@
           "regex": null
         }
       ]
+    },
+    "Verge.Trading.AnalysisLogType": {
+      "baseType": "System.Enum",
+      "isEnum": true,
+      "enumNames": [
+        "Standard",
+        "OpportunityRanking",
+        "AlertContext",
+        "AlertPrepare",
+        "AlertEntry",
+        "AlertInvalidated",
+        "AlertExit"
+      ],
+      "enumValues": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "genericArguments": null,
+      "properties": null
     },
     "Verge.Trading.BacktestResultDto": {
       "baseType": "Volo.Abp.Application.Dtos.FullAuditedEntityDto<System.Guid>",

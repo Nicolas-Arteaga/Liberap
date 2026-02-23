@@ -49,6 +49,17 @@ public enum AlertType
     System
 }
 
+public enum AnalysisLogType
+{
+    Standard,           // Logs normales del scanner
+    OpportunityRanking, // Top 3 oportunidades (solo AUTO)
+    AlertContext,       // "Mercado favorable para..."
+    AlertPrepare,       // "Preparándose para..."
+    AlertEntry,         // "🚀 ENTRAR..."
+    AlertInvalidated,   // "❌ Setup invalidado"
+    AlertExit           // "💰 Take Profit alcanzado"
+}
+
 public enum TradeStatus
 {
     Open,

@@ -1,5 +1,6 @@
 import * as Dtos from './dtos';
 export * from './alert-type.enum';
+export * from './analysis-log-type.enum';
 export * from './crypto-analysis.service';
 export * from './market-data.service';
 export * from './models';

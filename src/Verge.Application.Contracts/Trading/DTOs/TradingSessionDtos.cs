@@ -27,5 +27,6 @@ public class AnalysisLogDto
     public string Message { get; set; }
     public string Level { get; set; }
     public DateTime Timestamp { get; set; }
+    public AnalysisLogType LogType { get; set; }
     public string DataJson { get; set; }
 }

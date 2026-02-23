@@ -219,9 +219,40 @@ public class TradingSessionMonitorJob : BackgroundService
                 }
                 else
                 {
-                    // NEW: Multidimensional AUTO Evaluator
+                    // NEW: Multidimensional AUTO Evaluator with Ranking (Phase 3)
                     var contextsOnly = groupDataCache.ToDictionary(k => k.Key, v => v.Value.context);
-                    var bestOpportunity = await autoEvaluator.FindBestOpportunityAsync(session, strategy, contextsOnly);
+                    
+                    // Fetch top opportunities for ranking
+                    var allOpportunities = await autoEvaluator.FindTopOpportunitiesAsync(session, strategy, contextsOnly, 10);
+                    var bestOpportunity = allOpportunities.FirstOrDefault();
+
+                    // 1. Log Opportunity Ranking (Top 3)
+                    var top3 = allOpportunities.Take(3).ToList();
+                    if (top3.Any())
+                    {
+                        var rankingData = new {
+                            top = top3.Select(o => new {
+                                symbol = o.Symbol,
+                                style = o.Style.ToString(),
+                                direction = o.Direction.ToString(),
+                                score = o.Result.Score,
+                                confidence = o.Result.Confidence.ToString()
+                            }).ToList()
+                        };
+
+                        var rankingLog = new AnalysisLog(
+                            Guid.NewGuid(),
+                            session.TraderProfileId,
+                            session.Id,
+                            "AUTO",
+                            "📈 Top 3 Oportunidades detectadas",
+                            "info",
+                            DateTime.UtcNow,
+                            AnalysisLogType.OpportunityRanking,
+                            JsonSerializer.Serialize(rankingData)
+                        );
+                        await analysisLogRepo.InsertAsync(rankingLog);
+                    }
 
                     if (bestOpportunity != null)
                     {
@@ -319,30 +350,53 @@ public class TradingSessionMonitorJob : BackgroundService
         decimal price,
         DecisionEngine.MarketContext context)
     {
-        string emoji = result.Decision switch {
-            DecisionEngine.TradingDecision.Entry => "🚀",
-            DecisionEngine.TradingDecision.Prepare => "⚡",
-            DecisionEngine.TradingDecision.Context => "🔍",
+        // 1. Determine LogType based on Decision and Reason
+        AnalysisLogType logType = AnalysisLogType.Standard;
+        
+        if (result.Reason.Contains("INVALIDATED"))
+        {
+            logType = AnalysisLogType.AlertInvalidated;
+        }
+        else
+        {
+            logType = result.Decision switch {
+                DecisionEngine.TradingDecision.Entry => AnalysisLogType.AlertEntry,
+                DecisionEngine.TradingDecision.Prepare => AnalysisLogType.AlertPrepare,
+                DecisionEngine.TradingDecision.Context => result.Score >= 60 ? AnalysisLogType.AlertContext : AnalysisLogType.Standard,
+                _ => AnalysisLogType.Standard
+            };
+        }
+
+        // 2. Build Message with Emoji
+        string emoji = logType switch {
+            AnalysisLogType.AlertEntry => "🚀",
+            AnalysisLogType.AlertPrepare => "⚡",
+            AnalysisLogType.AlertContext => "🔍",
+            AnalysisLogType.AlertInvalidated => "❌",
+            AnalysisLogType.AlertExit => "💰",
             _ => "💤"
         };
 
         string confidenceLabel = result.Confidence.ToString().ToUpper();
         string message = $"{emoji} [{result.Decision}] Score: {result.Score}/100 | Confianza: {confidenceLabel} | Regimen: {context.MarketRegime?.Regime.ToString() ?? "N/A"} | Price: ${price:N2}";
 
-        if (result.Reason.Contains("INVALIDATED"))
+        if (logType == AnalysisLogType.AlertInvalidated)
         {
-            message = result.Reason; // Keep the alert clear
+            message = result.Reason; // Keep the alert clear for invalidations
         }
 
+        // 3. Enrich DataJson with Metadata
         var logData = new {
             score = result.Score,
             decision = result.Decision.ToString(),
             confidence = result.Confidence.ToString(),
             regime = context.MarketRegime?.Regime,
             rsi = context.Technicals?.Rsi,
+            adx = context.Technicals?.Adx,
             fng = context.FearAndGreed?.Value,
             reason = result.Reason,
-            weighted = result.WeightedScores
+            weighted = result.WeightedScores,
+            htfTrend = context.HigherTimeframeContext?.MarketRegime?.Regime.ToString()
         };
 
         var log = new AnalysisLog(
@@ -353,6 +407,7 @@ public class TradingSessionMonitorJob : BackgroundService
             message,
             result.Score >= 70 ? "success" : (result.Score >= 50 ? "warning" : "info"),
             DateTime.UtcNow,
+            logType,
             JsonSerializer.Serialize(logData)
         );
 

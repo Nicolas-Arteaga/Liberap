@@ -136,6 +136,7 @@ public class MarketScannerService : BackgroundService
                     $"Scanner: {symbol} | RSI: {rsi:F2} | Conf: {confidence}% | IA: {sentimentText}",
                     confidence > 70 ? "success" : "info",
                     DateTime.UtcNow,
+                    AnalysisLogType.Standard,
                     JsonSerializer.Serialize(analysisResult)
                 );
 
@@ -155,6 +156,7 @@ public class MarketScannerService : BackgroundService
                         $"🚀 OPORTUNIDAD DETECTADA: {symbol} con {confidence}% de confianza!",
                         "success",
                         DateTime.UtcNow,
+                        AnalysisLogType.AlertContext,
                         JsonSerializer.Serialize(new { 
                             symbol = symbol, 
                             confidence = confidence, 
