@@ -23,6 +23,7 @@ public class StartSessionDto
 
 public class AnalysisLogDto
 {
+    public string Symbol { get; set; }
     public string Message { get; set; }
     public string Level { get; set; }
     public DateTime Timestamp { get; set; }

@@ -373,66 +373,71 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   processScannerLogs(logs: AnalysisLogDto[]) {
     this.marketAnalyses = [];
+    if (!logs || logs.length === 0) return;
 
-    logs.forEach(log => {
-      if (!log.message) return;
+    // Process most recent logs first
+    const sortedLogs = [...logs].sort((a, b) =>
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
 
-      const msg = log.message;
+    for (const log of sortedLogs) {
+      if (!log.message) continue;
 
-      // Parsear logs de análisis normal: "📊 Analizando SYMBOL - RSI: X | Precio: $Y"
-      // y variaciones de sentiment: "📰 ... - 📊 Analizando SYMBOL - RSI: X | Precio: $Y"
-      const analysisMatch = msg.match(/Analizando\s+(\S+)\s+-\s+RSI:\s*([\d,\.]+)\s*\|\s*Precio:\s*\$([\d,\.]+)/);
-      if (analysisMatch) {
-        const symbol = analysisMatch[1];
-        const rsi = parseFloat(analysisMatch[2].replace(',', '.'));
-        const price = parseFloat(analysisMatch[3].replace(',', '.'));
+      // Parse structured data from dataJson field (set by backend CreateAnalysisLogAsync)
+      let data: any = null;
+      if (log.dataJson) {
+        try { data = JSON.parse(log.dataJson); } catch { }
+      }
+
+      // --- Populate lastMotorSignal from any log ---
+      if (!this.lastMotorSignal) {
+        this.lastMotorSignal = log.message;
+      }
+
+      // Prefer warning/success level as the "motor signal"
+      if (log.level === 'warning' || log.level === 'success') {
+        this.lastMotorSignal = log.message;
+      }
+
+      // --- Populate lastNewsTitle from sentiment in dataJson ---
+      if (data?.fng && !this.lastNewsTitle) {
+        this.lastNewsTitle = `Miedo & Codicia: ${data.fng}/100`;
+      }
+
+      // --- Build marketAnalyses from dataJson RSI and symbol ---
+      if (data?.rsi != null && log.symbol) {
+        const symbol = log.symbol;
+        const rsi = Number(data.rsi);
         const existing = this.marketAnalyses.find(a => a.symbol === symbol);
         if (existing) {
           existing.rsi = rsi;
           existing.description = this.getRsiDescription(rsi);
           existing.signal = rsi > 55 ? 'LONG' : (rsi < 45 ? 'SHORT' : 'NEUTRAL');
+          if (data.score != null) existing.confidence = Number(data.score);
         } else {
           this.marketAnalyses.push({
             symbol,
             rsi,
             description: this.getRsiDescription(rsi),
             signal: rsi > 55 ? 'LONG' : (rsi < 45 ? 'SHORT' : 'NEUTRAL'),
-            confidence: 0,
+            confidence: data.score != null ? Number(data.score) : 0,
             trend: rsi > 50 ? 'alcista' : 'bajista'
           });
         }
       }
 
-      // Última señal del motor: logs de warning/success o con emojis de señal
-      if (log.level === 'warning' || log.level === 'success') {
-        this.lastMotorSignal = msg;
-      } else if (!this.lastMotorSignal && analysisMatch) {
-        // Usar el primer log de análisis como señal inicial
-        this.lastMotorSignal = msg;
-      }
-
-      // Última noticia: logs que contienen sentimiento (📰)
-      if (msg.includes('📰') && msg.includes('Sentimiento')) {
-        const sentimentMatch = msg.match(/Sentimiento\s+(\w+)\s+\(([\d]+)\s*%\)/);
-        if (sentimentMatch) {
-          this.lastNewsTitle = `Sentimiento ${sentimentMatch[1]} (${sentimentMatch[2]}%)`;
-        }
-      }
-
-      // Oportunidad detectada: logs con nivel success o RSI extremo
-      if (log.level === 'success' && !this.currentOpportunity && analysisMatch) {
-        const symbol = analysisMatch[1];
-        const rsi = parseFloat(analysisMatch[2].replace(',', '.'));
-        if (rsi < 30 || rsi > 70) {
+      // --- Detect opportunity (score >= 70 or Entry decision) ---
+      if (!this.currentOpportunity && data) {
+        if (data.decision === 'Entry' || Number(data.score) >= 70) {
           this.currentOpportunity = {
-            symbol,
-            confidence: rsi < 30 ? 85 : 80,
-            signal: rsi < 30 ? 'LONG' : 'SHORT',
-            reason: msg
+            symbol: log.symbol || 'AUTO',
+            confidence: Number(data.score) || 70,
+            signal: data.decision === 'Entry' ? 'LONG' : 'NEUTRAL',
+            reason: log.message
           };
         }
       }
-    });
+    }
   }
 
   getRsiDescription(rsi: number): string {

@@ -10,6 +10,7 @@ import type { TradingLevel } from './trading-level.enum';
 import type { TradingStage } from './trading-stage.enum';
 
 export interface AnalysisLogDto {
+  symbol?: string;
   message?: string;
   level?: string;
   timestamp?: string;
