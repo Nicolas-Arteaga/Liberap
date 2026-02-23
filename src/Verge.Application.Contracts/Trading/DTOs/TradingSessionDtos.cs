@@ -13,6 +13,8 @@ public class TradingSessionDto : FullAuditedEntityDto<Guid>
     public decimal? EntryPrice { get; set; }
     public decimal? TakeProfitPrice { get; set; }
     public decimal? StopLossPrice { get; set; }
+    public TradingStyle? SelectedStyle { get; set; }
+    public SignalDirection? SelectedDirection { get; set; }
 }
 
 public class StartSessionDto

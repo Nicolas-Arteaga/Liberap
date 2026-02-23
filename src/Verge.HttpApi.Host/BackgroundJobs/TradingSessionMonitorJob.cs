@@ -266,10 +266,12 @@ public class TradingSessionMonitorJob : BackgroundService
                         // Update session if it's a candidate for action
                         if (best.Result.Decision != DecisionEngine.TradingDecision.Ignore)
                         {
-                            // If we enter or prepare, we adopt the winning symbol
+                            // If we enter or prepare, we adopt the winning symbol, style, and direction
                             if (best.Result.Decision >= DecisionEngine.TradingDecision.Prepare)
                             {
                                 session.Symbol = best.Symbol;
+                                session.SelectedStyle = best.Style;
+                                session.SelectedDirection = best.Direction;
                             }
 
                             bool stageChanged = ProcessDecision(session, best.Result, strategy, best.Context.Candles.Last().Close);
@@ -327,7 +329,10 @@ public class TradingSessionMonitorJob : BackgroundService
 
     private void CalculateTargets(TradingSession session, TradingStrategy strategy, decimal currentPrice)
     {
-        bool isLong = strategy.DirectionPreference == SignalDirection.Long;
+        // Use Adopted Direction if available, fallback to Strategy preference
+        var direction = session.SelectedDirection ?? strategy.DirectionPreference;
+        bool isLong = direction == SignalDirection.Long;
+        
         decimal tpFactor = strategy.TakeProfitPercentage / 100;
         decimal slFactor = strategy.StopLossPercentage / 100;
 

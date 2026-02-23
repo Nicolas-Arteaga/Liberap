@@ -31,7 +31,7 @@ interface TradeDetails {
 
 interface ExecuteTradeRequest {
   symbol: string;
-  direction: 'buy' | 'sell';
+  direction: 'buy' | 'sell' | 'auto';
   amount: number;
   leverage: number;
   takeProfit: number;
@@ -77,8 +77,11 @@ export class ExecuteTradeComponent implements OnInit {
     { label: 'HODL', icon: 'diamond-outline', value: TradingStyle.HODL, desc: '1w | 1x | Spot' },
     { label: 'Grid Trading', icon: 'grid-outline', value: TradingStyle.GridTrading, desc: 'Rango | Múltiples órdenes' },
     { label: 'Arbitraje', icon: 'swap-horizontal-outline', value: TradingStyle.Arbitrage, desc: 'Entre exchanges' },
-    { label: 'Algorítmico', icon: 'code-outline', value: TradingStyle.Algorithmic, desc: 'Bots automáticos' }
+    { label: 'Algorítmico', icon: 'code-outline', value: TradingStyle.Algorithmic, desc: 'Bots automáticos' },
+    { label: '🤖 AUTO', icon: 'sparkles-outline', value: TradingStyle.Auto, desc: 'IA elige el mejor estilo' }
   ];
+
+  SignalDirection = SignalDirection; // For template
 
   isAutoSelected = false;
   isRecommending = false;
@@ -164,7 +167,7 @@ export class ExecuteTradeComponent implements OnInit {
   onStyleSelect(style: TradingStyle) {
     if (this.isAutoSelected && this.isRecommending) return;
     this.request.style = style;
-    this.isAutoSelected = false; // Turn off auto if manual selection is made
+    this.isAutoSelected = style === TradingStyle.Auto;
     this.applyStyleDefaults(style);
   }
 
@@ -207,6 +210,11 @@ export class ExecuteTradeComponent implements OnInit {
         break;
       case TradingStyle.Algorithmic:
         this.request.leverage = 5;
+        this.request.takeProfit = 5;
+        this.request.stopLoss = 2;
+        break;
+      case TradingStyle.Auto:
+        this.request.leverage = 5; // Default safe leverage for auto
         this.request.takeProfit = 5;
         this.request.stopLoss = 2;
         break;
@@ -271,7 +279,7 @@ export class ExecuteTradeComponent implements OnInit {
 
     this.tradingService.createStrategy({
       name: `Cacería ${this.request.symbol} - ${new Date().toLocaleString()}`,
-      directionPreference: this.isAutoSelected ? SignalDirection.Auto : (this.request.direction === 'buy' ? SignalDirection.Long : SignalDirection.Short),
+      directionPreference: this.request.direction === 'auto' ? SignalDirection.Auto : (this.request.direction === 'buy' ? SignalDirection.Long : SignalDirection.Short),
       selectedCryptos: this.isAutoSelected ? autoPortfolio : [this.request.symbol],
       customSymbols: this.isAutoSelected ? [] : [],
       leverage: this.request.leverage,
