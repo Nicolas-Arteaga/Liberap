@@ -190,6 +190,13 @@ public class TradingSessionMonitorJob : BackgroundService
 
             try
             {
+                // 4.0 Check for TP/SL Exits (Sprint 1)
+                if (session.CurrentStage == TradingStage.BuyActive)
+                {
+                    bool exited = await CheckTradeExitsAsync(session, strategy, groupDataCache, sessionRepository, analysisLogRepo);
+                    if (exited) continue;
+                }
+
                 // 4.1 Evaluation Logic: Multidimensional AUTO or Generic
                 bool isAutoMode = session.Symbol == "AUTO" || 
                                   strategy.Style == TradingStyle.Auto || 
@@ -199,6 +206,15 @@ public class TradingSessionMonitorJob : BackgroundService
                 {
                     var groupKey = (session.Symbol, session.Timeframe);
                     if (!groupDataCache.TryGetValue(groupKey, out var data)) continue;
+
+                    // 4.0.1 Incremental Evaluation (Sprint 3)
+                    var lastCandleTime = data.candles.Last().Timestamp;
+                    if (session.LastEvaluationTimestamp.HasValue && session.LastEvaluationTimestamp.Value >= lastCandleTime)
+                    {
+                        _logger.LogInformation("⏩ Skipping evaluation for {Symbol}: Data unchanged since {Time}", session.Symbol, lastCandleTime);
+                        continue;
+                    }
+
 
                     // Attach HTF Context if exists
                     var profile = TradingStyleProfileFactory.GetProfile(strategy.Style);
@@ -213,6 +229,9 @@ public class TradingSessionMonitorJob : BackgroundService
                     var evalResult = decisionEngine.Evaluate(session, strategy.Style, data.context);
                     bool stageChanged = ProcessDecision(session, evalResult, strategy, data.candles.Last().Close);
                     await CreateAnalysisLogAsync(analysisLogRepo, session, evalResult, data.candles.Last().Close, data.context);
+
+                    // Update timestamp (Sprint 3)
+                    session.LastEvaluationTimestamp = data.candles.Last().Timestamp;
 
                     // Always update session to persist History (Phase 2)
                     await sessionRepository.UpdateAsync(session);
@@ -276,6 +295,10 @@ public class TradingSessionMonitorJob : BackgroundService
 
                             bool stageChanged = ProcessDecision(session, best.Result, strategy, best.Context.Candles.Last().Close);
                         }
+
+                        // Update timestamp for AUTO mode too (Sprint 3)
+                        var maxTs = contextsOnly.Values.Max(c => c.Candles.Last().Timestamp);
+                        session.LastEvaluationTimestamp = maxTs;
 
                         // Always update session (persist history and EvaluationHistoryJson)
                         await sessionRepository.UpdateAsync(session);
@@ -385,6 +408,11 @@ public class TradingSessionMonitorJob : BackgroundService
         string confidenceLabel = result.Confidence.ToString().ToUpper();
         string message = $"{emoji} [{result.Decision}] Score: {result.Score}/100 | Confianza: {confidenceLabel} | Regimen: {context.MarketRegime?.Regime.ToString() ?? "N/A"} | Price: ${price:N2}";
 
+        if (result.Decision >= DecisionEngine.TradingDecision.Prepare && result.EntryMinPrice.HasValue && result.EntryMaxPrice.HasValue)
+        {
+            message += $" | 🎯 Target: ${result.EntryMinPrice:N2}-${result.EntryMaxPrice:N2}";
+        }
+
         if (logType == AnalysisLogType.AlertInvalidated)
         {
             message = result.Reason; // Keep the alert clear for invalidations
@@ -401,7 +429,9 @@ public class TradingSessionMonitorJob : BackgroundService
             fng = context.FearAndGreed?.Value,
             reason = result.Reason,
             weighted = result.WeightedScores,
-            htfTrend = context.HigherTimeframeContext?.MarketRegime?.Regime.ToString()
+            htfTrend = context.HigherTimeframeContext?.MarketRegime?.Regime.ToString(),
+            entryMin = result.EntryMinPrice,
+            entryMax = result.EntryMaxPrice
         };
 
         var log = new AnalysisLog(
@@ -417,5 +447,99 @@ public class TradingSessionMonitorJob : BackgroundService
         );
 
         await repo.InsertAsync(log);
+    }
+
+    private async Task<bool> CheckTradeExitsAsync(
+        TradingSession session, 
+        TradingStrategy strategy, 
+        Dictionary<(string symbol, string timeframe), (List<MarketCandleModel> candles, DecisionEngine.MarketContext context)> groupDataCache,
+        IRepository<TradingSession, Guid> sessionRepo,
+        IRepository<AnalysisLog, Guid> logRepo)
+    {
+        if (!groupDataCache.TryGetValue((session.Symbol, session.Timeframe), out var data)) return false;
+        
+        var currentPrice = data.candles.Last().Close;
+        var direction = session.SelectedDirection ?? strategy.DirectionPreference;
+        bool isLong = direction == SignalDirection.Long;
+        
+        bool exitTriggered = false;
+        string exitMessage = "";
+        
+        if (isLong)
+        {
+            if (session.TakeProfitPrice.HasValue && currentPrice >= session.TakeProfitPrice.Value)
+            {
+                exitTriggered = true;
+                exitMessage = $"💰 Take Profit alcanzado! Precio: ${currentPrice:N2}";
+            }
+            else if (session.StopLossPrice.HasValue && currentPrice <= session.StopLossPrice.Value)
+            {
+                exitTriggered = true;
+                exitMessage = $"🛑 Stop Loss activado. Precio: ${currentPrice:N2}";
+            }
+        }
+        else // SHORT
+        {
+            if (session.TakeProfitPrice.HasValue && currentPrice <= session.TakeProfitPrice.Value)
+            {
+                exitTriggered = true;
+                exitMessage = $"💰 Take Profit alcanzado! Precio: ${currentPrice:N2}";
+            }
+            else if (session.StopLossPrice.HasValue && currentPrice >= session.StopLossPrice.Value)
+            {
+                exitTriggered = true;
+                exitMessage = $"🛑 Stop Loss activado. Precio: ${currentPrice:N2}";
+            }
+        }
+        
+        if (exitTriggered)
+        {
+            _logger.LogInformation("📉 Exit Triggered for {Symbol}: {Message}", session.Symbol, exitMessage);
+            
+            // Calculate Telemetry (Sprint 2)
+            decimal netProfit = 0;
+            if (session.EntryPrice.HasValue && session.EntryPrice.Value > 0)
+            {
+                var entryPrice = session.EntryPrice.Value;
+                var leverage = (decimal)strategy.Leverage;
+                var capital = strategy.Capital;
+                var quantity = (capital * leverage) / entryPrice;
+                
+                if (isLong)
+                    netProfit = (currentPrice - entryPrice) * quantity;
+                else
+                    netProfit = (entryPrice - currentPrice) * quantity;
+            }
+
+            session.CurrentStage = TradingStage.SellActive;
+            session.IsActive = false; // Deactivate once finished
+            session.EndTime = DateTime.UtcNow;
+            session.NetProfit = netProfit;
+            session.Outcome = netProfit >= 0 ? TradeStatus.Win : TradeStatus.Loss;
+            session.ExitReason = exitMessage.Contains("Profit") ? "TakeProfit" : "StopLoss";
+            
+            await sessionRepo.UpdateAsync(session);
+            
+            var exitLog = new AnalysisLog(
+                Guid.NewGuid(),
+                session.TraderProfileId,
+                session.Id,
+                session.Symbol,
+                $"{exitMessage} | Ganancia: ${netProfit:N2} USDT",
+                netProfit >= 0 ? "success" : "danger",
+                DateTime.UtcNow,
+                AnalysisLogType.AlertExit,
+                JsonSerializer.Serialize(new { 
+                    price = currentPrice, 
+                    reason = session.ExitReason,
+                    netProfit = netProfit,
+                    outcome = session.Outcome.ToString()
+                })
+            );
+            await logRepo.InsertAsync(exitLog);
+            return true;
+        }
+        
+        return false;
     }
 }

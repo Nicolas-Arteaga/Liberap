@@ -46,6 +46,8 @@ public class DecisionResult
     public int Score { get; set; } // 0-100
     public string Reason { get; set; } = string.Empty;
     public Dictionary<string, float> WeightedScores { get; set; } = new();
+    public decimal? EntryMinPrice { get; set; }
+    public decimal? EntryMaxPrice { get; set; }
 }
 
 public enum TradingDecision

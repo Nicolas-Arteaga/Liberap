@@ -15,6 +15,11 @@ public class TradingSessionDto : FullAuditedEntityDto<Guid>
     public decimal? StopLossPrice { get; set; }
     public TradingStyle? SelectedStyle { get; set; }
     public SignalDirection? SelectedDirection { get; set; }
+    
+    public decimal? NetProfit { get; set; }
+    public TradeStatus? Outcome { get; set; }
+    public string? ExitReason { get; set; }
+    public long? LastEvaluationTimestamp { get; set; }
 }
 
 public class StartSessionDto

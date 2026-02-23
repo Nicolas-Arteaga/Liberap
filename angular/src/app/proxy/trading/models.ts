@@ -123,6 +123,8 @@ export interface OpportunityDto {
   confidence: number;
   signal?: string;
   reason?: string;
+  entryMin?: number;
+  entryMax?: number;
 }
 
 export interface RecommendedStyleDto {

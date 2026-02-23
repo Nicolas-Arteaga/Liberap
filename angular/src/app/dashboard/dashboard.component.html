@@ -147,10 +147,14 @@
               <ion-icon name="checkmark-circle" class="text-success fs-1"></ion-icon>
               COMPRA AQUÍ!
             </h2>
-            <p class="text-white fw-medium mb-4">
+            <p class="text-white fw-medium mb-1">
               {{ currentOpportunity.symbol }} <span class="text-white-50 fw-normal ms-1">(confianza {{
                 currentOpportunity.confidence }}%)</span>
             </p>
+            <div *ngIf="currentOpportunity.entryMin" class="text-primary-light fw-bold mb-4" style="font-size: 0.9rem;">
+              🎯 Zona: ${{ currentOpportunity.entryMin | number:'1.2-2' }} - ${{ currentOpportunity.entryMax |
+              number:'1.2-2' }}
+            </div>
 
             <button class="btn btn-success-vision w-100 py-2 rounded-3 fw-bold fs-6" (click)="goToTrade()">
               Ir al Mercado
@@ -202,6 +206,9 @@
                     </span>
                     <span *ngIf="data?.reason" class="text-xs italic opacity-75">
                       {{ data.reason }}
+                    </span>
+                    <span *ngIf="data?.entryMin" class="text-xs fw-bold text-primary-light">
+                      🎯 Zona: ${{ data.entryMin | number:'1.2-2' }}-${{ data.entryMax | number:'1.2-2' }}
                     </span>
                   </ng-container>
                 </div>

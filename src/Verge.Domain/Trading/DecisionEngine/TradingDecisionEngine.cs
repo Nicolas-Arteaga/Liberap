@@ -124,6 +124,15 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
             }
         };
 
+        // 10. Entry Range Calculation (Sprint 4)
+        if (result.Decision >= TradingDecision.Prepare)
+        {
+            var currentPrice = context.Candles.Last().Close;
+            // 0.5% Zone window (+-0.25%)
+            result.EntryMinPrice = currentPrice * 0.9975m;
+            result.EntryMaxPrice = currentPrice * 1.0025m;
+        }
+
         _logger.LogInformation("✅ Evaluation Result for {Style}: {Decision} (Score: {Score})", style, result.Decision, result.Score);
         return result;
     }

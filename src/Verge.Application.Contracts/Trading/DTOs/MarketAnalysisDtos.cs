@@ -20,4 +20,6 @@ public class OpportunityDto
     public int Confidence { get; set; }
     public string Signal { get; set; }
     public string Reason { get; set; }
+    public decimal? EntryMinPrice { get; set; }
+    public decimal? EntryMaxPrice { get; set; }
 }

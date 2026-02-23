@@ -440,14 +440,19 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         }
       }
 
-      // --- Detect opportunity (score >= 70 or Entry decision) ---
+      // --- Detect opportunity (score >= 70 or Entry/Prepare decision) ---
       if (!this.currentOpportunity && data) {
-        if (data.decision === 'Entry' || log.logType === AnalysisLogType.AlertEntry || Number(data.score) >= 70) {
+        const isEntry = data.decision === 'Entry' || log.logType === AnalysisLogType.AlertEntry || Number(data.score) >= 70;
+        const isPrepare = data.decision === 'Prepare' || log.logType === AnalysisLogType.AlertPrepare || (Number(data.score) >= 50 && Number(data.score) < 70);
+
+        if (isEntry || isPrepare) {
           this.currentOpportunity = {
             symbol: log.symbol || 'AUTO',
-            confidence: Number(data.score) || 70,
-            signal: (data.decision === 'Entry' || log.logType === AnalysisLogType.AlertEntry) ? 'LONG' : 'NEUTRAL',
-            reason: log.message
+            confidence: Number(data.score) || (isEntry ? 70 : 50),
+            signal: isEntry ? 'LONG' : 'NEUTRAL',
+            reason: log.message,
+            entryMin: data.entryMin,
+            entryMax: data.entryMax
           };
         }
       }
