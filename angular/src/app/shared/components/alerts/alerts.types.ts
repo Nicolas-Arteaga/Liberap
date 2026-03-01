@@ -15,6 +15,7 @@ export interface VergeAlert {
     direction?: number;
     stage?: number;
     targetZone?: { low: number; high: number };
+    score?: number;
 
     // Institutional 1%
     riskRewardRatio?: number;

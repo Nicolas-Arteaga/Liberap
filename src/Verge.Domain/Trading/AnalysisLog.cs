@@ -29,6 +29,6 @@ public class AnalysisLog : FullAuditedAggregateRoot<Guid>
         Level = level;
         Timestamp = timestamp;
         LogType = logType;
-        DataJson = dataJson;
+        DataJson = dataJson ?? "{}";
     }
 }

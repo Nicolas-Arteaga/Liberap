@@ -219,6 +219,28 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         this.showStageToast(this.currentStage);
       }
     });
+
+    // Real-time UI updates from alerts (including Score decay and Stagnation)
+    this.alertService.alerts$.pipe(takeUntil(this.destroy$)).subscribe(alerts => {
+      if (!this.currentSession || alerts.length === 0) return;
+
+      const latestAlert = alerts[0]; // Alerts are sorted desc by timestamp in service
+
+      // Update last motor signal from any relevant alert for this session
+      if (latestAlert.crypto === this.currentSession.symbol || latestAlert.type === 'System') {
+        this.lastMotorSignal = latestAlert.message;
+
+        // Sync stage if it changed
+        if (latestAlert.stage && latestAlert.stage !== this.currentStage) {
+          this.currentStage = latestAlert.stage;
+        }
+
+        // Sync score decay
+        if (latestAlert.score !== undefined && this.currentSession) {
+          this.currentSession.score = latestAlert.score;
+        }
+      }
+    });
   }
 
   private handleSessionUpdate(session: any) {

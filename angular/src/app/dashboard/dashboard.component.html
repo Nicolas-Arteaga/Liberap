@@ -166,21 +166,26 @@
                 </div>
 
                 <!-- Technical Metadata (Phase 3) -->
-                <div *ngIf="log.dataJson" class="metadata-row d-flex flex-wrap gap-3 mt-1 opacity-60">
+                <div *ngIf="log.dataJson" class="metadata-row d-flex flex-wrap gap-3 mt-1">
                   <ng-container *ngIf="parseJson(log.dataJson) as data">
-                    <span *ngIf="data?.rsi" class="text-xs d-flex align-items-center gap-1">
-                      <ion-icon name="pulse-outline"></ion-icon> RSI: {{ data.rsi | number:'1.1-1' }}
+                    <span *ngIf="data?.rsi" class="text-xs d-flex align-items-center gap-1"
+                      [style.color]="getLogColor(log)">
+                      <ion-icon name="pulse-outline" [style.color]="getLogColor(log)"></ion-icon> RSI: {{ data.rsi |
+                      number:'1.1-1' }}
                     </span>
-                    <span *ngIf="data?.adx" class="text-xs d-flex align-items-center gap-1">
-                      <ion-icon name="trending-up-outline"></ion-icon> ADX: {{ data.adx | number:'1.1-1' }}
+                    <span *ngIf="data?.adx" class="text-xs d-flex align-items-center gap-1"
+                      [style.color]="getLogColor(log)">
+                      <ion-icon name="trending-up-outline" [style.color]="getLogColor(log)"></ion-icon> ADX: {{ data.adx
+                      | number:'1.1-1' }}
                     </span>
-                    <span *ngIf="data?.regime" class="text-xs d-flex align-items-center gap-1 text-info">
-                      <ion-icon name="layers-outline"></ion-icon> {{ data.regime }}
+                    <span *ngIf="data?.regime" class="text-xs d-flex align-items-center gap-1"
+                      [style.color]="getLogColor(log)">
+                      <ion-icon name="layers-outline" [style.color]="getLogColor(log)"></ion-icon> {{ data.regime }}
                     </span>
-                    <span *ngIf="data?.reason" class="text-xs italic opacity-75">
+                    <span *ngIf="data?.reason" class="text-xs fst-italic" [style.color]="getLogColor(log)">
                       {{ data.reason }}
                     </span>
-                    <span *ngIf="data?.entryMin" class="text-xs fw-bold text-primary-light">
+                    <span *ngIf="data?.entryMin" class="text-xs fw-bold" [style.color]="getLogColor(log)">
                       🎯 Zona: ${{ data.entryMin | number:'1.2-2' }}-${{ data.entryMax | number:'1.2-2' }}
                     </span>
                   </ng-container>

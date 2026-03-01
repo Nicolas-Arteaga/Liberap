@@ -1,4 +1,4 @@
-import type { AnalysisLogDto, BacktestResultDto, ConnectExchangeDto, CreateUpdateTradingAlertDto, CreateUpdateTradingStrategyDto, ExchangeConnectionDto, ExecuteTradeDto, GetHistoryInput, GetSignalsInput, MarketAnalysisDto, OpportunityDto, RecommendedStyleDto, RunBacktestDto, StartSessionDto, TradeOrderDto, TraderProfileDto, TradingAlertDto, TradingSessionDto, TradingSignalDto, TradingStrategyDto, UpdateTraderProfileDto } from './models';
+import type { AnalysisLogDto, BacktestResultDto, ConnectExchangeDto, CreateUpdateTradingAlertDto, CreateUpdateTradingStrategyDto, ExchangeConnectionDto, ExecuteTradeDto, GetHistoryInput, GetSignalsInput, MarketAnalysisDto, OpportunityDto, RecommendedStyleDto, RunBacktestDto, StartSessionDto, TradeOrderDto, TraderProfileDto, TradingAlertDto, TradingSessionDto, TradingSignalDto, TradingStrategyDto, UpdateTraderProfileDto, VergeAlertDto } from './models';
 import { RestService, Rest } from '@abp/ng.core';
 import type { PagedResultDto } from '@abp/ng.core';
 import { Injectable, inject } from '@angular/core';
@@ -158,6 +158,14 @@ export class TradingService {
     this.restService.request<any, TradingStrategyDto[]>({
       method: 'GET',
       url: '/api/app/trading/strategies',
+    },
+    { apiName: this.apiName,...config });
+  
+
+  getVergeAlertDummy = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, VergeAlertDto>({
+      method: 'GET',
+      url: '/get-verge-alert-dummy',
     },
     { apiName: this.apiName,...config });
   

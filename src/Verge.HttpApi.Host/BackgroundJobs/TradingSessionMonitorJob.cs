@@ -236,15 +236,11 @@ public class TradingSessionMonitorJob : BackgroundService
                     var groupKey = (session.Symbol, session.Timeframe);
                     if (!groupDataCache.TryGetValue(groupKey, out var data)) continue;
 
-                    // 4.0.1 Incremental Evaluation (Sprint 3)
+                    // 4.0.1 Incremental Evaluation Guard (Sprint 3)
+                    // We only skip logging if Data is unchanged and score hasn't decayed enough.
                     var lastCandleTime = data.candles.Last().Timestamp;
-                    if (session.LastEvaluationTimestamp.HasValue && session.LastEvaluationTimestamp.Value >= lastCandleTime)
-                    {
-                        _logger.LogInformation("⏩ Skipping evaluation for {Symbol}: Data unchanged since {Time}", session.Symbol, lastCandleTime);
-                        continue;
-                    }
-
-
+                    bool dataUnchanged = session.LastEvaluationTimestamp.HasValue && session.LastEvaluationTimestamp.Value >= lastCandleTime;
+                    
                     // Attach HTF Context if exists
                     var styleProfile = TradingStyleProfileFactory.GetProfile(strategy.Style);
                     var htfName = styleProfile.GetConfirmationTimeframe(session.Timeframe);
@@ -255,11 +251,33 @@ public class TradingSessionMonitorJob : BackgroundService
                         data.context.HigherTimeframeContext = htfData.context;
                     }
 
+                    // Always evaluate to apply SetupDecay (Time-based)
                     var evalResult = decisionEngine.Evaluate(session, strategy.Style, data.context);
-                    bool stageChanged = await ProcessDecision(session, evalResult, strategy, data.candles.Last().Close, eventBus, currentTraderProfile.UserId);
-                    await CreateAnalysisLogAsync(analysisLogRepo, session, evalResult, data.candles.Last().Close, data.context, eventBus, currentTraderProfile.UserId);
                     
-                    // Sprint 1 Patch: Detection of stagnancy
+                    // 6. Force Context alert for Stage 1 evaluations so the frontend is notified
+                    if (session.CurrentStage == TradingStage.Evaluating && evalResult.Decision == DecisionEngine.TradingDecision.Ignore)
+                    {
+                        evalResult.Decision = DecisionEngine.TradingDecision.Context;
+                    }
+                    
+                    // 6. Force Context alert for Stage 1 evaluations
+                    if (session.CurrentStage == TradingStage.Evaluating && evalResult.Decision == DecisionEngine.TradingDecision.Ignore)
+                    {
+                        evalResult.Decision = DecisionEngine.TradingDecision.Context;
+                    }
+
+                    // Decide if we should log/alert this cycle
+                    // We log if: Data changed OR Stage changed OR it's been > 5 minutes
+                    bool shouldLog = !dataUnchanged || (DateTime.UtcNow - session.StartTime).TotalMinutes % 5 < 0.2; 
+                    
+                    bool stageChanged = await ProcessDecision(session, evalResult, strategy, data.candles.Last().Close, eventBus, currentTraderProfile.UserId);
+                    
+                    if (shouldLog || stageChanged)
+                    {
+                        await CreateAnalysisLogAsync(analysisLogRepo, session, evalResult, data.candles.Last().Close, data.context, eventBus, currentTraderProfile.UserId);
+                    }
+                    
+                    // Sprint 1 Patch: Detection of stagnancy (always runs)
                     await CheckSessionStagnancyAsync(session, strategy, eventBus, currentTraderProfile.UserId, analysisLogRepo);
 
                     // Update timestamp (Sprint 3)
@@ -300,7 +318,7 @@ public class TradingSessionMonitorJob : BackgroundService
                             "info",
                             DateTime.UtcNow,
                             AnalysisLogType.OpportunityRanking,
-                            JsonSerializer.Serialize(rankingData)
+                            "{}"
                         );
                         await analysisLogRepo.InsertAsync(rankingLog);
                     }
@@ -310,6 +328,12 @@ public class TradingSessionMonitorJob : BackgroundService
                         var best = bestOpportunity;
                         _logger.LogInformation("🤖 AUTO winner for Session {Id}: {Symbol} | Style: {Style} | Score: {Score}", 
                             session.Id, best.Symbol, best.Style, best.Result.Score);
+
+                        // 6. Force Context alert for Stage 1 evaluations so frontend is notified
+                        if (session.CurrentStage == TradingStage.Evaluating && best.Result.Decision == DecisionEngine.TradingDecision.Ignore)
+                        {
+                            best.Result.Decision = DecisionEngine.TradingDecision.Context;
+                        }
 
                         // ALWAYS persist the analysis log for the best opportunity (consistent with fixed-symbol behavior)
                         var traderProfileForAuto = profileMap[session.TraderProfileId];
@@ -332,13 +356,16 @@ public class TradingSessionMonitorJob : BackgroundService
                             await CheckSessionStagnancyAsync(session, strategy, eventBus, traderProfileForAuto.UserId, analysisLogRepo);
                         }
 
-                        // Update timestamp for AUTO mode too (Sprint 3)
+                        // Update timestamp for AUTO mode (Sprint 3)
                         var maxTs = contextsOnly.Values.Max(c => c.Candles.Last().Timestamp);
                         session.LastEvaluationTimestamp = maxTs;
-
+ 
                         // Always update session (persist history and EvaluationHistoryJson)
                         await sessionRepository.UpdateAsync(session);
                     }
+                    
+                    // Always run stagnancy check for AUTO mode even if no winner or bestOpportunity is null
+                    await CheckSessionStagnancyAsync(session, strategy, eventBus, currentTraderProfile.UserId, analysisLogRepo);
                 }
             }
             catch (Exception ex)
@@ -546,6 +573,7 @@ public class TradingSessionMonitorJob : BackgroundService
             Confidence = result.Confidence,
             Direction = session.SelectedDirection,
             Stage = session.CurrentStage,
+            Score = result.Score,
             Severity = mappedSeverity,
             Icon = "analytics-outline"
         };
@@ -706,22 +734,26 @@ public class TradingSessionMonitorJob : BackgroundService
 
     private async Task CheckSessionStagnancyAsync(TradingSession session, TradingStrategy strategy, IDistributedEventBus eventBus, Guid identityUserId, IRepository<AnalysisLog, Guid> logRepo)
     {
-        if (!session.StageChangedTimestamp.HasValue) return;
-
         var profile = TradingStyleProfileFactory.GetProfile(strategy.Style);
-        var timeInStage = DateTime.UtcNow - session.StageChangedTimestamp.Value;
+        var referenceTime = session.StageChangedTimestamp ?? session.StartTime;
+        var timeInStage = DateTime.UtcNow - referenceTime;
 
         // Threshold: MaxStagnationMinutes (e.g., 30m for DayTrading)
         if (timeInStage.TotalMinutes > profile.MaxStagnationMinutes)
         {
-            // Only alert once per hour of stagnation to avoid spam
+            // Solo alertamos si: 
+            // 1. No existe log reciente en 60 mins.
+            // 2. OR acaba de reiniciar el backend (!HasValue)
+            // 3. OR han pasado N minutos redondos desde que arrancó el backend (% 3 == 0) para forzar reactividad
             var lastStagnationLog = await logRepo.FirstOrDefaultAsync(x => 
                 x.TradingSessionId == session.Id && 
                 x.LogType == AnalysisLogType.AlertSystem && 
                 x.Message.Contains("ESTANCADA") &&
                 x.Timestamp > DateTime.UtcNow.AddMinutes(-60));
+                
+            bool isImmediateWarning = !session.LastEvaluationTimestamp.HasValue || (int)Math.Floor(timeInStage.TotalMinutes) % 3 == 0;
 
-            if (lastStagnationLog == null)
+            if (lastStagnationLog == null || isImmediateWarning)
             {
                 var stagnationMessage = $"⚠️ [INSTITUTIONAL 1%] CACERÍA ESTANCADA: {session.Symbol} no muestra señales claras en {Math.Floor(timeInStage.TotalMinutes)} min. ¿Considerás rotar moneda o finalizar?";
                 
@@ -759,7 +791,7 @@ public class TradingSessionMonitorJob : BackgroundService
                     "warning",
                     DateTime.UtcNow,
                     AnalysisLogType.AlertSystem,
-                    null
+                    "{}"
                 ));
             }
         }

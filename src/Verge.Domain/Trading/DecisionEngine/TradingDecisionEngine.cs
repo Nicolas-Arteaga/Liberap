@@ -54,19 +54,6 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
             return invalidRegimeResult;
         }
 
-        // 3. Hard Setup Validation (Setup Validator Phase)
-        if (!profile.ValidateEntry(context, out string setupInvalidReason))
-        {
-            var setupInvalidResult = new DecisionResult
-            {
-                Decision = TradingDecision.Ignore,
-                Score = 0,
-                Reason = $"IGNORE: {setupInvalidReason}"
-            };
-            _logger.LogInformation("✅ Evaluation Result for {Style}: {Decision} | Reason: {Reason}", style, setupInvalidResult.Decision, setupInvalidResult.Reason);
-            return setupInvalidResult;
-        }
-
         // 4. Component Score Calculation (0-100)
         float technicalScore = CalculateTechnicalScore(context);
         float quantitativeScore = CalculateQuantitativeScore(context);
@@ -84,8 +71,22 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
         // 6.1 Apply Setup Decay (Institutional 1% Sprint 1)
         finalScore = ApplySetupDecay(session, profile, finalScore, ref penaltyReason);
 
-        // 7. Decision Mapping based on Profile Thresholds (Phase 2.0 Base)
         int roundedScore = (int)Math.Clamp(finalScore, 0, 100);
+
+        // 3. Hard Setup Validation (Setup Validator Phase)
+        if (!profile.ValidateEntry(context, out string setupInvalidReason))
+        {
+            var setupInvalidResult = new DecisionResult
+            {
+                Decision = TradingDecision.Ignore,
+                Score = roundedScore, // Return the decaying score so UI tracks it smoothly
+                Reason = $"IGNORE: {setupInvalidReason}"
+            };
+            _logger.LogInformation("✅ Evaluation Result for {Style}: {Decision} | Reason: {Reason}", style, setupInvalidResult.Decision, setupInvalidResult.Reason);
+            return setupInvalidResult;
+        }
+
+        // 7. Decision Mapping based on Profile Thresholds (Phase 2.0 Base)
         var decision = GetDecisionFromProfile(roundedScore, profile);
 
         // 7.1 Multi-Timeframe Confirmation (Phase 2)
@@ -271,10 +272,10 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
         if (session.CurrentStage != TradingStage.Evaluating && session.CurrentStage != TradingStage.Prepared)
             return currentScore;
 
-        if (!session.StageChangedTimestamp.HasValue)
-            return currentScore;
-
-        var minutesInStage = (float)(DateTime.UtcNow - session.StageChangedTimestamp.Value).TotalMinutes;
+        // Fallback to StartTime if the session was created before the StageChangedTimestamp update
+        var referenceTime = session.StageChangedTimestamp ?? session.StartTime;
+        var minutesInStage = (float)(DateTime.UtcNow - referenceTime).TotalMinutes;
+        
         if (minutesInStage <= 2) return currentScore; // Grace period
 
         // Penalty logic: 

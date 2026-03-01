@@ -120,6 +120,8 @@
   .line-clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
+    color: white !important;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
@@ -139,7 +141,7 @@
 
   .metadata-row {
     ion-icon {
-      font-size: 10px;
+      font-size: 14px;
     }
   }
 

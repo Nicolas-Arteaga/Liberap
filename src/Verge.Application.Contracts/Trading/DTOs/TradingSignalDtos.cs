@@ -38,6 +38,7 @@ public class VergeAlertDto
     public SignalConfidence? Confidence { get; set; }
     public SignalDirection? Direction { get; set; }
     public TradingStage? Stage { get; set; }
+    public int? Score { get; set; }
     
     public TargetZoneDto? TargetZone { get; set; }
     

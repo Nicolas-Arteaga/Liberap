@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Volo.Abp.Domain.Repositories;
+using Volo.Abp.Uow;
 using Verge.Trading.DecisionEngine;
 
 namespace Verge.Trading;
@@ -58,6 +59,7 @@ public class FastTickScannerService : BackgroundService
     private async Task ScanTicksAsync(Dictionary<string, decimal> lastPrices)
     {
         using var scope = _serviceProvider.CreateScope();
+        using var uow = scope.ServiceProvider.GetRequiredService<Volo.Abp.Uow.IUnitOfWorkManager>().Begin();
         var sessionRepository = scope.ServiceProvider.GetRequiredService<IRepository<TradingSession, Guid>>();
         
         // Resolve all symbols to monitor (Individual and AUTO portfolio)

@@ -145,6 +145,11 @@ export interface StartSessionDto {
   timeframe?: string;
 }
 
+export interface TargetZoneDto {
+  low: number;
+  high: number;
+}
+
 export interface TradeOrderDto extends FullAuditedEntityDto<string> {
   symbol?: string;
   direction?: SignalDirection;
@@ -234,25 +239,21 @@ export interface UpdateTraderProfileDto {
 }
 
 export interface VergeAlertDto {
-  id: string;
-  type: string;
-  title: string;
-  message: string;
-  timestamp: string;
+  id?: string;
+  type?: string;
+  title?: string;
+  message?: string;
+  timestamp?: string;
   read: boolean;
   crypto?: string;
   price?: number;
   confidence?: SignalConfidence;
   direction?: SignalDirection;
   stage?: TradingStage;
-  targetZone?: TargetZoneDto;
+  score?: number;
+  targetZone: TargetZoneDto;
   riskRewardRatio?: number;
   winProbability?: number;
-  severity: string;
-  icon: string;
-}
-
-export interface TargetZoneDto {
-  low: number;
-  high: number;
+  severity?: string;
+  icon?: string;
 }
