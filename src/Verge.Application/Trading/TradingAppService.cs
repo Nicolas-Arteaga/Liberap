@@ -432,6 +432,12 @@ public class TradingAppService : ApplicationService, ITradingAppService
         throw new NotImplementedException();
     }
 
+    [HttpGet("get-verge-alert-dummy")]
+    public Task<VergeAlertDto> GetVergeAlertDummyAsync()
+    {
+        throw new NotImplementedException();
+    }
+
     [HttpGet("api/app/trading/test-signalr")]
     public async Task TestSignalRAsync()
     {

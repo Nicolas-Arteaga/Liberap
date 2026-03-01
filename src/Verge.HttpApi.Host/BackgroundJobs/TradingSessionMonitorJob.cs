@@ -22,11 +22,13 @@ public class TradingSessionMonitorJob : BackgroundService
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<TradingSessionMonitorJob> _logger;
+    private readonly ITickSpikeAlerter _spikeAlerter;
 
-    public TradingSessionMonitorJob(IServiceProvider serviceProvider, ILogger<TradingSessionMonitorJob> logger)
+    public TradingSessionMonitorJob(IServiceProvider serviceProvider, ILogger<TradingSessionMonitorJob> logger, ITickSpikeAlerter spikeAlerter)
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
+        _spikeAlerter = spikeAlerter;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -45,8 +47,20 @@ public class TradingSessionMonitorJob : BackgroundService
                 _logger.LogError(ex, "❌ Error in job cycle");
             }
 
-            _logger.LogInformation("😴 Job sleeping for 30 seconds...");
-            await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+            _logger.LogInformation("😴 Job waiting for next cycle or ⚡ pulse spike...");
+            
+            // Institutional 1% Sprint 1: Wait for 30s OR an instant spike signal
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+            var delayTask = Task.Delay(TimeSpan.FromSeconds(30), cts.Token);
+            var spikeTask = _spikeAlerter.WaitAsync(cts.Token);
+
+            var finishedTask = await Task.WhenAny(delayTask, spikeTask);
+            cts.Cancel(); // Stop the other task
+
+            if (finishedTask == spikeTask)
+            {
+                _logger.LogWarning("⚡ REACCIÓN INSTANTÁNEA: Pulso de mercado detectado. Iniciando re-evaluación forzada.");
+            }
         }
     }
 
@@ -382,9 +396,15 @@ public class TradingSessionMonitorJob : BackgroundService
                 if (session.CurrentStage == TradingStage.Evaluating)
                 {
                     session.CurrentStage = TradingStage.Prepared;
+                    session.StageChangedTimestamp = DateTime.UtcNow;
                     changed = true;
                 }
                 break;
+        }
+
+        if (session.CurrentStage == TradingStage.BuyActive && oldStage != TradingStage.BuyActive)
+        {
+            session.StageChangedTimestamp = DateTime.UtcNow;
         }
 
         if (changed)
@@ -438,7 +458,7 @@ public class TradingSessionMonitorJob : BackgroundService
             logType = result.Decision switch {
                 DecisionEngine.TradingDecision.Entry => AnalysisLogType.AlertEntry,
                 DecisionEngine.TradingDecision.Prepare => AnalysisLogType.AlertPrepare,
-                DecisionEngine.TradingDecision.Context => result.Score >= 60 ? AnalysisLogType.AlertContext : AnalysisLogType.Standard,
+                DecisionEngine.TradingDecision.Context => AnalysisLogType.AlertContext,
                 _ => AnalysisLogType.Standard
             };
         }
@@ -479,7 +499,9 @@ public class TradingSessionMonitorJob : BackgroundService
             weighted = result.WeightedScores,
             htfTrend = context.HigherTimeframeContext?.MarketRegime?.Regime.ToString(),
             entryMin = result.EntryMinPrice,
-            entryMax = result.EntryMaxPrice
+            entryMax = result.EntryMaxPrice,
+            winProb = result.WinProbability,
+            rr = result.RiskRewardRatio
         };
 
         var log = new AnalysisLog(
@@ -522,6 +544,9 @@ public class TradingSessionMonitorJob : BackgroundService
         {
             alertDto.TargetZone = new TargetZoneDto { Low = result.EntryMinPrice.Value, High = result.EntryMaxPrice.Value };
         }
+
+        alertDto.RiskRewardRatio = result.RiskRewardRatio;
+        alertDto.WinProbability = result.WinProbability;
 
         _logger.LogInformation("🔔 [Analysis] Publicando alerta {Type} para sesión {Id}", alertDto.Type, session.Id);
         await eventBus.PublishAsync(new AlertStateChangedEto

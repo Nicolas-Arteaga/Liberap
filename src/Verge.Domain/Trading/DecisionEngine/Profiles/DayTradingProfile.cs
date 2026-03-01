@@ -8,6 +8,7 @@ public class DayTradingProfile : ITradingStyleProfile
     public float QuantitativeWeight => 0.25f;
     public float SentimentWeight => 0.15f;
     public float FundamentalWeight => 0.10f;
+    public float DecayFactor => 1.5f; // Medium decay for day trading
 
     public int EntryThreshold => 70;
     public int PrepareThreshold => 50;

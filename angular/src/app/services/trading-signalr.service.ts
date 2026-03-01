@@ -81,8 +81,13 @@ export class TradingSignalrService {
             this.stageAdvancedSource.next(session);
         });
 
-        this.connection.on('ReceiveAlert', (alert: VergeAlert) => {
+        this.connection.on('ReceiveAlert', (alert: any) => {
             console.log('[SignalR] 🔔 Alerta RECIBIDA en frontend:', alert);
+
+            // Convertir timestamp string a Date si es necesario
+            if (typeof alert.timestamp === 'string') {
+                alert.timestamp = new Date(alert.timestamp);
+            }
 
             // Siempre agregamos al servicio para que aparezca en la lista/campanita
             this.alertService.addAlert(alert);

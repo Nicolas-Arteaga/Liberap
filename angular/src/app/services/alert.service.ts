@@ -68,8 +68,13 @@ export class AlertService {
         try {
             const stored = localStorage.getItem('verge_alerts');
             if (stored) {
-                const parsed: VergeAlert[] = JSON.parse(stored);
-                this.alerts.set(parsed);
+                const parsed: any[] = JSON.parse(stored);
+                // Asegurar que los timestamps sean Date objects
+                const alertsWithDates = parsed.map(a => ({
+                    ...a,
+                    timestamp: new Date(a.timestamp)
+                }));
+                this.alerts.set(alertsWithDates);
             }
         } catch (e) {
             console.warn('Could not load alerts from localStorage', e);

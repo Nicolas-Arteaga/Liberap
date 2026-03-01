@@ -24,6 +24,7 @@ public class TradingSession : FullAuditedAggregateRoot<Guid>
     public TradeStatus? Outcome { get; set; }
     public string? ExitReason { get; set; }
     public long? LastEvaluationTimestamp { get; set; }
+    public DateTime? StageChangedTimestamp { get; set; }
 
     protected TradingSession() { }
 
@@ -35,6 +36,7 @@ public class TradingSession : FullAuditedAggregateRoot<Guid>
         Timeframe = timeframe;
         CurrentStage = TradingStage.Evaluating;
         StartTime = DateTime.UtcNow;
+        StageChangedTimestamp = StartTime;
         IsActive = true;
     }
 }

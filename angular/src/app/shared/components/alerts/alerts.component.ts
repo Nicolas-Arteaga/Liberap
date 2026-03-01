@@ -25,9 +25,9 @@ export class AlertsComponent {
     }
 
     get activeOverlayAlert(): VergeAlert | undefined {
-        // Mostramos la alerta más reciente que sea de Etapa activa (1-4) o Custom y no esté leída
+        // Mostramos la alerta más reciente que coincida con lo operativo o sistema y no esté leída
         return this.alerts.find(a =>
-            (a.type.startsWith('Stage') || a.type === 'Custom') && !a.read
+            (a.type.startsWith('Stage') || a.type === 'Custom' || a.type === 'System') && !a.read
         );
     }
 
@@ -49,8 +49,26 @@ export class AlertsComponent {
                 return '¡COMPRA AQUÍ!';
             case 'Stage4':
                 return '¡SESIÓN FINALIZADA!';
+            case 'System':
+                return 'ANÁLISIS DE MERCADO';
             default:
                 return '¡AVISO!';
         }
+    }
+
+    getSeverityClass(severity: string): string {
+        switch (severity) {
+            case 'success': return 'text-success';
+            case 'warning': return 'text-warning';
+            case 'danger': return 'text-danger';
+            default: return 'text-primary';
+        }
+    }
+
+    getRRRating(rr: number | undefined): string {
+        if (!rr) return '';
+        if (rr >= 3) return 'EXCELENTE';
+        if (rr >= 2) return 'BUENO';
+        return 'MODERADO';
     }
 }

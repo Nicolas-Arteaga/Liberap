@@ -196,6 +196,7 @@ export interface TradingSessionDto extends FullAuditedEntityDto<string> {
   outcome?: TradeStatus;
   exitReason?: string;
   lastEvaluationTimestamp?: number;
+  stageChangedTimestamp?: string;
 }
 
 export interface TradingSignalDto extends EntityDto<string> {
@@ -230,4 +231,28 @@ export interface UpdateTraderProfileDto {
   name?: string;
   level?: TradingLevel;
   riskTolerance?: RiskTolerance;
+}
+
+export interface VergeAlertDto {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+  crypto?: string;
+  price?: number;
+  confidence?: SignalConfidence;
+  direction?: SignalDirection;
+  stage?: TradingStage;
+  targetZone?: TargetZoneDto;
+  riskRewardRatio?: number;
+  winProbability?: number;
+  severity: string;
+  icon: string;
+}
+
+export interface TargetZoneDto {
+  low: number;
+  high: number;
 }

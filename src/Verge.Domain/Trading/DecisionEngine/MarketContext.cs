@@ -48,6 +48,10 @@ public class DecisionResult
     public Dictionary<string, float> WeightedScores { get; set; } = new();
     public decimal? EntryMinPrice { get; set; }
     public decimal? EntryMaxPrice { get; set; }
+    
+    // Institutional 1% metrics
+    public double? RiskRewardRatio { get; set; }
+    public double? WinProbability { get; set; }
 }
 
 public enum TradingDecision

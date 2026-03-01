@@ -127,6 +127,8 @@ public class VergeHttpApiHostModule : AbpModule
         ConfigureVirtualFileSystem(context);
         ConfigureCors(context, configuration);
         
+        context.Services.AddSingleton<ITickSpikeAlerter, TickSpikeAlerter>();
+        context.Services.AddHostedService<FastTickScannerService>();
         context.Services.AddHostedService<TradingSessionMonitorJob>();
         context.Services.AddHostedService<MarketScannerService>();
 

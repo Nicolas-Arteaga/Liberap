@@ -81,6 +81,9 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
         // 6. Apply Profile Penalties
         finalScore = profile.ApplyPenalties(context, finalScore, out string penaltyReason);
 
+        // 6.1 Apply Setup Decay (Institutional 1% Sprint 1)
+        finalScore = ApplySetupDecay(session, profile, finalScore, ref penaltyReason);
+
         // 7. Decision Mapping based on Profile Thresholds (Phase 2.0 Base)
         int roundedScore = (int)Math.Clamp(finalScore, 0, 100);
         var decision = GetDecisionFromProfile(roundedScore, profile);
@@ -109,6 +112,10 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
             }
         }
 
+        // 9.1 Calculate Institutional Metrics (Sprint 1)
+        var winProb = CalculateWinProbability(roundedScore, confidence, context);
+        var rrRatio = CalculateRiskRewardRatio(context, style, decision);
+
         var result = new DecisionResult
         {
             Decision = decision,
@@ -121,7 +128,9 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
                 { "Quantitative", quantitativeScore * profile.QuantitativeWeight },
                 { "Sentiment", sentimentScore * profile.SentimentWeight },
                 { "Fundamental", fundamentalScore * profile.FundamentalWeight }
-            }
+            },
+            WinProbability = winProb,
+            RiskRewardRatio = rrRatio
         };
 
         // 10. Entry Range Calculation (Sprint 4)
@@ -254,6 +263,54 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
 
         return true;
     }
+
+    #region Institutional 1% Helpers (Sprint 1)
+    private float ApplySetupDecay(TradingSession session, ITradingStyleProfile profile, float currentScore, ref string reason)
+    {
+        if (session.CurrentStage != TradingStage.Prepared || !session.StageChangedTimestamp.HasValue)
+            return currentScore;
+
+        var minutesInStage = (float)(DateTime.UtcNow - session.StageChangedTimestamp.Value).TotalMinutes;
+        if (minutesInStage <= 2) return currentScore; // Grace period
+
+        float decay = minutesInStage * profile.DecayFactor;
+        reason += $" [Time Decay: -{decay:F1}]";
+        
+        return Math.Max(0, currentScore - decay);
+    }
+
+    private double CalculateWinProbability(int score, SignalConfidence confidence, MarketContext context)
+    {
+        // Base probability from score (0-100 -> 30%-60%)
+        double prob = 30.0 + (score * 0.3);
+        
+        // Boost from confidence
+        if (confidence == SignalConfidence.High) prob += 15.0;
+        else if (confidence == SignalConfidence.Medium) prob += 5.0;
+
+        // Regime alignment boost
+        if (context.MarketRegime?.TrendStrength > 70) prob += 10.0;
+
+        return Math.Min(95.0, prob) / 100.0;
+    }
+
+    private double CalculateRiskRewardRatio(MarketContext context, TradingStyle style, TradingDecision decision)
+    {
+        if (decision < TradingDecision.Prepare) return 0;
+
+        // Institutional estimation based on profile expectations
+        // Scalping usually targets smaller R:R (1:1.5)
+        // Swing targets larger R:R (1:3)
+        return style switch
+        {
+            TradingStyle.Scalping => 1.5,
+            TradingStyle.DayTrading => 2.0,
+            TradingStyle.SwingTrading => 3.0,
+            TradingStyle.PositionTrading => 4.5,
+            _ => 2.0
+        };
+    }
+    #endregion
 
     private bool ValidateHTFConfirmation(MarketContext context, TradingSession session, TradingStyle style, ITradingStyleProfile profile, out string reason)
     {

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Volo.Abp.Application.Dtos;
 using Volo.Abp.Application.Services;
+using Verge.Trading.DTOs;
 
 namespace Verge.Trading;
 
@@ -47,6 +48,7 @@ public interface ITradingAppService : IApplicationService
     // Forced Proxies
     Task<MarketAnalysisDto> GetMarketAnalysisDummyAsync();
     Task<OpportunityDto> GetOpportunityDummyAsync();
+    Task<VergeAlertDto> GetVergeAlertDummyAsync();
 
     // Recommendation
     Task<RecommendedStyleDto> RecommendTradingStyleAsync(string symbol);

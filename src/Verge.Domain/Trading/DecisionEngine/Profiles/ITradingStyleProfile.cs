@@ -10,6 +10,9 @@ public interface ITradingStyleProfile
     float SentimentWeight { get; }
     float FundamentalWeight { get; }
     
+    // Institutional 1% metrics: Decay
+    float DecayFactor { get; }
+    
     // Decision Thresholds
     int EntryThreshold { get; }
     int PrepareThreshold { get; }

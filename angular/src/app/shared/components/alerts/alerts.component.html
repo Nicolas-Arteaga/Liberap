@@ -32,43 +32,85 @@
   </div>
 </div>
 
-<!-- MODO OVERLAY (Para el Dashboard) -->
+<!-- MODO OVERLAY (Para el Dashboard - Premium Institutional) -->
 <div *ngIf="mode === 'overlay' && activeOverlayAlert"
   class="opportunity-overlay-card position-absolute top-50 start-50 translate-middle rounded-4 shadow-2xl">
 
-  <!-- Header con Icono y Estado -->
+  <div class="glass-shine"></div>
+
+  <!-- Header -->
   <div class="overlay-header d-flex justify-content-between align-items-center mb-4">
-    <div class="d-flex align-items-center gap-2">
+    <div class="d-flex align-items-center gap-3">
       <div class="status-indicator">
-        <div class="status-dot pulsing bg-danger"></div>
+        <div class="status-dot pulsing" [ngClass]="getSeverityClass(activeOverlayAlert.severity)"></div>
       </div>
-      <span class="overlay-label">OPORTUNIDAD DETECTADA</span>
+      <div class="header-meta">
+        <span class="overlay-label">ALGORITMO VERGE V1</span>
+        <span class="overlay-time">{{ activeOverlayAlert.timestamp | date:'HH:mm:ss' }}</span>
+      </div>
     </div>
-    <button class="close-btn shadow-none" (click)="onMarkAsReadClick($event, activeOverlayAlert.id)">
+    <button class="close-btn" (click)="onMarkAsReadClick($event, activeOverlayAlert.id)" title="Cerrar notificación">
       <ion-icon name="close-outline"></ion-icon>
     </button>
   </div>
 
-  <!-- Body con Título Dinámico -->
-  <div class="overlay-body text-center">
-    <div class="title-wrapper mb-3">
-      <ion-icon [name]="activeOverlayAlert.icon" [class.text-success]="activeOverlayAlert.type === 'Stage3'"
-        [class.text-warning]="activeOverlayAlert.type === 'Stage2' || activeOverlayAlert.type === 'Stage1'"
-        class="main-icon"></ion-icon>
-      <h2 class="main-title">{{ getOverlayTitle(activeOverlayAlert.type) }}</h2>
+  <!-- Body -->
+  <div class="overlay-body">
+    <div class="main-info d-flex align-items-center gap-4 mb-4">
+      <div class="crypto-icon-wrapper">
+        <ion-icon [name]="activeOverlayAlert.icon" [ngClass]="getSeverityClass(activeOverlayAlert.severity)"
+          class="main-icon"></ion-icon>
+      </div>
+      <div class="signal-info">
+        <h2 class="main-title">{{ getOverlayTitle(activeOverlayAlert.type) }}</h2>
+        <div class="crypto-badge">
+          <span class="symbol">{{ activeOverlayAlert.crypto }}</span>
+          <span class="price" *ngIf="activeOverlayAlert.price">${{ activeOverlayAlert.price | number:'1.2-2' }}</span>
+        </div>
+      </div>
     </div>
 
-    <!-- Crypto Info -->
-    <div class="crypto-badge mb-2">
-      <span class="symbol">{{ activeOverlayAlert.crypto }}</span>
-      <span class="confidence">confianza {{ activeOverlayAlert.confidence }}%</span>
+    <!-- Institutional Metrics (The 1% Tier) -->
+    <div *ngIf="activeOverlayAlert.winProbability || activeOverlayAlert.riskRewardRatio"
+      class="institutional-metrics d-grid gap-3 mb-4">
+      <div *ngIf="activeOverlayAlert.winProbability" class="metric-card">
+        <span class="metric-label">PROBABILIDAD</span>
+        <div class="metric-value-wrapper">
+          <span class="metric-value">{{ (activeOverlayAlert.winProbability || 0) | percent:'1.0-0' }}</span>
+          <div class="metric-progress">
+            <div class="progress-bar" [style.width.%]="activeOverlayAlert.winProbability * 100"></div>
+          </div>
+        </div>
+      </div>
+
+      <div *ngIf="activeOverlayAlert.riskRewardRatio" class="metric-card">
+        <span class="metric-label">RISK / REWARD</span>
+        <div class="metric-value-wrapper">
+          <span class="metric-value">1 : {{ (activeOverlayAlert.riskRewardRatio || 0) | number:'1.1-1' }}</span>
+          <span class="metric-sub">{{ getRRRating(activeOverlayAlert.riskRewardRatio) }}</span>
+        </div>
+      </div>
     </div>
 
     <!-- Zona Operativa -->
     <div *ngIf="activeOverlayAlert.targetZone" class="zone-box">
-      <span class="label">ZONA OPERATIVA</span>
-      <span class="value">${{ activeOverlayAlert.targetZone.low | number:'1.2-2' }} - ${{
-        activeOverlayAlert.targetZone.high | number:'1.2-2' }}</span>
+      <div class="zone-header d-flex justify-content-between align-items-center mb-2">
+        <span class="label">ZONA DE ENTRADA IDEAL</span>
+        <ion-icon name="locate-outline" class="text-primary"></ion-icon>
+      </div>
+      <div class="zone-value">
+        <span class="low">${{ activeOverlayAlert.targetZone.low | number:'1.2-2' }}</span>
+        <span class="separator">/</span>
+        <span class="high">${{ activeOverlayAlert.targetZone.high | number:'1.2-2' }}</span>
+      </div>
     </div>
+  </div>
+
+  <!-- Footer Insight -->
+  <div class="overlay-footer mt-4 pt-3 border-top border-white border-opacity-10">
+    <p class="insight-text">
+      <ion-icon name="bulb-outline" class="me-1"></ion-icon>
+      {{ activeOverlayAlert.message }}
+    </p>
   </div>
 </div>

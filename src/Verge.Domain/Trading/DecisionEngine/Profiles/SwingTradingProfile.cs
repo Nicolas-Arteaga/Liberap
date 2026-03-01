@@ -9,7 +9,8 @@ public class SwingTradingProfile : ITradingStyleProfile
     public float TechnicalWeight => 0.40f;
     public float QuantitativeWeight => 0.25f;
     public float SentimentWeight => 0.20f;
-    public float FundamentalWeight => 0.15f;
+    public float FundamentalWeight => 0.20f;
+    public float DecayFactor => 0.5f; // Slow decay for swing trading
 
     public int EntryThreshold => 70;
     public int PrepareThreshold => 50;

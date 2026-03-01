@@ -7,7 +7,8 @@ public class GridTradingProfile : ITradingStyleProfile
     public float TechnicalWeight => 0.35f;
     public float QuantitativeWeight => 0.30f;
     public float SentimentWeight => 0.20f;
-    public float FundamentalWeight => 0.15f;
+    public float FundamentalWeight => 0.05f;
+    public float DecayFactor => 1.0f; // Medium decay for grid trading
 
     public int EntryThreshold => 65;
     public int PrepareThreshold => 45;

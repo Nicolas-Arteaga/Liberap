@@ -20,6 +20,7 @@ public class TradingSessionDto : FullAuditedEntityDto<Guid>
     public TradeStatus? Outcome { get; set; }
     public string? ExitReason { get; set; }
     public long? LastEvaluationTimestamp { get; set; }
+    public DateTime? StageChangedTimestamp { get; set; }
 }
 
 public class StartSessionDto
