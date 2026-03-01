@@ -43,11 +43,11 @@
           <span class="text-white fw-bold text-sm">{{ analysisTime }}</span>
         </div>
 
-        <button *ngIf="currentSession" class="btn btn-danger-vision btn-sm px-3 rounded-pill ms-auto"
-          (click)="finalizeHunt()">
+        <app-glass-button *ngIf="currentSession" variant="danger" class="ms-auto" (click)="finalizeHunt()"
+          style="width: auto; height: 36px; padding: 0 15px; font-size: 0.85rem;">
           <ion-icon name="stop-circle-outline" class="me-1"></ion-icon>
           Finalizar cacería
-        </button>
+        </app-glass-button>
       </div>
 
       <div class="service-box bg-dark-soft border border-white-10 rounded-3 p-4 mb-3 position-relative">
@@ -131,36 +131,9 @@
         style="min-height: 500px;">
         <div #chartContainer id="tradingview-chart" class="w-100 h-100"></div>
 
-        <!-- Oportunidad Overlay -->
-        <div *ngIf="currentOpportunity"
-          class="opportunity-alert-box position-absolute top-50 start-50 translate-middle p-4 rounded-4 shadow-xl glow-primary">
-          <div class="d-flex justify-content-between align-items-center mb-3">
-            <div class="d-flex align-items-center gap-2">
-              <ion-icon name="radio-button-on-outline" class="text-danger-custom"></ion-icon>
-              <span class="text-white fw-bold text-xs tracking-widest">OPORTUNIDAD DETECTADA</span>
-            </div>
-            <ion-icon name="close-outline" class="text-white-50 pointer" (click)="dismissOpportunity()"></ion-icon>
-          </div>
-
-          <div class="text-center py-2">
-            <h2 class="text-white fw-bold mb-3 d-flex align-items-center justify-content-center gap-2">
-              <ion-icon name="checkmark-circle" class="text-success fs-1"></ion-icon>
-              COMPRA AQUÍ!
-            </h2>
-            <p class="text-white fw-medium mb-1">
-              {{ currentOpportunity.symbol }} <span class="text-white-50 fw-normal ms-1">(confianza {{
-                currentOpportunity.confidence }}%)</span>
-            </p>
-            <div *ngIf="currentOpportunity.entryMin" class="text-primary-light fw-bold mb-4" style="font-size: 0.9rem;">
-              🎯 Zona: ${{ currentOpportunity.entryMin | number:'1.2-2' }} - ${{ currentOpportunity.entryMax |
-              number:'1.2-2' }}
-            </div>
-
-            <button class="btn btn-success-vision w-100 py-2 rounded-3 fw-bold fs-6" (click)="goToTrade()">
-              Ir al Mercado
-            </button>
-          </div>
-        </div>
+        <!-- NEW App Alerts Overlay -->
+        <app-alerts mode="overlay" [alerts]="(alertService.alerts$ | async) || []" (alertClick)="goToTrade($event)"
+          (markAsRead)="alertService.markAsRead($event)"></app-alerts>
       </div>
 
       <!-- Consola de Análisis -->
@@ -194,7 +167,7 @@
 
                 <!-- Technical Metadata (Phase 3) -->
                 <div *ngIf="log.dataJson" class="metadata-row d-flex flex-wrap gap-3 mt-1 opacity-60">
-                  <ng-container *ngLet="parseJson(log.dataJson) as data">
+                  <ng-container *ngIf="parseJson(log.dataJson) as data">
                     <span *ngIf="data?.rsi" class="text-xs d-flex align-items-center gap-1">
                       <ion-icon name="pulse-outline"></ion-icon> RSI: {{ data.rsi | number:'1.1-1' }}
                     </span>
@@ -256,8 +229,8 @@
     (dismiss)="showConfirmationDialog = false">
     <p class="text-white">¿Estás seguro? Al finalizar la cacería se eliminará físicamente la estrategia actual y sus
       registros.</p>
-    <div actions class="d-flex gap-2 w-100 mt-3">
-      <app-glass-button variant="danger" class="flex-grow-1" (click)="confirmEndHunt()">
+    <div actions>
+      <app-glass-button variant="danger" (click)="confirmEndHunt()">
         Sí, finalizar
       </app-glass-button>
     </div>

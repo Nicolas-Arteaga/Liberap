@@ -39,10 +39,12 @@
       opacity: 1;
       transform: scale(1);
     }
+
     50% {
       opacity: 0.5;
       transform: scale(1.1);
     }
+
     100% {
       opacity: 1;
       transform: scale(1);
@@ -51,18 +53,6 @@
 
   .service-box {
     border-radius: 12px;
-  }
-
-  .opportunity-alert-box {
-    background-color: rgba(20, 31, 42, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    min-width: 320px;
-    z-index: 1000;
-    backdrop-filter: blur(12px);
-  }
-
-  .glow-primary {
-    box-shadow: 0 0 40px rgba(16, 185, 129, 0.15);
   }
 
   .btn-success-vision {
@@ -137,7 +127,7 @@
   /* Console Enhancements */
   .log-entry {
     transition: background-color 0.2s ease;
-    
+
     &:hover {
       background-color: rgba(255, 255, 255, 0.02);
     }

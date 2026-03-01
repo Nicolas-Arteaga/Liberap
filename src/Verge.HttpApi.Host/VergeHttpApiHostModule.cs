@@ -135,6 +135,33 @@ public class VergeHttpApiHostModule : AbpModule
     private void ConfigureAuthentication(ServiceConfigurationContext context)
     {
         context.Services.ForwardIdentityAuthenticationForBearer(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
+
+        // Fix SignalR Auth (Extract access_token from QueryString for WebSockets)
+        context.Services.Configure<Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerOptions>(
+            OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme,
+            options =>
+            {
+                var previousOnMessageReceived = options.Events?.OnMessageReceived;
+                options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+                {
+                    OnMessageReceived = async ctx =>
+                    {
+                        if (previousOnMessageReceived != null)
+                        {
+                            await previousOnMessageReceived(ctx);
+                        }
+                        
+                        var accessToken = ctx.Request.Query["access_token"];
+                        var path = ctx.HttpContext.Request.Path;
+                        // Si la peticion es para nuestro hub
+                        if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/signalr-hubs"))
+                        {
+                            ctx.Token = accessToken;
+                        }
+                    }
+                };
+            });
+
         context.Services.Configure<AbpClaimsPrincipalFactoryOptions>(options =>
         {
             options.IsDynamicClaimsEnabled = true;
@@ -266,6 +293,25 @@ public class VergeHttpApiHostModule : AbpModule
 
         app.UseCors();
         app.UseRouting();
+
+        // Middleware para inyectar token de SignalR a los headers para que OpenIddict lo tome
+        app.Use(async (context, next) =>
+        {
+            try
+            {
+                if (context.Request.Path.StartsWithSegments("/signalr-hubs") &&
+                    context.Request.Query.TryGetValue("access_token", out var token))
+                {
+                    context.Request.Headers.Authorization = $"Bearer {token}";
+                }
+                await next();
+            }
+            catch (Exception ex) when (ex is System.IO.IOException || ex is OperationCanceledException)
+            {
+                // Silently swallow aborted requests during refresh/navigation
+            }
+        });
+
         app.MapAbpStaticAssets();
         app.UseAbpStudioLink();
         app.UseAbpSecurityHeaders();

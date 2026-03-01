@@ -96,7 +96,20 @@ import {
   radioButtonOnOutline,
   closeOutline,
   scanOutline,
-  eyeOffOutline
+  eyeOffOutline,
+  timerOutline,
+  exitOutline,
+  alertCircleOutline,
+  checkmarkDoneOutline,
+  pulseOutline,
+  layersOutline,
+  checkmarkCircle,
+  sunnyOutline,
+  diamondOutline,
+  gridOutline,
+  swapHorizontalOutline,
+  codeOutline,
+  colorWandOutline
 } from 'ionicons/icons';
 
 addIcons({
@@ -159,7 +172,20 @@ addIcons({
   'radio-button-on-outline': radioButtonOnOutline,
   'close-outline': closeOutline,
   'scan-outline': scanOutline,
-  'eye-off-outline': eyeOffOutline
+  'eye-off-outline': eyeOffOutline,
+  'timer-outline': timerOutline,
+  'exit-outline': exitOutline,
+  'alert-circle-outline': alertCircleOutline,
+  'checkmark-done-outline': checkmarkDoneOutline,
+  'pulse-outline': pulseOutline,
+  'layers-outline': layersOutline,
+  'checkmark-circle': checkmarkCircle,
+  'sunny-outline': sunnyOutline,
+  'diamond-outline': diamondOutline,
+  'grid-outline': gridOutline,
+  'swap-horizontal-outline': swapHorizontalOutline,
+  'code-outline': codeOutline,
+  'color-wand-outline': colorWandOutline
 });
 
 export const appConfig: ApplicationConfig = {

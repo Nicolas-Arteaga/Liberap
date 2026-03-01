@@ -123,8 +123,8 @@ export interface OpportunityDto {
   confidence: number;
   signal?: string;
   reason?: string;
-  entryMin?: number;
-  entryMax?: number;
+  entryMinPrice?: number;
+  entryMaxPrice?: number;
 }
 
 export interface RecommendedStyleDto {
@@ -190,6 +190,12 @@ export interface TradingSessionDto extends FullAuditedEntityDto<string> {
   entryPrice?: number;
   takeProfitPrice?: number;
   stopLossPrice?: number;
+  selectedStyle?: TradingStyle;
+  selectedDirection?: SignalDirection;
+  netProfit?: number;
+  outcome?: TradeStatus;
+  exitReason?: string;
+  lastEvaluationTimestamp?: number;
 }
 
 export interface TradingSignalDto extends EntityDto<string> {

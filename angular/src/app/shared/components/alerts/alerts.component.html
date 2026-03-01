@@ -1,0 +1,74 @@
+<!-- MODO LISTA (Para Campanita y otros dropdowns) -->
+<div *ngIf="mode === 'list'" class="alerts-list">
+  <div *ngFor="let alert of filteredAlerts" class="alert-item" [class.unread]="!alert.read"
+    (click)="onAlertClick(alert.id)">
+
+    <div class="alert-icon" [ngClass]="alert.severity">
+      <ion-icon [name]="alert.icon"></ion-icon>
+    </div>
+
+    <div class="alert-content">
+      <div class="alert-header">
+        <h4 class="alert-title">{{ alert.title }}</h4>
+        <span class="alert-time">{{ alert.timestamp | date:'shortTime' }}</span>
+      </div>
+      <p class="alert-message">{{ alert.message }}</p>
+
+      <div *ngIf="alert.targetZone" class="alert-target">
+        🎯 Zona: ${{ alert.targetZone.low | number:'1.2-2' }} - ${{ alert.targetZone.high | number:'1.2-2' }}
+      </div>
+    </div>
+
+    <div class="alert-actions" *ngIf="!alert.read">
+      <button class="btn-read" (click)="onMarkAsReadClick($event, alert.id)" title="Marcar como leída">
+        <ion-icon name="checkmark-done-outline"></ion-icon>
+      </button>
+    </div>
+  </div>
+
+  <div *ngIf="filteredAlerts.length === 0" class="empty-state">
+    <ion-icon name="notifications-off-outline"></ion-icon>
+    <p>No hay notificaciones</p>
+  </div>
+</div>
+
+<!-- MODO OVERLAY (Para el Dashboard) -->
+<div *ngIf="mode === 'overlay' && activeOverlayAlert"
+  class="opportunity-overlay-card position-absolute top-50 start-50 translate-middle rounded-4 shadow-2xl">
+
+  <!-- Header con Icono y Estado -->
+  <div class="overlay-header d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex align-items-center gap-2">
+      <div class="status-indicator">
+        <div class="status-dot pulsing bg-danger"></div>
+      </div>
+      <span class="overlay-label">OPORTUNIDAD DETECTADA</span>
+    </div>
+    <button class="close-btn shadow-none" (click)="onMarkAsReadClick($event, activeOverlayAlert.id)">
+      <ion-icon name="close-outline"></ion-icon>
+    </button>
+  </div>
+
+  <!-- Body con Título Dinámico -->
+  <div class="overlay-body text-center">
+    <div class="title-wrapper mb-3">
+      <ion-icon [name]="activeOverlayAlert.icon" [class.text-success]="activeOverlayAlert.type === 'Stage3'"
+        [class.text-warning]="activeOverlayAlert.type === 'Stage2' || activeOverlayAlert.type === 'Stage1'"
+        class="main-icon"></ion-icon>
+      <h2 class="main-title">{{ getOverlayTitle(activeOverlayAlert.type) }}</h2>
+    </div>
+
+    <!-- Crypto Info -->
+    <div class="crypto-badge mb-2">
+      <span class="symbol">{{ activeOverlayAlert.crypto }}</span>
+      <span class="confidence">confianza {{ activeOverlayAlert.confidence }}%</span>
+    </div>
+
+    <!-- Zona Operativa -->
+    <div *ngIf="activeOverlayAlert.targetZone" class="zone-box">
+      <span class="label">ZONA OPERATIVA</span>
+      <span class="value">${{ activeOverlayAlert.targetZone.low | number:'1.2-2' }} - ${{
+        activeOverlayAlert.targetZone.high | number:'1.2-2' }}</span>
+    </div>
+  </div>
+</div>

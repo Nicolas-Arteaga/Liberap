@@ -50,6 +50,10 @@ public interface ITradingAppService : IApplicationService
 
     // Recommendation
     Task<RecommendedStyleDto> RecommendTradingStyleAsync(string symbol);
+
+    // Test SignalR manually
+    Task TestSignalRAsync();
+    Task TestSignalRPublicAsync();
 }
 
 public class GetSignalsInput : PagedAndSortedResultRequestDto

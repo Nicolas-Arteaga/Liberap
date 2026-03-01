@@ -189,6 +189,22 @@ export class TradingService {
     { apiName: this.apiName,...config });
   
 
+  testSignalR = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'GET',
+      url: '/api/app/trading/test-signalr',
+    },
+    { apiName: this.apiName,...config });
+  
+
+  testSignalRPublic = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'GET',
+      url: '/api/app/trading/test-signalr-public',
+    },
+    { apiName: this.apiName,...config });
+  
+
   updateProfile = (input: UpdateTraderProfileDto, config?: Partial<Rest.Config>) =>
     this.restService.request<any, TraderProfileDto>({
       method: 'PUT',

@@ -1450,6 +1450,22 @@
                     "type": "Verge.Trading.RecommendedStyleDto",
                     "typeSimple": "Verge.Trading.RecommendedStyleDto"
                   }
+                },
+                {
+                  "name": "TestSignalRAsync",
+                  "parametersOnMethod": [],
+                  "returnValue": {
+                    "type": "System.Void",
+                    "typeSimple": "System.Void"
+                  }
+                },
+                {
+                  "name": "TestSignalRPublicAsync",
+                  "parametersOnMethod": [],
+                  "returnValue": {
+                    "type": "System.Void",
+                    "typeSimple": "System.Void"
+                  }
                 }
               ]
             }
@@ -2298,6 +2314,36 @@
                 "typeSimple": "Verge.Trading.OpportunityDto"
               },
               "allowAnonymous": false,
+              "implementFrom": "Verge.Trading.ITradingAppService"
+            },
+            "TestSignalRAsync": {
+              "uniqueName": "TestSignalRAsync",
+              "name": "TestSignalRAsync",
+              "httpMethod": "GET",
+              "url": "api/app/trading/test-signalr",
+              "supportedVersions": [],
+              "parametersOnMethod": [],
+              "parameters": [],
+              "returnValue": {
+                "type": "System.Void",
+                "typeSimple": "System.Void"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Trading.ITradingAppService"
+            },
+            "TestSignalRPublicAsync": {
+              "uniqueName": "TestSignalRPublicAsync",
+              "name": "TestSignalRPublicAsync",
+              "httpMethod": "GET",
+              "url": "api/app/trading/test-signalr-public",
+              "supportedVersions": [],
+              "parametersOnMethod": [],
+              "parameters": [],
+              "returnValue": {
+                "type": "System.Void",
+                "typeSimple": "System.Void"
+              },
+              "allowAnonymous": true,
               "implementFrom": "Verge.Trading.ITradingAppService"
             }
           }
@@ -6266,6 +6312,30 @@
           "minimum": null,
           "maximum": null,
           "regex": null
+        },
+        {
+          "name": "EntryMinPrice",
+          "jsonName": null,
+          "type": "System.Decimal?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "EntryMaxPrice",
+          "jsonName": null,
+          "type": "System.Decimal?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
         }
       ]
     },
@@ -6952,6 +7022,78 @@
           "name": "StopLossPrice",
           "jsonName": null,
           "type": "System.Decimal?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "SelectedStyle",
+          "jsonName": null,
+          "type": "Verge.Trading.TradingStyle?",
+          "typeSimple": "enum?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "SelectedDirection",
+          "jsonName": null,
+          "type": "Verge.Trading.SignalDirection?",
+          "typeSimple": "enum?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "NetProfit",
+          "jsonName": null,
+          "type": "System.Decimal?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Outcome",
+          "jsonName": null,
+          "type": "Verge.Trading.TradeStatus?",
+          "typeSimple": "enum?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "ExitReason",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "LastEvaluationTimestamp",
+          "jsonName": null,
+          "type": "System.Int64?",
           "typeSimple": "number?",
           "isRequired": false,
           "minLength": null,

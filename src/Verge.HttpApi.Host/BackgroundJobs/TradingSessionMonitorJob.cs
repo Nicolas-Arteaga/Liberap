@@ -9,6 +9,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Uow;
+using Volo.Abp.EventBus.Distributed;
 using Verge.Trading.DTOs;
 using Verge.Trading.Integrations;
 using Verge.Trading.DecisionEngine;
@@ -65,7 +66,9 @@ public class TradingSessionMonitorJob : BackgroundService
         var autoEvaluator = scope.ServiceProvider.GetRequiredService<AutoEvaluatorService>();
         var snapshotCache = scope.ServiceProvider.GetRequiredService<MarketSnapshotCache>();
         var analysisLogRepo = scope.ServiceProvider.GetRequiredService<IRepository<AnalysisLog, Guid>>();
+        var profileRepository = scope.ServiceProvider.GetRequiredService<IRepository<TraderProfile, Guid>>();
         var unitOfWorkManager = scope.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
+        var eventBus = scope.ServiceProvider.GetRequiredService<IDistributedEventBus>();
 
         using var uow = unitOfWorkManager.Begin();
 
@@ -83,12 +86,19 @@ public class TradingSessionMonitorJob : BackgroundService
         // 2. Discovery: Identify all required Symbol/Timeframe pairs
         var requiredGroups = new HashSet<(string symbol, string timeframe)>();
         var sessionStrategies = new Dictionary<Guid, TradingStrategy>(); // SessionId -> Strategy
+        var profileMap = new Dictionary<Guid, TraderProfile>(); // ProfileId -> Profile
 
         foreach (var session in activeSessions)
         {
             var strategy = await strategyRepository.FirstOrDefaultAsync(x => x.TraderProfileId == session.TraderProfileId && x.IsActive);
             if (strategy == null) continue;
             sessionStrategies[session.Id] = strategy;
+
+            if (!profileMap.ContainsKey(session.TraderProfileId))
+            {
+                var traderProfile = await profileRepository.GetAsync(session.TraderProfileId);
+                profileMap[session.TraderProfileId] = traderProfile;
+            }
 
             if (session.Symbol != "AUTO")
             {
@@ -108,8 +118,8 @@ public class TradingSessionMonitorJob : BackgroundService
                     requiredGroups.Add((symbol, session.Timeframe));
                     
                     // Discover HTF for AUTO candidates
-                    var profile = TradingStyleProfileFactory.GetProfile(strategy.Style);
-                    var htf = profile.GetConfirmationTimeframe(session.Timeframe);
+                    var styleProfile = TradingStyleProfileFactory.GetProfile(strategy.Style);
+                    var htf = styleProfile.GetConfirmationTimeframe(session.Timeframe);
                     if (!string.IsNullOrEmpty(htf) && htf != session.Timeframe)
                     {
                         requiredGroups.Add((symbol, htf));
@@ -191,9 +201,10 @@ public class TradingSessionMonitorJob : BackgroundService
             try
             {
                 // 4.0 Check for TP/SL Exits (Sprint 1)
+                var currentTraderProfile = profileMap[session.TraderProfileId];
                 if (session.CurrentStage == TradingStage.BuyActive)
                 {
-                    bool exited = await CheckTradeExitsAsync(session, strategy, groupDataCache, sessionRepository, analysisLogRepo);
+                    bool exited = await CheckTradeExitsAsync(session, strategy, groupDataCache, sessionRepository, analysisLogRepo, eventBus, currentTraderProfile.UserId);
                     if (exited) continue;
                 }
 
@@ -217,8 +228,8 @@ public class TradingSessionMonitorJob : BackgroundService
 
 
                     // Attach HTF Context if exists
-                    var profile = TradingStyleProfileFactory.GetProfile(strategy.Style);
-                    var htfName = profile.GetConfirmationTimeframe(session.Timeframe);
+                    var styleProfile = TradingStyleProfileFactory.GetProfile(strategy.Style);
+                    var htfName = styleProfile.GetConfirmationTimeframe(session.Timeframe);
                     var htfKey = (session.Symbol, htfName);
                     
                     if (groupDataCache.TryGetValue(htfKey, out var htfData))
@@ -227,8 +238,8 @@ public class TradingSessionMonitorJob : BackgroundService
                     }
 
                     var evalResult = decisionEngine.Evaluate(session, strategy.Style, data.context);
-                    bool stageChanged = ProcessDecision(session, evalResult, strategy, data.candles.Last().Close);
-                    await CreateAnalysisLogAsync(analysisLogRepo, session, evalResult, data.candles.Last().Close, data.context);
+                    bool stageChanged = await ProcessDecision(session, evalResult, strategy, data.candles.Last().Close, eventBus, currentTraderProfile.UserId);
+                    await CreateAnalysisLogAsync(analysisLogRepo, session, evalResult, data.candles.Last().Close, data.context, eventBus, currentTraderProfile.UserId);
 
                     // Update timestamp (Sprint 3)
                     session.LastEvaluationTimestamp = data.candles.Last().Timestamp;
@@ -280,7 +291,8 @@ public class TradingSessionMonitorJob : BackgroundService
                             session.Id, best.Symbol, best.Style, best.Result.Score);
 
                         // ALWAYS persist the analysis log for the best opportunity (consistent with fixed-symbol behavior)
-                        await CreateAnalysisLogAsync(analysisLogRepo, session, best.Result, best.Context.Candles.Last().Close, best.Context);
+                        var traderProfileForAuto = profileMap[session.TraderProfileId];
+                        await CreateAnalysisLogAsync(analysisLogRepo, session, best.Result, best.Context.Candles.Last().Close, best.Context, eventBus, traderProfileForAuto.UserId);
 
                         // Update session if it's a candidate for action
                         if (best.Result.Decision != DecisionEngine.TradingDecision.Ignore)
@@ -293,7 +305,7 @@ public class TradingSessionMonitorJob : BackgroundService
                                 session.SelectedDirection = best.Direction;
                             }
 
-                            bool stageChanged = ProcessDecision(session, best.Result, strategy, best.Context.Candles.Last().Close);
+                            bool stageChanged = await ProcessDecision(session, best.Result, strategy, best.Context.Candles.Last().Close, eventBus, traderProfileForAuto.UserId);
                         }
 
                         // Update timestamp for AUTO mode too (Sprint 3)
@@ -315,7 +327,7 @@ public class TradingSessionMonitorJob : BackgroundService
         _logger.LogInformation("🏁 Monitoring cycle completed.");
     }
 
-    private bool ProcessDecision(TradingSession session, DecisionEngine.DecisionResult result, TradingStrategy strategy, decimal currentPrice)
+    private async Task<bool> ProcessDecision(TradingSession session, DecisionEngine.DecisionResult result, TradingStrategy strategy, decimal currentPrice, IDistributedEventBus eventBus, Guid identityUserId)
     {
         var oldStage = session.CurrentStage;
         bool changed = false;
@@ -323,6 +335,40 @@ public class TradingSessionMonitorJob : BackgroundService
         switch (result.Decision)
         {
             case DecisionEngine.TradingDecision.Entry:
+                if (session.CurrentStage == TradingStage.Prepared && result.EntryMaxPrice.HasValue && currentPrice >= result.EntryMaxPrice.Value)
+                {
+                    // EMITIR EVENTO DE ENTRY CONFIRMADO (Breakout)
+                    var alertDto = new VergeAlertDto
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        Type = "Stage3", // Entry
+                        Title = $"🚀 Breakout Confirmado en {session.Symbol}!",
+                        Message = $"El precio ha superado la zona superior (${result.EntryMaxPrice:N2}). Breakout detectado.",
+                        Timestamp = DateTime.UtcNow,
+                        Read = false,
+                        Crypto = session.Symbol,
+                        Price = currentPrice,
+                        Confidence = result.Confidence,
+                        Direction = session.SelectedDirection ?? strategy.DirectionPreference,
+                        Stage = TradingStage.BuyActive,
+                        TargetZone = new TargetZoneDto { Low = result.EntryMinPrice ?? 0, High = result.EntryMaxPrice ?? 0 },
+                        Severity = "success",
+                        Icon = "rocket-outline"
+                    };
+                    
+                    _logger.LogInformation("🔔 [Breakout] Publicando alerta de Stage3 para sesión {Id}", session.Id);
+                    await eventBus.PublishAsync(new AlertStateChangedEto
+                    {
+                        UserId = identityUserId,
+                        SessionId = session.Id,
+                        Alert = alertDto,
+                        TriggeredAt = DateTime.UtcNow,
+                        IsBreakout = true,
+                        EntryZoneHigh = result.EntryMaxPrice,
+                        EntryZoneLow = result.EntryMinPrice
+                    });
+                }
+
                 if (session.CurrentStage == TradingStage.Evaluating || session.CurrentStage == TradingStage.Prepared)
                 {
                     session.CurrentStage = TradingStage.BuyActive;
@@ -376,7 +422,9 @@ public class TradingSessionMonitorJob : BackgroundService
         TradingSession session, 
         DecisionEngine.DecisionResult result,
         decimal price,
-        DecisionEngine.MarketContext context)
+        DecisionEngine.MarketContext context,
+        IDistributedEventBus eventBus,
+        Guid identityUserId)
     {
         // 1. Determine LogType based on Decision and Reason
         AnalysisLogType logType = AnalysisLogType.Standard;
@@ -447,14 +495,65 @@ public class TradingSessionMonitorJob : BackgroundService
         );
 
         await repo.InsertAsync(log);
+
+        string mappedSeverity = log.Level;
+        if (logType == AnalysisLogType.AlertInvalidated) mappedSeverity = "danger";
+        else if (logType == AnalysisLogType.AlertPrepare) mappedSeverity = "warning";
+        else if (logType == AnalysisLogType.AlertEntry) mappedSeverity = "success";
+
+        var alertDto = new VergeAlertDto
+        {
+            Id = log.Id.ToString(),
+            Type = GetAlertType(logType),
+            Title = $"Análisis {session.Symbol}",
+            Message = log.Message.Split('|')[0].Trim(),
+            Timestamp = log.Timestamp,
+            Read = false,
+            Crypto = session.Symbol,
+            Price = price,
+            Confidence = result.Confidence,
+            Direction = session.SelectedDirection,
+            Stage = session.CurrentStage,
+            Severity = mappedSeverity,
+            Icon = "analytics-outline"
+        };
+        
+        if (result.EntryMinPrice.HasValue && result.EntryMaxPrice.HasValue)
+        {
+            alertDto.TargetZone = new TargetZoneDto { Low = result.EntryMinPrice.Value, High = result.EntryMaxPrice.Value };
+        }
+
+        _logger.LogInformation("🔔 [Analysis] Publicando alerta {Type} para sesión {Id}", alertDto.Type, session.Id);
+        await eventBus.PublishAsync(new AlertStateChangedEto
+        {
+            UserId = identityUserId,
+            SessionId = session.Id,
+            Alert = alertDto,
+            TriggeredAt = DateTime.UtcNow,
+            IsBreakout = false,
+            EntryZoneHigh = result.EntryMaxPrice,
+            EntryZoneLow = result.EntryMinPrice
+        });
     }
+
+    private string GetAlertType(AnalysisLogType logType) => logType switch
+    {
+        AnalysisLogType.AlertContext => "Stage1",
+        AnalysisLogType.AlertPrepare => "Stage2",
+        AnalysisLogType.AlertEntry => "Stage3",
+        AnalysisLogType.AlertExit => "Stage4",
+        AnalysisLogType.AlertInvalidated => "Custom",
+        _ => "System"
+    };
 
     private async Task<bool> CheckTradeExitsAsync(
         TradingSession session, 
         TradingStrategy strategy, 
         Dictionary<(string symbol, string timeframe), (List<MarketCandleModel> candles, DecisionEngine.MarketContext context)> groupDataCache,
         IRepository<TradingSession, Guid> sessionRepo,
-        IRepository<AnalysisLog, Guid> logRepo)
+        IRepository<AnalysisLog, Guid> logRepo,
+        IDistributedEventBus eventBus,
+        Guid identityUserId)
     {
         if (!groupDataCache.TryGetValue((session.Symbol, session.Timeframe), out var data)) return false;
         
@@ -537,6 +636,33 @@ public class TradingSessionMonitorJob : BackgroundService
                 })
             );
             await logRepo.InsertAsync(exitLog);
+            
+            var alertDto = new VergeAlertDto
+            {
+                Id = exitLog.Id.ToString(),
+                Type = "Stage4",
+                Title = $"Sesión Finalizada: {session.Symbol}",
+                Message = exitMessage,
+                Timestamp = DateTime.UtcNow,
+                Read = false,
+                Crypto = session.Symbol,
+                Price = currentPrice,
+                Direction = session.SelectedDirection ?? strategy.DirectionPreference,
+                Stage = TradingStage.SellActive,
+                Severity = netProfit >= 0 ? "success" : "danger",
+                Icon = netProfit >= 0 ? "cash-outline" : "warning-outline"
+            };
+
+            _logger.LogInformation("🔔 [Exit] Publicando alerta de Stage4 para sesión {Id}", session.Id);
+            await eventBus.PublishAsync(new AlertStateChangedEto
+            {
+                UserId = identityUserId,
+                SessionId = session.Id,
+                Alert = alertDto,
+                TriggeredAt = DateTime.UtcNow,
+                IsBreakout = false
+            });
+            
             return true;
         }
         

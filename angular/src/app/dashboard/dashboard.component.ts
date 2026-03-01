@@ -15,6 +15,8 @@ import { DialogComponent } from 'src/shared/components/dialog/dialog.component';
 import { CardContentComponent } from "src/shared/components/card-content/card-content.component";
 import { TradingSignalrService } from '../services/trading-signalr.service';
 import { AUTH_TOKEN_KEY } from '../core/auth.service';
+import { AlertsComponent } from '../shared/components/alerts/alerts.component';
+import { AlertService } from '../services/alert.service';
 
 interface TradingSignal {
   id: number;
@@ -45,7 +47,8 @@ interface StageInfo {
     FormsModule,
     GlassButtonComponent,
     IonIcon,
-    DialogComponent
+    DialogComponent,
+    AlertsComponent
   ],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss']
@@ -53,6 +56,11 @@ interface StageInfo {
 export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('chartContainer') set chartContainer(content: ElementRef) {
     if (content) {
+      // Si ya hay un chart, destruirlo antes de crear uno nuevo
+      if (this.chart) {
+        this.chart.remove();
+        this.chart = null;
+      }
       // Si el contenedor aparece (por el *ngIf), inicializamos el gráfico
       this.initChart(content.nativeElement);
       this.loadData();
@@ -64,6 +72,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private marketDataService = inject(MarketDataService);
   private tradingService = inject(TradingService);
   private signalrService = inject(TradingSignalrService);
+  public alertService = inject(AlertService);
   private destroy$ = new Subject<void>();
 
   // Estado del dashboard
@@ -92,6 +101,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   // Lightweight Charts
   private chart: IChartApi | null = null;
   private candlestickSeries: ISeriesApi<'Candlestick'> | null = null;
+  private chartContainerElement: HTMLElement | null = null;
 
   // Configuración
   selectedSymbol = 'BTCUSDT';
@@ -263,6 +273,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    window.removeEventListener('resize', this.onResize);
     if (this.analysisInterval) {
       clearInterval(this.analysisInterval);
     }
@@ -271,14 +282,17 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     if (this.chart) {
       this.chart.remove();
+      this.chart = null;
     }
     this.destroy$.next();
     this.destroy$.complete();
   }
 
   initChart(container: HTMLElement) {
+    this.chartContainerElement = container;
     if (this.chart) {
       this.chart.remove();
+      this.chart = null;
     }
 
     this.chart = createChart(container, {
@@ -310,12 +324,18 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       wickDownColor: '#ef5350',
     });
 
-    window.addEventListener('resize', () => {
-      this.chart?.applyOptions({ width: container.clientWidth });
-    });
+    window.addEventListener('resize', this.onResize);
   }
 
+  private onResize = () => {
+    if (this.chart && this.chartContainerElement) {
+      this.chart.applyOptions({ width: this.chartContainerElement.clientWidth });
+    }
+  };
+
   loadData() {
+    if (!this.chart || !this.candlestickSeries) return;
+
     this.marketDataService.getCandles({
       symbol: this.selectedSymbol,
       interval: `${this.selectedTimeframe}m`,
@@ -480,8 +500,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.currentOpportunity = null;
   }
 
-  goToTrade() {
-    if (this.currentOpportunity) {
+  goToTrade(alertId?: string) {
+    if (alertId) {
+      this.router.navigate(['/execute-trade']);
+      this.alertService.markAsRead(alertId);
+    } else if (this.currentOpportunity) {
       this.router.navigate(['/execute-trade'], {
         queryParams: {
           symbol: this.currentOpportunity.symbol,

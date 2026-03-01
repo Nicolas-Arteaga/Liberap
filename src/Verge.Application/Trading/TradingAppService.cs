@@ -10,6 +10,7 @@ using Volo.Abp.Application.Services;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Users;
 using Microsoft.AspNetCore.SignalR;
+using Verge.Trading.DTOs;
 
 namespace Verge.Trading;
 
@@ -429,5 +430,41 @@ public class TradingAppService : ApplicationService, ITradingAppService
     public Task<OpportunityDto> GetOpportunityDummyAsync()
     {
         throw new NotImplementedException();
+    }
+
+    [HttpGet("api/app/trading/test-signalr")]
+    public async Task TestSignalRAsync()
+    {
+        var userId = CurrentUser.Id?.ToString();
+        if (string.IsNullOrEmpty(userId)) return;
+
+        await _hubContext.Clients.User(userId).SendAsync("ReceiveAlert", new VergeAlertDto
+        {
+            Id = Guid.NewGuid().ToString(),
+            Type = "System",
+            Title = "Test SignalR",
+            Message = "Si ves esto, SignalR funciona con cookies perfectly!",
+            Timestamp = DateTime.UtcNow,
+            Read = false,
+            Severity = "success",
+            Icon = "checkmark-circle-outline"
+        });
+    }
+
+    [AllowAnonymous]
+    [HttpGet("api/app/trading/test-signalr-public")]
+    public async Task TestSignalRPublicAsync()
+    {
+        await _hubContext.Clients.All.SendAsync("ReceiveAlert", new VergeAlertDto
+        {
+            Id = Guid.NewGuid().ToString(),
+            Type = "System",
+            Title = "Test Público SignalR",
+            Message = "Si ves esto, la conexión SignalR base está establecida (incluso sin Auth funcandon).",
+            Timestamp = DateTime.UtcNow,
+            Read = false,
+            Severity = "info",
+            Icon = "megaphone-outline"
+        });
     }
 }

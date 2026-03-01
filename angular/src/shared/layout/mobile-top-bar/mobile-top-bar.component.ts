@@ -1,31 +1,65 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { addIcons } from 'ionicons';
-import { personOutline } from 'ionicons/icons';
+import { personOutline, notificationsOutline, checkmarkDoneOutline, notificationsOffOutline, pulseOutline, trendingUpOutline, layersOutline, rocketOutline, analyticsOutline, cashOutline, warningOutline } from 'ionicons/icons';
 import {
   IonHeader,
   IonToolbar,
-  IonTitle,
-  IonButtons,
   IonButton,
   IonIcon
 } from '@ionic/angular/standalone';
+import { AlertsComponent } from '../../../app/shared/components/alerts/alerts.component';
+import { AlertService } from '../../../app/services/alert.service';
+import { VergeAlert } from '../../../app/shared/components/alerts/alerts.types';
+import { Observable } from 'rxjs';
 
 @Component({
   selector: 'app-mobile-top-bar',
   standalone: true,
   imports: [
+    CommonModule,
     IonHeader,
     IonToolbar,
     IonButton,
-    IonIcon
+    IonIcon,
+    AlertsComponent
   ],
   templateUrl: './mobile-top-bar.component.html',
   styleUrls: ['./mobile-top-bar.component.scss']
 })
 export class MobileTopBarComponent {
+  private alertService = inject(AlertService);
+
+  notifications$: Observable<VergeAlert[]> = this.alertService.alerts$;
+  showNotifications = false;
+
   constructor() {
-    addIcons({ personOutline });
+    addIcons({ personOutline, notificationsOutline, checkmarkDoneOutline, notificationsOffOutline, pulseOutline, trendingUpOutline, layersOutline, rocketOutline, analyticsOutline, cashOutline, warningOutline });
   }
 
-  onProfileClick() {}
+  get unreadCount(): number {
+    return this.alertService.getUnreadCount();
+  }
+
+  toggleNotificationPanel() {
+    console.log('[MobileTopBar] Campana clickeada. Estado anterior:', this.showNotifications);
+    this.showNotifications = !this.showNotifications;
+    console.log('[MobileTopBar] Nuevo estado showNotifications:', this.showNotifications);
+  }
+
+  markAllAsRead() {
+    this.alertService.markAllAsRead();
+  }
+
+  markAsRead(id: string) {
+    this.alertService.markAsRead(id);
+  }
+
+  onNotificationClick(id: string) {
+    console.log('[MobileTopBar] Notificación clickeada:', id);
+    this.showNotifications = false;
+    this.alertService.handleAlertClick(id);
+  }
+
+  onProfileClick() { }
 }

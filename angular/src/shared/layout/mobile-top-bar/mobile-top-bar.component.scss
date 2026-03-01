@@ -1,16 +1,25 @@
+ion-header::part(background) {
+  overflow: visible !important;
+}
+
+ion-toolbar {
+  overflow: visible !important;
+  contain: none !important;
+}
+
 .deudaso-header {
-  background: linear-gradient(
-    180deg,
-    #0b0f1a 0%,
-    #151925 100%
-  );
-  overflow: visible;
+  background: linear-gradient(180deg,
+      #0b0f1a 0%,
+      #151925 100%);
+  overflow: visible !important;
+  contain: none !important;
 }
 
 .header-toolbar {
   --background: transparent;
   --min-height: auto;
   padding: env(safe-area-inset-top) 24px 20px;
+  overflow: visible !important;
 }
 
 .header-content {
@@ -19,6 +28,8 @@
   justify-content: space-between;
   position: relative;
   top: 8px;
+  overflow: visible !important;
+  contain: none !important;
 }
 
 .logo {
@@ -35,9 +46,106 @@
 .profile-btn {
   --padding-start: 0;
   --padding-end: 0;
-   
+
   ion-icon {
     font-size: 20px;
     color: #00c47d;
   }
+}
+
+.notification-btn {
+  --padding-start: 0;
+  --padding-end: 0;
+  margin-right: 0.5rem;
+  overflow: visible;
+
+  ion-icon {
+    font-size: 20px;
+    color: white;
+  }
+}
+
+.notification-panel {
+  position: fixed;
+  top: 72px; // Justo debajo del top bar (ajustado para móvil)
+  right: 16px;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  background: #1e2230; // Color sólido oscuro para asegurar visibilidad
+  border: 1px solid rgba(0, 196, 125, 0.3); // Borde con color de la marca
+  border-radius: 16px;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6), 0 0 15px rgba(0, 196, 125, 0.1);
+  z-index: 999999 !important; // Máxima prioridad
+  padding: 1.25rem;
+  padding-bottom: 0.75rem;
+  backdrop-filter: blur(10px);
+  animation: slideInDown 0.2s ease-out;
+
+  @keyframes slideInDown {
+    from {
+      transform: translateY(-10px);
+      opacity: 0;
+    }
+
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  .panel-body {
+    max-height: 70vh;
+    padding-right: 4px;
+    overflow-y: auto;
+
+    // Forzar colores para asegurar visibilidad en este panel específico
+    app-alerts {
+      --ion-text-color: #ffffff;
+      --ion-color-step-50: rgba(255, 255, 255, 0.05); // Fondo de item oscuro
+      --ion-color-step-100: rgba(255, 255, 255, 0.1); // Borde de item
+      --ion-color-step-600: #cbd5e0; // Texto secundario gris claro
+    }
+
+    // Custom scrollbar
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+    }
+  }
+}
+
+.panel-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 999998;
+  backdrop-filter: blur(2px);
+  animation: fadeIn 0.2s ease-out;
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+:host {
+  display: block;
+  z-index: 1000;
+  position: relative;
 }
