@@ -57,7 +57,8 @@ public enum AnalysisLogType
     AlertPrepare,       // "Preparándose para..."
     AlertEntry,         // "🚀 ENTRAR..."
     AlertInvalidated,   // "❌ Setup invalidado"
-    AlertExit           // "💰 Take Profit alcanzado"
+    AlertExit,          // "💰 Take Profit alcanzado"
+    AlertSystem         // "⚠️ Mensajes del sistema/motor"
 }
 
 public enum TradeStatus

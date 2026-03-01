@@ -9,6 +9,7 @@ public class DayTradingProfile : ITradingStyleProfile
     public float SentimentWeight => 0.15f;
     public float FundamentalWeight => 0.10f;
     public float DecayFactor => 1.5f; // Medium decay for day trading
+    public float MaxStagnationMinutes => 30f; // Warn after 30 mins without signals
 
     public int EntryThreshold => 70;
     public int PrepareThreshold => 50;

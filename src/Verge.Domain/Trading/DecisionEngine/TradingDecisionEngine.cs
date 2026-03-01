@@ -267,14 +267,23 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
     #region Institutional 1% Helpers (Sprint 1)
     private float ApplySetupDecay(TradingSession session, ITradingStyleProfile profile, float currentScore, ref string reason)
     {
-        if (session.CurrentStage != TradingStage.Prepared || !session.StageChangedTimestamp.HasValue)
+        // Sprint 1 Patch: Apply to both Evaluating (Context) and Prepared stages
+        if (session.CurrentStage != TradingStage.Evaluating && session.CurrentStage != TradingStage.Prepared)
+            return currentScore;
+
+        if (!session.StageChangedTimestamp.HasValue)
             return currentScore;
 
         var minutesInStage = (float)(DateTime.UtcNow - session.StageChangedTimestamp.Value).TotalMinutes;
         if (minutesInStage <= 2) return currentScore; // Grace period
 
-        float decay = minutesInStage * profile.DecayFactor;
-        reason += $" [Time Decay: -{decay:F1}]";
+        // Penalty logic: 
+        // Prepared: Full Decay (Act fast or lose setup)
+        // Evaluating: 50% Decay (Allow for longer context discovery)
+        float efficiencyFactor = session.CurrentStage == TradingStage.Evaluating ? 0.5f : 1.0f;
+        float decay = minutesInStage * profile.DecayFactor * efficiencyFactor;
+
+        reason += $" [Setup Decay ({session.CurrentStage}): -{decay:F1}]";
         
         return Math.Max(0, currentScore - decay);
     }

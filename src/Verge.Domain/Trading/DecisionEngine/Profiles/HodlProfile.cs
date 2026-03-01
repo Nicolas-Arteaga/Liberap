@@ -8,7 +8,8 @@ public class HodlProfile : ITradingStyleProfile
     public float QuantitativeWeight => 0.15f;
     public float SentimentWeight => 0.30f;
     public float FundamentalWeight => 0.40f;
-    public float DecayFactor => 0.01f; // Almost no decay for HODL
+    public float DecayFactor => 0.05f; // Extremely slow decay for HODL
+    public float MaxStagnationMinutes => 10080f; // Alert after 7 days for HODL style
 
     public int EntryThreshold => 70;
     public int PrepareThreshold => 50;

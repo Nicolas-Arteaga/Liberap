@@ -8,6 +8,7 @@ export enum AnalysisLogType {
   AlertEntry = 4,
   AlertInvalidated = 5,
   AlertExit = 6,
+  AlertSystem = 7,
 }
 
 export const analysisLogTypeOptions = mapEnumToOptions(AnalysisLogType);

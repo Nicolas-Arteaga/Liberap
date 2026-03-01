@@ -10,6 +10,7 @@ public class DefaultProfile : ITradingStyleProfile
     public float SentimentWeight => 0.20f;
     public float FundamentalWeight => 0.10f;
     public float DecayFactor => 0.5f; // Default conservative decay
+    public float MaxStagnationMinutes => 60f; // Alert after 1 hour for default style
 
     public int EntryThreshold => 70;
     public int PrepareThreshold => 50;

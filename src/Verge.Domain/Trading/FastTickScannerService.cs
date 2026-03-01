@@ -60,12 +60,26 @@ public class FastTickScannerService : BackgroundService
         using var scope = _serviceProvider.CreateScope();
         var sessionRepository = scope.ServiceProvider.GetRequiredService<IRepository<TradingSession, Guid>>();
         
-        // Only monitor symbols in active sessions (Efficiency)
-        var activeSymbols = (await sessionRepository.GetListAsync(x => x.IsActive))
-                            .Select(x => x.Symbol)
-                            .Where(s => s != "AUTO")
-                            .Distinct()
-                            .ToList();
+        // Resolve all symbols to monitor (Individual and AUTO portfolio)
+        var activeSessions = await sessionRepository.GetListAsync(x => x.IsActive);
+        var strategyRepository = scope.ServiceProvider.GetRequiredService<IRepository<TradingStrategy, Guid>>();
+        var activeSymbols = new HashSet<string>();
+
+        foreach (var session in activeSessions)
+        {
+            if (session.Symbol != "AUTO")
+            {
+                activeSymbols.Add(session.Symbol);
+            }
+            else
+            {
+                var strategy = await strategyRepository.FirstOrDefaultAsync(x => x.TraderProfileId == session.TraderProfileId && x.IsActive);
+                if (strategy != null)
+                {
+                    foreach (var s in strategy.GetSelectedCryptos()) activeSymbols.Add(s);
+                }
+            }
+        }
 
         if (!activeSymbols.Any()) return;
 
@@ -94,6 +108,7 @@ public class FastTickScannerService : BackgroundService
 
 public interface ITickSpikeAlerter
 {
+    string LastSpikedSymbol { get; }
     void SignalSpike(string symbol);
     Task WaitAsync(CancellationToken token);
 }

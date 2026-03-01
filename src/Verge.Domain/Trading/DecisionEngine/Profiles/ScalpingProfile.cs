@@ -9,6 +9,7 @@ public class ScalpingProfile : ITradingStyleProfile
     public float SentimentWeight => 0.10f;
     public float FundamentalWeight => 0.05f;
     public float DecayFactor => 3.0f; // Fast decay for scalping
+    public float MaxStagnationMinutes => 15f; // Fast alert for stagnant scalps
 
     public int EntryThreshold => 65;
     public int PrepareThreshold => 45;

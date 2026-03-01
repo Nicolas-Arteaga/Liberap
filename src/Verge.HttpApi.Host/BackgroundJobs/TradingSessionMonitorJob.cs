@@ -59,7 +59,11 @@ public class TradingSessionMonitorJob : BackgroundService
 
             if (finishedTask == spikeTask)
             {
-                _logger.LogWarning("⚡ REACCIÓN INSTANTÁNEA: Pulso de mercado detectado. Iniciando re-evaluación forzada.");
+                _logger.LogWarning("⚡ [INSTITUTIONAL 1%] REACCIÓN INSTANTÁNEA: Pulso de mercado detectado en {Symbol}. Iniciando re-evaluación forzada.", _spikeAlerter.LastSpikedSymbol);
+            }
+            else
+            {
+                _logger.LogInformation("⏰ [STANDARD 10%] Ciclo de 30s completado. Evaluando estado del mercado...");
             }
         }
     }
@@ -254,6 +258,9 @@ public class TradingSessionMonitorJob : BackgroundService
                     var evalResult = decisionEngine.Evaluate(session, strategy.Style, data.context);
                     bool stageChanged = await ProcessDecision(session, evalResult, strategy, data.candles.Last().Close, eventBus, currentTraderProfile.UserId);
                     await CreateAnalysisLogAsync(analysisLogRepo, session, evalResult, data.candles.Last().Close, data.context, eventBus, currentTraderProfile.UserId);
+                    
+                    // Sprint 1 Patch: Detection of stagnancy
+                    await CheckSessionStagnancyAsync(session, strategy, eventBus, currentTraderProfile.UserId, analysisLogRepo);
 
                     // Update timestamp (Sprint 3)
                     session.LastEvaluationTimestamp = data.candles.Last().Timestamp;
@@ -320,6 +327,9 @@ public class TradingSessionMonitorJob : BackgroundService
                             }
 
                             bool stageChanged = await ProcessDecision(session, best.Result, strategy, best.Context.Candles.Last().Close, eventBus, traderProfileForAuto.UserId);
+                            
+                            // Sprint 1 Patch: Detection of stagnancy in AUTO mode
+                            await CheckSessionStagnancyAsync(session, strategy, eventBus, traderProfileForAuto.UserId, analysisLogRepo);
                         }
 
                         // Update timestamp for AUTO mode too (Sprint 3)
@@ -692,5 +702,66 @@ public class TradingSessionMonitorJob : BackgroundService
         }
         
         return false;
+    }
+
+    private async Task CheckSessionStagnancyAsync(TradingSession session, TradingStrategy strategy, IDistributedEventBus eventBus, Guid identityUserId, IRepository<AnalysisLog, Guid> logRepo)
+    {
+        if (!session.StageChangedTimestamp.HasValue) return;
+
+        var profile = TradingStyleProfileFactory.GetProfile(strategy.Style);
+        var timeInStage = DateTime.UtcNow - session.StageChangedTimestamp.Value;
+
+        // Threshold: MaxStagnationMinutes (e.g., 30m for DayTrading)
+        if (timeInStage.TotalMinutes > profile.MaxStagnationMinutes)
+        {
+            // Only alert once per hour of stagnation to avoid spam
+            var lastStagnationLog = await logRepo.FirstOrDefaultAsync(x => 
+                x.TradingSessionId == session.Id && 
+                x.LogType == AnalysisLogType.AlertSystem && 
+                x.Message.Contains("ESTANCADA") &&
+                x.Timestamp > DateTime.UtcNow.AddMinutes(-60));
+
+            if (lastStagnationLog == null)
+            {
+                var stagnationMessage = $"⚠️ [INSTITUTIONAL 1%] CACERÍA ESTANCADA: {session.Symbol} no muestra señales claras en {Math.Floor(timeInStage.TotalMinutes)} min. ¿Considerás rotar moneda o finalizar?";
+                
+                _logger.LogWarning("🚨 Stagnancy detected for Session {Id}: {Symbol}", session.Id, session.Symbol);
+
+                var alertDto = new VergeAlertDto
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Type = "System",
+                    Title = "⚠ ALERTA DE ESTANCAMIENTO",
+                    Message = stagnationMessage,
+                    Timestamp = DateTime.UtcNow,
+                    Read = false,
+                    Crypto = session.Symbol,
+                    Stage = session.CurrentStage,
+                    Severity = "warning",
+                    Icon = "timer-outline"
+                };
+
+                await eventBus.PublishAsync(new AlertStateChangedEto
+                {
+                    UserId = identityUserId,
+                    SessionId = session.Id,
+                    Alert = alertDto,
+                    TriggeredAt = DateTime.UtcNow
+                });
+
+                // Persist it as an AnalysisLog too
+                await logRepo.InsertAsync(new AnalysisLog(
+                    Guid.NewGuid(),
+                    session.TraderProfileId,
+                    session.Id,
+                    session.Symbol,
+                    stagnationMessage,
+                    "warning",
+                    DateTime.UtcNow,
+                    AnalysisLogType.AlertSystem,
+                    null
+                ));
+            }
+        }
     }
 }

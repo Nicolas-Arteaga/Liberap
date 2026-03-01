@@ -8,7 +8,8 @@ public class PositionTradingProfile : ITradingStyleProfile
     public float QuantitativeWeight => 0.20f;
     public float SentimentWeight => 0.25f;
     public float FundamentalWeight => 0.30f;
-    public float DecayFactor => 0.2f; // Very slow decay for position trading
+    public float DecayFactor => 0.2f; // Very slow decay for position
+    public float MaxStagnationMinutes => 720f; // Alert after 12 hours for position trading
 
     public int EntryThreshold => 75;
     public int PrepareThreshold => 55;

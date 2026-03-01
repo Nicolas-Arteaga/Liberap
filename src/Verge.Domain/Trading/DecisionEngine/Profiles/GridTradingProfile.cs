@@ -8,7 +8,8 @@ public class GridTradingProfile : ITradingStyleProfile
     public float QuantitativeWeight => 0.30f;
     public float SentimentWeight => 0.20f;
     public float FundamentalWeight => 0.05f;
-    public float DecayFactor => 1.0f; // Medium decay for grid trading
+    public float DecayFactor => 0.1f; // Grids are patient
+    public float MaxStagnationMinutes => 1440f; // Alert after 24 hours for grids
 
     public int EntryThreshold => 65;
     public int PrepareThreshold => 45;
