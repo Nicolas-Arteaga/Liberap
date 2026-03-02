@@ -26,6 +26,13 @@ public class TradingSession : FullAuditedAggregateRoot<Guid>
     public long? LastEvaluationTimestamp { get; set; }
     public DateTime? StageChangedTimestamp { get; set; }
 
+    // Pro Trade Management (Sprint 3)
+    public decimal? TrailingStopPrice { get; set; }
+    public bool IsBreakEvenActive { get; set; } = false;
+    public int PartialTpsCount { get; set; } = 0;
+    public decimal? InitialStopLoss { get; set; }
+    public decimal CurrentInvestment { get; set; }
+
     protected TradingSession() { }
 
     public TradingSession(Guid id, Guid traderProfileId, string symbol, string timeframe)

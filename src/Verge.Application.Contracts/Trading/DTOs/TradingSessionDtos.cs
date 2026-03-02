@@ -22,6 +22,13 @@ public class TradingSessionDto : FullAuditedEntityDto<Guid>
     public long? LastEvaluationTimestamp { get; set; }
     public DateTime? StageChangedTimestamp { get; set; }
     public int? Score { get; set; }
+    
+    // Pro Trade Management (Sprint 3)
+    public decimal? TrailingStopPrice { get; set; }
+    public bool IsBreakEvenActive { get; set; }
+    public int PartialTpsCount { get; set; }
+    public decimal? InitialStopLoss { get; set; }
+    public decimal CurrentInvestment { get; set; }
 }
 
 public class StartSessionDto

@@ -207,6 +207,11 @@ export interface TradingSessionDto extends FullAuditedEntityDto<string> {
   lastEvaluationTimestamp?: number;
   stageChangedTimestamp?: string;
   score?: number;
+  trailingStopPrice?: number;
+  isBreakEvenActive: boolean;
+  partialTpsCount: number;
+  initialStopLoss?: number;
+  currentInvestment: number;
 }
 
 export interface TradingSignalDto extends EntityDto<string> {

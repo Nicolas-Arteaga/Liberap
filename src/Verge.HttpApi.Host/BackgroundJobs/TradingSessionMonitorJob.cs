@@ -481,7 +481,8 @@ public class TradingSessionMonitorJob : BackgroundService
         decimal price,
         DecisionEngine.MarketContext context,
         IDistributedEventBus eventBus,
-        Guid identityUserId)
+        Guid identityUserId,
+        string? customMessage = null)
     {
         // 1. Determine LogType based on Decision and Reason
         AnalysisLogType logType = AnalysisLogType.Standard;
@@ -511,7 +512,7 @@ public class TradingSessionMonitorJob : BackgroundService
         };
 
         string confidenceLabel = result.Confidence.ToString().ToUpper();
-        string message = $"{emoji} [{result.Decision}] Score: {result.Score}/100 | Confianza: {confidenceLabel} | Regimen: {context.MarketRegime?.Regime.ToString() ?? "N/A"} | Price: ${price:N2}";
+        string message = customMessage ?? $"{emoji} [{result.Decision}] Score: {result.Score}/100 | Confianza: {confidenceLabel} | Regimen: {context.MarketRegime?.Regime.ToString() ?? "N/A"} | Price: ${price:N2}";
 
         if (result.Decision >= DecisionEngine.TradingDecision.Prepare && result.EntryMinPrice.HasValue && result.EntryMaxPrice.HasValue)
         {
@@ -627,7 +628,87 @@ public class TradingSessionMonitorJob : BackgroundService
         var currentPrice = data.candles.Last().Close;
         var direction = session.SelectedDirection ?? strategy.DirectionPreference;
         bool isLong = direction == SignalDirection.Long;
-        
+        var style = session.SelectedStyle ?? strategy.Style;
+        var regime = data.context.MarketRegime;
+        var atr = CalculateAtr(data.candles);
+
+        // 1. Initialize Pro Stats (if first time)
+        if (!session.InitialStopLoss.HasValue) session.InitialStopLoss = session.StopLossPrice;
+        if (session.CurrentInvestment == 0) session.CurrentInvestment = strategy.Capital;
+
+        // 2. Thresholds by Style
+        decimal beThreshold = style switch { 
+            TradingStyle.Scalping => 0.01m, 
+            TradingStyle.DayTrading => 0.02m, 
+            TradingStyle.SwingTrading => 0.03m, 
+            _ => 0.05m 
+        };
+        float trailMultiplier = style switch {
+            TradingStyle.Scalping => 1.0f,
+            TradingStyle.DayTrading => 1.5f,
+            TradingStyle.SwingTrading => 2.0f,
+            _ => 3.0f
+        };
+
+        // 3. Logic: Calculate Current Metrics
+        decimal entryPrice = session.EntryPrice ?? currentPrice;
+        decimal priceChangePct = isLong ? (currentPrice - entryPrice) / entryPrice : (entryPrice - currentPrice) / entryPrice;
+        bool isTrend = regime?.Regime == MarketRegimeType.BullTrend || regime?.Regime == MarketRegimeType.BearTrend;
+
+        // 4. BREAK-EVEN Logic
+        if (!session.IsBreakEvenActive && priceChangePct >= beThreshold)
+        {
+            session.StopLossPrice = entryPrice;
+            session.IsBreakEvenActive = true;
+            _logger.LogInformation("🛡️ [BE] Break-even Activo para {Symbol}", session.Symbol);
+            await CreateAnalysisLogAsync(logRepo, session, new DecisionEngine.DecisionResult { Decision = DecisionEngine.TradingDecision.Context }, currentPrice, data.context, eventBus, identityUserId, "🛡️ BREAK-EVEN ACTIVADO: Operación protegida");
+        }
+
+        // 5. INTELLIGENT TRAILING STOP (Structural)
+        if (regime != null && (regime.BosDetected || regime.ChochDetected))
+        {
+            decimal newTs = isLong ? (currentPrice - (decimal)trailMultiplier * atr) : (currentPrice + (decimal)trailMultiplier * atr);
+            bool isBetter = isLong ? (newTs > (session.StopLossPrice ?? 0)) : (newTs < (session.StopLossPrice ?? decimal.MaxValue));
+            
+            if (isBetter)
+            {
+                session.TrailingStopPrice = newTs;
+                session.StopLossPrice = newTs;
+                _logger.LogInformation("📈 [TS] Trailing Stop Actualizado a {Price} por BOS", newTs);
+                await CreateAnalysisLogAsync(logRepo, session, new DecisionEngine.DecisionResult { Decision = DecisionEngine.TradingDecision.Context }, currentPrice, data.context, eventBus, identityUserId, $"📈 TRAILING STOP ACTUALIZADO: ${newTs:N2} (Volatilidad estructural)");
+            }
+        }
+
+        // 6. PARTIAL TAKE PROFITS & SCALE-IN
+        if (session.TakeProfitPrice.HasValue)
+        {
+            decimal totalGoal = Math.Abs(session.TakeProfitPrice.Value - entryPrice);
+            decimal currentProfitDistance = isLong ? (currentPrice - entryPrice) : (entryPrice - currentPrice);
+
+            // TP1: 33% of target -> Close 25% and Move to BE
+            if (session.PartialTpsCount < 1 && currentProfitDistance >= totalGoal * 0.33m)
+            {
+                session.PartialTpsCount = 1;
+                session.CurrentInvestment *= 0.75m; // Liquida 25%
+                if (!session.IsBreakEvenActive) { session.StopLossPrice = entryPrice; session.IsBreakEvenActive = true; }
+                await CreateAnalysisLogAsync(logRepo, session, new DecisionEngine.DecisionResult { Decision = DecisionEngine.TradingDecision.Context }, currentPrice, data.context, eventBus, identityUserId, "💰 TP1 ALCANZADO: 25% cerrado. SL movido a entrada.");
+            }
+            // TP2: 66% of target -> Close another 33% (25% original) and activate TS
+            else if (session.PartialTpsCount < 2 && currentProfitDistance >= totalGoal * 0.66m)
+            {
+                session.PartialTpsCount = 2;
+                session.CurrentInvestment *= 0.66m; // Liquida otro ~25% original
+                await CreateAnalysisLogAsync(logRepo, session, new DecisionEngine.DecisionResult { Decision = DecisionEngine.TradingDecision.Context }, currentPrice, data.context, eventBus, identityUserId, "💰 TP2 ALCANZADO: 50% total cobrado. Trailing Stop activado.");
+            }
+            // SCALE-IN: If BOS occurs after TP1 in Trend
+            else if (session.PartialTpsCount >= 1 && (regime?.BosDetected ?? false) && isTrend)
+            {
+                session.CurrentInvestment *= 1.3m; // Reinvertir 30%
+                await CreateAnalysisLogAsync(logRepo, session, new DecisionEngine.DecisionResult { Decision = DecisionEngine.TradingDecision.Context }, currentPrice, data.context, eventBus, identityUserId, "🚀 ESCALADO (Scale-in): Aumentando posición 30% por BOS en tendencia fuerte.");
+            }
+        }
+
+        // 7. FINAL EXIT CHECK
         bool exitTriggered = false;
         string exitMessage = "";
         
@@ -636,12 +717,12 @@ public class TradingSessionMonitorJob : BackgroundService
             if (session.TakeProfitPrice.HasValue && currentPrice >= session.TakeProfitPrice.Value)
             {
                 exitTriggered = true;
-                exitMessage = $"💰 Take Profit alcanzado! Precio: ${currentPrice:N2}";
+                exitMessage = $"💰 TP3 Final alcanzado! Precio: ${currentPrice:N2}";
             }
             else if (session.StopLossPrice.HasValue && currentPrice <= session.StopLossPrice.Value)
             {
                 exitTriggered = true;
-                exitMessage = $"🛑 Stop Loss activado. Precio: ${currentPrice:N2}";
+                exitMessage = session.TrailingStopPrice.HasValue ? $"📈 Trailing Stop activado. Precio: ${currentPrice:N2}" : $"🛑 Stop Loss activado. Precio: ${currentPrice:N2}";
             }
         }
         else // SHORT
@@ -649,36 +730,33 @@ public class TradingSessionMonitorJob : BackgroundService
             if (session.TakeProfitPrice.HasValue && currentPrice <= session.TakeProfitPrice.Value)
             {
                 exitTriggered = true;
-                exitMessage = $"💰 Take Profit alcanzado! Precio: ${currentPrice:N2}";
+                exitMessage = $"💰 TP3 Final alcanzado! Precio: ${currentPrice:N2}";
             }
             else if (session.StopLossPrice.HasValue && currentPrice >= session.StopLossPrice.Value)
             {
                 exitTriggered = true;
-                exitMessage = $"🛑 Stop Loss activado. Precio: ${currentPrice:N2}";
+                exitMessage = session.TrailingStopPrice.HasValue ? $"📈 Trailing Stop activado. Precio: ${currentPrice:N2}" : $"🛑 Stop Loss activado. Precio: ${currentPrice:N2}";
             }
         }
         
         if (exitTriggered)
         {
-            _logger.LogInformation("📉 Exit Triggered for {Symbol}: {Message}", session.Symbol, exitMessage);
+            _logger.LogInformation("📉 Final Exit for {Symbol}: {Message}", session.Symbol, exitMessage);
             
-            // Calculate Telemetry (Sprint 2)
             decimal netProfit = 0;
             if (session.EntryPrice.HasValue && session.EntryPrice.Value > 0)
             {
-                var entryPrice = session.EntryPrice.Value;
                 var leverage = (decimal)strategy.Leverage;
-                var capital = strategy.Capital;
-                var quantity = (capital * leverage) / entryPrice;
+                var quantity = (session.CurrentInvestment * leverage) / session.EntryPrice.Value;
                 
                 if (isLong)
-                    netProfit = (currentPrice - entryPrice) * quantity;
+                    netProfit = (currentPrice - session.EntryPrice.Value) * quantity;
                 else
-                    netProfit = (entryPrice - currentPrice) * quantity;
+                    netProfit = (session.EntryPrice.Value - currentPrice) * quantity;
             }
 
             session.CurrentStage = TradingStage.SellActive;
-            session.IsActive = false; // Deactivate once finished
+            session.IsActive = false;
             session.EndTime = DateTime.UtcNow;
             session.NetProfit = netProfit;
             session.Outcome = netProfit >= 0 ? TradeStatus.Win : TradeStatus.Loss;
@@ -691,7 +769,7 @@ public class TradingSessionMonitorJob : BackgroundService
                 session.TraderProfileId,
                 session.Id,
                 session.Symbol,
-                $"{exitMessage} | Ganancia: ${netProfit:N2} USDT",
+                $"{exitMessage} | Resultado Final: ${netProfit:N2} USDT",
                 netProfit >= 0 ? "success" : "danger",
                 DateTime.UtcNow,
                 AnalysisLogType.AlertExit,
@@ -711,24 +789,13 @@ public class TradingSessionMonitorJob : BackgroundService
                 Title = $"Sesión Finalizada: {session.Symbol}",
                 Message = exitMessage,
                 Timestamp = DateTime.UtcNow,
-                Read = false,
                 Crypto = session.Symbol,
                 Price = currentPrice,
-                Direction = session.SelectedDirection ?? strategy.DirectionPreference,
-                Stage = TradingStage.SellActive,
                 Severity = netProfit >= 0 ? "success" : "danger",
                 Icon = netProfit >= 0 ? "cash-outline" : "warning-outline"
             };
 
-            _logger.LogInformation("🔔 [Exit] Publicando alerta de Stage4 para sesión {Id}", session.Id);
-            await eventBus.PublishAsync(new AlertStateChangedEto
-            {
-                UserId = identityUserId,
-                SessionId = session.Id,
-                Alert = alertDto,
-                TriggeredAt = DateTime.UtcNow,
-                IsBreakout = false
-            });
+            await eventBus.PublishAsync(new AlertStateChangedEto { UserId = identityUserId, SessionId = session.Id, Alert = alertDto });
             
             return true;
         }
@@ -799,5 +866,23 @@ public class TradingSessionMonitorJob : BackgroundService
                 ));
             }
         }
+    }
+
+    private decimal CalculateAtr(List<MarketCandleModel> candles, int period = 14)
+    {
+        if (candles.Count < period + 1) return 0;
+        
+        var trs = new List<decimal>();
+        for (int i = candles.Count - period; i < candles.Count; i++)
+        {
+            var high = candles[i].High;
+            var low = candles[i].Low;
+            var prevClose = candles[i - 1].Close;
+            
+            var tr = Math.Max(high - low, Math.Max(Math.Abs(high - prevClose), Math.Abs(low - prevClose)));
+            trs.Add(tr);
+        }
+        
+        return trs.Average();
     }
 }

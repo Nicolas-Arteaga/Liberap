@@ -1,0 +1,761 @@
+{
+  "$schema": "http://json.schemastore.org/sarif-1.0.0",
+  "version": "1.0.0",
+  "runs": [
+    {
+      "tool": {
+        "name": "Compilador de Microsoft (R) Visual C#",
+        "version": "5.0.0.0",
+        "fileVersion": "5.0.0-2.26075.103 (c2435c3e)",
+        "semanticVersion": "5.0.0",
+        "language": "es-ES"
+      },
+      "results": [
+        {
+          "ruleId": "CS0162",
+          "level": "warning",
+          "message": "Se detectó código inaccesible",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/VergeHttpApiHostModule.cs",
+                "region": {
+                  "startLine": 325,
+                  "startColumn": 13,
+                  "endLine": 325,
+                  "endColumn": 16
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 2
+          }
+        },
+        {
+          "ruleId": "CS0117",
+          "level": "error",
+          "message": "'TradingStyle' no contiene una definición para 'Swing'",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/BackgroundJobs/TradingSessionMonitorJob.cs",
+                "region": {
+                  "startLine": 642,
+                  "startColumn": 26,
+                  "endLine": 642,
+                  "endColumn": 31
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CS0117",
+          "level": "error",
+          "message": "'TradingStyle' no contiene una definición para 'Swing'",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/BackgroundJobs/TradingSessionMonitorJob.cs",
+                "region": {
+                  "startLine": 648,
+                  "startColumn": 26,
+                  "endLine": 648,
+                  "endColumn": 31
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CS0234",
+          "level": "error",
+          "message": "El tipo o el nombre del espacio de nombres 'TradingDecisionResult' no existe en el espacio de nombres 'Verge.Trading.DecisionEngine' (¿falta alguna referencia de ensamblado?)",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/BackgroundJobs/TradingSessionMonitorJob.cs",
+                "region": {
+                  "startLine": 663,
+                  "startColumn": 79,
+                  "endLine": 663,
+                  "endColumn": 100
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CS0234",
+          "level": "error",
+          "message": "El tipo o el nombre del espacio de nombres 'TradingDecisionResult' no existe en el espacio de nombres 'Verge.Trading.DecisionEngine' (¿falta alguna referencia de ensamblado?)",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/BackgroundJobs/TradingSessionMonitorJob.cs",
+                "region": {
+                  "startLine": 677,
+                  "startColumn": 83,
+                  "endLine": 677,
+                  "endColumn": 104
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CS0234",
+          "level": "error",
+          "message": "El tipo o el nombre del espacio de nombres 'TradingDecisionResult' no existe en el espacio de nombres 'Verge.Trading.DecisionEngine' (¿falta alguna referencia de ensamblado?)",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/BackgroundJobs/TradingSessionMonitorJob.cs",
+                "region": {
+                  "startLine": 693,
+                  "startColumn": 83,
+                  "endLine": 693,
+                  "endColumn": 104
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CS0234",
+          "level": "error",
+          "message": "El tipo o el nombre del espacio de nombres 'TradingDecisionResult' no existe en el espacio de nombres 'Verge.Trading.DecisionEngine' (¿falta alguna referencia de ensamblado?)",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/BackgroundJobs/TradingSessionMonitorJob.cs",
+                "region": {
+                  "startLine": 700,
+                  "startColumn": 83,
+                  "endLine": 700,
+                  "endColumn": 104
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CS0234",
+          "level": "error",
+          "message": "El tipo o el nombre del espacio de nombres 'TradingDecisionResult' no existe en el espacio de nombres 'Verge.Trading.DecisionEngine' (¿falta alguna referencia de ensamblado?)",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/BackgroundJobs/TradingSessionMonitorJob.cs",
+                "region": {
+                  "startLine": 706,
+                  "startColumn": 83,
+                  "endLine": 706,
+                  "endColumn": 104
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CA1861",
+          "level": "note",
+          "message": "Preferir campos \"static readonly\" frente a argumentos de matriz constantes si se llama repetidamente al método llamado y no muta la matriz pasada",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/HealthChecks/HealthChecksBuilderExtensions.cs",
+                "region": {
+                  "startLine": 17,
+                  "startColumn": 89,
+                  "endLine": 17,
+                  "endColumn": 116
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1,
+            "customProperties": {
+              "paramName": "tags"
+            }
+          }
+        },
+        {
+          "ruleId": "CA1873",
+          "level": "note",
+          "message": "La evaluación de este argumento puede ser costosa e innecesaria si el registro está deshabilitado",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/BackgroundJobs/TradingSessionMonitorJob.cs",
+                "region": {
+                  "startLine": 40,
+                  "startColumn": 13,
+                  "endLine": 40,
+                  "endColumn": 86
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1
+          }
+        },
+        {
+          "ruleId": "CA1822",
+          "level": "note",
+          "message": "El miembro \"ConfigureAuthentication\" no tiene acceso a los datos de la instancia y se puede marcar como static.",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/VergeHttpApiHostModule.cs",
+                "region": {
+                  "startLine": 137,
+                  "startColumn": 18,
+                  "endLine": 137,
+                  "endColumn": 41
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1
+          }
+        },
+        {
+          "ruleId": "CA1822",
+          "level": "note",
+          "message": "El miembro \"ConfigureHealthChecks\" no tiene acceso a los datos de la instancia y se puede marcar como static.",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/VergeHttpApiHostModule.cs",
+                "region": {
+                  "startLine": 272,
+                  "startColumn": 18,
+                  "endLine": 272,
+                  "endColumn": 39
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1
+          }
+        },
+        {
+          "ruleId": "CA1822",
+          "level": "note",
+          "message": "El miembro \"ConfigureCors\" no tiene acceso a los datos de la instancia y se puede marcar como static.",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/VergeHttpApiHostModule.cs",
+                "region": {
+                  "startLine": 246,
+                  "startColumn": 18,
+                  "endLine": 246,
+                  "endColumn": 31
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1
+          }
+        },
+        {
+          "ruleId": "CA1873",
+          "level": "note",
+          "message": "La evaluación de este argumento puede ser costosa e innecesaria si el registro está deshabilitado",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/BackgroundJobs/TradingSessionMonitorJob.cs",
+                "region": {
+                  "startLine": 177,
+                  "startColumn": 21,
+                  "endLine": 177,
+                  "endColumn": 97
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1
+          }
+        },
+        {
+          "ruleId": "CA1873",
+          "level": "note",
+          "message": "La evaluación de este argumento puede ser costosa e innecesaria si el registro está deshabilitado",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/BackgroundJobs/TradingSessionMonitorJob.cs",
+                "region": {
+                  "startLine": 181,
+                  "startColumn": 17,
+                  "endLine": 181,
+                  "endColumn": 112
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1
+          }
+        },
+        {
+          "ruleId": "CA1873",
+          "level": "note",
+          "message": "La evaluación de este argumento puede ser costosa e innecesaria si el registro está deshabilitado",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/BackgroundJobs/TradingSessionMonitorJob.cs",
+                "region": {
+                  "startLine": 329,
+                  "startColumn": 25,
+                  "endLine": 330,
+                  "endColumn": 84
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1
+          }
+        },
+        {
+          "ruleId": "CA1860",
+          "level": "note",
+          "message": "Es preferible comparar \"Count\" con 0 en lugar de usar \"Any()\", tanto por claridad como por rendimiento.",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/BackgroundJobs/TradingSessionMonitorJob.cs",
+                "region": {
+                  "startLine": 94,
+                  "startColumn": 14,
+                  "endLine": 94,
+                  "endColumn": 34
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1,
+            "customProperties": {
+              "DiagnosticPropertyKey": "Count"
+            }
+          }
+        },
+        {
+          "ruleId": "CA1860",
+          "level": "note",
+          "message": "Es preferible comparar \"Count\" con 0 en lugar de usar \"Any()\", tanto por claridad como por rendimiento.",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/BackgroundJobs/TradingSessionMonitorJob.cs",
+                "region": {
+                  "startLine": 128,
+                  "startColumn": 44,
+                  "endLine": 128,
+                  "endColumn": 60
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1,
+            "customProperties": {
+              "DiagnosticPropertyKey": "Count"
+            }
+          }
+        },
+        {
+          "ruleId": "CA1860",
+          "level": "note",
+          "message": "Es preferible comparar \"Count\" con 0 en lugar de usar \"Any()\", tanto por claridad como por rendimiento.",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/BackgroundJobs/TradingSessionMonitorJob.cs",
+                "region": {
+                  "startLine": 169,
+                  "startColumn": 41,
+                  "endLine": 169,
+                  "endColumn": 54
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1,
+            "customProperties": {
+              "DiagnosticPropertyKey": "Count"
+            }
+          }
+        },
+        {
+          "ruleId": "CA1860",
+          "level": "note",
+          "message": "Es preferible comparar \"Count\" con 0 en lugar de usar \"Any()\", tanto por claridad como por rendimiento.",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/BackgroundJobs/TradingSessionMonitorJob.cs",
+                "region": {
+                  "startLine": 300,
+                  "startColumn": 25,
+                  "endLine": 300,
+                  "endColumn": 35
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1,
+            "customProperties": {
+              "DiagnosticPropertyKey": "Count"
+            }
+          }
+        },
+        {
+          "ruleId": "CA2254",
+          "level": "note",
+          "message": "La plantilla de mensaje de registro no debe variar entre las llamadas a \"LoggerExtensions.LogWarning(ILogger, string?, params object?[])\"",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/BackgroundJobs/TradingSessionMonitorJob.cs",
+                "region": {
+                  "startLine": 210,
+                  "startColumn": 36,
+                  "endLine": 210,
+                  "endColumn": 113
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1
+          }
+        },
+        {
+          "ruleId": "CA1873",
+          "level": "note",
+          "message": "La evaluación de este argumento puede ser costosa e innecesaria si el registro está deshabilitado",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/BackgroundJobs/TradingSessionMonitorJob.cs",
+                "region": {
+                  "startLine": 410,
+                  "startColumn": 21,
+                  "endLine": 410,
+                  "endColumn": 117
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1
+          }
+        },
+        {
+          "ruleId": "CA1873",
+          "level": "note",
+          "message": "La evaluación de este argumento puede ser costosa e innecesaria si el registro está deshabilitado",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/BackgroundJobs/TradingSessionMonitorJob.cs",
+                "region": {
+                  "startLine": 449,
+                  "startColumn": 13,
+                  "endLine": 450,
+                  "endColumn": 78
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1
+          }
+        },
+        {
+          "ruleId": "CA1873",
+          "level": "note",
+          "message": "La evaluación de este argumento puede ser costosa e innecesaria si el registro está deshabilitado",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/BackgroundJobs/TradingSessionMonitorJob.cs",
+                "region": {
+                  "startLine": 593,
+                  "startColumn": 9,
+                  "endLine": 593,
+                  "endColumn": 117
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1
+          }
+        },
+        {
+          "ruleId": "CA1873",
+          "level": "note",
+          "message": "La evaluación de este argumento puede ser costosa e innecesaria si el registro está deshabilitado",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/BackgroundJobs/TradingSessionMonitorJob.cs",
+                "region": {
+                  "startLine": 662,
+                  "startColumn": 13,
+                  "endLine": 662,
+                  "endColumn": 95
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1
+          }
+        },
+        {
+          "ruleId": "CA1873",
+          "level": "note",
+          "message": "La evaluación de este argumento puede ser costosa e innecesaria si el registro está deshabilitado",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/BackgroundJobs/TradingSessionMonitorJob.cs",
+                "region": {
+                  "startLine": 676,
+                  "startColumn": 17,
+                  "endLine": 676,
+                  "endColumn": 101
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1
+          }
+        },
+        {
+          "ruleId": "CA1873",
+          "level": "note",
+          "message": "La evaluación de este argumento puede ser costosa e innecesaria si el registro está deshabilitado",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/BackgroundJobs/TradingSessionMonitorJob.cs",
+                "region": {
+                  "startLine": 743,
+                  "startColumn": 13,
+                  "endLine": 743,
+                  "endColumn": 105
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1
+          }
+        },
+        {
+          "ruleId": "CA1822",
+          "level": "note",
+          "message": "El miembro \"CalculateTargets\" no tiene acceso a los datos de la instancia y se puede marcar como static.",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/BackgroundJobs/TradingSessionMonitorJob.cs",
+                "region": {
+                  "startLine": 456,
+                  "startColumn": 18,
+                  "endLine": 456,
+                  "endColumn": 34
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1
+          }
+        },
+        {
+          "ruleId": "CA1822",
+          "level": "note",
+          "message": "El miembro \"GetAlertType\" no tiene acceso a los datos de la instancia y se puede marcar como static.",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/BackgroundJobs/TradingSessionMonitorJob.cs",
+                "region": {
+                  "startLine": 606,
+                  "startColumn": 20,
+                  "endLine": 606,
+                  "endColumn": 32
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1
+          }
+        },
+        {
+          "ruleId": "CA1822",
+          "level": "note",
+          "message": "El miembro \"CalculateAtr\" no tiene acceso a los datos de la instancia y se puede marcar como static.",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///c:/Users/Nicolas/Desktop/Verge/Verge/src/Verge.HttpApi.Host/BackgroundJobs/TradingSessionMonitorJob.cs",
+                "region": {
+                  "startLine": 870,
+                  "startColumn": 21,
+                  "endLine": 870,
+                  "endColumn": 33
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1
+          }
+        }
+      ],
+      "rules": {
+        "CA1822": {
+          "id": "CA1822",
+          "shortDescription": "Marcar miembros como static",
+          "fullDescription": "Los miembros que no tienen acceso a datos de instancia o que llaman a métodos de instancia se pueden marcar como static. Después de marcar los métodos como static, el compilador emitirá los sitios de llamada no virtuales para estos miembros. Esto puede proporcionar una mejora apreciable del rendimiento del código sensible al rendimiento.",
+          "defaultLevel": "note",
+          "helpUri": "https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1822",
+          "properties": {
+            "category": "Performance",
+            "isEnabledByDefault": true,
+            "tags": [
+              "PortedFromFxCop",
+              "Telemetry",
+              "EnabledRuleInAggressiveMode"
+            ]
+          }
+        },
+        "CA1860": {
+          "id": "CA1860",
+          "shortDescription": "Evitar usar el método de extensión \"Enumerable.Any()\"",
+          "fullDescription": "Es preferible usar las propiedades \"IsEmpty\", \"Count\" o \"Length\", si hay alguna disponible, en lugar de llamar a \"Enumerable.Any()\". La intención es más clara y tiene un mejor rendimiento que usar el método de extensión \"Enumerable.Any()\".",
+          "defaultLevel": "note",
+          "helpUri": "https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1860",
+          "properties": {
+            "category": "Performance",
+            "isEnabledByDefault": true,
+            "tags": [
+              "Telemetry",
+              "EnabledRuleInAggressiveMode"
+            ]
+          }
+        },
+        "CA1861": {
+          "id": "CA1861",
+          "shortDescription": "Evitar matrices constantes como argumentos",
+          "fullDescription": "Las matrices constantes pasadas como argumentos no se reutilizan cuando se llaman repetidamente, lo que implica que se cree una nueva matriz cada vez. Considere la posibilidad de extraerlas a campos \"static readonly\" para mejorar el rendimiento si la matriz pasada no se muta dentro del método llamado.",
+          "defaultLevel": "note",
+          "helpUri": "https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1861",
+          "properties": {
+            "category": "Performance",
+            "isEnabledByDefault": true,
+            "tags": [
+              "Telemetry",
+              "EnabledRuleInAggressiveMode"
+            ]
+          }
+        },
+        "CA1873": {
+          "id": "CA1873",
+          "shortDescription": "Evitar el registro potencialmente costoso",
+          "fullDescription": "En muchas situaciones, el registro se deshabilita o se establece en un nivel de registro que da como resultado una evaluación innecesaria para este argumento.",
+          "defaultLevel": "note",
+          "helpUri": "https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1873",
+          "properties": {
+            "category": "Performance",
+            "isEnabledByDefault": true,
+            "tags": [
+              "Telemetry",
+              "EnabledRuleInAggressiveMode"
+            ]
+          }
+        },
+        "CA2254": {
+          "id": "CA2254",
+          "shortDescription": "La plantilla debe ser una expresión estática",
+          "fullDescription": "La plantilla de mensaje de registro no debe variar entre llamadas.",
+          "defaultLevel": "note",
+          "helpUri": "https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca2254",
+          "properties": {
+            "category": "Usage",
+            "isEnabledByDefault": true,
+            "tags": [
+              "Telemetry",
+              "EnabledRuleInAggressiveMode"
+            ]
+          }
+        },
+        "CS0117": {
+          "id": "CS0117",
+          "defaultLevel": "error",
+          "helpUri": "https://msdn.microsoft.com/query/roslyn.query?appId=roslyn&k=k(CS0117)",
+          "properties": {
+            "category": "Compiler",
+            "isEnabledByDefault": true,
+            "tags": [
+              "Compiler",
+              "Telemetry",
+              "NotConfigurable"
+            ]
+          }
+        },
+        "CS0162": {
+          "id": "CS0162",
+          "shortDescription": "Se detectó código inaccesible",
+          "defaultLevel": "warning",
+          "helpUri": "https://msdn.microsoft.com/query/roslyn.query?appId=roslyn&k=k(CS0162)",
+          "properties": {
+            "category": "Compiler",
+            "isEnabledByDefault": true,
+            "tags": [
+              "Compiler",
+              "Telemetry"
+            ]
+          }
+        },
+        "CS0234": {
+          "id": "CS0234",
+          "defaultLevel": "error",
+          "helpUri": "https://msdn.microsoft.com/query/roslyn.query?appId=roslyn&k=k(CS0234)",
+          "properties": {
+            "category": "Compiler",
+            "isEnabledByDefault": true,
+            "tags": [
+              "Compiler",
+              "Telemetry",
+              "NotConfigurable"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
