@@ -130,6 +130,7 @@ public class VergeHttpApiHostModule : AbpModule
         context.Services.AddSingleton<ITickSpikeAlerter, TickSpikeAlerter>();
         context.Services.AddHostedService<FastTickScannerService>();
         context.Services.AddHostedService<TradingSessionMonitorJob>();
+        context.Services.AddHostedService<AutoCalibrationJob>();
         context.Services.AddHostedService<MarketScannerService>();
 
     }

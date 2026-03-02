@@ -1,4 +1,5 @@
 using Verge.Trading;
+using Verge.Trading.DecisionEngine;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Volo.Abp.EntityFrameworkCore.Modeling;
@@ -77,6 +78,13 @@ public static class TradingModelBuilderExtensions
             b.Property(x => x.Level).IsRequired().HasMaxLength(20);
             b.HasIndex(x => x.TradingSessionId);
             b.HasIndex(x => x.TraderProfileId);
+        });
+        
+        builder.Entity<StrategyCalibration>(b =>
+        {
+            b.ToTable("StrategyCalibrations");
+            b.ConfigureByConvention();
+            b.HasIndex(x => new { x.Style, x.Regime }).IsUnique();
         });
     }
 }

@@ -32,4 +32,7 @@ public interface ITradingStyleProfile
     
     // Contextual penalties / bonuses
     float ApplyPenalties(MarketContext context, float score, out string reason);
+
+    // Dynamic Thresholds (Sprint 4)
+    (int Entry, int Prepare, int Context) GetAdjustedThresholds(double? winRate);
 }

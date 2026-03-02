@@ -76,4 +76,19 @@ public class HodlProfile : ITradingStyleProfile
         // HODL usually doesn't apply penalties, it accumulates
         return score;
     }
+
+    public (int Entry, int Prepare, int Context) GetAdjustedThresholds(double? winRate)
+    {
+        int entry = EntryThreshold;
+        int prepare = PrepareThreshold;
+        int context = ContextThreshold;
+
+        if (winRate.HasValue)
+        {
+            if (winRate < 0.40) { entry += 10; prepare += 5; }
+            else if (winRate > 0.80) { entry -= 5; }
+        }
+
+        return (entry, prepare, context);
+    }
 }

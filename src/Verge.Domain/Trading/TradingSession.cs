@@ -33,6 +33,15 @@ public class TradingSession : FullAuditedAggregateRoot<Guid>
     public decimal? InitialStopLoss { get; set; }
     public decimal CurrentInvestment { get; set; }
 
+    // Feedback Loop (Sprint 4)
+    public int? InitialScore { get; set; }
+    public MarketRegimeType? InitialRegime { get; set; }
+    public SignalConfidence? InitialConfidence { get; set; }
+    public decimal? InitialVolatility { get; set; }
+    public decimal? InitialVolumeMcapRatio { get; set; }
+    public int? EntryHour { get; set; }
+    public DayOfWeek? EntryDayOfWeek { get; set; }
+
     protected TradingSession() { }
 
     public TradingSession(Guid id, Guid traderProfileId, string symbol, string timeframe)

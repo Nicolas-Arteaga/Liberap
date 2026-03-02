@@ -44,4 +44,20 @@ public class DefaultProfile : ITradingStyleProfile
         reason = string.Empty;
         return score;
     }
+
+    public (int Entry, int Prepare, int Context) GetAdjustedThresholds(double? winRate)
+    {
+        int entry = EntryThreshold;
+        int prepare = PrepareThreshold;
+        int context = ContextThreshold;
+
+        if (winRate.HasValue)
+        {
+            if (winRate < 0.45) { entry += 10; prepare += 10; context += 5; }
+            else if (winRate < 0.55) { entry += 5; prepare += 5; }
+            else if (winRate > 0.75) { entry -= 5; prepare -= 5; }
+        }
+
+        return (entry, prepare, context);
+    }
 }

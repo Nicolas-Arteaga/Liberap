@@ -70,7 +70,7 @@ public class AutoEvaluatorService : ITransientDependency
 
                 foreach (var direction in directions)
                 {
-                    var evalResult = _engine.Evaluate(session, style, context, true);
+                    var evalResult = await _engine.EvaluateAsync(session, style, context, true);
                     
                     if (evalResult.Score > 0)
                     {

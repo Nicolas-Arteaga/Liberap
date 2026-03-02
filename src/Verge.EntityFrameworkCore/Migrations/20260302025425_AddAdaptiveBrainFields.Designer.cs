@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Verge.EntityFrameworkCore;
@@ -12,9 +13,11 @@ using Volo.Abp.EntityFrameworkCore;
 namespace Verge.Migrations
 {
     [DbContext(typeof(VergeDbContext))]
-    partial class VergeDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260302025425_AddAdaptiveBrainFields")]
+    partial class AddAdaptiveBrainFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -204,76 +207,6 @@ namespace Verge.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("BacktestResults", (string)null);
-                });
-
-            modelBuilder.Entity("Verge.Trading.DecisionEngine.StrategyCalibration", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("CreationTime");
-
-                    b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("CreatorId");
-
-                    b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("DeleterId");
-
-                    b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("DeletionTime");
-
-                    b.Property<int>("EntryThresholdShift")
-                        .HasColumnType("integer");
-
-                    b.Property<float>("FundamentalMultiplier")
-                        .HasColumnType("real");
-
-                    b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("IsDeleted");
-
-                    b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("LastModificationTime");
-
-                    b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("LastModifierId");
-
-                    b.Property<DateTime>("LastRecalibrated")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<float>("QuantitativeMultiplier")
-                        .HasColumnType("real");
-
-                    b.Property<int>("Regime")
-                        .HasColumnType("integer");
-
-                    b.Property<float>("SentimentMultiplier")
-                        .HasColumnType("real");
-
-                    b.Property<int>("Style")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TakeProfitMultiplier")
-                        .HasColumnType("integer");
-
-                    b.Property<float>("TechnicalMultiplier")
-                        .HasColumnType("real");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Style", "Regime")
-                        .IsUnique();
-
-                    b.ToTable("StrategyCalibrations", (string)null);
                 });
 
             modelBuilder.Entity("Verge.Trading.ExchangeConnection", b =>

@@ -45,6 +45,8 @@ public class VergeAlertDto
     // Institutional 1% metrics
     public double? RiskRewardRatio { get; set; }
     public double? WinProbability { get; set; }
+    public int? HistoricSampleSize { get; set; }
+    public string? PatternSignal { get; set; }
 
     // Structure (Sprint 2)
     public string? Structure { get; set; }

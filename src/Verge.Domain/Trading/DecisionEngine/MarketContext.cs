@@ -52,6 +52,8 @@ public class DecisionResult
     // Institutional 1% metrics
     public double? RiskRewardRatio { get; set; }
     public double? WinProbability { get; set; }
+    public int? HistoricSampleSize { get; set; }
+    public string? PatternSignal { get; set; }
 }
 
 public enum TradingDecision

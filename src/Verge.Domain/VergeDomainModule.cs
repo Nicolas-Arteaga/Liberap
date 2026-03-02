@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Verge.Localization;
 using Verge.MultiTenancy;
 using Verge.Trading;
+using Verge.Trading.DecisionEngine;
 using System;
 using Volo.Abp.Localization;
 using Volo.Abp.Timing;
@@ -54,6 +55,7 @@ public class VergeDomainModule : AbpModule
 
         context.Services.AddHttpClient();
         context.Services.AddTransient<CryptoAnalysisService>();
+        context.Services.AddTransient<IProbabilisticEngine, ProbabilisticEngine>();
 
 #if DEBUG
         context.Services.Replace(ServiceDescriptor.Singleton<IEmailSender, NullEmailSender>());

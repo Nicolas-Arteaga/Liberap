@@ -252,7 +252,7 @@ public class TradingSessionMonitorJob : BackgroundService
                     }
 
                     // Always evaluate to apply SetupDecay (Time-based)
-                    var evalResult = decisionEngine.Evaluate(session, strategy.Style, data.context, isAutoMode);
+                    var evalResult = await decisionEngine.EvaluateAsync(session, strategy.Style, data.context, isAutoMode);
                     
                     // 6. Force Context alert for Stage 1 evaluations so the frontend is notified
                     if (session.CurrentStage == TradingStage.Evaluating && evalResult.Decision == DecisionEngine.TradingDecision.Ignore)
@@ -270,7 +270,7 @@ public class TradingSessionMonitorJob : BackgroundService
                     // We log if: Data changed OR Stage changed OR it's been > 5 minutes
                     bool shouldLog = !dataUnchanged || (DateTime.UtcNow - session.StartTime).TotalMinutes % 5 < 0.2; 
                     
-                    bool stageChanged = await ProcessDecision(session, evalResult, strategy, data.candles.Last().Close, eventBus, currentTraderProfile.UserId);
+                    bool stageChanged = await ProcessDecision(session, evalResult, strategy, data.candles.Last().Close, eventBus, currentTraderProfile.UserId, data.context);
                     
                     if (shouldLog || stageChanged)
                     {
@@ -350,7 +350,7 @@ public class TradingSessionMonitorJob : BackgroundService
                                 session.SelectedDirection = best.Direction;
                             }
 
-                            bool stageChanged = await ProcessDecision(session, best.Result, strategy, best.Context.Candles.Last().Close, eventBus, traderProfileForAuto.UserId);
+                            bool stageChanged = await ProcessDecision(session, best.Result, strategy, best.Context.Candles.Last().Close, eventBus, traderProfileForAuto.UserId, best.Context);
                             
                             // Sprint 1 Patch: Detection of stagnancy in AUTO mode
                             await CheckSessionStagnancyAsync(session, strategy, eventBus, traderProfileForAuto.UserId, analysisLogRepo);
@@ -378,7 +378,14 @@ public class TradingSessionMonitorJob : BackgroundService
         _logger.LogInformation("🏁 Monitoring cycle completed.");
     }
 
-    private async Task<bool> ProcessDecision(TradingSession session, DecisionEngine.DecisionResult result, TradingStrategy strategy, decimal currentPrice, IDistributedEventBus eventBus, Guid identityUserId)
+    private async Task<bool> ProcessDecision(
+        TradingSession session, 
+        DecisionResult result, 
+        TradingStrategy strategy, 
+        decimal currentPrice, 
+        IDistributedEventBus eventBus, 
+        Guid identityUserId,
+        DecisionEngine.MarketContext context)
     {
         var oldStage = session.CurrentStage;
         bool changed = false;
@@ -424,6 +431,16 @@ public class TradingSessionMonitorJob : BackgroundService
                 {
                     session.CurrentStage = TradingStage.BuyActive;
                     session.EntryPrice = currentPrice;
+                    
+                    // Feedback Loop (Sprint 4): Record Initial conditions
+                    session.InitialScore = result.Score;
+                    session.InitialRegime = context.MarketRegime?.Regime;
+                    session.InitialConfidence = result.Confidence;
+                    session.InitialVolatility = (decimal?)context.Technicals?.Atr;
+                    session.InitialVolumeMcapRatio = (decimal?)(context.CoinGeckoData?.MarketCap > 0 ? context.CoinGeckoData.TotalVolume / context.CoinGeckoData.MarketCap : 0);
+                    session.EntryHour = DateTime.UtcNow.Hour;
+                    session.EntryDayOfWeek = DateTime.UtcNow.DayOfWeek;
+
                     CalculateTargets(session, strategy, currentPrice);
                     changed = true;
                 }
@@ -539,7 +556,9 @@ public class TradingSessionMonitorJob : BackgroundService
             entryMin = result.EntryMinPrice,
             entryMax = result.EntryMaxPrice,
             winProb = result.WinProbability,
-            rr = result.RiskRewardRatio
+            rr = result.RiskRewardRatio,
+            sampleSize = result.HistoricSampleSize,
+            pattern = result.PatternSignal
         };
 
         var log = new AnalysisLog(
@@ -590,6 +609,8 @@ public class TradingSessionMonitorJob : BackgroundService
 
         alertDto.RiskRewardRatio = result.RiskRewardRatio;
         alertDto.WinProbability = result.WinProbability;
+        alertDto.HistoricSampleSize = result.HistoricSampleSize;
+        alertDto.PatternSignal = result.PatternSignal;
 
         _logger.LogInformation("🔔 [Analysis] Publicando alerta {Type} para sesión {Id}", alertDto.Type, session.Id);
         await eventBus.PublishAsync(new AlertStateChangedEto

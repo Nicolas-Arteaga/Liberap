@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Verge.Trading.DecisionEngine.Factory;
 using Verge.Trading.DecisionEngine.Profiles;
@@ -11,13 +12,20 @@ namespace Verge.Trading.DecisionEngine;
 public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
 {
     private readonly ILogger<TradingDecisionEngine> _logger;
+    private readonly IProbabilisticEngine _probabilisticEngine;
+    private readonly Volo.Abp.Domain.Repositories.IRepository<StrategyCalibration, Guid> _calibrationRepository;
 
-    public TradingDecisionEngine(ILogger<TradingDecisionEngine> logger)
+    public TradingDecisionEngine(
+        ILogger<TradingDecisionEngine> logger,
+        IProbabilisticEngine probabilisticEngine,
+        Volo.Abp.Domain.Repositories.IRepository<StrategyCalibration, Guid> calibrationRepository)
     {
         _logger = logger;
+        _probabilisticEngine = probabilisticEngine;
+        _calibrationRepository = calibrationRepository;
     }
 
-    public DecisionResult Evaluate(TradingSession session, TradingStyle style, MarketContext context, bool isAutoMode = false)
+    public async Task<DecisionResult> EvaluateAsync(TradingSession session, TradingStyle style, MarketContext context, bool isAutoMode = false)
     {
         _logger.LogInformation("🧠 Profile-Based Evaluation: Session {SessionId} | Style: {Style} | AutoAdapt: {AutoAdapt}", session.Id, style, isAutoMode);
 
@@ -66,11 +74,17 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
         float sentimentScore = CalculateSentimentScore(context);
         float fundamentalScore = CalculateFundamentalScore(context);
 
-        // 5. Apply Profile Weights
-        float finalScore = (technicalScore * profile.TechnicalWeight) +
-                           (quantitativeScore * profile.QuantitativeWeight) +
-                           (sentimentScore * profile.SentimentWeight) +
-                           (fundamentalScore * profile.FundamentalWeight);
+        // 5. Apply Profile Weights (Sprint 4: Adaptive Weights + Calibration)
+        var calibration = await GetCalibrationAsync(style, currentRegime);
+        var weights = GetAdaptiveWeights(currentRegime, profile, calibration);
+        
+        float finalScore = (technicalScore * weights.Technical) +
+                           (quantitativeScore * weights.Quantitative) +
+                           (sentimentScore * weights.Sentiment) +
+                           (fundamentalScore * weights.Fundamental);
+
+        // 5.1 Apply Threshold Shift from Calibration
+        int thresholdShift = calibration?.EntryThresholdShift ?? 0;
         // 6. Apply Profile Penalties
         finalScore = profile.ApplyPenalties(context, finalScore, out string penaltyReason);
 
@@ -92,10 +106,22 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
             return setupInvalidResult;
         }
 
-        // 7. Decision Mapping based on Profile Thresholds (Phase 2.0 Base)
-        var decision = GetDecisionFromProfile(roundedScore, profile);
+        // 7. Probabilistic Engine (Sprint 4)
+        var winRate = await _probabilisticEngine.GetWinRateAsync(style, session.Symbol, currentRegime, roundedScore, DateTime.UtcNow);
 
-        // 7.1 Multi-Timeframe Confirmation (Phase 2)
+        // 8. Decision Mapping based on Profile Thresholds (Sprint 4: Dynamic Thresholds)
+        var thresholds = profile.GetAdjustedThresholds(winRate.Probability);
+        
+        // Apply calibration shifts to thresholds
+        thresholds = (
+            Math.Clamp(thresholds.Entry + thresholdShift, 0, 100),
+            Math.Clamp(thresholds.Prepare + thresholdShift, 0, 100),
+            Math.Clamp(thresholds.Context + thresholdShift, 0, 100)
+        );
+
+        var decision = GetDecisionFromThresholds(roundedScore, thresholds);
+        
+        // 9. Multi-Timeframe Confirmation (Phase 2)
         if (decision == TradingDecision.Entry)
         {
             if (!ValidateHTFConfirmation(context, session, style, profile, out string htfReason))
@@ -139,18 +165,25 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
             Score = roundedScore,
             Reason = string.IsNullOrEmpty(penaltyReason) 
                 ? (decision == TradingDecision.Entry ? "🚀 ENTRY SETUP READY" : $"Score: {roundedScore}. Style: {style}.")
-                : $"{penaltyReason}".Trim(),
+                : $"{penaltyReason} | WinProb: {winRate.Probability:P0} | Thresh: {thresholds.Entry}/{thresholds.Prepare}".Trim(),
             Confidence = confidence,
             WeightedScores = new Dictionary<string, float>
             {
-                { "Technical", technicalScore * profile.TechnicalWeight },
-                { "Quantitative", quantitativeScore * profile.QuantitativeWeight },
-                { "Sentiment", sentimentScore * profile.SentimentWeight },
-                { "Fundamental", fundamentalScore * profile.FundamentalWeight }
+                { "Technical", technicalScore * weights.Technical },
+                { "Quantitative", quantitativeScore * weights.Quantitative },
+                { "Sentiment", sentimentScore * weights.Sentiment },
+                { "Fundamental", fundamentalScore * weights.Fundamental }
             },
-            WinProbability = winProb,
+            WinProbability = winRate.Probability, // Use Sprint 4 Engine Probability
+            HistoricSampleSize = winRate.SampleSize,
             RiskRewardRatio = rrRatio
         };
+
+        if (winRate.Probability > 0.75 && winRate.SampleSize >= 10)
+        {
+            result.PatternSignal = $"🔥 WINNING PATTERN: {style} in {currentRegime} with {roundedScore} score has {winRate.Probability:P0} Win Rate!";
+            _logger.LogInformation("🎯 Pattern Detected for {Symbol}: {Pattern}", session.Symbol, result.PatternSignal);
+        }
 
         // 10. Entry Range Calculation (Sprint 4)
         if (result.Decision >= TradingDecision.Prepare)
@@ -195,12 +228,51 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
         }
     }
 
-    private TradingDecision GetDecisionFromProfile(int score, ITradingStyleProfile profile)
+    private TradingDecision GetDecisionFromThresholds(int score, (int Entry, int Prepare, int Context) thresholds)
     {
-        if (score >= profile.EntryThreshold) return TradingDecision.Entry;
-        if (score >= profile.PrepareThreshold) return TradingDecision.Prepare;
-        if (score >= profile.ContextThreshold) return TradingDecision.Context;
+        if (score >= thresholds.Entry) return TradingDecision.Entry;
+        if (score >= thresholds.Prepare) return TradingDecision.Prepare;
+        if (score >= thresholds.Context) return TradingDecision.Context;
         return TradingDecision.Ignore;
+    }
+
+    private (float Technical, float Quantitative, float Sentiment, float Fundamental) GetAdaptiveWeights(MarketRegimeType regime, ITradingStyleProfile profile, StrategyCalibration? calibration)
+    {
+        float technical = profile.TechnicalWeight * (calibration?.TechnicalMultiplier ?? 1.0f);
+        float quantitative = profile.QuantitativeWeight * (calibration?.QuantitativeMultiplier ?? 1.0f);
+        float sentiment = profile.SentimentWeight * (calibration?.SentimentMultiplier ?? 1.0f);
+        float fundamental = profile.FundamentalWeight * (calibration?.FundamentalMultiplier ?? 1.0f);
+
+        // Adaptive Adjustments (Sprint 4)
+        if (regime == MarketRegimeType.Ranging)
+        {
+            technical *= 1.3f; // Give more weight to oscillators in range
+            quantitative *= 0.7f; // Less weight to trend strength
+        }
+        else if (regime == MarketRegimeType.BullTrend || regime == MarketRegimeType.BearTrend)
+        {
+            quantitative *= 1.4f; // More weight to trend
+            technical *= 0.8f; 
+        }
+
+        // Normalize weights to sum to 1.0
+        float total = technical + quantitative + sentiment + fundamental;
+        if (total <= 0) return (0.25f, 0.25f, 0.25f, 0.25f);
+        return (technical / total, quantitative / total, sentiment / total, fundamental / total);
+    }
+
+    private async Task<StrategyCalibration?> GetCalibrationAsync(TradingStyle style, MarketRegimeType regime)
+    {
+        try
+        {
+            var query = await _calibrationRepository.GetQueryableAsync();
+            return query.FirstOrDefault(c => c.Style == style && c.Regime == regime);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("⚠️ Could not fetch StrategyCalibration: {Message}", ex.Message);
+            return null;
+        }
     }
 
     #region Component Calculations (Linear logic remains consistent for comparability)

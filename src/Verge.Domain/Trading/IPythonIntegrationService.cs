@@ -30,4 +30,5 @@ public class TechnicalsResponseModel
     public float BbWidth { get; set; }
     public float Adx { get; set; }
     public float Rsi { get; set; }
+    public float Atr { get; set; }
 }
