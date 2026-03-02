@@ -6,7 +6,7 @@ import { Router } from '@angular/router';
 import { GlassButtonComponent } from 'src/shared/components/glass-button/glass-button.component';
 import { IonIcon } from '@ionic/angular/standalone';
 import { IconService } from 'src/shared/services/icon.service';
-import { createChart, IChartApi, ISeriesApi, CandlestickData, CandlestickSeries } from 'lightweight-charts';
+import { createChart, IChartApi, ISeriesApi, CandlestickData, CandlestickSeries, LineSeries } from 'lightweight-charts';
 import { MarketDataService } from '../proxy/trading/market-data.service';
 import { TradingService } from '../proxy/trading/trading.service';
 import { TradingSessionDto, AnalysisLogDto, MarketAnalysisDto, OpportunityDto } from '../proxy/trading/models';
@@ -90,6 +90,17 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   sessionChecked = false;
   AnalysisLogType = AnalysisLogType; // Expose enum to template
 
+  // Tabs & Categorized Data (Institutional Overhaul)
+  activeTab: 'events' | 'whales' | 'liquidations' | 'scanner' = 'events';
+  whaleLogs: any[] = [];
+  liquidationLogs: any[] = [];
+  scannerData: Map<string, any> = new Map(); // Real-time grid data
+
+  // Header Institutional Metrics
+  headerWhales: any[] = [];
+  headerSqueezes: any[] = [];
+  headerHeatmapCoins: any[] = [];
+
   // Toast de notificación de stage
   stageNotification: { message: string; icon: string; color: string; visible: boolean } | null = null;
   private toastTimeout: any;
@@ -101,27 +112,40 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   // Lightweight Charts
   private chart: IChartApi | null = null;
   private candlestickSeries: ISeriesApi<'Candlestick'> | null = null;
+  private hmaSeries: ISeriesApi<'Line'> | null = null;
   private chartContainerElement: HTMLElement | null = null;
 
   // Configuración
   selectedSymbol = 'BTCUSDT';
   selectedTimeframe = '15';
+  hmaPeriod = 50;
 
   symbols = [
     { value: 'BTCUSDT', label: 'BTC/USDT' },
     { value: 'ETHUSDT', label: 'ETH/USDT' },
     { value: 'SOLUSDT', label: 'SOL/USDT' },
     { value: 'BNBUSDT', label: 'BNB/USDT' },
-    { value: 'XRPUSDT', label: 'XRP/USDT' }
+    { value: 'XRPUSDT', label: 'XRP/USDT' },
+    { value: 'ADAUSDT', label: 'ADA/USDT' },
+    { value: 'DOGEUSDT', label: 'DOGE/USDT' },
+    { value: 'MATICUSDT', label: 'MATIC/USDT' },
+    { value: 'DOTUSDT', label: 'DOT/USDT' },
+    { value: 'LTCUSDT', label: 'LTC/USDT' },
+    { value: 'AVAXUSDT', label: 'AVAX/USDT' },
+    { value: 'LINKUSDT', label: 'LINK/USDT' }
   ];
 
   timeframes = [
-    { value: '1', label: '1 minuto' },
-    { value: '5', label: '5 minutos' },
-    { value: '15', label: '15 minutos' },
-    { value: '60', label: '1 hora' },
-    { value: '240', label: '4 horas' },
-    { value: '1D', label: '1 día' }
+    { value: '1m', label: '1m' },
+    { value: '5m', label: '5m' },
+    { value: '15m', label: '15m' },
+    { value: '30m', label: '30m' },
+    { value: '1h', label: '1h' },
+    { value: '2h', label: '2h' },
+    { value: '4h', label: '4h' },
+    { value: '1d', label: '1d' },
+    { value: '1w', label: '1w' },
+    { value: '1M', label: '1M' }
   ];
 
   // Señales activas (reemplazado por logs reales)
@@ -235,22 +259,79 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
           this.currentStage = latestAlert.stage;
         }
 
-        // Sync score decay
-        if (latestAlert.score !== undefined && this.currentSession) {
-          this.currentSession.score = latestAlert.score;
-        }
-
-        // Sync Institutional Data (Sprint 5)
-        if (latestAlert.whaleInfluenceScore !== undefined && this.currentSession) {
-          this.currentSession.whaleInfluenceScore = latestAlert.whaleInfluenceScore;
-          this.currentSession.whaleSentiment = latestAlert.whaleSentiment;
-        }
-        if (latestAlert.macroQuietPeriod !== undefined && this.currentSession) {
-          this.currentSession.macroQuietPeriod = latestAlert.macroQuietPeriod;
-          this.currentSession.macroReason = latestAlert.macroReason;
-        }
+        // Institutional Data Categorization (Sprint 5 UI)
+        this.processInstitutionalAlert(latestAlert);
       }
     });
+  }
+
+  private processInstitutionalAlert(alert: any) {
+    if (!this.currentSession) return;
+
+    // 1. Update Scanner (Grid Data)
+    if (alert.crypto) {
+      this.scannerData.set(alert.crypto, {
+        symbol: alert.crypto,
+        score: alert.score || 0,
+        confidence: alert.confidence || 0,
+        direction: alert.direction,
+        winProb: alert.winProbability || 0,
+        whaleInfluence: alert.whaleInfluenceScore || 0,
+        regime: alert.structure || 'N/A',
+        isSqueeze: alert.title?.toLowerCase().includes('squeeze') || false
+      });
+    }
+
+    // 2. Whale Tab
+    if (alert.whaleInfluenceScore > 0) {
+      this.whaleLogs.unshift({
+        symbol: alert.crypto,
+        influence: alert.whaleInfluenceScore,
+        sentiment: alert.whaleSentiment,
+        message: alert.message,
+        timestamp: new Date()
+      });
+      this.whaleLogs = this.whaleLogs.slice(0, 50);
+
+      // Update Header Whales (Top 3)
+      this.headerWhales = this.whaleLogs
+        .filter(w => w.influence > 40)
+        .slice(0, 3);
+    }
+
+    // 3. Liquidations Tab
+    if (alert.title?.toLowerCase().includes('squeeze') || alert.message?.toLowerCase().includes('liquidación')) {
+      this.liquidationLogs.unshift({
+        symbol: alert.crypto,
+        message: alert.message,
+        confidence: alert.confidence || 80,
+        timestamp: new Date()
+      });
+      this.liquidationLogs = this.liquidationLogs.slice(0, 50);
+
+      // Update Header Squeezes
+      this.headerSqueezes = this.liquidationLogs.slice(0, 2);
+    }
+
+    // 4. Update Header Heatmap (Sprint 5 Enhancement)
+    if (alert.score > 0) {
+      const existing = this.headerHeatmapCoins.find(c => c.symbol === alert.crypto);
+      if (existing) {
+        existing.score = alert.score;
+      } else {
+        this.headerHeatmapCoins.push({ symbol: alert.crypto, score: alert.score });
+      }
+      this.headerHeatmapCoins.sort((a, b) => b.score - a.score);
+      this.headerHeatmapCoins = this.headerHeatmapCoins.slice(0, 3);
+    }
+  }
+
+  setTab(tab: 'events' | 'whales' | 'liquidations' | 'scanner') {
+    this.activeTab = tab;
+  }
+
+  getScannerList() {
+    return Array.from(this.scannerData.values()).sort((a, b) => b.score - a.score);
   }
 
   private handleSessionUpdate(session: any) {
@@ -356,6 +437,12 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       wickDownColor: '#ef5350',
     });
 
+    this.hmaSeries = this.chart.addSeries(LineSeries, {
+      color: '#3b82f6',
+      lineWidth: 2,
+      title: 'HMA 50',
+    });
+
     window.addEventListener('resize', this.onResize);
   }
 
@@ -370,14 +457,16 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.marketDataService.getCandles({
       symbol: this.selectedSymbol,
-      interval: `${this.selectedTimeframe}m`,
-      limit: 100
+      interval: this.selectedTimeframe,
+      limit: 1000
     }).subscribe({
       next: (data) => {
         if (this.candlestickSeries) {
           // Sort data for lightweight-charts
           const sortedData = [...data].sort((a, b) => a.time - b.time);
           this.candlestickSeries.setData(sortedData as CandlestickData[]);
+
+          this.updateHMA(sortedData);
 
           if (sortedData.length > 0) {
             const lastCandle = sortedData[sortedData.length - 1];
@@ -749,7 +838,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     };
   }
 
-  // Nuevo método para obtener la descripción según el stage
   getCurrentDescription(): string {
     switch (this.currentStage) {
       case 1: return 'Buscando patrón ideal en el mercado...';
@@ -760,17 +848,14 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  // Método para obtener el progreso en porcentaje
   getProgressPercentage(): number {
     return (this.currentStage / 4) * 100;
   }
 
-  // Método para verificar si un stage está activo
   isStageActive(stageIndex: number): boolean {
     return this.currentStage > stageIndex;
   }
 
-  // Método para verificar si es el stage actual
   isStageCurrent(stageIndex: number): boolean {
     return this.currentStage === stageIndex + 1;
   }
@@ -782,5 +867,83 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     } catch (e) {
       return null;
     }
+  }
+
+  // --- Indicator Calculations ---
+
+  updateHMA(data: any[]) {
+    if (!this.hmaSeries || data.length < this.hmaPeriod) {
+      if (this.hmaSeries) this.hmaSeries.setData([]);
+      return;
+    }
+
+    const prices = data.map(d => Number(d.close));
+    const hmaValues = this.calculateHMA(prices, this.hmaPeriod);
+
+    const hmaData = hmaValues.map((val, i) => ({
+      time: data[i + (data.length - hmaValues.length)].time,
+      value: val
+    }));
+
+    this.hmaSeries.setData(hmaData);
+    this.hmaSeries.applyOptions({ title: `HMA ${this.hmaPeriod}` });
+  }
+
+  private calculateHMA(data: number[], period: number): number[] {
+    const halfPeriod = Math.floor(period / 2);
+    const sqrtPeriod = Math.floor(Math.sqrt(period));
+
+    const wmaHalf = this.calculateWMA(data, halfPeriod);
+    const wmaFull = this.calculateWMA(data, period);
+
+    if (wmaFull.length === 0) return [];
+
+    const diff = [];
+    const offset = period - halfPeriod;
+    for (let i = 0; i < wmaFull.length; i++) {
+      diff.push(2 * wmaHalf[i + offset] - wmaFull[i]);
+    }
+
+    return this.calculateWMA(diff, sqrtPeriod);
+  }
+
+  private calculateWMA(data: number[], period: number): number[] {
+    const wma = [];
+    if (data.length < period) return [];
+
+    const weightSum = (period * (period + 1)) / 2;
+
+    for (let i = period - 1; i < data.length; i++) {
+      let sum = 0;
+      for (let j = 0; j < period; j++) {
+        sum += data[i - j] * (period - j);
+      }
+      wma.push(sum / weightSum);
+    }
+    return wma;
+  }
+
+  // --- UI Handlers ---
+
+  onSymbolChange() {
+    this.loadData();
+  }
+
+  onTimeframeChange(tf: string) {
+    this.selectedTimeframe = tf;
+    this.loadData();
+  }
+
+  onHmaChange() {
+    // Force recalculation if we have data
+    if (this.candlestickSeries) {
+      const currentData = (this.candlestickSeries as any)._data?._items || [];
+      // Handle private access if necessary, or just reload
+      this.loadData();
+    }
+  }
+
+  clearAlerts() {
+    this.alertService.clearAllAlerts();
   }
 }

@@ -45,6 +45,11 @@ export class AlertService {
         this.persistToStorage();
     }
 
+    clearAllAlerts() {
+        this.alerts.set([]);
+        this.persistToStorage();
+    }
+
     getUnreadCount(): number {
         return this.alerts().filter(a => !a.read).length;
     }

@@ -100,7 +100,7 @@ public class MarketDataManager : DomainService
             symbol = symbol.ToUpper().Replace("/", "").Replace("-", "").Trim();
             
             // CONVERSIÓN DEL INTERVALO
-            string binanceInterval = interval switch
+            string binanceInterval = interval.ToLower() switch
             {
                 "1" => "1m",
                 "5" => "5m",
@@ -108,10 +108,7 @@ public class MarketDataManager : DomainService
                 "30" => "30m",
                 "60" => "1h",
                 "240" => "4h",
-                "1D" => "1d",
-                "1W" => "1w",
-                "1M" => "1M",
-                _ => interval // si ya viene en formato correcto
+                _ => interval // handles "1h", "1d", "1w", "1M" etc. directly
             };
             
             // LOG: a qué se convirtió
