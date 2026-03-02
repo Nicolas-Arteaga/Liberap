@@ -4,5 +4,5 @@ namespace Verge.Trading.DecisionEngine;
 
 public interface ITradingDecisionEngine
 {
-    DecisionResult Evaluate(TradingSession session, TradingStyle style, MarketContext context);
+    DecisionResult Evaluate(TradingSession session, TradingStyle style, MarketContext context, bool isAutoMode = false);
 }

@@ -12,6 +12,8 @@ public class MarketAnalysisDto
     public string Sentiment { get; set; }
     public DateTime Timestamp { get; set; }
     public string Description { get; set; }
+    public string Structure { get; set; } = "Neutral";
+    public bool BosDetected { get; set; }
 }
 
 public class OpportunityDto
@@ -22,4 +24,6 @@ public class OpportunityDto
     public string Reason { get; set; }
     public decimal? EntryMinPrice { get; set; }
     public decimal? EntryMaxPrice { get; set; }
+    public decimal? EntryMin { get; set; }
+    public decimal? EntryMax { get; set; }
 }

@@ -17,9 +17,15 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
         _logger = logger;
     }
 
-    public DecisionResult Evaluate(TradingSession session, TradingStyle style, MarketContext context)
+    public DecisionResult Evaluate(TradingSession session, TradingStyle style, MarketContext context, bool isAutoMode = false)
     {
-        _logger.LogInformation("🧠 Profile-Based Evaluation: Session {SessionId} | Style: {Style}", session.Id, style);
+        _logger.LogInformation("🧠 Profile-Based Evaluation: Session {SessionId} | Style: {Style} | AutoAdapt: {AutoAdapt}", session.Id, style, isAutoMode);
+
+        // 0. Update Direction based on Market Structure (Sprint 2 Adaptive)
+        if (isAutoMode)
+        {
+            UpdateDirectionBasedOnStructure(session, context);
+        }
 
         // 1. Get corresponding Profile
         var profile = TradingStyleProfileFactory.GetProfile(style);
@@ -117,12 +123,24 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
         var winProb = CalculateWinProbability(roundedScore, confidence, context);
         var rrRatio = CalculateRiskRewardRatio(context, style, decision);
 
+        // 8. Add Structural Context to Reason (Sprint 2)
+        if (context.MarketRegime != null && context.MarketRegime.Structure != "Neutral")
+        {
+            var structInfo = $"[{context.MarketRegime.Structure}";
+            if (context.MarketRegime.BosDetected) structInfo += " / BOS Detected";
+            if (context.MarketRegime.ChochDetected) structInfo += " / CHOCH Detected";
+            structInfo += "]";
+            penaltyReason = $"{structInfo} {penaltyReason}".Trim();
+        }
+
         var result = new DecisionResult
         {
             Decision = decision,
-            Confidence = confidence,
             Score = roundedScore,
-            Reason = $"Score: {roundedScore}. Style: {style}. {penaltyReason}".Trim(),
+            Reason = string.IsNullOrEmpty(penaltyReason) 
+                ? (decision == TradingDecision.Entry ? "🚀 ENTRY SETUP READY" : $"Score: {roundedScore}. Style: {style}.")
+                : $"{penaltyReason}".Trim(),
+            Confidence = confidence,
             WeightedScores = new Dictionary<string, float>
             {
                 { "Technical", technicalScore * profile.TechnicalWeight },
@@ -145,6 +163,36 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
 
         _logger.LogInformation("✅ Evaluation Result for {Style}: {Decision} (Score: {Score})", style, result.Decision, result.Score);
         return result;
+    }
+
+    private void UpdateDirectionBasedOnStructure(TradingSession session, MarketContext context)
+    {
+        if (context.MarketRegime == null) return;
+
+        var structure = context.MarketRegime.Structure;
+        var bos = context.MarketRegime.BosDetected;
+        var choch = context.MarketRegime.ChochDetected;
+
+        // Adaptive Direction Logic (Sprint 2)
+        // If we detect a clear structural break (BOS or CHOCH), we flip the session direction
+        if (structure == "Bullish" && (bos || choch))
+        {
+            if (session.SelectedDirection != SignalDirection.Long)
+            {
+                _logger.LogInformation("🔄 AUTO ADAPT: Changing direction to LONG due to {Type} detected for {Symbol} (Session: {Id})", 
+                    bos ? "BOS" : "CHOCH", session.Symbol, session.Id);
+                session.SelectedDirection = SignalDirection.Long;
+            }
+        }
+        else if (structure == "Bearish" && (bos || choch))
+        {
+            if (session.SelectedDirection != SignalDirection.Short)
+            {
+                _logger.LogInformation("🔄 AUTO ADAPT: Changing direction to SHORT due to {Type} detected for {Symbol} (Session: {Id})", 
+                    bos ? "BOS" : "CHOCH", session.Symbol, session.Id);
+                session.SelectedDirection = SignalDirection.Short;
+            }
+        }
     }
 
     private TradingDecision GetDecisionFromProfile(int score, ITradingStyleProfile profile)

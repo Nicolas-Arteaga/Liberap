@@ -12,13 +12,16 @@ public interface IPythonIntegrationService
     Task<bool> IsHealthyAsync();
 }
 
-
 public class RegimeResponseModel
 {
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public MarketRegimeType Regime { get; set; }
     public float VolatilityScore { get; set; }
     public float TrendStrength { get; set; }
+    public string Structure { get; set; } = "Neutral";
+    public bool BosDetected { get; set; }
+    public bool ChochDetected { get; set; }
+    public List<float> LiquidityZones { get; set; } = new();
 }
 
 public class TechnicalsResponseModel

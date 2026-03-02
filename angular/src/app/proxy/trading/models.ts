@@ -108,6 +108,8 @@ export interface MarketAnalysisDto {
   sentiment?: string;
   timestamp?: string;
   description?: string;
+  structure?: string;
+  bosDetected: boolean;
 }
 
 export interface MarketCandleDto {
@@ -125,6 +127,8 @@ export interface OpportunityDto {
   reason?: string;
   entryMinPrice?: number;
   entryMaxPrice?: number;
+  entryMin?: number;
+  entryMax?: number;
 }
 
 export interface RecommendedStyleDto {
@@ -254,6 +258,10 @@ export interface VergeAlertDto {
   targetZone: TargetZoneDto;
   riskRewardRatio?: number;
   winProbability?: number;
+  structure?: string;
+  bosDetected: boolean;
+  chochDetected: boolean;
+  liquidityZones: number[];
   severity?: string;
   icon?: string;
 }

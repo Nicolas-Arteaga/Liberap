@@ -21,6 +21,12 @@ export interface VergeAlert {
     riskRewardRatio?: number;
     winProbability?: number;
 
+    // Structure (Sprint 2)
+    structure?: string;
+    bosDetected?: boolean;
+    chochDetected?: boolean;
+    liquidityZones?: number[];
+
     severity: string;
     icon: string;
 }

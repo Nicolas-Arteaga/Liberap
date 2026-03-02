@@ -357,3 +357,46 @@
     box-shadow: 0 0 0 0 rgba(0, 196, 125, 0);
   }
 }
+
+.structure-ribbon {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  &.bullish {
+    background: rgba(0, 196, 125, 0.05);
+    border-color: rgba(0, 196, 125, 0.2);
+
+    .structure-label {
+      color: #00c47d;
+    }
+  }
+
+  &.bearish {
+    background: rgba(235, 68, 90, 0.05);
+    border-color: rgba(235, 68, 90, 0.2);
+
+    .structure-label {
+      color: #ff4d4d;
+    }
+  }
+
+  .structure-label {
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  .badge {
+    font-size: 0.6rem;
+    padding: 0.35em 0.65em;
+    border-radius: 6px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+}

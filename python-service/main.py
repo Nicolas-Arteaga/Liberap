@@ -129,44 +129,92 @@ def _df_from_request(request: MarketDataRequest) -> pd.DataFrame:
     df = pd.DataFrame([d.model_dump() for d in request.data])
     return df
 
+def detect_swings(df: pd.DataFrame, window: int = 5):
+    """Detect Swing Highs and Swing Lows"""
+    df['swing_high'] = df['high'].rolling(window=window*2+1, center=True).max()
+    df['swing_low'] = df['low'].rolling(window=window*2+1, center=True).min()
+    
+    is_high = df['high'] == df['swing_high']
+    is_low = df['low'] == df['swing_low']
+    
+    return is_high, is_low
+
 @app.post("/detect-regime", response_model=RegimeResponse)
 async def detect_regime(request: MarketDataRequest):
     try:
-        if not request.data or len(request.data) < 20:
+        if not request.data or len(request.data) < 30:
             return RegimeResponse(regime="Ranging", volatility_score=0.0, trend_strength=0.0)
             
         df = _df_from_request(request)
         
-        # Calculate ADX for trend strength
+        # 1. basic Indicators
         adx_indicator = ta.trend.ADXIndicator(high=df["high"], low=df["low"], close=df["close"])
         df["adx"] = adx_indicator.adx()
-        
-        # Calculate ATR for volatility
         atr_indicator = ta.volatility.AverageTrueRange(high=df["high"], low=df["low"], close=df["close"])
         df["atr"] = atr_indicator.average_true_range()
         
-        # Normalized volatility
         current_close = df["close"].iloc[-1]
         volatility_score = (df["atr"].iloc[-1] / current_close) * 100 if current_close > 0 else 0
-        
         adx_val = df["adx"].iloc[-1]
         
+        # 2. Market Structure (BOS/CHOCH)
+        is_high, is_low = detect_swings(df, window=5)
+        highs = df[is_high]['high'].tolist()
+        lows = df[is_low]['low'].tolist()
+        
+        structure = "Neutral"
+        bos = False
+        choch = False
+        
+        if len(highs) >= 2 and len(lows) >= 2:
+            last_high = highs[-1]
+            prev_high = highs[-2]
+            last_low = lows[-1]
+            prev_low = lows[-2]
+            
+            # BOS Detection (Trend Continuation)
+            if current_close > last_high:
+                bos = True
+                structure = "Bullish"
+            elif current_close < last_low:
+                bos = True
+                structure = "Bearish"
+                
+            # CHOCH Detection (Trend Reversal)
+            # Simplificado: si veníamos de Bullish (highs subiendo) y rompemos el último Low relevante
+            if last_high > prev_high and current_close < last_low:
+                choch = True
+                structure = "Bearish"
+            elif last_low < prev_low and current_close > last_high:
+                choch = True
+                structure = "Bullish"
+
+        # 3. Regime Determination
         regime = "Ranging"
         if pd.notna(adx_val) and adx_val > 25:
-            # Check direction using simple SMA 20
             df["sma20"] = ta.trend.sma_indicator(df["close"], window=20)
             if current_close > df["sma20"].iloc[-1]:
                 regime = "BullTrend"
             else:
                 regime = "BearTrend"
                 
-        if volatility_score > 2.0:
+        if volatility_score > 1.8: # Umbral ajustado
             regime = "VolatileBreakout"
             
+        # 4. Liquidity Zones (Basic)
+        # Find price levels with multiple touches
+        price_rounded = df['close'].round(2)
+        counts = price_rounded.value_counts()
+        liquidity_zones = counts[counts >= 3].index.tolist()[:3] # Top 3 zones
+
         return RegimeResponse(
             regime=regime,
             volatility_score=float(volatility_score) if pd.notna(volatility_score) else 0.0,
-            trend_strength=float(adx_val) if pd.notna(adx_val) else 0.0
+            trend_strength=float(adx_val) if pd.notna(adx_val) else 0.0,
+            structure=structure,
+            bos_detected=bos,
+            choch_detected=choch,
+            liquidity_zones=[float(z) for z in liquidity_zones]
         )
     except Exception as e:
         logger.exception("Error in detect_regime")

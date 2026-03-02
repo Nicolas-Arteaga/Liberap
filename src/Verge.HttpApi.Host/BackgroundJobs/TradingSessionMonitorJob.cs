@@ -252,7 +252,7 @@ public class TradingSessionMonitorJob : BackgroundService
                     }
 
                     // Always evaluate to apply SetupDecay (Time-based)
-                    var evalResult = decisionEngine.Evaluate(session, strategy.Style, data.context);
+                    var evalResult = decisionEngine.Evaluate(session, strategy.Style, data.context, isAutoMode);
                     
                     // 6. Force Context alert for Stage 1 evaluations so the frontend is notified
                     if (session.CurrentStage == TradingStage.Evaluating && evalResult.Decision == DecisionEngine.TradingDecision.Ignore)
@@ -575,7 +575,11 @@ public class TradingSessionMonitorJob : BackgroundService
             Stage = session.CurrentStage,
             Score = result.Score,
             Severity = mappedSeverity,
-            Icon = "analytics-outline"
+            Icon = "analytics-outline",
+            Structure = context.MarketRegime?.Structure,
+            BosDetected = context.MarketRegime?.BosDetected ?? false,
+            ChochDetected = context.MarketRegime?.ChochDetected ?? false,
+            LiquidityZones = context.MarketRegime?.LiquidityZones ?? new List<float>()
         };
         
         if (result.EntryMinPrice.HasValue && result.EntryMaxPrice.HasValue)

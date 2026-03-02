@@ -92,6 +92,21 @@
       </div>
     </div>
 
+    <!-- Market Structure (Sprint 2) -->
+    <div *ngIf="activeOverlayAlert.structure || activeOverlayAlert.bosDetected || activeOverlayAlert.chochDetected"
+      class="structure-ribbon mb-4" [ngClass]="activeOverlayAlert.structure?.toLowerCase()">
+      <div class="structure-label d-flex align-items-center gap-2">
+        <ion-icon
+          [name]="activeOverlayAlert.bosDetected || activeOverlayAlert.chochDetected ? 'flash-outline' : 'prism-outline'"></ion-icon>
+        <span class="text-uppercase fw-bold">{{ activeOverlayAlert.structure || 'Neutral' }} Structure</span>
+      </div>
+      <div class="structure-meta d-flex gap-2">
+        <span *ngIf="activeOverlayAlert.bosDetected" class="badge bg-primary text-white">BOS Detectado</span>
+        <span *ngIf="activeOverlayAlert.chochDetected" class="badge bg-warning text-dark">CHOCH Detectado</span>
+      </div>
+    </div>
+
+
     <!-- Zona Operativa -->
     <div *ngIf="activeOverlayAlert.targetZone" class="zone-box">
       <div class="zone-header d-flex justify-content-between align-items-center mb-2">

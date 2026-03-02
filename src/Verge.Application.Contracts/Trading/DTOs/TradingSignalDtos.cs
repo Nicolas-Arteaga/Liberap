@@ -46,6 +46,12 @@ public class VergeAlertDto
     public double? RiskRewardRatio { get; set; }
     public double? WinProbability { get; set; }
 
+    // Structure (Sprint 2)
+    public string? Structure { get; set; }
+    public bool BosDetected { get; set; }
+    public bool ChochDetected { get; set; }
+    public System.Collections.Generic.List<float> LiquidityZones { get; set; } = new();
+
     // UI
     public string Severity { get; set; } = "info"; 
     public string Icon { get; set; } = string.Empty;
