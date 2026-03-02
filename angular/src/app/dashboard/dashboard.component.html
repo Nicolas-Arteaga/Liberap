@@ -43,6 +43,13 @@
           <span class="text-white fw-bold text-sm">{{ analysisTime }}</span>
         </div>
 
+        <!-- Sprint 5: Macro Quiet Period Alert -->
+        <div *ngIf="currentSession?.macroQuietPeriod"
+          class="macro-quiet-warning d-flex align-items-center gap-2 px-3 py-1 rounded-pill bg-danger-soft border border-danger">
+          <ion-icon name="alert-circle" class="text-danger pulsate"></ion-icon>
+          <span class="text-danger fw-bold text-xs">{{ currentSession?.macroReason }}</span>
+        </div>
+
         <app-glass-button *ngIf="currentSession" variant="danger" class="ms-auto" (click)="finalizeHunt()"
           style="width: auto; height: 36px; padding: 0 15px; font-size: 0.85rem;">
           <ion-icon name="stop-circle-outline" class="me-1"></ion-icon>
@@ -121,6 +128,13 @@
             <span class="text-white-50 text-sm">→</span>
             <span class="text-primary fw-bold text-sm">RSI {{ m.rsi }}</span>
             <span class="text-white-50 text-sm">| {{ m.description }}</span>
+
+            <!-- Sprint 5: Institutional Badges per Symbol -->
+            <div class="d-flex gap-2 ms-2">
+              <span *ngIf="m.isSqueeze" class="badge bg-danger text-xs pulsate">🔥 SQUEEZE</span>
+              <span *ngIf="m.whaleInfluence > 40" class="badge bg-info text-xs">🐋 WHALE: {{ m.whaleInfluence }}%</span>
+              <span *ngIf="m.macroQuiet" class="badge bg-light text-dark text-xs">🌍 QUIET</span>
+            </div>
           </div>
         </div>
       </div>
@@ -187,6 +201,13 @@
                     </span>
                     <span *ngIf="data?.entryMin" class="text-xs fw-bold" [style.color]="getLogColor(log)">
                       🎯 Zona: ${{ data.entryMin | number:'1.2-2' }}-${{ data.entryMax | number:'1.2-2' }}
+                    </span>
+                    <!-- Sprint 5: Institutional Metadata in Logs -->
+                    <span *ngIf="data?.whaleInfluence" class="text-xs d-flex align-items-center gap-1 text-info">
+                      <ion-icon name="water-outline"></ion-icon> 🐋 Impacto: {{ data.whaleInfluence }}%
+                    </span>
+                    <span *ngIf="data?.macroQuiet" class="text-xs d-flex align-items-center gap-1 text-danger">
+                      <ion-icon name="alert-circle-outline"></ion-icon> 📅 Noticia: {{ data.macroReason }}
                     </span>
                   </ng-container>
                 </div>

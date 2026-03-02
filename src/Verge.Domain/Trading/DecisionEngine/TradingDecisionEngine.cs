@@ -14,15 +14,24 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
     private readonly ILogger<TradingDecisionEngine> _logger;
     private readonly IProbabilisticEngine _probabilisticEngine;
     private readonly Volo.Abp.Domain.Repositories.IRepository<StrategyCalibration, Guid> _calibrationRepository;
+    private readonly IWhaleTrackerService _whaleTrackerService;
+    private readonly IInstitutionalDataService _institutionalDataService;
+    private readonly IMacroSentimentService _macroSentimentService;
 
     public TradingDecisionEngine(
         ILogger<TradingDecisionEngine> logger,
         IProbabilisticEngine probabilisticEngine,
-        Volo.Abp.Domain.Repositories.IRepository<StrategyCalibration, Guid> calibrationRepository)
+        Volo.Abp.Domain.Repositories.IRepository<StrategyCalibration, Guid> calibrationRepository,
+        IWhaleTrackerService whaleTrackerService,
+        IInstitutionalDataService institutionalDataService,
+        IMacroSentimentService macroSentimentService)
     {
         _logger = logger;
         _probabilisticEngine = probabilisticEngine;
         _calibrationRepository = calibrationRepository;
+        _whaleTrackerService = whaleTrackerService;
+        _institutionalDataService = institutionalDataService;
+        _macroSentimentService = macroSentimentService;
     }
 
     public async Task<DecisionResult> EvaluateAsync(TradingSession session, TradingStyle style, MarketContext context, bool isAutoMode = false)
@@ -74,9 +83,16 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
         float sentimentScore = CalculateSentimentScore(context);
         float fundamentalScore = CalculateFundamentalScore(context);
 
+        // 4.1. Institutional Score Calculation (Whale Activity)
+        context.WhaleData ??= await _whaleTrackerService.GetWhaleActivityAsync(session.Symbol);
+        context.InstitutionalData ??= await _institutionalDataService.GetInstitutionalDataAsync(session.Symbol);
+        context.MacroData ??= await _macroSentimentService.GetMacroSentimentAsync();
+        
+        float institutionalScore = CalculateInstitutionalScore(context);
+
         // 5. Apply Profile Weights (Sprint 4: Adaptive Weights + Calibration)
         var calibration = await GetCalibrationAsync(style, currentRegime);
-        var weights = GetAdaptiveWeights(currentRegime, profile, calibration);
+        var weights = GetAdaptiveWeights(currentRegime, profile, calibration, context);
         
         float finalScore = (technicalScore * weights.Technical) +
                            (quantitativeScore * weights.Quantitative) +
@@ -176,8 +192,21 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
             },
             WinProbability = winRate.Probability, // Use Sprint 4 Engine Probability
             HistoricSampleSize = winRate.SampleSize,
-            RiskRewardRatio = rrRatio
+            RiskRewardRatio = rrRatio,
+            WhaleInfluenceScore = context.WhaleData?.MaxInfluenceDetected ?? 0,
+            WhaleSentiment = context.WhaleData?.Summary,
+            MacroQuietPeriod = context.MacroData?.IsInQuietPeriod ?? false,
+            MacroReason = context.MacroData?.QuietPeriodReason
         };
+
+        // 9. Quiet Period Enforcement (Sprint 5)
+        if (context.MacroData?.IsInQuietPeriod == true)
+        {
+            _logger.LogWarning("🌍 BLOCKING ENTRY: Quiet period active for {symbol} due to macroeconomic volatility.", session.Symbol);
+            result.Decision = TradingDecision.Ignore;
+            result.Reason = context.MacroData.QuietPeriodReason;
+            return result;
+        }
 
         if (winRate.Probability > 0.75 && winRate.SampleSize >= 10)
         {
@@ -236,7 +265,7 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
         return TradingDecision.Ignore;
     }
 
-    private (float Technical, float Quantitative, float Sentiment, float Fundamental) GetAdaptiveWeights(MarketRegimeType regime, ITradingStyleProfile profile, StrategyCalibration? calibration)
+    private (float Technical, float Quantitative, float Sentiment, float Fundamental) GetAdaptiveWeights(MarketRegimeType regime, ITradingStyleProfile profile, StrategyCalibration? calibration, MarketContext context)
     {
         float technical = profile.TechnicalWeight * (calibration?.TechnicalMultiplier ?? 1.0f);
         float quantitative = profile.QuantitativeWeight * (calibration?.QuantitativeMultiplier ?? 1.0f);
@@ -253,6 +282,15 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
         {
             quantitative *= 1.4f; // More weight to trend
             technical *= 0.8f; 
+        }
+
+        // Adaptive Adjustments (Sprint 5: Institutional Squeezes)
+        if (context.InstitutionalData?.IsSqueezeDetected == true)
+        {
+            // During a squeeze, order flow and institutional data are the ONLY thing that matter
+            quantitative *= 1.5f; 
+            technical *= 0.5f;
+            _logger.LogInformation("🔥 ADAPTIVE WEIGHTS: Boosting institutional weight due to Squeeze detected!");
         }
 
         // Normalize weights to sum to 1.0
@@ -325,6 +363,38 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
     private float CalculateFundamentalScore(MarketContext context)
     {
         return 50f; // Standardized fundamental base
+    }
+
+    private float CalculateInstitutionalScore(MarketContext context)
+    {
+        float score = 50f;
+
+        // 1. Whale Activity (NetFlow + Influence)
+        if (context.WhaleData != null)
+        {
+            score += (float)(context.WhaleData.NetFlowScore * 20); // -20 to +20
+            if (context.WhaleData.MaxInfluenceDetected > 0.8)
+            {
+                score += context.WhaleData.NetFlowScore > 0 ? 10 : -10;
+            }
+        }
+
+        // 2. Liquidation Squeezes (Sprint 5)
+        if (context.InstitutionalData != null)
+        {
+            if (context.InstitutionalData.IsSqueezeDetected)
+            {
+                // A short squeeze is BULLISH (seller exhaustion), a long squeeze is BEARISH
+                score += context.InstitutionalData.SqueezeType == "Short Squeeze" ? 25 : -25;
+            }
+
+            // 3. Bid/Ask Imbalance (Order Flow)
+            // Ratio > 2.0 is strong. We use (Ratio - 1.0) * 10
+            double imbalanceBonus = (context.InstitutionalData.BidAskImbalance - 1.0) * 10;
+            score += (float)Math.Clamp(imbalanceBonus, -20, 20);
+        }
+
+        return Math.Clamp(score, 0, 100);
     }
     #endregion
 

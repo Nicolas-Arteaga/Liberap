@@ -9,6 +9,7 @@ import type { TradeStatus } from './trade-status.enum';
 import type { SignalConfidence } from './signal-confidence.enum';
 import type { TradingLevel } from './trading-level.enum';
 import type { TradingStage } from './trading-stage.enum';
+import type { MarketRegimeType } from './market-regime-type.enum';
 
 export interface AnalysisLogDto {
   symbol?: string;
@@ -212,6 +213,17 @@ export interface TradingSessionDto extends FullAuditedEntityDto<string> {
   partialTpsCount: number;
   initialStopLoss?: number;
   currentInvestment: number;
+  initialScore?: number;
+  initialRegime?: MarketRegimeType;
+  initialConfidence?: SignalConfidence;
+  initialVolatility?: number;
+  initialVolumeMcapRatio?: number;
+  entryHour?: number;
+  entryDayOfWeek?: any;
+  whaleInfluenceScore?: number;
+  whaleSentiment?: string;
+  macroQuietPeriod?: boolean;
+  macroReason?: string;
 }
 
 export interface TradingSignalDto extends EntityDto<string> {
@@ -264,6 +276,8 @@ export interface VergeAlertDto {
   targetZone: TargetZoneDto;
   riskRewardRatio?: number;
   winProbability?: number;
+  historicSampleSize?: number;
+  patternSignal?: string;
   structure?: string;
   bosDetected: boolean;
   chochDetected: boolean;

@@ -5126,6 +5126,30 @@
     }
   },
   "types": {
+    "System.DayOfWeek": {
+      "baseType": "System.Enum",
+      "isEnum": true,
+      "enumNames": [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday"
+      ],
+      "enumValues": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "genericArguments": null,
+      "properties": null
+    },
     "System.Nullable<T0>": {
       "baseType": "System.ValueType",
       "isEnum": false,
@@ -6307,6 +6331,26 @@
         }
       ]
     },
+    "Verge.Trading.MarketRegimeType": {
+      "baseType": "System.Enum",
+      "isEnum": true,
+      "enumNames": [
+        "BullTrend",
+        "BearTrend",
+        "Ranging",
+        "HighVolatility",
+        "LowVolatility"
+      ],
+      "enumValues": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "genericArguments": null,
+      "properties": null
+    },
     "Verge.Trading.OpportunityDto": {
       "baseType": null,
       "isEnum": false,
@@ -7291,6 +7335,138 @@
           "minimum": null,
           "maximum": null,
           "regex": null
+        },
+        {
+          "name": "InitialScore",
+          "jsonName": null,
+          "type": "System.Int32?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "InitialRegime",
+          "jsonName": null,
+          "type": "Verge.Trading.MarketRegimeType?",
+          "typeSimple": "enum?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "InitialConfidence",
+          "jsonName": null,
+          "type": "Verge.Trading.SignalConfidence?",
+          "typeSimple": "enum?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "InitialVolatility",
+          "jsonName": null,
+          "type": "System.Decimal?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "InitialVolumeMcapRatio",
+          "jsonName": null,
+          "type": "System.Decimal?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "EntryHour",
+          "jsonName": null,
+          "type": "System.Int32?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "EntryDayOfWeek",
+          "jsonName": null,
+          "type": "System.DayOfWeek?",
+          "typeSimple": "enum?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "WhaleInfluenceScore",
+          "jsonName": null,
+          "type": "System.Double?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "WhaleSentiment",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "MacroQuietPeriod",
+          "jsonName": null,
+          "type": "System.Boolean?",
+          "typeSimple": "boolean?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "MacroReason",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
         }
       ]
     },
@@ -7847,6 +8023,30 @@
           "jsonName": null,
           "type": "System.Double?",
           "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "HistoricSampleSize",
+          "jsonName": null,
+          "type": "System.Int32?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "PatternSignal",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
           "isRequired": false,
           "minLength": null,
           "maxLength": null,

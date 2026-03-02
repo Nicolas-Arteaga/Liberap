@@ -71,6 +71,7 @@ public class VergeDbContext :
     public DbSet<ExchangeConnection> ExchangeConnections { get; set; }
     public DbSet<AnalysisLog> AnalysisLogs { get; set; }
     public DbSet<StrategyCalibration> StrategyCalibrations { get; set; }
+    public DbSet<WhaleMovement> WhaleMovements { get; set; }
 
     #endregion
 

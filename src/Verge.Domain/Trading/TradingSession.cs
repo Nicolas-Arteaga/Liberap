@@ -42,6 +42,12 @@ public class TradingSession : FullAuditedAggregateRoot<Guid>
     public int? EntryHour { get; set; }
     public DayOfWeek? EntryDayOfWeek { get; set; }
 
+    // Institutional (Sprint 5)
+    public double? WhaleInfluenceScore { get; set; }
+    public string? WhaleSentiment { get; set; }
+    public bool? MacroQuietPeriod { get; set; }
+    public string? MacroReason { get; set; }
+
     protected TradingSession() { }
 
     public TradingSession(Guid id, Guid traderProfileId, string symbol, string timeframe)

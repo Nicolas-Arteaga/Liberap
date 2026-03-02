@@ -56,7 +56,9 @@ public class VergeDomainModule : AbpModule
         context.Services.AddHttpClient();
         context.Services.AddTransient<CryptoAnalysisService>();
         context.Services.AddTransient<IProbabilisticEngine, ProbabilisticEngine>();
-
+        context.Services.AddScoped<IWhaleTrackerService, WhaleTrackerService>();
+        context.Services.AddScoped<IInstitutionalDataService, InstitutionalDataService>();
+        context.Services.AddSingleton<IMacroSentimentService, MacroSentimentService>();
 #if DEBUG
         context.Services.Replace(ServiceDescriptor.Singleton<IEmailSender, NullEmailSender>());
 #endif

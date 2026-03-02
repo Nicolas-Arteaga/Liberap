@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Verge.EntityFrameworkCore;
@@ -12,9 +13,11 @@ using Volo.Abp.EntityFrameworkCore;
 namespace Verge.Migrations
 {
     [DbContext(typeof(VergeDbContext))]
-    partial class VergeDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260302035344_AddWhaleTracking")]
+    partial class AddWhaleTracking
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -779,12 +782,6 @@ namespace Verge.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("LastModifierId");
 
-                    b.Property<bool?>("MacroQuietPeriod")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("MacroReason")
-                        .HasColumnType("text");
-
                     b.Property<decimal?>("NetProfit")
                         .HasColumnType("numeric");
 
@@ -826,12 +823,6 @@ namespace Verge.Migrations
 
                     b.Property<decimal?>("TrailingStopPrice")
                         .HasColumnType("numeric");
-
-                    b.Property<double?>("WhaleInfluenceScore")
-                        .HasColumnType("double precision");
-
-                    b.Property<string>("WhaleSentiment")
-                        .HasColumnType("text");
 
                     b.HasKey("Id");
 

@@ -38,6 +38,12 @@ public class TradingSessionDto : FullAuditedEntityDto<Guid>
     public decimal? InitialVolumeMcapRatio { get; set; }
     public int? EntryHour { get; set; }
     public DayOfWeek? EntryDayOfWeek { get; set; }
+    
+    // Institutional (Sprint 5)
+    public double? WhaleInfluenceScore { get; set; }
+    public string? WhaleSentiment { get; set; }
+    public bool? MacroQuietPeriod { get; set; }
+    public string? MacroReason { get; set; }
 }
 
 public class StartSessionDto

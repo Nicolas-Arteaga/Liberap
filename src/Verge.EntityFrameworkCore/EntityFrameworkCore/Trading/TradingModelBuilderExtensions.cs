@@ -86,5 +86,15 @@ public static class TradingModelBuilderExtensions
             b.ConfigureByConvention();
             b.HasIndex(x => new { x.Style, x.Regime }).IsUnique();
         });
+
+        builder.Entity<WhaleMovement>(b =>
+        {
+            b.ToTable("WhaleMovements");
+            b.ConfigureByConvention();
+            b.Property(x => x.Symbol).IsRequired().HasMaxLength(20);
+            b.Property(x => x.WalletAddress).IsRequired().HasMaxLength(128);
+            b.HasIndex(x => x.Symbol);
+            b.HasIndex(x => x.WalletAddress);
+        });
     }
 }

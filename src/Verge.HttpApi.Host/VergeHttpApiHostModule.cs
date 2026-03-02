@@ -131,6 +131,8 @@ public class VergeHttpApiHostModule : AbpModule
         context.Services.AddHostedService<FastTickScannerService>();
         context.Services.AddHostedService<TradingSessionMonitorJob>();
         context.Services.AddHostedService<AutoCalibrationJob>();
+        context.Services.AddHostedService<WhaleMonitoringJob>();
+        context.Services.AddHostedService<MacroCalendarJob>();
         context.Services.AddHostedService<MarketScannerService>();
 
     }

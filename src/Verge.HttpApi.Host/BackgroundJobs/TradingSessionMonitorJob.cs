@@ -85,6 +85,7 @@ public class TradingSessionMonitorJob : BackgroundService
         var snapshotCache = scope.ServiceProvider.GetRequiredService<MarketSnapshotCache>();
         var analysisLogRepo = scope.ServiceProvider.GetRequiredService<IRepository<AnalysisLog, Guid>>();
         var profileRepository = scope.ServiceProvider.GetRequiredService<IRepository<TraderProfile, Guid>>();
+        var macroService = scope.ServiceProvider.GetRequiredService<IMacroSentimentService>();
         var unitOfWorkManager = scope.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
         var eventBus = scope.ServiceProvider.GetRequiredService<IDistributedEventBus>();
 
@@ -100,6 +101,7 @@ public class TradingSessionMonitorJob : BackgroundService
         // 1. Fetch GLOBAL Macro Data (Once per cycle)
         _logger.LogInformation("🌍 Fetching Global Macro Data...");
         var fng = await fngService.GetCurrentFearAndGreedAsync();
+        var macroData = await macroService.GetMacroSentimentAsync();
         
         // 2. Discovery: Identify all required Symbol/Timeframe pairs
         var requiredGroups = new HashSet<(string symbol, string timeframe)>();
@@ -198,6 +200,7 @@ public class TradingSessionMonitorJob : BackgroundService
                     OpenInterest = oi,
                     MarketRegime = regime,
                     Technicals = technicals,
+                    MacroData = macroData,
                     Candles = candles
                 };
 
@@ -441,6 +444,12 @@ public class TradingSessionMonitorJob : BackgroundService
                     session.EntryHour = DateTime.UtcNow.Hour;
                     session.EntryDayOfWeek = DateTime.UtcNow.DayOfWeek;
 
+                    // Sprint 5: Institutional persistence
+                    session.WhaleInfluenceScore = result.WhaleInfluenceScore;
+                    session.WhaleSentiment = result.WhaleSentiment;
+                    session.MacroQuietPeriod = result.MacroQuietPeriod;
+                    session.MacroReason = result.MacroReason;
+
                     CalculateTargets(session, strategy, currentPrice);
                     changed = true;
                 }
@@ -558,7 +567,11 @@ public class TradingSessionMonitorJob : BackgroundService
             winProb = result.WinProbability,
             rr = result.RiskRewardRatio,
             sampleSize = result.HistoricSampleSize,
-            pattern = result.PatternSignal
+            pattern = result.PatternSignal,
+            whaleInfluence = result.WhaleInfluenceScore,
+            whaleSentiment = result.WhaleSentiment,
+            macroQuiet = result.MacroQuietPeriod,
+            macroReason = result.MacroReason
         };
 
         var log = new AnalysisLog(

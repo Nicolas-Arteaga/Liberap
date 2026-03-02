@@ -29,4 +29,10 @@ export interface VergeAlert {
 
     severity: string;
     icon: string;
+
+    // Institutional Sprint 5
+    whaleInfluenceScore?: number;
+    whaleSentiment?: string;
+    macroQuietPeriod?: boolean;
+    macroReason?: string;
 }

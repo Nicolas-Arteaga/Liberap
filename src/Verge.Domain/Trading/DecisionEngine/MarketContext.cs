@@ -24,6 +24,9 @@ public class MarketContext
     // AI / Data Science (Python)
     public RegimeResponseModel? MarketRegime { get; set; }
     public TechnicalsResponseModel? Technicals { get; set; }
+    public WhaleAnalysisResult? WhaleData { get; set; }
+    public InstitutionalAnalysisResult? InstitutionalData { get; set; }
+    public MacroAnalysisResult? MacroData { get; set; }
     
     // Raw Data for internal calculations
     public List<MarketCandleModel> Candles { get; set; } = new();
@@ -54,6 +57,10 @@ public class DecisionResult
     public double? WinProbability { get; set; }
     public int? HistoricSampleSize { get; set; }
     public string? PatternSignal { get; set; }
+    public double? WhaleInfluenceScore { get; set; }
+    public string? WhaleSentiment { get; set; }
+    public bool? MacroQuietPeriod { get; set; }
+    public string? MacroReason { get; set; }
 }
 
 public enum TradingDecision

@@ -3,6 +3,7 @@ export * from './alert-type.enum';
 export * from './analysis-log-type.enum';
 export * from './crypto-analysis.service';
 export * from './market-data.service';
+export * from './market-regime-type.enum';
 export * from './models';
 export * from './order-type.enum';
 export * from './risk-tolerance.enum';

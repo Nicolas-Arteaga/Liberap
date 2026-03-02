@@ -239,6 +239,16 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         if (latestAlert.score !== undefined && this.currentSession) {
           this.currentSession.score = latestAlert.score;
         }
+
+        // Sync Institutional Data (Sprint 5)
+        if (latestAlert.whaleInfluenceScore !== undefined && this.currentSession) {
+          this.currentSession.whaleInfluenceScore = latestAlert.whaleInfluenceScore;
+          this.currentSession.whaleSentiment = latestAlert.whaleSentiment;
+        }
+        if (latestAlert.macroQuietPeriod !== undefined && this.currentSession) {
+          this.currentSession.macroQuietPeriod = latestAlert.macroQuietPeriod;
+          this.currentSession.macroReason = latestAlert.macroReason;
+        }
       }
     });
   }
@@ -474,12 +484,18 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
           this.marketAnalyses.push({
             symbol,
             rsi,
-            description: this.getRsiDescription(rsi),
+            description: this.generateMarketDescription({ rsi, symbol, trend: rsi > 50 ? 'alcista' : 'bajista', confidence: data.score, bosDetected: data.bosDetected } as any),
             signal: rsi > 55 ? 'LONG' : (rsi < 45 ? 'SHORT' : 'NEUTRAL'),
             confidence: data.score != null ? Number(data.score) : 0,
             trend: rsi > 50 ? 'alcista' : 'bajista',
-            bosDetected: false
-          });
+            bosDetected: data.bosDetected || false,
+            // Institutional Sprint 5
+            whaleSentiment: data.whaleSentiment,
+            whaleInfluence: data.whaleInfluence,
+            isSqueeze: data.isSqueeze,
+            macroQuiet: data.macroQuiet,
+            macroReason: data.macroReason
+          } as any);
         }
       }
 
@@ -510,13 +526,18 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     return 'zona neutral | sin señal clara';
   }
 
-  generateMarketDescription(data: MarketAnalysisDto): string {
+  generateMarketDescription(data: any): string {
     const rsi = data.rsi;
-    if (rsi < 30) return 'sobreventa extrema | divergencia alcista';
-    if (rsi < 45) return 'posible reversión alcista';
-    if (rsi > 70) return 'sobrecompra | riesgo de corrección';
-    if (rsi > 55) return 'fuerza alcista confirmada';
-    return `${data.trend} | volumen normal`;
+    let desc = '';
+    if (rsi < 30) desc = 'sobreventa extrema';
+    else if (rsi < 45) desc = 'posible reversión alcista';
+    else if (rsi > 70) desc = 'sobrecompra';
+    else if (rsi > 55) desc = 'fuerza alcista';
+    else desc = `${data.trend} | volumen normal`;
+
+    if (data.isSqueeze) desc += ' | 🔥 SQUEEZE DETECTADO';
+    if (data.whaleInfluence > 60) desc += ' | 🐋 ACTIVIDAD BALLENA ALTA';
+    return desc;
   }
 
   dismissOpportunity() {

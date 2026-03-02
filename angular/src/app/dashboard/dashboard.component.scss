@@ -148,4 +148,53 @@
   .text-primary-light {
     color: #93c5fd;
   }
+
+  /* Institutional Sprint 5 */
+  .bg-danger-soft {
+    background-color: rgba(239, 68, 68, 0.15);
+  }
+
+  .pulsate {
+    animation: pulsate-anim 1.5s infinite ease-in-out;
+  }
+
+  @keyframes pulsate-anim {
+    0% {
+      opacity: 0.6;
+      transform: scale(1);
+    }
+
+    50% {
+      opacity: 1;
+      transform: scale(1.05);
+    }
+
+    100% {
+      opacity: 0.6;
+      transform: scale(1);
+    }
+  }
+
+  .badge {
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 3px 8px;
+    border-radius: 4px;
+
+    &.bg-info {
+      background-color: #0ea5e9 !important;
+      color: white;
+    }
+
+    &.bg-light {
+      background-color: #f8fafc !important;
+      color: #0f172a;
+    }
+  }
+
+  .macro-quiet-warning {
+    z-index: 10;
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
+  }
 }

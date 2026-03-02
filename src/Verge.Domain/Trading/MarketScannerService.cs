@@ -11,6 +11,7 @@ using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Uow;
 
 using Verge.Trading.Integrations;
+using Verge.Trading.DecisionEngine;
 
 namespace Verge.Trading;
 
@@ -57,9 +58,18 @@ public class MarketScannerService : BackgroundService
         var strategyRepository = scope.ServiceProvider.GetRequiredService<IRepository<TradingStrategy, Guid>>();
         var sessionRepository = scope.ServiceProvider.GetRequiredService<IRepository<TradingSession, Guid>>();
         var analysisLogRepo = scope.ServiceProvider.GetRequiredService<IRepository<AnalysisLog, Guid>>();
+        var whaleTracker = scope.ServiceProvider.GetRequiredService<IWhaleTrackerService>();
+        var institutionalService = scope.ServiceProvider.GetRequiredService<IInstitutionalDataService>();
+        var macroService = scope.ServiceProvider.GetRequiredService<IMacroSentimentService>();
         var unitOfWorkManager = scope.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
 
         using var uow = unitOfWorkManager.Begin();
+
+        // 0. Macro Check (Sprint 5) - Affects entire scan cycle
+        var macroData = await macroService.GetMacroSentimentAsync();
+        if (macroData.IsInQuietPeriod) {
+            _logger.LogWarning("🌍 QUIET PERIOD ACTIVE: {reason}. Skipping scanners or dampening entries...", macroData.QuietPeriodReason);
+        }
 
         // 1. Obtener Top 30
         var topSymbols = await marketDataManager.GetTopSymbolsAsync(30);
@@ -99,20 +109,35 @@ public class MarketScannerService : BackgroundService
                     }
                 } catch { /* Ignorar error de Noticias */ }
 
+                // 3.1. Ballenas (Sprint 5)
+                var whaleData = await whaleTracker.GetWhaleActivityAsync(symbol);
+                int whaleBonus = (int)(whaleData.NetFlowScore * 15); // Max +15 bonus
+
+                // 3.2. Liquidaciones y Order Flow (Sprint 5)
+                var instData = await institutionalService.GetInstitutionalDataAsync(symbol);
+                int instBonus = instData.IsSqueezeDetected ? (instData.SqueezeType == "Short Squeeze" ? 15 : -15) : 0;
+                instBonus += (int)((instData.BidAskImbalance - 1.0) * 5); // Max +10 bonus
+
                 // 4. Calcular Confianza
                 int confidence = 0;
                 SignalDirection signal = SignalDirection.Auto;
 
                 if (rsi < 35) {
-                    confidence = (int)(35 - rsi) * 2 + 50 + sentimentBonus;
+                    confidence = (int)(35 - rsi) * 2 + 50;
                     signal = SignalDirection.Long;
                 } else if (rsi > 65) {
-                    confidence = (int)(rsi - 65) * 2 + 50 - sentimentBonus; 
-                    if (sentimentBonus < 0) confidence += Math.Abs(sentimentBonus);
+                    confidence = (int)(rsi - 65) * 2 + 50; 
                     signal = SignalDirection.Short;
                 } else {
                     confidence = 30 + (trend == "bullish" ? 10 : 0);
                     signal = SignalDirection.Auto;
+                }
+
+                confidence += sentimentBonus + whaleBonus + instBonus;
+                
+                // 4.2. Quiet Period Dampening
+                if (macroData.IsInQuietPeriod) {
+                    confidence = 0; // Absolute protection during news
                 }
 
                 confidence = Math.Clamp(confidence, 0, 100);
@@ -125,6 +150,11 @@ public class MarketScannerService : BackgroundService
                     confidence = confidence,
                     signal = signal.ToString(),
                     sentiment = sentimentText,
+                    whaleSentiment = whaleData.Summary,
+                    institutionalSummary = instData.Summary,
+                    isSqueeze = instData.IsSqueezeDetected,
+                    macroQuietPeriod = macroData.IsInQuietPeriod,
+                    macroReason = macroData.QuietPeriodReason,
                     timestamp = DateTime.UtcNow
                 };
 
@@ -133,7 +163,7 @@ public class MarketScannerService : BackgroundService
                     Guid.Empty, 
                     null,
                     symbol,
-                    $"Scanner: {symbol} | RSI: {rsi:F2} | Conf: {confidence}% | IA: {sentimentText}",
+                    $"Scanner: {symbol} | RSI: {rsi:F2} | Conf: {confidence}% | 🐋: {whaleData.Summary} | 🔥: {instData.SqueezeType} | 🌍: {(macroData.IsInQuietPeriod ? "QUIET" : "OK")}",
                     confidence > 70 ? "success" : "info",
                     DateTime.UtcNow,
                     AnalysisLogType.Standard,
