@@ -206,6 +206,7 @@ export interface TradingSessionDto extends FullAuditedEntityDto<string> {
   exitReason?: string;
   lastEvaluationTimestamp?: number;
   stageChangedTimestamp?: string;
+  score?: number;
 }
 
 export interface TradingSignalDto extends EntityDto<string> {

@@ -5,6 +5,11 @@ ion-header::part(background) {
 ion-toolbar {
   overflow: visible !important;
   contain: none !important;
+
+  &::part(container) {
+    overflow: visible !important;
+    contain: none !important;
+  }
 }
 
 .deudaso-header {
@@ -53,16 +58,70 @@ ion-toolbar {
   }
 }
 
+.notification-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  /* Espacio suficiente para que el badge respire */
+  height: 42px;
+  overflow: visible !important;
+  flex-shrink: 0 !important;
+}
+
 .notification-btn {
   --padding-start: 0;
   --padding-end: 0;
-  margin-right: 0.5rem;
-  overflow: visible;
+  margin-right: 0;
+  /* Removido para usar gap del padre */
+  overflow: visible !important;
 
   ion-icon {
-    font-size: 20px;
+    font-size: 24px;
+    /* Un poco más grande para mejor UI */
     color: white;
   }
+}
+
+.badge-host {
+  /* Estilos ya aplicados inline para máxima prioridad, pero reforzamos aquí */
+  overflow: visible !important;
+}
+
+.badge-pill-absolute {
+  position: absolute !important;
+  top: -5px !important;
+  right: -5px !important;
+  z-index: 9999 !important;
+  /* Por encima de TODO */
+  background-color: #ff3b30;
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  height: 18px;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #151925;
+  /* Borde de contraste */
+  pointer-events: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.badge-sibling {
+  position: absolute !important;
+  top: -5px !important;
+  right: -5px !important;
+  z-index: 9999 !important;
+  pointer-events: none;
+  font-size: 0.65rem !important;
+  padding: 0.35em 0.5em !important;
+  border: 1px solid #151925;
+  /* Borde para que no se pegue al fondo */
 }
 
 .notification-panel {

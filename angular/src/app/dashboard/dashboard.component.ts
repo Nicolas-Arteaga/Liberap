@@ -477,7 +477,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
             description: this.getRsiDescription(rsi),
             signal: rsi > 55 ? 'LONG' : (rsi < 45 ? 'SHORT' : 'NEUTRAL'),
             confidence: data.score != null ? Number(data.score) : 0,
-            trend: rsi > 50 ? 'alcista' : 'bajista'
+            trend: rsi > 50 ? 'alcista' : 'bajista',
+            bosDetected: false
           });
         }
       }
