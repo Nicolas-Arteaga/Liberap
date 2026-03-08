@@ -421,6 +421,25 @@ public class TradingAppService : ApplicationService, ITradingAppService
         int losses = signals.Count(x => x.Status == TradeStatus.Loss);
         int total = wins + losses;
         decimal totalPnL = signals.Sum(x => x.RealizedPnL ?? 0);
+        
+        // 1. Calculate Expectancy: (WinRate * AvgWin) - (LossRate * AvgLoss)
+        double winRate = total > 0 ? (double)wins / total : 0;
+        double lossRate = total > 0 ? (double)losses / total : 0;
+        decimal avgWin = wins > 0 ? signals.Where(x => x.Status == TradeStatus.Win).Average(x => x.RealizedPnL ?? 0) : 0;
+        decimal avgLoss = losses > 0 ? Math.Abs(signals.Where(x => x.Status == TradeStatus.Loss).Average(x => x.RealizedPnL ?? 0)) : 0;
+        double expectancy = (winRate * (double)avgWin) - (lossRate * (double)avgLoss);
+
+        // 2. Average Duration
+        double avgDuration = total > 0 ? signals.Average(x => x.DurationMinutes ?? 0) : 0;
+
+        // 3. Equity Curve (Simplified: cumulative PnL)
+        decimal currentEquity = 0;
+        var equityCurve = signals
+            .OrderBy(x => x.ExitTime ?? x.AnalyzedDate)
+            .Select(x => {
+                currentEquity += (x.RealizedPnL ?? 0);
+                return currentEquity;
+            }).ToList();
 
         var byRegime = signals
             .Where(x => x.Regime.HasValue)
@@ -446,9 +465,12 @@ public class TradingAppService : ApplicationService, ITradingAppService
             TotalSignals = total,
             Wins = wins,
             Losses = losses,
-            WinRate = total > 0 ? (double)wins / total * 100.0 : 0,
+            WinRate = winRate * 100.0,
             TotalRealizedPnL = totalPnL,
             AveragePnLPerTrade = total > 0 ? totalPnL / total : 0,
+            Expectancy = expectancy,
+            AverageDurationMinutes = avgDuration,
+            EquityCurve = equityCurve,
             ByRegime = byRegime
         };
     }

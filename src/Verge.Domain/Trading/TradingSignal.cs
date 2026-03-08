@@ -18,6 +18,13 @@ public class TradingSignal : FullAuditedAggregateRoot<Guid>
     // Mode B: Signal Tracking
     public decimal? RealizedPnL { get; set; }
     public MarketRegimeType? Regime { get; set; }
+    
+    // Phase 12: Live Execution Tracking
+    public decimal? ExitPrice { get; set; }
+    public DateTime? ExitTime { get; set; }
+    public int? DurationMinutes { get; set; }
+    public decimal? EquityAfter { get; set; }
+    public int? Score { get; set; }
 
     protected TradingSignal() { }
 

@@ -15,6 +15,11 @@ public class TradingSignalDto : EntityDto<Guid>
     public TradeStatus Status { get; set; }    
     public decimal? RealizedPnL { get; set; }
     public MarketRegimeType? Regime { get; set; }
+    public decimal? ExitPrice { get; set; }
+    public DateTime? ExitTime { get; set; }
+    public int? DurationMinutes { get; set; }
+    public decimal? EquityAfter { get; set; }
+    public int? Score { get; set; }
 }
 
 public class CreateTradingSignalDto
@@ -77,6 +82,9 @@ public class SignalStatsDto
     public double WinRate { get; set; }
     public decimal TotalRealizedPnL { get; set; }
     public decimal AveragePnLPerTrade { get; set; }
+    public double Expectancy { get; set; }
+    public double AverageDurationMinutes { get; set; }
+    public List<decimal> EquityCurve { get; set; } = new();
     public List<SignalRegimeStatDto> ByRegime { get; set; } = new();
 }
 

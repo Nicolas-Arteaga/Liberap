@@ -16,6 +16,7 @@ using OpenIddict.Server.AspNetCore;
 using Verge.EntityFrameworkCore;
 using Verge.MultiTenancy;
 using Verge.Trading;
+using Verge.Trading.BackgroundJobs;
 using Microsoft.AspNetCore.SignalR;
 using Verge.HealthChecks;
 using Microsoft.OpenApi.Models;
@@ -134,7 +135,7 @@ public class VergeHttpApiHostModule : AbpModule
         context.Services.AddHostedService<WhaleMonitoringJob>();
         context.Services.AddHostedService<MacroCalendarJob>();
         context.Services.AddHostedService<MarketScannerService>();
-
+        context.Services.AddHostedService<LiveSignalCollectorJob>();
     }
 
     private void ConfigureAuthentication(ServiceConfigurationContext context)
