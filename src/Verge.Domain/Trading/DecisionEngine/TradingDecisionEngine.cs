@@ -34,7 +34,14 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
         _macroSentimentService = macroSentimentService;
     }
 
-    public async Task<DecisionResult> EvaluateAsync(TradingSession session, TradingStyle style, MarketContext context, bool isAutoMode = false)
+    public async Task<DecisionResult> EvaluateAsync(
+        TradingSession session, 
+        TradingStyle style, 
+        MarketContext context, 
+        bool isAutoMode = false,
+        Dictionary<string, float>? weightOverrides = null,
+        int? entryThresholdOverride = null,
+        float? trailingMultiplierOverride = null)
     {
         _logger.LogInformation("🧠 Profile-Based Evaluation: Session {SessionId} | Style: {Style} | AutoAdapt: {AutoAdapt}", session.Id, style, isAutoMode);
 
@@ -92,15 +99,18 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
 
         // 5. Apply Profile Weights (Sprint 4: Adaptive Weights + Calibration)
         var calibration = await GetCalibrationAsync(style, currentRegime);
-        var weights = await GetAdaptiveWeightsAsync(currentRegime, profile, calibration, context, session, style);
+        var weights = await GetAdaptiveWeightsAsync(currentRegime, profile, calibration, context, session, style, weightOverrides);
         
         float finalScore = (technicalScore * weights.Technical) +
                            (quantitativeScore * weights.Quantitative) +
                            (sentimentScore * weights.Sentiment) +
-                           (fundamentalScore * weights.Fundamental);
+                           (fundamentalScore * weights.Fundamental) +
+                           (institutionalScore * weights.Institutional);
 
-        // 5.1 Apply Threshold Shift from Calibration
+        // 5.1 Apply Threshold Shift from Calibration (Fallback) or Absolute Optimized Threshold
         int thresholdShift = calibration?.EntryThresholdShift ?? 0;
+        int? entryThresholdCalibrated = calibration?.EntryThreshold;
+        
         // 6. Apply Profile Penalties
         finalScore = profile.ApplyPenalties(context, finalScore, out string penaltyReason);
 
@@ -128,9 +138,9 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
         // 8. Decision Mapping based on Profile Thresholds (Sprint 4: Dynamic Thresholds)
         var thresholds = profile.GetAdjustedThresholds(winRate.Probability);
         
-        // Apply calibration shifts to thresholds
+        // Apply calibration shifts or absolute optimized thresholds
         thresholds = (
-            Math.Clamp(thresholds.Entry + thresholdShift, 0, 100),
+            entryThresholdOverride ?? entryThresholdCalibrated ?? Math.Clamp(thresholds.Entry + thresholdShift, 0, 100),
             Math.Clamp(thresholds.Prepare + thresholdShift, 0, 100),
             Math.Clamp(thresholds.Context + thresholdShift, 0, 100)
         );
@@ -196,7 +206,8 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
             WhaleInfluenceScore = context.WhaleData?.MaxInfluenceDetected ?? 0,
             WhaleSentiment = context.WhaleData?.Summary,
             MacroQuietPeriod = context.MacroData?.IsInQuietPeriod ?? false,
-            MacroReason = context.MacroData?.QuietPeriodReason
+            MacroReason = context.MacroData?.QuietPeriodReason,
+            TrailingMultiplier = trailingMultiplierOverride ?? calibration?.TrailingMultiplier ?? profile.TrailingMultiplier
         };
 
         // 9. Quiet Period Enforcement (Sprint 5)
@@ -265,19 +276,61 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
         return TradingDecision.Ignore;
     }
 
-    private async Task<(float Technical, float Quantitative, float Sentiment, float Fundamental)> GetAdaptiveWeightsAsync(
+    private async Task<(float Technical, float Quantitative, float Sentiment, float Fundamental, float Institutional)> GetAdaptiveWeightsAsync(
         MarketRegimeType regime, 
         ITradingStyleProfile profile, 
         StrategyCalibration? calibration, 
         MarketContext context,
         TradingSession session,
-        TradingStyle style)
+        TradingStyle style,
+        Dictionary<string, float>? weightOverrides = null)
     {
-        // 1. BASE WEIGHTS (from Profile + Calibration)
+        // 0. Manual Overrides (Used for Optimization Phase 6)
+        if (weightOverrides != null)
+        {
+            _logger.LogInformation("🎯 ADAPTIVE WEIGHTS: Using manual overrides for optimization.");
+            float oTech = weightOverrides.GetValueOrDefault("Technical", profile.TechnicalWeight);
+            float oQuant = weightOverrides.GetValueOrDefault("Quantitative", profile.QuantitativeWeight);
+            float oSent = weightOverrides.GetValueOrDefault("Sentiment", profile.SentimentWeight);
+            float oFund = weightOverrides.GetValueOrDefault("Fundamental", profile.FundamentalWeight);
+            float oInst = weightOverrides.GetValueOrDefault("Whales", profile.InstitutionalWeight); // Mapper uses "Whales"
+            
+            float oTotal = oTech + oQuant + oSent + oFund + oInst;
+            if (oTotal <= 0) return (0.2f, 0.2f, 0.2f, 0.2f, 0.2f);
+            return (oTech / oTotal, oQuant / oTotal, oSent / oTotal, oFund / oTotal, oInst / oTotal);
+        }
+
+        // 0.1 Check for Absolute Calibrated Weights in DB
+        if (calibration != null && !string.IsNullOrEmpty(calibration.WeightsJson))
+        {
+            try
+            {
+                var calWeights = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, float>>(calibration.WeightsJson);
+                if (calWeights != null)
+                {
+                    _logger.LogInformation("🏆 ADAPTIVE WEIGHTS: Using ABSOLUTE calibrated weights from DB.");
+                    float cTech = calWeights.GetValueOrDefault("Technical", profile.TechnicalWeight);
+                    float cQuant = calWeights.GetValueOrDefault("Quantitative", profile.QuantitativeWeight);
+                    float cSent = calWeights.GetValueOrDefault("Sentiment", profile.SentimentWeight);
+                    float cFund = calWeights.GetValueOrDefault("Fundamental", profile.FundamentalWeight);
+                    float cInst = calWeights.GetValueOrDefault("Whales", profile.InstitutionalWeight);
+
+                    float cTotal = cTech + cQuant + cSent + cFund + cInst;
+                    if (cTotal > 0) return (cTech / cTotal, cQuant / cTotal, cSent / cTotal, cFund / cTotal, cInst / cTotal);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("⚠️ Error parsing WeightsJson for calibration: {Message}", ex.Message);
+            }
+        }
+
+        // 1. BASE WEIGHTS (from Profile + Calibration Multipliers)
         float technical = profile.TechnicalWeight * (calibration?.TechnicalMultiplier ?? 1.0f);
         float quantitative = profile.QuantitativeWeight * (calibration?.QuantitativeMultiplier ?? 1.0f);
         float sentiment = profile.SentimentWeight * (calibration?.SentimentMultiplier ?? 1.0f);
         float fundamental = profile.FundamentalWeight * (calibration?.FundamentalMultiplier ?? 1.0f);
+        float institutional = profile.InstitutionalWeight * (calibration?.InstitutionalMultiplier ?? 1.0f);
 
         // 2. DYNAMIC FEEDBACK (NO MORE FIXED RULES)
         // We query the Probabilistic Engine to see which components performed better in this regime
@@ -303,9 +356,9 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
         }
 
         // Normalize weights to sum to 1.0
-        float total = technical + quantitative + sentiment + fundamental;
-        if (total <= 0) return (0.25f, 0.25f, 0.25f, 0.25f);
-        return (technical / total, quantitative / total, sentiment / total, fundamental / total);
+        float total = technical + quantitative + sentiment + fundamental + institutional;
+        if (total <= 0) return (0.2f, 0.2f, 0.2f, 0.2f, 0.2f);
+        return (technical / total, quantitative / total, sentiment / total, fundamental / total, institutional / total);
     }
 
     private async Task<StrategyCalibration?> GetCalibrationAsync(TradingStyle style, MarketRegimeType regime)

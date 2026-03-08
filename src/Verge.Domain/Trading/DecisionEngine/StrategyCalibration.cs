@@ -13,8 +13,22 @@ public class StrategyCalibration : FullAuditedEntity<Guid>
     public float QuantitativeMultiplier { get; set; } = 1.0f;
     public float SentimentMultiplier { get; set; } = 1.0f;
     public float FundamentalMultiplier { get; set; } = 1.0f;
+    public float InstitutionalMultiplier { get; set; } = 1.0f;
 
-    // Threshold Shifts (Base = 0)
+    // Serialized Calibrated Weights (Absolute)
+    public string? WeightsJson { get; set; }
+    
+    // Performance Metrics from last calibration
+    public double? ProfitFactor { get; set; }
+    public double? SharpeRatio { get; set; }
+    public double? WinRate { get; set; }
+    public int? TotalTrades { get; set; }
+
+    // Hard Optimized Thresholds (Absolute)
+    public int? EntryThreshold { get; set; }
+    public float? TrailingMultiplier { get; set; }
+
+    // Threshold Shifts (Legacy/Manual)
     public int EntryThresholdShift { get; set; } = 0;
     public int TakeProfitMultiplier { get; set; } = 100; // Percentage 100 = 1.0x
 

@@ -9,6 +9,7 @@ public interface ITradingStyleProfile
     float QuantitativeWeight { get; }
     float SentimentWeight { get; }
     float FundamentalWeight { get; }
+    float InstitutionalWeight { get; }
     
     // Institutional 1% metrics: Decay & Stagnation
     float DecayFactor { get; }
@@ -18,6 +19,7 @@ public interface ITradingStyleProfile
     int EntryThreshold { get; }
     int PrepareThreshold { get; }
     int ContextThreshold { get; }
+    float TrailingMultiplier { get; }
     
     // Valid Market Regimes for this style
     List<MarketRegimeType> ValidRegimes { get; }

@@ -8,12 +8,14 @@ public class GridTradingProfile : ITradingStyleProfile
     public float QuantitativeWeight => 0.30f;
     public float SentimentWeight => 0.20f;
     public float FundamentalWeight => 0.05f;
+    public float InstitutionalWeight => 0.0f;
     public float DecayFactor => 0.1f; // Grids are patient
     public float MaxStagnationMinutes => 1440f; // Alert after 24 hours for grids
 
-    public int EntryThreshold => 65;
-    public int PrepareThreshold => 45;
-    public int ContextThreshold => 30;
+    public int EntryThreshold => 50;
+    public int PrepareThreshold => 30;
+    public int ContextThreshold => 20;
+    public float TrailingMultiplier => 1.0f;
 
     public List<MarketRegimeType> ValidRegimes => new List<MarketRegimeType> 
     { 

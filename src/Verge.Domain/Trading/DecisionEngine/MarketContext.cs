@@ -61,6 +61,7 @@ public class DecisionResult
     public string? WhaleSentiment { get; set; }
     public bool? MacroQuietPeriod { get; set; }
     public string? MacroReason { get; set; }
+    public float? TrailingMultiplier { get; set; }
 }
 
 public enum TradingDecision

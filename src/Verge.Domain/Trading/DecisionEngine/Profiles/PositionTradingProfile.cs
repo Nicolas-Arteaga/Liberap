@@ -8,12 +8,14 @@ public class PositionTradingProfile : ITradingStyleProfile
     public float QuantitativeWeight => 0.20f;
     public float SentimentWeight => 0.25f;
     public float FundamentalWeight => 0.30f;
+    public float InstitutionalWeight => 0.0f;
     public float DecayFactor => 0.2f; // Very slow decay for position
     public float MaxStagnationMinutes => 720f; // Alert after 12 hours for position trading
 
-    public int EntryThreshold => 75;
-    public int PrepareThreshold => 55;
-    public int ContextThreshold => 40;
+    public int EntryThreshold => 80;
+    public int PrepareThreshold => 60;
+    public int ContextThreshold => 45;
+    public float TrailingMultiplier => 4.0f;
 
     public List<MarketRegimeType> ValidRegimes => new List<MarketRegimeType> 
     { 

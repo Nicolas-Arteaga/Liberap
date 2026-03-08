@@ -40,6 +40,8 @@ public interface ITradingAppService : IApplicationService
 
     // Backtesting
     Task<BacktestResultDto> RunBacktestAsync(RunBacktestDto input);
+    Task OptimizeRegimeAsync(string regime, string symbol);
+    Task ExecuteMassOptimizationAsync(string symbol);
 
     // Exchange Connections
     Task<ExchangeConnectionDto> ConnectExchangeAsync(ConnectExchangeDto input);
@@ -56,6 +58,10 @@ public interface ITradingAppService : IApplicationService
     // Test SignalR manually
     Task TestSignalRAsync();
     Task TestSignalRPublicAsync();
+
+    // Evaluation
+    Task RunComparativeEvaluationAsync(List<string> symbols, bool runInBackground = true);
+    Task<ComparativeEvaluationReportDto> GetComparativeReportAsync();
 }
 
 public class GetSignalsInput : PagedAndSortedResultRequestDto

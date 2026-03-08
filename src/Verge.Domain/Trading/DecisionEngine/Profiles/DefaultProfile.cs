@@ -9,12 +9,14 @@ public class DefaultProfile : ITradingStyleProfile
     public float QuantitativeWeight => 0.20f;
     public float SentimentWeight => 0.20f;
     public float FundamentalWeight => 0.10f;
+    public float InstitutionalWeight => 0.0f;
     public float DecayFactor => 0.5f; // Default conservative decay
     public float MaxStagnationMinutes => 60f; // Alert after 1 hour for default style
 
     public int EntryThreshold => 70;
     public int PrepareThreshold => 50;
     public int ContextThreshold => 30;
+    public float TrailingMultiplier => 2.0f;
 
     public List<MarketRegimeType> ValidRegimes => new List<MarketRegimeType> 
     { 

@@ -1,5 +1,6 @@
 using Verge.Trading;
 using Verge.Trading.DecisionEngine;
+using Verge.Trading.Optimization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Volo.Abp.EntityFrameworkCore.Modeling;
@@ -95,6 +96,16 @@ public static class TradingModelBuilderExtensions
             b.Property(x => x.WalletAddress).IsRequired().HasMaxLength(128);
             b.HasIndex(x => x.Symbol);
             b.HasIndex(x => x.WalletAddress);
+        });
+
+        builder.Entity<TemporalOptimizationResult>(b =>
+        {
+            b.ToTable("TemporalOptimizationResults");
+            b.ConfigureByConvention();
+            b.Property(x => x.Regime).IsRequired().HasMaxLength(64);
+            b.Property(x => x.Symbol).IsRequired().HasMaxLength(20);
+            b.Property(x => x.WeightsJson).IsRequired();
+            b.HasIndex(x => new { x.Regime, x.Symbol });
         });
     }
 }

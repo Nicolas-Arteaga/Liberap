@@ -1,4 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
 using Volo.Abp;
 using Volo.Abp.Authorization;
 using Volo.Abp.Autofac;
@@ -6,6 +5,7 @@ using Volo.Abp.BackgroundJobs;
 using Volo.Abp.Data;
 using Volo.Abp.Modularity;
 using Volo.Abp.Threading;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Verge;
 
@@ -38,9 +38,11 @@ public class VergeTestBaseModule : AbpModule
         {
             using (var scope = context.ServiceProvider.CreateScope())
             {
+                /* 
                 await scope.ServiceProvider
                     .GetRequiredService<IDataSeeder>()
                     .SeedAsync();
+                */
             }
         });
     }

@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Verge.EntityFrameworkCore.Trading;
 using Verge.Trading;
 using Verge.Trading.DecisionEngine;
+using Verge.Trading.Optimization;
 using Volo.Abp.AuditLogging.EntityFrameworkCore;
 using Volo.Abp.BackgroundJobs.EntityFrameworkCore;
 using Volo.Abp.BlobStoring.Database.EntityFrameworkCore;
@@ -72,6 +73,7 @@ public class VergeDbContext :
     public DbSet<AnalysisLog> AnalysisLogs { get; set; }
     public DbSet<StrategyCalibration> StrategyCalibrations { get; set; }
     public DbSet<WhaleMovement> WhaleMovements { get; set; }
+    public DbSet<TemporalOptimizationResult> TemporalOptimizationResults { get; set; }
 
     #endregion
 

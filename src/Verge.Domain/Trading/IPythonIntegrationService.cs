@@ -2,6 +2,8 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using Verge.Trading;
 using System.Text.Json.Serialization;
+using System.Text.Json;
+using System;
 
 namespace Verge.Trading;
 
@@ -12,9 +14,31 @@ public interface IPythonIntegrationService
     Task<bool> IsHealthyAsync();
 }
 
+public class MarketRegimeTypeConverter : JsonConverter<MarketRegimeType>
+{
+    public override MarketRegimeType Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        string? value = reader.GetString()?.Replace("_", "").Replace(" ", "").ToLowerInvariant();
+        
+        if (string.IsNullOrEmpty(value)) return MarketRegimeType.Ranging;
+
+        if (value.Contains("bull")) return MarketRegimeType.BullTrend;
+        if (value.Contains("bear")) return MarketRegimeType.BearTrend;
+        if (value.Contains("range") || value.Contains("ranging")) return MarketRegimeType.Ranging;
+        if (value.Contains("volatility") || value.Contains("volatile")) return MarketRegimeType.HighVolatility;
+
+        return MarketRegimeType.Ranging; // Fallback safe
+    }
+
+    public override void Write(Utf8JsonWriter writer, MarketRegimeType value, JsonSerializerOptions options)
+    {
+        writer.WriteStringValue(value.ToString());
+    }
+}
+
 public class RegimeResponseModel
 {
-    [JsonConverter(typeof(JsonStringEnumConverter))]
+    [JsonConverter(typeof(MarketRegimeTypeConverter))]
     public MarketRegimeType Regime { get; set; }
     public float VolatilityScore { get; set; }
     public float TrendStrength { get; set; }
