@@ -20,6 +20,11 @@ public class BacktestResultDto : FullAuditedEntityDto<Guid>
     public decimal MaxDrawdown { get; set; }
     public double SharpeRatio { get; set; }
     public string EquityCurveJson { get; set; } = string.Empty;
+    public decimal InitialCapital { get; set; }
+    public decimal TotalFeesPaid { get; set; }
+    public decimal TotalSlippageLoss { get; set; }
+    public double Expectancy { get; set; }
+    public double TradeFrequencyPerDay { get; set; }
 }
 
 public class ComparativeEvaluationResultDto
@@ -53,4 +58,40 @@ public class RunBacktestDto
     public Dictionary<string, float>? WeightOverrides { get; set; }
     public int? EntryThresholdOverride { get; set; }
     public float? TrailingMultiplierOverride { get; set; }
+    
+    // Hedge Fund Standards 
+    public decimal FeePercentage { get; set; } = 0.1m; 
+    public decimal SlippagePercentage { get; set; } = 0.1m; 
+    public decimal InitialCapital { get; set; } = 1000m; 
+}
+
+public class ExhaustiveValidationReportDto
+{
+    public DateTime EvaluationDate { get; set; }
+    public List<ExhaustiveValidationResultDto> Results { get; set; } = new();
+}
+
+public class ExhaustiveValidationResultDto
+{
+    public string Symbol { get; set; } = string.Empty;
+    public string TradingStyle { get; set; } = string.Empty;
+    public BacktestResultDto Training { get; set; } = new();
+    public BacktestResultDto Testing { get; set; } = new();
+    
+    // Diferencias
+    public double ProfitFactorDiff { get; set; }
+    public double WinRateDiffPoints { get; set; }
+    public double SharpeRatioDiff { get; set; }
+    public double ExpectancyDiff { get; set; }
+    public decimal MaxDrawdownDiffPoints { get; set; }
+    public double TradeFrequencyDiff { get; set; }
+    public decimal TotalFeesDiff { get; set; }
+    public decimal TotalSlippageDiff { get; set; }
+    
+    // Criterios
+    public bool PassedProfitFactor { get; set; }
+    public bool PassedRobustness { get; set; }
+    public bool PassedDrawdown { get; set; }
+    public bool PassedExpectancy { get; set; }
+    public bool IsApprovedForRealCapital => PassedProfitFactor && PassedRobustness && PassedDrawdown && PassedExpectancy;
 }

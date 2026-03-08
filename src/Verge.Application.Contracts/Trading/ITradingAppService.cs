@@ -62,6 +62,9 @@ public interface ITradingAppService : IApplicationService
     // Evaluation
     Task RunComparativeEvaluationAsync(List<string> symbols, bool runInBackground = true);
     Task<ComparativeEvaluationReportDto> GetComparativeReportAsync();
+    
+    // Exhaustive Validation
+    Task RunExhaustiveValidationAsync(List<string> symbols, bool runInBackground = true);
 }
 
 public class GetSignalsInput : PagedAndSortedResultRequestDto
