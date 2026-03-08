@@ -1,19 +1,34 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
+using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace Verge.Trading.DecisionEngine;
 
 public class MacroSentimentService : IMacroSentimentService
 {
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ILogger<MacroSentimentService> _logger;
     private List<MacroEvent> _cachedEvents = new();
+    private int _fearAndGreedIndex = 50;
     private DateTime _lastSync = DateTime.MinValue;
+
+    public MacroSentimentService(IHttpClientFactory httpClientFactory, ILogger<MacroSentimentService> logger)
+    {
+        _httpClientFactory = httpClientFactory;
+        _logger = logger;
+    }
 
     public async Task<MacroAnalysisResult> GetMacroSentimentAsync()
     {
-        // Ensure we have some mock events if sync never ran
-        if (!_cachedEvents.Any()) await SyncEconomicCalendarAsync();
+        // Auto-sync if more than 1 hour old
+        if ((DateTime.UtcNow - _lastSync).TotalHours > 1)
+        {
+            await SyncEconomicCalendarAsync();
+        }
 
         var now = DateTime.UtcNow;
         var result = new MacroAnalysisResult();
@@ -41,25 +56,47 @@ public class MacroSentimentService : IMacroSentimentService
         result.ActiveEvents = highImpactActive;
         result.UpcomingEvents = _cachedEvents.Where(e => e.EventTime > now).OrderBy(e => e.EventTime).Take(5).ToList();
         result.NextHighImpactEventTime = _cachedEvents.Where(e => e.Impact == "High" && e.EventTime > now).OrderBy(e => e.EventTime).Select(e => e.EventTime).FirstOrDefault();
+        result.FearAndGreedIndex = _fearAndGreedIndex;
 
         return result;
     }
 
-    public Task SyncEconomicCalendarAsync()
+    public async Task SyncEconomicCalendarAsync()
     {
-        // SIMULATION: Sync with API (e.g., ForexFactory, Investing.com RSS)
-        // For development, we create fake recurring tokens for high volatility.
-        var today = DateTime.UtcNow.Date;
-        
-        _cachedEvents = new List<MacroEvent>
-        {
-            new MacroEvent { Name = "FED Interest Rate Decision", Impact = "High", Currency = "USD", EventTime = today.AddHours(14).AddMinutes(30).ToUniversalTime() },
-            new MacroEvent { Name = "CPI Data Release", Impact = "High", Currency = "USD", EventTime = today.AddHours(10).AddMinutes(30).ToUniversalTime() },
-            new MacroEvent { Name = "NFP Employment Report", Impact = "High", Currency = "USD", EventTime = today.AddDays(1).AddHours(8).ToUniversalTime() },
-            new MacroEvent { Name = "EU Central Bank Speech", Impact = "Medium", Currency = "EUR", EventTime = today.AddHours(11).ToUniversalTime() }
-        };
+        _logger.LogInformation("🌍 Syncing Macro Data & Fear/Greed Index...");
 
-        _lastSync = DateTime.UtcNow;
-        return Task.CompletedTask;
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            
+            // 1. Fear & Greed Index from alternative.me
+            var fngResponse = await client.GetAsync("https://api.alternative.me/fng/");
+            if (fngResponse.IsSuccessStatusCode)
+            {
+                var content = await fngResponse.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(content);
+                var valueStr = doc.RootElement.GetProperty("data")[0].GetProperty("value").GetString();
+                if (int.TryParse(valueStr, out int val))
+                {
+                    _fearAndGreedIndex = val;
+                }
+            }
+
+            // 2. ECONOMIC CALENDAR (Simulation/Mock for now, as free APIs are limited)
+            // In a full implementation, we'd scrape or use a paid/freemium API like Finnhub
+            var today = DateTime.UtcNow.Date;
+            _cachedEvents = new List<MacroEvent>
+            {
+                new MacroEvent { Name = "FED Interest Rate Decision", Impact = "High", Currency = "USD", EventTime = today.AddHours(14).AddMinutes(30).ToUniversalTime() },
+                new MacroEvent { Name = "CPI Data Release", Impact = "High", Currency = "USD", EventTime = today.AddHours(10).AddMinutes(30).ToUniversalTime() },
+                new MacroEvent { Name = "EU Central Bank Speech", Impact = "Medium", Currency = "EUR", EventTime = today.AddHours(11).ToUniversalTime() }
+            };
+
+            _lastSync = DateTime.UtcNow;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ Error syncing Macro data");
+        }
     }
 }

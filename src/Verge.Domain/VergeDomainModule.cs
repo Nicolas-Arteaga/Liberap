@@ -4,6 +4,7 @@ using Verge.Localization;
 using Verge.MultiTenancy;
 using Verge.Trading;
 using Verge.Trading.DecisionEngine;
+using Verge.Trading.Integrations;
 using System;
 using Volo.Abp.Localization;
 using Volo.Abp.Timing;
@@ -59,6 +60,9 @@ public class VergeDomainModule : AbpModule
         context.Services.AddScoped<IWhaleTrackerService, WhaleTrackerService>();
         context.Services.AddScoped<IInstitutionalDataService, InstitutionalDataService>();
         context.Services.AddSingleton<IMacroSentimentService, MacroSentimentService>();
+        
+        context.Services.AddSingleton<BinanceWebSocketService>();
+        context.Services.AddHostedService(sp => sp.GetRequiredService<BinanceWebSocketService>());
 #if DEBUG
         context.Services.Replace(ServiceDescriptor.Singleton<IEmailSender, NullEmailSender>());
 #endif

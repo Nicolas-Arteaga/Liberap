@@ -6,20 +6,36 @@ using Verge.Trading.DecisionEngine.Factory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 using Xunit;
+using NSubstitute;
+using Volo.Abp.Domain.Repositories;
+using System.Threading.Tasks;
 
 namespace Verge.Trading.Trading;
 
 public class DecisionEngine_Profile_Tests
 {
     private readonly ITradingDecisionEngine _engine;
+    private readonly IProbabilisticEngine _probEngine;
 
     public DecisionEngine_Profile_Tests()
     {
-        _engine = new TradingDecisionEngine(NullLogger<TradingDecisionEngine>.Instance);
+        _probEngine = Substitute.For<IProbabilisticEngine>();
+        var calibRepo = Substitute.For<IRepository<StrategyCalibration, Guid>>();
+        var whaleTracker = Substitute.For<IWhaleTrackerService>();
+        var instService = Substitute.For<IInstitutionalDataService>();
+        var macroService = Substitute.For<IMacroSentimentService>();
+
+        _engine = new TradingDecisionEngine(
+            NullLogger<TradingDecisionEngine>.Instance,
+            _probEngine,
+            calibRepo,
+            whaleTracker,
+            instService,
+            macroService);
     }
 
     [Fact]
-    public void Should_Ignore_Scalping_If_Invalid_Regime()
+    public async Task Should_Ignore_Scalping_If_Invalid_Regime()
     {
         // Arrange
         var session = new TradingSession(System.Guid.NewGuid(), System.Guid.NewGuid(), "BTC", "1h");
@@ -30,7 +46,7 @@ public class DecisionEngine_Profile_Tests
         };
 
         // Act
-        var result = _engine.Evaluate(session, TradingStyle.Scalping, context);
+        var result = await _engine.EvaluateAsync(session, TradingStyle.Scalping, context);
 
         // Assert
         result.Decision.ShouldBe(TradingDecision.Ignore);
@@ -38,7 +54,7 @@ public class DecisionEngine_Profile_Tests
     }
 
     [Fact]
-    public void Should_Ignore_Scalping_If_RSI_Outside_Range()
+    public async Task Should_Ignore_Scalping_If_RSI_Outside_Range()
     {
         // Arrange
         var session = new TradingSession(System.Guid.NewGuid(), System.Guid.NewGuid(), "BTC", "1h");
@@ -49,7 +65,7 @@ public class DecisionEngine_Profile_Tests
         };
 
         // Act
-        var result = _engine.Evaluate(session, TradingStyle.Scalping, context);
+        var result = await _engine.EvaluateAsync(session, TradingStyle.Scalping, context);
 
         // Assert
         result.Decision.ShouldBe(TradingDecision.Ignore);
@@ -57,7 +73,7 @@ public class DecisionEngine_Profile_Tests
     }
 
     [Fact]
-    public void Should_Accept_GridTrading_In_Ranging_Market()
+    public async Task Should_Accept_GridTrading_In_Ranging_Market()
     {
         // Arrange
         var session = new TradingSession(System.Guid.NewGuid(), System.Guid.NewGuid(), "BTC", "1h");
@@ -68,14 +84,14 @@ public class DecisionEngine_Profile_Tests
         };
 
         // Act
-        var result = _engine.Evaluate(session, TradingStyle.GridTrading, context);
+        var result = await _engine.EvaluateAsync(session, TradingStyle.GridTrading, context);
 
         // Assert
         result.Decision.ShouldNotBe(TradingDecision.Ignore);
     }
 
     [Fact]
-    public void Should_Ignore_Position_If_Extreme_Greed()
+    public async Task Should_Ignore_Position_If_Extreme_Greed()
     {
         // Arrange
         var session = new TradingSession(System.Guid.NewGuid(), System.Guid.NewGuid(), "BTC", "1h");
@@ -87,7 +103,7 @@ public class DecisionEngine_Profile_Tests
         };
 
         // Act
-        var result = _engine.Evaluate(session, TradingStyle.PositionTrading, context);
+        var result = await _engine.EvaluateAsync(session, TradingStyle.PositionTrading, context);
 
         // Assert
         result.Decision.ShouldBe(TradingDecision.Ignore);

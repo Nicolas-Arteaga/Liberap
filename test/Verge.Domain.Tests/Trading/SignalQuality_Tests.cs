@@ -7,20 +7,36 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 using Xunit;
 using System.Linq;
+using NSubstitute;
+using Volo.Abp.Domain.Repositories;
+using System.Threading.Tasks;
 
 namespace Verge.Trading.Trading;
 
 public class SignalQuality_Tests
 {
     private readonly ITradingDecisionEngine _engine;
+    private readonly IProbabilisticEngine _probEngine;
 
     public SignalQuality_Tests()
     {
-        _engine = new TradingDecisionEngine(NullLogger<TradingDecisionEngine>.Instance);
+        _probEngine = Substitute.For<IProbabilisticEngine>();
+        var calibRepo = Substitute.For<IRepository<StrategyCalibration, Guid>>();
+        var whaleTracker = Substitute.For<IWhaleTrackerService>();
+        var instService = Substitute.For<IInstitutionalDataService>();
+        var macroService = Substitute.For<IMacroSentimentService>();
+
+        _engine = new TradingDecisionEngine(
+            NullLogger<TradingDecisionEngine>.Instance,
+            _probEngine,
+            calibRepo,
+            whaleTracker,
+            instService,
+            macroService);
     }
 
     [Fact]
-    public void Should_Calculate_High_Confidence_For_Strong_Trend()
+    public async Task Should_Calculate_High_Confidence_For_Strong_Trend()
     {
         // Arrange
         var session = new TradingSession(Guid.NewGuid(), Guid.NewGuid(), "BTC", "1h");
@@ -31,14 +47,14 @@ public class SignalQuality_Tests
         };
 
         // Act
-        var result = _engine.Evaluate(session, TradingStyle.DayTrading, context);
+        var result = await _engine.EvaluateAsync(session, TradingStyle.DayTrading, context);
 
         // Assert
         result.Confidence.ShouldBe(SignalConfidence.Medium);
     }
 
     [Fact]
-    public void Should_Wait_For_Temporal_Persistence()
+    public async Task Should_Wait_For_Temporal_Persistence()
     {
         // Arrange
         var session = new TradingSession(Guid.NewGuid(), Guid.NewGuid(), "BTC", "1h");
@@ -54,17 +70,17 @@ public class SignalQuality_Tests
         };
 
         // Act & Assert - Cycle 1
-        var result1 = _engine.Evaluate(session, TradingStyle.DayTrading, context);
+        var result1 = await _engine.EvaluateAsync(session, TradingStyle.DayTrading, context);
         result1.Decision.ShouldBe(TradingDecision.Prepare);
         result1.Reason.ShouldContain("Needs 2 cycles");
 
         // Act & Assert - Cycle 2
-        var result2 = _engine.Evaluate(session, TradingStyle.DayTrading, context);
+        var result2 = await _engine.EvaluateAsync(session, TradingStyle.DayTrading, context);
         result2.Decision.ShouldBe(TradingDecision.Entry);
     }
 
     [Fact]
-    public void Should_Invalidate_Prepared_Setup()
+    public async Task Should_Invalidate_Prepared_Setup()
     {
         // Arrange
         var session = new TradingSession(Guid.NewGuid(), Guid.NewGuid(), "BTC", "1h");
@@ -77,7 +93,7 @@ public class SignalQuality_Tests
         };
 
         // Act
-        var result = _engine.Evaluate(session, TradingStyle.Scalping, context);
+        var result = await _engine.EvaluateAsync(session, TradingStyle.Scalping, context);
 
         // Assert
         result.Decision.ShouldBe(TradingDecision.Ignore);
@@ -86,7 +102,7 @@ public class SignalQuality_Tests
     }
 
     [Fact]
-    public void Should_Block_Entry_If_HTF_Contradicts()
+    public async Task Should_Block_Entry_If_HTF_Contradicts()
     {
         // Arrange
         var session = new TradingSession(Guid.NewGuid(), Guid.NewGuid(), "BTC", "1h");
@@ -104,7 +120,7 @@ public class SignalQuality_Tests
         };
 
         // Act
-        var result = _engine.Evaluate(session, TradingStyle.DayTrading, context);
+        var result = await _engine.EvaluateAsync(session, TradingStyle.DayTrading, context);
 
         // Assert
         result.Decision.ShouldBe(TradingDecision.Prepare);

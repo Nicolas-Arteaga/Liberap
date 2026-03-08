@@ -9,6 +9,8 @@ using Verge.Trading.DecisionEngine.Cache;
 using Verge.Trading;
 using Shouldly;
 using Xunit;
+using NSubstitute;
+using Volo.Abp.Domain.Repositories;
 
 namespace Verge.Trading.Trading;
 
@@ -23,7 +25,21 @@ public class AutoEvaluatorService_Tests
         // Setup dependencies manually without ABP for speed
         var memoryCache = new MemoryDistributedCache(new Microsoft.Extensions.Options.OptionsWrapper<MemoryDistributedCacheOptions>(new MemoryDistributedCacheOptions()));
         _cache = new MarketSnapshotCache(memoryCache);
-        _engine = new TradingDecisionEngine(NullLogger<TradingDecisionEngine>.Instance);
+        
+        var probEngine = Substitute.For<IProbabilisticEngine>();
+        var calibRepo = Substitute.For<IRepository<StrategyCalibration, Guid>>();
+        var whaleTracker = Substitute.For<IWhaleTrackerService>();
+        var instService = Substitute.For<IInstitutionalDataService>();
+        var macroService = Substitute.For<IMacroSentimentService>();
+
+        _engine = new TradingDecisionEngine(
+            NullLogger<TradingDecisionEngine>.Instance,
+            probEngine,
+            calibRepo,
+            whaleTracker,
+            instService,
+            macroService);
+            
         _service = new AutoEvaluatorService(_engine, _cache, NullLogger<AutoEvaluatorService>.Instance);
     }
 

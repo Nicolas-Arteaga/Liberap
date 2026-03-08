@@ -17,6 +17,7 @@ public class MacroAnalysisResult
     public bool IsInQuietPeriod { get; set; }
     public string QuietPeriodReason { get; set; }
     public DateTime? NextHighImpactEventTime { get; set; }
+    public int FearAndGreedIndex { get; set; }
 }
 
 public class MacroEvent

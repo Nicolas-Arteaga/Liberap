@@ -92,7 +92,7 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
 
         // 5. Apply Profile Weights (Sprint 4: Adaptive Weights + Calibration)
         var calibration = await GetCalibrationAsync(style, currentRegime);
-        var weights = GetAdaptiveWeights(currentRegime, profile, calibration, context);
+        var weights = await GetAdaptiveWeightsAsync(currentRegime, profile, calibration, context, session, style);
         
         float finalScore = (technicalScore * weights.Technical) +
                            (quantitativeScore * weights.Quantitative) +
@@ -265,29 +265,38 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
         return TradingDecision.Ignore;
     }
 
-    private (float Technical, float Quantitative, float Sentiment, float Fundamental) GetAdaptiveWeights(MarketRegimeType regime, ITradingStyleProfile profile, StrategyCalibration? calibration, MarketContext context)
+    private async Task<(float Technical, float Quantitative, float Sentiment, float Fundamental)> GetAdaptiveWeightsAsync(
+        MarketRegimeType regime, 
+        ITradingStyleProfile profile, 
+        StrategyCalibration? calibration, 
+        MarketContext context,
+        TradingSession session,
+        TradingStyle style)
     {
+        // 1. BASE WEIGHTS (from Profile + Calibration)
         float technical = profile.TechnicalWeight * (calibration?.TechnicalMultiplier ?? 1.0f);
         float quantitative = profile.QuantitativeWeight * (calibration?.QuantitativeMultiplier ?? 1.0f);
         float sentiment = profile.SentimentWeight * (calibration?.SentimentMultiplier ?? 1.0f);
         float fundamental = profile.FundamentalWeight * (calibration?.FundamentalMultiplier ?? 1.0f);
 
-        // Adaptive Adjustments (Sprint 4)
-        if (regime == MarketRegimeType.Ranging)
+        // 2. DYNAMIC FEEDBACK (NO MORE FIXED RULES)
+        // We query the Probabilistic Engine to see which components performed better in this regime
+        var perf = await _probabilisticEngine.GetWinRateAsync(style, session.Symbol, regime, 70, DateTime.UtcNow.AddDays(-7));
+        
+        if (perf.SampleSize >= 10)
         {
-            technical *= 1.3f; // Give more weight to oscillators in range
-            quantitative *= 0.7f; // Less weight to trend strength
-        }
-        else if (regime == MarketRegimeType.BullTrend || regime == MarketRegimeType.BearTrend)
-        {
-            quantitative *= 1.4f; // More weight to trend
-            technical *= 0.8f; 
+            // If we have enough data, we slightly boost weights if probability is high
+            float boost = (float)(perf.Probability - 0.5) * 0.5f; // -0.25 to +0.25
+            
+            if (regime == MarketRegimeType.Ranging) technical += boost;
+            else quantitative += boost;
+            
+            _logger.LogInformation("🧠 ADAPTIVE WEIGHTS: Applying dynamic boost of {Boost:F2} based on {Count} samples.", boost, perf.SampleSize);
         }
 
-        // Adaptive Adjustments (Sprint 5: Institutional Squeezes)
+        // 3. INSTITUTIONAL SQUEEZE OVERRIDE
         if (context.InstitutionalData?.IsSqueezeDetected == true)
         {
-            // During a squeeze, order flow and institutional data are the ONLY thing that matter
             quantitative *= 1.5f; 
             technical *= 0.5f;
             _logger.LogInformation("🔥 ADAPTIVE WEIGHTS: Boosting institutional weight due to Squeeze detected!");
