@@ -65,6 +65,9 @@ public interface ITradingAppService : IApplicationService
     
     // Exhaustive Validation
     Task RunExhaustiveValidationAsync(List<string> symbols, bool runInBackground = true);
+
+    // Signal Analytics (Mode B)
+    Task<SignalStatsDto> GetSignalStatsAsync(string? symbol = null, MarketRegimeType? regime = null);
 }
 
 public class GetSignalsInput : PagedAndSortedResultRequestDto

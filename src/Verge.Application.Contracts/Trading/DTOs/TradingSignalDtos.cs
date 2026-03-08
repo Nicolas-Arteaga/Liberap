@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Volo.Abp.Application.Dtos;
 
 namespace Verge.Trading;
@@ -11,7 +12,9 @@ public class TradingSignalDto : EntityDto<Guid>
     public SignalConfidence Confidence { get; set; }
     public decimal ProfitPotential { get; set; }
     public DateTime AnalyzedDate { get; set; }
-    public TradeStatus Status { get; set; }
+    public TradeStatus Status { get; set; }    
+    public decimal? RealizedPnL { get; set; }
+    public MarketRegimeType? Regime { get; set; }
 }
 
 public class CreateTradingSignalDto
@@ -63,4 +66,25 @@ public class TargetZoneDto
 {
     public decimal Low { get; set; }
     public decimal High { get; set; }
+}
+
+public class SignalStatsDto
+{
+    public string Symbol { get; set; } = string.Empty;
+    public int TotalSignals { get; set; }
+    public int Wins { get; set; }
+    public int Losses { get; set; }
+    public double WinRate { get; set; }
+    public decimal TotalRealizedPnL { get; set; }
+    public decimal AveragePnLPerTrade { get; set; }
+    public List<SignalRegimeStatDto> ByRegime { get; set; } = new();
+}
+
+public class SignalRegimeStatDto
+{
+    public string Regime { get; set; } = string.Empty;
+    public int Wins { get; set; }
+    public int Losses { get; set; }
+    public double WinRate { get; set; }
+    public decimal TotalPnL { get; set; }
 }

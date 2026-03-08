@@ -69,4 +69,28 @@ public class OptimizationService : DomainService, ITransientDependency
 
         return (profitFactor, sharpe, winRate);
     }
+
+    public (double Sharpe, double Sortino) CalculateTrueMetrics(List<double> returnsList)
+    {
+        if (returnsList == null || returnsList.Count < 2) return (0, 0);
+
+        double averageReturn = returnsList.Average();
+        
+        // Calculate Sharpe (StdDev)
+        double sumExceedances = returnsList.Sum(r => Math.Pow(r - averageReturn, 2));
+        double stdDev = Math.Sqrt(sumExceedances / (returnsList.Count - 1));
+        double sharpe = stdDev > 0 ? averageReturn / stdDev : 0;
+
+        // Calculate Sortino (Downside Dev)
+        var downsideReturns = returnsList.Where(r => r < 0).ToList();
+        double downsideDev = 0;
+        if (downsideReturns.Count > 0)
+        {
+            double sumDownsideExceedances = downsideReturns.Sum(r => Math.Pow(r, 2)); // Target = 0 usually
+            downsideDev = Math.Sqrt(sumDownsideExceedances / downsideReturns.Count);
+        }
+        double sortino = downsideDev > 0 ? averageReturn / downsideDev : sharpe; // fallback to sharpe if no downside
+
+        return (sharpe, sortino);
+    }
 }

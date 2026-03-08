@@ -14,6 +14,10 @@ public class TradingSignal : FullAuditedAggregateRoot<Guid>
     public decimal ProfitPotential { get; set; }
     public DateTime AnalyzedDate { get; set; }
     public TradeStatus Status { get; set; }
+    
+    // Mode B: Signal Tracking
+    public decimal? RealizedPnL { get; set; }
+    public MarketRegimeType? Regime { get; set; }
 
     protected TradingSignal() { }
 

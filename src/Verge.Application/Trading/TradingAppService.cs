@@ -402,6 +402,57 @@ public class TradingAppService : ApplicationService, ITradingAppService
         await _alertRepository.UpdateAsync(alert);
     }
 
+    [HttpGet("api/app/trading/signal-stats")]
+    public async Task<SignalStatsDto> GetSignalStatsAsync(string? symbol = null, MarketRegimeType? regime = null)
+    {
+        var query = await _signalRepository.GetQueryableAsync();
+
+        if (!string.IsNullOrEmpty(symbol))
+            query = query.Where(x => x.Symbol == symbol);
+
+        if (regime.HasValue)
+            query = query.Where(x => x.Regime == regime.Value);
+
+        // Only closed trades
+        var signals = await AsyncExecuter.ToListAsync(
+            query.Where(x => x.Status == TradeStatus.Win || x.Status == TradeStatus.Loss));
+
+        int wins = signals.Count(x => x.Status == TradeStatus.Win);
+        int losses = signals.Count(x => x.Status == TradeStatus.Loss);
+        int total = wins + losses;
+        decimal totalPnL = signals.Sum(x => x.RealizedPnL ?? 0);
+
+        var byRegime = signals
+            .Where(x => x.Regime.HasValue)
+            .GroupBy(x => x.Regime!.Value)
+            .Select(g =>
+            {
+                int rWins = g.Count(x => x.Status == TradeStatus.Win);
+                int rLosses = g.Count(x => x.Status == TradeStatus.Loss);
+                int rTotal = rWins + rLosses;
+                return new SignalRegimeStatDto
+                {
+                    Regime = g.Key.ToString(),
+                    Wins = rWins,
+                    Losses = rLosses,
+                    WinRate = rTotal > 0 ? (double)rWins / rTotal * 100.0 : 0,
+                    TotalPnL = g.Sum(x => x.RealizedPnL ?? 0)
+                };
+            }).ToList();
+
+        return new SignalStatsDto
+        {
+            Symbol = symbol ?? "ALL",
+            TotalSignals = total,
+            Wins = wins,
+            Losses = losses,
+            WinRate = total > 0 ? (double)wins / total * 100.0 : 0,
+            TotalRealizedPnL = totalPnL,
+            AveragePnLPerTrade = total > 0 ? totalPnL / total : 0,
+            ByRegime = byRegime
+        };
+    }
+
     public async Task<BacktestResultDto> RunBacktestAsync(RunBacktestDto input)
     {
         return await RunBacktestInternalAsync(input);
@@ -428,8 +479,12 @@ public class TradingAppService : ApplicationService, ITradingAppService
         decimal totalFees = 0;
         decimal totalSlippage = 0;
 
-        foreach (var candle in candles.OrderBy(x => x.AnalyzedDate))
+        var orderedCandles = candles.OrderBy(x => x.AnalyzedDate).ToList();
+        List<double> returnsList = new List<double>();
+
+        for (int i = 0; i < orderedCandles.Count; i++)
         {
+            var candle = orderedCandles[i];
             var context = CreateVirtualContext(candle, candles);
             var decision = await _decisionEngine.EvaluateAsync(
                 session, 
@@ -451,19 +506,71 @@ public class TradingAppService : ApplicationService, ITradingAppService
                 totalSlippage += slippageCost;
                 decimal totalCosts = feeCost + slippageCost;
 
-                if (decision.WinProbability > 0.6) 
+                // Deterministic Traversal (Mode B)
+                decimal entryPrice = candle.EntryPrice;
+                decimal takeProfitPerc = strategy.TakeProfitPercentage > 0 ? strategy.TakeProfitPercentage / 100m : 0.02m;
+                decimal stopLossPerc = strategy.StopLossPercentage > 0 ? strategy.StopLossPercentage / 100m : 0.01m;
+                
+                decimal tpPrice = candle.Direction == SignalDirection.Long ? entryPrice * (1 + takeProfitPerc) : entryPrice * (1 - takeProfitPerc);
+                decimal slPrice = candle.Direction == SignalDirection.Long ? entryPrice * (1 - stopLossPerc) : entryPrice * (1 + stopLossPerc);
+
+                bool isWin = false;
+                bool positionClosed = false;
+
+                // Intrabar/Forward simulation using future signals as pseudo-candles
+                for (int j = i + 1; j < orderedCandles.Count; j++)
+                {
+                    var futurePrice = orderedCandles[j].EntryPrice;
+                    
+                    if (candle.Direction == SignalDirection.Long)
+                    {
+                        if (futurePrice <= slPrice) { isWin = false; positionClosed = true; break; }
+                        if (futurePrice >= tpPrice) { isWin = true; positionClosed = true; break; }
+                    }
+                    else
+                    {
+                        if (futurePrice >= slPrice) { isWin = false; positionClosed = true; break; }
+                        if (futurePrice <= tpPrice) { isWin = true; positionClosed = true; break; }
+                    }
+                }
+
+                // If end of dataset reached and not closed, force close at last price
+                if (!positionClosed && i < orderedCandles.Count - 1)
+                {
+                    var lastPrice = orderedCandles.Last().EntryPrice;
+                    isWin = candle.Direction == SignalDirection.Long ? (lastPrice > entryPrice) : (lastPrice < entryPrice);
+                }
+
+                if (isWin) 
                 {
                     wins++;
-                    totalPnL += (tradeAmount * (decimal)(decision.RiskRewardRatio ?? 2.0)) - totalCosts;
+                    decimal profit = (tradeAmount * takeProfitPerc) - totalCosts;
+                    totalPnL += profit;
+                    returnsList.Add((double)(profit / tradeAmount));
+                    
+                    // Signal Tracking: persist result
+                    candle.Status = TradeStatus.Win;
+                    candle.RealizedPnL = profit;
+                    candle.Regime = context.MarketRegime?.Regime;
+                    await _signalRepository.UpdateAsync(candle);
                 }
                 else
                 {
-                    totalPnL -= tradeAmount + totalCosts;
+                    decimal loss = (tradeAmount * stopLossPerc) + totalCosts;
+                    totalPnL -= loss;
+                    returnsList.Add((double)(-loss / tradeAmount));
+                    
+                    // Signal Tracking: persist result
+                    candle.Status = TradeStatus.Loss;
+                    candle.RealizedPnL = -loss;
+                    candle.Regime = context.MarketRegime?.Regime;
+                    await _signalRepository.UpdateAsync(candle);
                 }
             }
         }
 
-        var (pf, sharpe, winRate) = _optimizationService.CalculateAdvancedMetrics(totalTrades, wins, totalPnL);
+        var (pf, _, winRate) = _optimizationService.CalculateAdvancedMetrics(totalTrades, wins, totalPnL);
+        var (trueSharpe, trueSortino) = _optimizationService.CalculateTrueMetrics(returnsList);
         
         double totalDays = (input.EndDate - input.StartDate).TotalDays;
         double tradeFrequency = totalDays > 0 ? totalTrades / totalDays : 0;
@@ -477,7 +584,8 @@ public class TradingAppService : ApplicationService, ITradingAppService
             WinRate = winRate,
             TotalProfit = totalPnL,
             ProfitFactor = pf,
-            SharpeRatio = sharpe,
+            SharpeRatio = trueSharpe,
+            SortinoRatio = trueSortino,
             TotalFeesPaid = totalFees,
             TotalSlippageLoss = totalSlippage,
             Expectancy = (double)expectancy,

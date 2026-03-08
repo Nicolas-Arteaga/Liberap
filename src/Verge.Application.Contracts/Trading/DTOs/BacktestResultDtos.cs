@@ -19,6 +19,7 @@ public class BacktestResultDto : FullAuditedEntityDto<Guid>
     public double ProfitFactor { get; set; }
     public decimal MaxDrawdown { get; set; }
     public double SharpeRatio { get; set; }
+    public double SortinoRatio { get; set; }
     public string EquityCurveJson { get; set; } = string.Empty;
     public decimal InitialCapital { get; set; }
     public decimal TotalFeesPaid { get; set; }
