@@ -340,7 +340,7 @@ public class TradingSessionMonitorJob : BackgroundService
 
                         // ALWAYS persist the analysis log for the best opportunity (consistent with fixed-symbol behavior)
                         var traderProfileForAuto = profileMap[session.TraderProfileId];
-                        await CreateAnalysisLogAsync(analysisLogRepo, session, best.Result, best.Context.Candles.Last().Close, best.Context, eventBus, traderProfileForAuto.UserId);
+                        await CreateAnalysisLogAsync(analysisLogRepo, session, best.Result, best.Context.Candles.Last().Close, best.Context, eventBus, traderProfileForAuto.UserId, null, best.Symbol, best.Direction);
 
                         // Update session if it's a candidate for action
                         if (best.Result.Decision != DecisionEngine.TradingDecision.Ignore)
@@ -508,7 +508,9 @@ public class TradingSessionMonitorJob : BackgroundService
         DecisionEngine.MarketContext context,
         IDistributedEventBus eventBus,
         Guid identityUserId,
-        string? customMessage = null)
+        string? customMessage = null,
+        string? overrideSymbol = null,
+        SignalDirection? overrideDirection = null)
     {
         // 1. Determine LogType based on Decision and Reason
         AnalysisLogType logType = AnalysisLogType.Standard;
@@ -537,13 +539,12 @@ public class TradingSessionMonitorJob : BackgroundService
             _ => "💤"
         };
 
+        string logSymbol = overrideSymbol ?? session.Symbol;
+        SignalDirection? logDirection = overrideDirection ?? session.SelectedDirection;
+        string dirText = logDirection?.ToString().ToUpper() ?? "WAIT";
         string confidenceLabel = result.Confidence.ToString().ToUpper();
-        string message = customMessage ?? $"{emoji} [{result.Decision}] Score: {result.Score}/100 | Confianza: {confidenceLabel} | Regimen: {context.MarketRegime?.Regime.ToString() ?? "N/A"} | Price: ${price:N2}";
-
-        if (result.Decision >= DecisionEngine.TradingDecision.Prepare && result.EntryMinPrice.HasValue && result.EntryMaxPrice.HasValue)
-        {
-            message += $" | 🎯 Target: ${result.EntryMinPrice:N2}-${result.EntryMaxPrice:N2}";
-        }
+        
+        string message = customMessage ?? $"{emoji} {logSymbol} {dirText} | Entry: ${price:N2} | SL: ${(result.StopLossPrice ?? 0):N2} | TP: ${(result.TakeProfitPrice ?? 0):N2} | Score: {result.Score}/100";
 
         if (logType == AnalysisLogType.AlertInvalidated)
         {
@@ -578,7 +579,7 @@ public class TradingSessionMonitorJob : BackgroundService
             Guid.NewGuid(),
             session.TraderProfileId,
             session.Id,
-            session.Symbol,
+            logSymbol,
             message,
             result.Score >= 70 ? "success" : (result.Score >= 50 ? "warning" : "info"),
             DateTime.UtcNow,
@@ -597,14 +598,14 @@ public class TradingSessionMonitorJob : BackgroundService
         {
             Id = log.Id.ToString(),
             Type = GetAlertType(logType),
-            Title = $"Análisis {session.Symbol}",
-            Message = log.Message.Split('|')[0].Trim(),
+            Title = $"Análisis {logSymbol}",
+            Message = log.Message.Contains(" | Score:") ? log.Message.Substring(0, log.Message.IndexOf(" | Score:")) : log.Message,
             Timestamp = log.Timestamp,
             Read = false,
-            Crypto = session.Symbol,
+            Crypto = logSymbol,
             Price = price,
             Confidence = result.Confidence,
-            Direction = session.SelectedDirection,
+            Direction = logDirection,
             Stage = session.CurrentStage,
             Score = result.Score,
             Severity = mappedSeverity,

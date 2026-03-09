@@ -51,10 +51,6 @@ public class AutoEvaluatorService : ITransientDependency
             ? new[] { TradingStyle.Scalping, TradingStyle.DayTrading, TradingStyle.SwingTrading, TradingStyle.PositionTrading, TradingStyle.GridTrading, TradingStyle.HODL }
             : new[] { strategy.Style };
 
-        var directions = strategy.DirectionPreference == SignalDirection.Auto
-            ? new[] { SignalDirection.Long, SignalDirection.Short }
-            : new[] { strategy.DirectionPreference };
-
         var results = new List<AutoEvaluationResult>();
         var timeframe = session.Timeframe;
 
@@ -66,33 +62,42 @@ public class AutoEvaluatorService : ITransientDependency
             {
                 var profile = TradingStyleProfileFactory.GetProfile(style);
                 var originalSymbol = session.Symbol;
+                var originalDirection = session.SelectedDirection;
+                
                 session.Symbol = symbol;
+                session.SelectedDirection = strategy.DirectionPreference;
 
-                foreach (var direction in directions)
+                var evalResult = await _engine.EvaluateAsync(session, style, context, true);
+                
+                if (evalResult.Score > 0)
                 {
-                    var evalResult = await _engine.EvaluateAsync(session, style, context, true);
-                    
-                    if (evalResult.Score > 0)
+                    var resolvedDirection = session.SelectedDirection.GetValueOrDefault(SignalDirection.Auto);
+                    if (resolvedDirection == SignalDirection.Auto)
                     {
-                        results.Add(new AutoEvaluationResult
-                        {
-                            Symbol = symbol,
-                            Style = style,
-                            Direction = direction,
-                            Result = evalResult,
-                            Context = context
-                        });
+                        resolvedDirection = context.MarketRegime?.Structure == "Bearish" ? SignalDirection.Short : SignalDirection.Long;
+                    }
 
-                        // Early Exit: Only if we are looking for the absolute best (limit=1)
-                        if (limit == 1 && evalResult.Decision == TradingDecision.Entry && evalResult.Score >= profile.EntryThreshold + 10)
-                        {
-                            _logger.LogInformation("🚀 Early exit triggered for AUTO session {Id}: Found excellent setup on {Symbol} with {Style}", session.Id, symbol, style);
-                            session.Symbol = originalSymbol;
-                            return results;
-                        }
+                    results.Add(new AutoEvaluationResult
+                    {
+                        Symbol = symbol,
+                        Style = style,
+                        Direction = resolvedDirection,
+                        Result = evalResult,
+                        Context = context
+                    });
+
+                    // Early Exit: Only if we are looking for the absolute best (limit=1)
+                    if (limit == 1 && evalResult.Decision == TradingDecision.Entry && evalResult.Score >= profile.EntryThreshold + 10)
+                    {
+                        _logger.LogInformation("🚀 Early exit triggered for AUTO session {Id}: Found excellent setup on {Symbol} with {Style} ({Direction})", session.Id, symbol, style, resolvedDirection);
+                        session.Symbol = originalSymbol;
+                        session.SelectedDirection = originalDirection;
+                        return results;
                     }
                 }
+                
                 session.Symbol = originalSymbol;
+                session.SelectedDirection = originalDirection;
             }
         }
 

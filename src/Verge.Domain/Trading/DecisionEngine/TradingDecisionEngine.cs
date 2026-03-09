@@ -128,7 +128,36 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
                 Score = roundedScore, // Return the decaying score so UI tracks it smoothly
                 Reason = $"IGNORE: {setupInvalidReason}"
             };
-            _logger.LogInformation("✅ Evaluation Result for {Style}: {Decision} | Reason: {Reason}", style, setupInvalidResult.Decision, setupInvalidResult.Reason);
+
+            // Always calculate SL/TP even for invalidated results so the UI has real data
+            var earlyCandle = context.Candles.LastOrDefault();
+            var earlyPrice = earlyCandle?.Close ?? 0;
+            if (earlyPrice > 0)
+            {
+                var earlyDir = session.SelectedDirection;
+                if (earlyDir == null || earlyDir == SignalDirection.Auto)
+                    earlyDir = context.MarketRegime?.Structure == "Bearish" ? SignalDirection.Short : SignalDirection.Long;
+
+                var earlyAtr = (decimal)(context.Technicals?.Atr ?? 0);
+                var earlyRisk = earlyAtr > 0 ? earlyAtr * 1.5m : earlyPrice * 0.015m;
+                var earlyRR = 2.0m;
+
+                if (earlyDir == SignalDirection.Long)
+                {
+                    setupInvalidResult.StopLossPrice = earlyPrice - earlyRisk;
+                    setupInvalidResult.TakeProfitPrice = earlyPrice + earlyRisk * earlyRR;
+                }
+                else
+                {
+                    setupInvalidResult.StopLossPrice = earlyPrice + earlyRisk;
+                    setupInvalidResult.TakeProfitPrice = earlyPrice - earlyRisk * earlyRR;
+                }
+
+                setupInvalidResult.RiskRewardRatio = (double?)earlyRR;
+                setupInvalidResult.WinProbability = 0.5f; // Neutral fallback
+            }
+
+            _logger.LogInformation("✅ Evaluation Result for {Style}: {Decision} | Reason: {Reason} | SL: {SL} | TP: {TP}", style, setupInvalidResult.Decision, setupInvalidResult.Reason, setupInvalidResult.StopLossPrice, setupInvalidResult.TakeProfitPrice);
             return setupInvalidResult;
         }
 
@@ -211,37 +240,50 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
         };
 
         // 10.1 Institutional 1% Price Calculation (Sprint 1)
-        if (result.Decision >= TradingDecision.Context)
+        var lastCandle = context.Candles.LastOrDefault();
+        var currentPrice = lastCandle?.Close ?? 0;
+        
+        if (session.Symbol == "BTCUSDT")
         {
-            var lastCandle = context.Candles.LastOrDefault();
-            var currentPrice = lastCandle?.Close ?? 0;
-            
-            if (currentPrice > 0)
+            _logger.LogWarning("🔍 [DEBUG BTC] Starting Price Calculation. CandleCount: {Count}, CurrentPrice: {Price}, Decision: {Decision}, SelectedDirection: {Dir}",
+                context.Candles?.Count ?? 0, currentPrice, result.Decision, session.SelectedDirection?.ToString() ?? "null");
+        }
+        
+        if (currentPrice > 0)
+        {
+            // Determine concrete direction for the result if session is still Auto or null
+            var effectiveDirection = session.SelectedDirection;
+            if (effectiveDirection == null || effectiveDirection == SignalDirection.Auto)
             {
-                // Determine concrete direction for the result if session is still Auto
-                var effectiveDirection = session.SelectedDirection;
-                if (effectiveDirection == SignalDirection.Auto)
-                {
-                    // Fallback to structure or momentum if still Auto
-                    effectiveDirection = context.MarketRegime?.Structure == "Bearish" ? SignalDirection.Short : SignalDirection.Long;
-                    session.SelectedDirection = effectiveDirection; // Persist for this session
-                }
+                // Fallback to structure or momentum if still Auto/null
+                effectiveDirection = context.MarketRegime?.Structure == "Bearish" ? SignalDirection.Short : SignalDirection.Long;
+                session.SelectedDirection = effectiveDirection; // Persist for this session
+            }
 
-                // ATR-based Risk Management
-                var atr = (decimal)(context.Technicals?.Atr ?? 0);
-                var riskAmount = atr > 0 ? atr * 1.5m : currentPrice * 0.015m; // 1.5x ATR or 1.5% fixed
-                var rr = (decimal)result.RiskRewardRatio.GetValueOrDefault(2.0);
+            var atr = (decimal)(context.Technicals?.Atr ?? 0);
+            var riskAmount = atr > 0 ? atr * 1.5m : currentPrice * 0.015m; // 1.5x ATR or 1.5% fixed
+            var rr = (decimal)result.RiskRewardRatio.GetValueOrDefault(2.0);
+            if (rr <= 0) rr = 2.0m;
 
-                if (effectiveDirection == SignalDirection.Long)
-                {
-                    result.StopLossPrice = currentPrice - riskAmount;
-                    result.TakeProfitPrice = currentPrice + (riskAmount * rr);
-                }
-                else
-                {
-                    result.StopLossPrice = currentPrice + riskAmount;
-                    result.TakeProfitPrice = currentPrice - (riskAmount * rr);
-                }
+            if (session.Symbol == "BTCUSDT")
+            {
+                _logger.LogWarning("🔍 [DEBUG BTC] Params -> ATR: {Atr}, RiskAmount: {RiskAmount}, RR: {RR}, Direction: {Dir}", atr, riskAmount, rr, effectiveDirection);
+            }
+
+            if (effectiveDirection == SignalDirection.Long)
+            {
+                result.StopLossPrice = currentPrice - riskAmount;
+                result.TakeProfitPrice = currentPrice + (riskAmount * rr);
+            }
+            else
+            {
+                result.StopLossPrice = currentPrice + riskAmount;
+                result.TakeProfitPrice = currentPrice - (riskAmount * rr);
+            }
+            
+            if (session.Symbol == "BTCUSDT")
+            {
+                _logger.LogWarning("🔍 [DEBUG BTC] Assigned -> SL: {SL}, TP: {TP}", result.StopLossPrice, result.TakeProfitPrice);
             }
         }
 
@@ -251,6 +293,8 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
             _logger.LogWarning("🌍 BLOCKING ENTRY: Quiet period active for {symbol} due to macroeconomic volatility.", session.Symbol);
             result.Decision = TradingDecision.Ignore;
             result.Reason = context.MacroData.QuietPeriodReason;
+            
+            if (session.Symbol == "BTCUSDT") _logger.LogWarning("🔍 [DEBUG BTC] Exiting early at Quiet Period. SL: {SL}, TP: {TP}", result.StopLossPrice, result.TakeProfitPrice);
             return result;
         }
 
@@ -263,10 +307,15 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
         // 10. Entry Range Calculation (Sprint 4)
         if (result.Decision >= TradingDecision.Prepare)
         {
-            var currentPrice = context.Candles.Last().Close;
+            var entryBasePrice = context.Candles.Last().Close;
             // 0.5% Zone window (+-0.25%)
-            result.EntryMinPrice = currentPrice * 0.9975m;
-            result.EntryMaxPrice = currentPrice * 1.0025m;
+            result.EntryMinPrice = entryBasePrice * 0.9975m;
+            result.EntryMaxPrice = entryBasePrice * 1.0025m;
+        }
+
+        if (session.Symbol == "BTCUSDT")
+        {
+            _logger.LogWarning("🔍 [DEBUG BTC] Returning Result -> Decision: {Decision}, SL: {SL}, TP: {TP}", result.Decision, result.StopLossPrice, result.TakeProfitPrice);
         }
 
         _logger.LogInformation("✅ Evaluation Result for {Style}: {Decision} (Score: {Score})", style, result.Decision, result.Score);
@@ -593,8 +642,6 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
 
     private double CalculateRiskRewardRatio(MarketContext context, TradingStyle style, TradingDecision decision)
     {
-        if (decision < TradingDecision.Prepare) return 0;
-
         // Institutional estimation based on profile expectations
         // Scalping usually targets smaller R:R (1:1.5)
         // Swing targets larger R:R (1:3)
