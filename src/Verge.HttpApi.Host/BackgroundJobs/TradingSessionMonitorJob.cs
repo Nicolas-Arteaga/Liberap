@@ -303,7 +303,7 @@ public class TradingSessionMonitorJob : BackgroundService
                     if (top3.Any())
                     {
                         var rankingData = new {
-                            top = top3.Select(o => new {
+                            rankings = top3.Select(o => new {
                                 symbol = o.Symbol,
                                 style = o.Style.ToString(),
                                 direction = o.Direction.ToString(),
@@ -311,7 +311,7 @@ public class TradingSessionMonitorJob : BackgroundService
                                 confidence = o.Result.Confidence.ToString()
                             }).ToList()
                         };
-
+ 
                         var rankingLog = new AnalysisLog(
                             Guid.NewGuid(),
                             session.TraderProfileId,
@@ -321,7 +321,7 @@ public class TradingSessionMonitorJob : BackgroundService
                             "info",
                             DateTime.UtcNow,
                             AnalysisLogType.OpportunityRanking,
-                            "{}"
+                            JsonSerializer.Serialize(rankingData)
                         );
                         await analysisLogRepo.InsertAsync(rankingLog);
                     }
@@ -624,6 +624,8 @@ public class TradingSessionMonitorJob : BackgroundService
         alertDto.WinProbability = result.WinProbability;
         alertDto.HistoricSampleSize = result.HistoricSampleSize;
         alertDto.PatternSignal = result.PatternSignal;
+        alertDto.StopLoss = result.StopLossPrice;
+        alertDto.TakeProfit = result.TakeProfitPrice;
 
         _logger.LogInformation("🔔 [Analysis] Publicando alerta {Type} para sesión {Id}", alertDto.Type, session.Id);
         await eventBus.PublishAsync(new AlertStateChangedEto

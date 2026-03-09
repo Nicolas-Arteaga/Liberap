@@ -270,12 +270,25 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.currentSession) return;
 
     // Normalize signal/direction names
-    const symbol = alert.crypto || alert.symbol;
-    if (!symbol) return;
+    let symbol = alert.crypto || alert.Crypto || alert.symbol || alert.Symbol;
+
+    // FALLBACK: If no symbol is provided, it's likely a global/macro event. 
+    // We assign a generic symbol to avoid returning early and losing the data for Whales/Liqs.
+    if (!symbol) {
+      if (alert.message?.toLowerCase().includes('ballena')) symbol = '🐋 WHALE';
+      else if (alert.message?.toLowerCase().includes('liquidación')) symbol = '💥 LIQ';
+      else symbol = 'VERGE';
+    }
 
     const winProb = alert.winProbability !== undefined ? alert.winProbability : (alert.WinProbability !== undefined ? alert.WinProbability : 0.5);
     const score = alert.score !== undefined ? alert.score : (alert.Score !== undefined ? alert.Score : 0);
     const confidence = alert.confidence !== undefined ? alert.confidence : (alert.Confidence !== undefined ? alert.Confidence : 0);
+
+    // Tactical Price Mapping (Institutional 1% Standards)
+    const entryPrice = alert.entryPrice || alert.EntryPrice || alert.price || alert.Price;
+    const stopLoss = alert.stopLoss || alert.StopLoss;
+    const takeProfit = alert.takeProfit || alert.TakeProfit;
+    const patternName = alert.patternSignal || alert.patternName || alert.PatternSignal || alert.PatternName || 'Institutional Analysis';
 
     // Normalize direction with fallback
     let direction = alert.direction !== undefined ? alert.direction : alert.Direction;
@@ -318,7 +331,12 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       timeWindow: timeWindow,
       historicProb: historicProb,
       rrRatio: alert.riskRewardRatio || 0,
-      sampleSize: alert.historicSampleSize || 0
+      sampleSize: alert.historicSampleSize || 0,
+      // Tactical
+      entryPrice: entryPrice,
+      stopLoss: stopLoss,
+      takeProfit: takeProfit,
+      patternName: patternName
     });
 
     // 2. Whale Tab
@@ -603,46 +621,51 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // Deduplicate logs to reduce UI noise
     const cleanLogs = this.deduplicateLogs(logs);
-    this.analysisLogs = cleanLogs;
 
     // Process most recent logs first
     const sortedLogs = [...cleanLogs].sort((a, b) =>
       new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
 
+    // 1. First Pass: Enrich and Process ALL logs for Institutional state
     for (const log of sortedLogs) {
       if (!log.message) continue;
 
-      // Handle Opportunity Ranking (Phase 3)
-      // Handle Opportunity Ranking (Phase 3)
+      const data = this.parseJson(log.dataJson);
+
+      // Handle Opportunity Ranking (Phase 3/20) - Support both legacy 'top' and new 'rankings' keys
       if (log.logType === AnalysisLogType.OpportunityRanking) {
-        const data = this.parseJson(log.dataJson);
-        if (data?.rankings) {
-          this.topOpportunities = data.rankings;
+        const rankings = data?.rankings || data?.top || data?.Rankings || data?.Top;
+        if (rankings && Array.isArray(rankings)) {
+          this.topOpportunities = rankings;
+
+          // Enrich the log message with the actual coins (Top 3)
+          const top3 = rankings.slice(0, 3).map((r: any) => `${r.symbol || r.Symbol}(${r.score || r.Score})`).join(', ');
+          log.message = `📈 TOP 3: ${top3}`;
+
           // Populate Scanner with each ranked coin
-          data.rankings.forEach((rank: any) => {
+          rankings.forEach((rank: any) => {
             this.processInstitutionalAlert({
               ...rank,
+              symbol: rank.symbol || rank.Symbol,
               timestamp: log.timestamp,
-              message: `Oportunidad detectada por ranking (#${rank.symbol})`
+              message: `Oportunidad detectada (#${rank.symbol || rank.Symbol})`
             });
           });
         }
-        continue;
       }
 
-      // Parse structured data from dataJson field (set by backend CreateAnalysisLogAsync)
-      let data: any = null;
-      if (log.dataJson) {
-        try { data = JSON.parse(log.dataJson); } catch { }
+      // Process any log with structured data for institutional tabs
+      if (data) {
+        this.processInstitutionalAlert({
+          ...data,
+          symbol: log.symbol,
+          message: log.message,
+          timestamp: log.timestamp
+        });
       }
 
-      // --- Populate lastMotorSignal from any log ---
-      if (!this.lastMotorSignal) {
-        this.lastMotorSignal = log.message;
-      }
-
-      // Prefer warning/success level as the "motor signal"
+      // Populate lastMotorSignal
       if (log.level === 'warning' || log.level === 'success' ||
         log.logType === AnalysisLogType.AlertEntry ||
         log.logType === AnalysisLogType.AlertPrepare) {
@@ -710,6 +733,32 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         }
       }
     }
+
+    // 2. Second Pass: Filter for the "EVENTOS" UI tab to avoid noise
+    this.analysisLogs = sortedLogs.filter(log => {
+      if (!log.message) return false;
+      const msg = log.message.toLowerCase();
+
+      // Keep significant events
+      if (log.level === 'success' || log.level === 'warning' ||
+        log.logType === AnalysisLogType.AlertEntry ||
+        log.logType === AnalysisLogType.AlertPrepare ||
+        msg.includes('top 3') ||
+        msg.includes('cacería') ||
+        msg.includes('squeeze') ||
+        msg.includes('ballena')) return true;
+
+      // Filter context logs: only show high scores (>70) or every 10th
+      if (msg.includes('[context]')) {
+        const data = this.parseJson(log.dataJson);
+        const score = data?.score || data?.Score || 0;
+        return (score >= 70) || (sortedLogs.indexOf(log) % 10 === 0);
+      }
+
+      return true;
+    });
+
+    console.log(`[Dashboard] 📊 Log processing complete. Scanner symbols: ${Array.from(this.scannerData.keys()).join(', ')}`);
   }
 
   getRsiDescription(rsi: number): string {

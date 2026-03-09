@@ -84,30 +84,69 @@ export class TradingSignalrService {
         this.connection.on('ReceiveAlert', (alert: any) => {
             console.log('[SignalR] 🔔 Alerta RECIBIDA en frontend:', alert);
 
-            // Convertir timestamp string a Date si es necesario
-            if (typeof alert.timestamp === 'string') {
-                alert.timestamp = new Date(alert.timestamp);
-            }
+            // Normalizar el objeto antes de procesarlo
+            const normalized = this.normalizeAlert(alert);
 
             // Siempre agregamos al servicio para que aparezca en la lista/campanita
-            this.alertService.addAlert(alert);
+            this.alertService.addAlert(normalized);
 
             // Evitar spam de Toasts: solo lo mostramos si el estado ha cambiado para este par
-            const symbol = alert.crypto || 'Global';
-            const stateKey = `${symbol}_${alert.type}`;
-
-            if (this.lastNotifiedState[symbol] !== alert.type) {
-                console.log(`[SignalR] ✨ Cambio de estado detectado para ${symbol}: ${this.lastNotifiedState[symbol]} -> ${alert.type}. Disparando Toast.`);
-                this.lastNotifiedState[symbol] = alert.type;
-                this.showToastForAlert(alert);
+            const symbol = normalized.crypto || 'Global';
+            if (this.lastNotifiedState[symbol] !== normalized.type) {
+                console.log(`[SignalR] ✨ Cambio de estado detectado para ${symbol}: ${this.lastNotifiedState[symbol]} -> ${normalized.type}. Disparando Toast.`);
+                this.lastNotifiedState[symbol] = normalized.type;
+                this.showToastForAlert(normalized);
             } else {
-                console.log(`[SignalR] ⏩ Omitiendo Toast para ${symbol} (mismo estado: ${alert.type})`);
+                console.log(`[SignalR] ⏩ Omitiendo Toast para ${symbol} (mismo estado: ${normalized.type})`);
             }
         });
 
         this.connection.start()
             .then(() => console.warn('[SignalR] 🟢🔥 CONECTADO EXITOSAMENTE AL HUB DE TRADING'))
             .catch(err => console.error('[SignalR] 🔴 Error de conexión:', err));
+    }
+
+    private normalizeAlert(alert: any): VergeAlert {
+        console.log('[SignalR] 🛠️ Normalizando alerta RAW:', alert);
+
+        // Mapear campos que pueden venir en PascalCase o camelCase desde C# SignalR
+        const normalized: any = { ...alert };
+
+        normalized.timestamp = alert.timestamp ? new Date(alert.timestamp) : new Date();
+
+        // Mapeo exhaustivo de campos institucionales
+        normalized.crypto = alert.crypto || alert.Crypto || alert.symbol || alert.Symbol || 'AUTO';
+        normalized.price = alert.price || alert.Price || alert.entryPrice || alert.EntryPrice || 0;
+
+        // Direction handling (0=Long, 1=Short, etc)
+        normalized.direction = alert.direction !== undefined ? alert.direction : alert.Direction;
+
+        normalized.score = alert.score !== undefined ? alert.score : alert.Score;
+
+        // Confidence/WinProb mapping
+        const rawConfidence = alert.confidence !== undefined ? alert.confidence : alert.Confidence;
+        normalized.confidence = rawConfidence !== undefined ? rawConfidence : (normalized.score || 0);
+
+        normalized.stage = alert.stage !== undefined ? alert.stage : alert.Stage;
+        normalized.type = alert.type || alert.Type || 'System';
+        normalized.severity = alert.severity || alert.Severity || 'info';
+
+        // Tactical 1% + Fallbacks
+        normalized.entryPrice = alert.entryPrice || alert.EntryPrice || alert.price || alert.Price || 0;
+        normalized.entryMin = alert.entryMin || alert.EntryMin;
+        normalized.entryMax = alert.entryMax || alert.EntryMax;
+        normalized.stopLoss = alert.stopLoss || alert.StopLoss || alert.stopLossPrice || alert.StopLossPrice || 0;
+        normalized.takeProfit = alert.takeProfit || alert.TakeProfit || alert.takeProfitPrice || alert.TakeProfitPrice || 0;
+        normalized.riskRewardRatio = alert.riskRewardRatio || alert.RiskRewardRatio || alert.rrRatio || 0;
+        normalized.winProbability = alert.winProbability || alert.WinProbability || alert.winProb || 0;
+        normalized.patternName = alert.patternName || alert.PatternName || alert.patternSignal || alert.PatternSignal || 'Institutional Analysis';
+
+        // Whale/Squeeze
+        normalized.whaleInfluenceScore = alert.whaleInfluenceScore || alert.WhaleInfluenceScore || alert.whaleInfluence || 0;
+        normalized.isSqueeze = alert.isSqueeze || alert.IsSqueeze || false;
+
+        console.log('[SignalR] ✅ Alerta NORMALIZADA:', normalized);
+        return normalized as VergeAlert;
     }
 
     private showToastForAlert(alert: VergeAlert) {

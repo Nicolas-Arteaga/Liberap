@@ -35,4 +35,11 @@ export interface VergeAlert {
     whaleSentiment?: string;
     macroQuietPeriod?: boolean;
     macroReason?: string;
+    // Tactical info
+    entryPrice?: number;
+    stopLoss?: number;
+    takeProfit?: number;
+    patternName?: string;
+    entryMin?: number;
+    entryMax?: number;
 }

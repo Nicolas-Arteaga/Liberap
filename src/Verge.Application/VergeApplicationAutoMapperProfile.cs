@@ -1,5 +1,6 @@
 using AutoMapper;
 using Verge.Trading;
+using Verge.Trading.DTOs;
 
 namespace Verge;
 

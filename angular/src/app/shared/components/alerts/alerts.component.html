@@ -67,24 +67,59 @@
     </div>
 
     <!-- Center: Signal Reason/Message -->
-    <div class="message-area">
-      <div class="text-xs text-uppercase fw-bold text-info-light opacity-75">{{ getOverlayTitle(activeOverlayAlert.type)
-        }}</div>
-      <div class="text-white fw-bold truncate-msg italic" title="{{ activeOverlayAlert.message }}">
+    <div class="message-area flex-grow-1">
+      <div class="d-flex align-items-center gap-2 mb-1">
+        <span class="text-xs text-uppercase fw-bold text-info-light opacity-75">{{
+          getOverlayTitle(activeOverlayAlert.type) }}</span>
+        <span class="badge bg-white-10 text-white-50" *ngIf="activeOverlayAlert.patternName" style="font-size: 9px;">{{
+          activeOverlayAlert.patternName }}</span>
+      </div>
+      <div class="text-white fw-black fs-5 truncate-msg italic" title="{{ activeOverlayAlert.message }}">
         "{{ activeOverlayAlert.message }}"
       </div>
     </div>
 
     <!-- Right: Stats -->
-    <div class="stats-area d-flex align-items-center gap-3">
+    <div class="stats-area d-flex align-items-center gap-3 ps-3 border-start border-white-10">
       <div class="mini-stat">
         <span class="label">WINPROB</span>
-        <span class="value text-success">{{ (activeOverlayAlert.winProbability || 0.5) | percent:'1.0-0' }}</span>
+        <span class="value text-success fw-black fs-6">{{ (activeOverlayAlert.winProbability || 0.5) | percent:'1.0-0'
+          }}</span>
       </div>
       <div class="mini-stat">
-        <span class="label">RR</span>
-        <span class="value text-warning">1:{{ (activeOverlayAlert.riskRewardRatio || 0) | number:'1.1-1' }}</span>
+        <span class="label">CONFIANZA</span>
+        <span class="value text-info fw-black fs-6">{{ (activeOverlayAlert.confidence || 0) }}%</span>
       </div>
+    </div>
+  </div>
+
+  <!-- Row 3: Tactical Prices (New Row for richness) -->
+  <div
+    class="alert-row tactical-row mt-2 d-flex justify-content-between align-items-center bg-white-05 p-2 rounded shadow-sm"
+    *ngIf="activeOverlayAlert.entryPrice || activeOverlayAlert.direction !== undefined">
+    <div class="price-stat text-center">
+      <span class="text-white-50 text-xxs block">ENTRY</span>
+      <span class="text-white fw-bold d-block" *ngIf="activeOverlayAlert.entryMin">
+         ${{ activeOverlayAlert.entryMin | number:'1.2-2' }} - ${{ activeOverlayAlert.entryMax | number:'1.2-2' }}
+      </span>
+      <span class="text-white fw-bold d-block" *ngIf="!activeOverlayAlert.entryMin">
+         ${{ (activeOverlayAlert.entryPrice || activeOverlayAlert.price || 0) | number:'1.2-2' }}
+      </span>
+    </div>
+    <div class="v-divider-small" style="width: 1px; height: 15px; background: rgba(255,255,255,0.1);"></div>
+    <div class="price-stat text-center">
+      <span class="text-white-50 text-xxs block">STOP LOSS</span>
+      <span class="text-danger fw-bold d-block">${{ (activeOverlayAlert.stopLoss || 0) | number:'1.2-2' }}</span>
+    </div>
+    <div class="v-divider-small" style="width: 1px; height: 15px; background: rgba(255,255,255,0.1);"></div>
+    <div class="price-stat text-center">
+      <span class="text-white-50 text-xxs block">TAKE PROFIT</span>
+      <span class="text-success fw-bold d-block">${{ (activeOverlayAlert.takeProfit || 0) | number:'1.2-2' }}</span>
+    </div>
+    <div class="v-divider-small" style="width: 1px; height: 15px; background: rgba(255,255,255,0.1);"></div>
+    <div class="price-stat text-center">
+      <span class="text-white-50 text-xxs block">RR</span>
+      <span class="text-warning fw-bold d-block">1:{{ activeOverlayAlert.riskRewardRatio || '0.0' }}</span>
     </div>
   </div>
 

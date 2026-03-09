@@ -210,6 +210,41 @@ public class TradingDecisionEngine : DomainService, ITradingDecisionEngine
             TrailingMultiplier = trailingMultiplierOverride ?? calibration?.TrailingMultiplier ?? profile.TrailingMultiplier
         };
 
+        // 10.1 Institutional 1% Price Calculation (Sprint 1)
+        if (result.Decision >= TradingDecision.Context)
+        {
+            var lastCandle = context.Candles.LastOrDefault();
+            var currentPrice = lastCandle?.Close ?? 0;
+            
+            if (currentPrice > 0)
+            {
+                // Determine concrete direction for the result if session is still Auto
+                var effectiveDirection = session.SelectedDirection;
+                if (effectiveDirection == SignalDirection.Auto)
+                {
+                    // Fallback to structure or momentum if still Auto
+                    effectiveDirection = context.MarketRegime?.Structure == "Bearish" ? SignalDirection.Short : SignalDirection.Long;
+                    session.SelectedDirection = effectiveDirection; // Persist for this session
+                }
+
+                // ATR-based Risk Management
+                var atr = (decimal)(context.Technicals?.Atr ?? 0);
+                var riskAmount = atr > 0 ? atr * 1.5m : currentPrice * 0.015m; // 1.5x ATR or 1.5% fixed
+                var rr = (decimal)result.RiskRewardRatio.GetValueOrDefault(2.0);
+
+                if (effectiveDirection == SignalDirection.Long)
+                {
+                    result.StopLossPrice = currentPrice - riskAmount;
+                    result.TakeProfitPrice = currentPrice + (riskAmount * rr);
+                }
+                else
+                {
+                    result.StopLossPrice = currentPrice + riskAmount;
+                    result.TakeProfitPrice = currentPrice - (riskAmount * rr);
+                }
+            }
+        }
+
         // 9. Quiet Period Enforcement (Sprint 5)
         if (context.MacroData?.IsInQuietPeriod == true)
         {

@@ -11,6 +11,7 @@ using Verge.Trading.DecisionEngine;
 using Volo.Abp;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Domain.Repositories;
+using Verge.Trading.DTOs;
 
 namespace Verge.Trading;
 

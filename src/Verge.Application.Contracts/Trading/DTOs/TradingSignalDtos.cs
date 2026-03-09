@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Volo.Abp.Application.Dtos;
 
-namespace Verge.Trading;
+namespace Verge.Trading.DTOs;
 
 public class TradingSignalDto : EntityDto<Guid>
 {
@@ -55,6 +55,8 @@ public class VergeAlertDto
     public double? WinProbability { get; set; }
     public int? HistoricSampleSize { get; set; }
     public string? PatternSignal { get; set; }
+    public decimal? StopLoss { get; set; }
+    public decimal? TakeProfit { get; set; }
 
     // Structure (Sprint 2)
     public string? Structure { get; set; }
