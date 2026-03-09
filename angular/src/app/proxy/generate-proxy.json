@@ -999,6 +999,244 @@
             }
           }
         },
+        "Verge.Trading.ExecutionAppService": {
+          "controllerName": "Execution",
+          "controllerGroupName": "Execution",
+          "isRemoteService": true,
+          "isIntegrationService": false,
+          "apiVersion": null,
+          "type": "Verge.Trading.ExecutionAppService",
+          "interfaces": [
+            {
+              "type": "Verge.Trading.IExecutionAppService",
+              "name": "IExecutionAppService",
+              "methods": [
+                {
+                  "name": "RunPaperTradingSimulationAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "symbol",
+                      "typeAsString": "System.String, System.Private.CoreLib",
+                      "type": "System.String",
+                      "typeSimple": "string",
+                      "isOptional": false,
+                      "defaultValue": null
+                    },
+                    {
+                      "name": "simulatedDays",
+                      "typeAsString": "System.Int32, System.Private.CoreLib",
+                      "type": "System.Int32",
+                      "typeSimple": "number",
+                      "isOptional": true,
+                      "defaultValue": 30
+                    },
+                    {
+                      "name": "runInBackground",
+                      "typeAsString": "System.Boolean, System.Private.CoreLib",
+                      "type": "System.Boolean",
+                      "typeSimple": "boolean",
+                      "isOptional": true,
+                      "defaultValue": true
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "Verge.Trading.PaperTradingReportDto",
+                    "typeSimple": "Verge.Trading.PaperTradingReportDto"
+                  }
+                },
+                {
+                  "name": "RunLiveShadowAnalysisAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "symbol",
+                      "typeAsString": "System.String, System.Private.CoreLib",
+                      "type": "System.String",
+                      "typeSimple": "string",
+                      "isOptional": false,
+                      "defaultValue": null
+                    },
+                    {
+                      "name": "signalsToAnalyze",
+                      "typeAsString": "System.Int32, System.Private.CoreLib",
+                      "type": "System.Int32",
+                      "typeSimple": "number",
+                      "isOptional": true,
+                      "defaultValue": 100
+                    },
+                    {
+                      "name": "runInBackground",
+                      "typeAsString": "System.Boolean, System.Private.CoreLib",
+                      "type": "System.Boolean",
+                      "typeSimple": "boolean",
+                      "isOptional": true,
+                      "defaultValue": true
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "Verge.Trading.LiveShadowReportDto",
+                    "typeSimple": "Verge.Trading.LiveShadowReportDto"
+                  }
+                }
+              ]
+            }
+          ],
+          "actions": {
+            "RunPaperTradingSimulationAsyncBySymbolAndSimulatedDaysAndRunInBackground": {
+              "uniqueName": "RunPaperTradingSimulationAsyncBySymbolAndSimulatedDaysAndRunInBackground",
+              "name": "RunPaperTradingSimulationAsync",
+              "httpMethod": "POST",
+              "url": "api/app/execution/run-paper-trading-simulation",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "symbol",
+                  "typeAsString": "System.String, System.Private.CoreLib",
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null
+                },
+                {
+                  "name": "simulatedDays",
+                  "typeAsString": "System.Int32, System.Private.CoreLib",
+                  "type": "System.Int32",
+                  "typeSimple": "number",
+                  "isOptional": true,
+                  "defaultValue": 30
+                },
+                {
+                  "name": "runInBackground",
+                  "typeAsString": "System.Boolean, System.Private.CoreLib",
+                  "type": "System.Boolean",
+                  "typeSimple": "boolean",
+                  "isOptional": true,
+                  "defaultValue": true
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "symbol",
+                  "name": "symbol",
+                  "jsonName": null,
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "simulatedDays",
+                  "name": "simulatedDays",
+                  "jsonName": null,
+                  "type": "System.Int32",
+                  "typeSimple": "number",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "runInBackground",
+                  "name": "runInBackground",
+                  "jsonName": null,
+                  "type": "System.Boolean",
+                  "typeSimple": "boolean",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "Verge.Trading.PaperTradingReportDto",
+                "typeSimple": "Verge.Trading.PaperTradingReportDto"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.IExecutionAppService"
+            },
+            "RunLiveShadowAnalysisAsyncBySymbolAndSignalsToAnalyzeAndRunInBackground": {
+              "uniqueName": "RunLiveShadowAnalysisAsyncBySymbolAndSignalsToAnalyzeAndRunInBackground",
+              "name": "RunLiveShadowAnalysisAsync",
+              "httpMethod": "POST",
+              "url": "api/app/execution/run-live-shadow-analysis",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "symbol",
+                  "typeAsString": "System.String, System.Private.CoreLib",
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null
+                },
+                {
+                  "name": "signalsToAnalyze",
+                  "typeAsString": "System.Int32, System.Private.CoreLib",
+                  "type": "System.Int32",
+                  "typeSimple": "number",
+                  "isOptional": true,
+                  "defaultValue": 100
+                },
+                {
+                  "name": "runInBackground",
+                  "typeAsString": "System.Boolean, System.Private.CoreLib",
+                  "type": "System.Boolean",
+                  "typeSimple": "boolean",
+                  "isOptional": true,
+                  "defaultValue": true
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "symbol",
+                  "name": "symbol",
+                  "jsonName": null,
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "signalsToAnalyze",
+                  "name": "signalsToAnalyze",
+                  "jsonName": null,
+                  "type": "System.Int32",
+                  "typeSimple": "number",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "runInBackground",
+                  "name": "runInBackground",
+                  "jsonName": null,
+                  "type": "System.Boolean",
+                  "typeSimple": "boolean",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "Verge.Trading.LiveShadowReportDto",
+                "typeSimple": "Verge.Trading.LiveShadowReportDto"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.IExecutionAppService"
+            }
+          }
+        },
         "Verge.Trading.MarketDataAppService": {
           "controllerName": "MarketData",
           "controllerGroupName": "MarketData",
@@ -1394,6 +1632,48 @@
                   }
                 },
                 {
+                  "name": "OptimizeRegimeAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "regime",
+                      "typeAsString": "System.String, System.Private.CoreLib",
+                      "type": "System.String",
+                      "typeSimple": "string",
+                      "isOptional": false,
+                      "defaultValue": null
+                    },
+                    {
+                      "name": "symbol",
+                      "typeAsString": "System.String, System.Private.CoreLib",
+                      "type": "System.String",
+                      "typeSimple": "string",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "System.Void",
+                    "typeSimple": "System.Void"
+                  }
+                },
+                {
+                  "name": "ExecuteMassOptimizationAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "symbol",
+                      "typeAsString": "System.String, System.Private.CoreLib",
+                      "type": "System.String",
+                      "typeSimple": "string",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "System.Void",
+                    "typeSimple": "System.Void"
+                  }
+                },
+                {
                   "name": "ConnectExchangeAsync",
                   "parametersOnMethod": [
                     {
@@ -1473,6 +1753,89 @@
                   "returnValue": {
                     "type": "System.Void",
                     "typeSimple": "System.Void"
+                  }
+                },
+                {
+                  "name": "RunComparativeEvaluationAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "symbols",
+                      "typeAsString": "System.Collections.Generic.List`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                      "type": "System.Collections.Generic.List<System.String>",
+                      "typeSimple": "[string]",
+                      "isOptional": false,
+                      "defaultValue": null
+                    },
+                    {
+                      "name": "runInBackground",
+                      "typeAsString": "System.Boolean, System.Private.CoreLib",
+                      "type": "System.Boolean",
+                      "typeSimple": "boolean",
+                      "isOptional": true,
+                      "defaultValue": true
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "System.Void",
+                    "typeSimple": "System.Void"
+                  }
+                },
+                {
+                  "name": "GetComparativeReportAsync",
+                  "parametersOnMethod": [],
+                  "returnValue": {
+                    "type": "Verge.Trading.ComparativeEvaluationReportDto",
+                    "typeSimple": "Verge.Trading.ComparativeEvaluationReportDto"
+                  }
+                },
+                {
+                  "name": "RunExhaustiveValidationAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "symbols",
+                      "typeAsString": "System.Collections.Generic.List`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                      "type": "System.Collections.Generic.List<System.String>",
+                      "typeSimple": "[string]",
+                      "isOptional": false,
+                      "defaultValue": null
+                    },
+                    {
+                      "name": "runInBackground",
+                      "typeAsString": "System.Boolean, System.Private.CoreLib",
+                      "type": "System.Boolean",
+                      "typeSimple": "boolean",
+                      "isOptional": true,
+                      "defaultValue": true
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "System.Void",
+                    "typeSimple": "System.Void"
+                  }
+                },
+                {
+                  "name": "GetSignalStatsAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "symbol",
+                      "typeAsString": "System.String, System.Private.CoreLib",
+                      "type": "System.String",
+                      "typeSimple": "string",
+                      "isOptional": true,
+                      "defaultValue": null
+                    },
+                    {
+                      "name": "regime",
+                      "typeAsString": "System.Nullable`1[[Verge.Trading.MarketRegimeType, Verge.Domain.Shared, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]], System.Private.CoreLib",
+                      "type": "Verge.Trading.MarketRegimeType?",
+                      "typeSimple": "enum?",
+                      "isOptional": true,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "Verge.Trading.SignalStatsDto",
+                    "typeSimple": "Verge.Trading.SignalStatsDto"
                   }
                 }
               ]
@@ -2168,6 +2531,63 @@
               "allowAnonymous": false,
               "implementFrom": "Verge.Trading.ITradingAppService"
             },
+            "GetSignalStatsAsyncBySymbolAndRegime": {
+              "uniqueName": "GetSignalStatsAsyncBySymbolAndRegime",
+              "name": "GetSignalStatsAsync",
+              "httpMethod": "GET",
+              "url": "api/app/trading/signal-stats",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "symbol",
+                  "typeAsString": "System.String, System.Private.CoreLib",
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": true,
+                  "defaultValue": null
+                },
+                {
+                  "name": "regime",
+                  "typeAsString": "System.Nullable`1[[Verge.Trading.MarketRegimeType, Verge.Domain.Shared, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]], System.Private.CoreLib",
+                  "type": "Verge.Trading.MarketRegimeType?",
+                  "typeSimple": "enum?",
+                  "isOptional": true,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "symbol",
+                  "name": "symbol",
+                  "jsonName": null,
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "regime",
+                  "name": "regime",
+                  "jsonName": null,
+                  "type": "Verge.Trading.MarketRegimeType?",
+                  "typeSimple": "enum?",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "Verge.Trading.SignalStatsDto",
+                "typeSimple": "Verge.Trading.SignalStatsDto"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Trading.ITradingAppService"
+            },
             "RunBacktestAsyncByInput": {
               "uniqueName": "RunBacktestAsyncByInput",
               "name": "RunBacktestAsync",
@@ -2201,6 +2621,100 @@
               "returnValue": {
                 "type": "Verge.Trading.BacktestResultDto",
                 "typeSimple": "Verge.Trading.BacktestResultDto"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Trading.ITradingAppService"
+            },
+            "OptimizeRegimeAsyncByRegimeAndSymbol": {
+              "uniqueName": "OptimizeRegimeAsyncByRegimeAndSymbol",
+              "name": "OptimizeRegimeAsync",
+              "httpMethod": "POST",
+              "url": "api/app/trading/optimize-regime",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "regime",
+                  "typeAsString": "System.String, System.Private.CoreLib",
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null
+                },
+                {
+                  "name": "symbol",
+                  "typeAsString": "System.String, System.Private.CoreLib",
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "regime",
+                  "name": "regime",
+                  "jsonName": null,
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "symbol",
+                  "name": "symbol",
+                  "jsonName": null,
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "System.Void",
+                "typeSimple": "System.Void"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Trading.ITradingAppService"
+            },
+            "ExecuteMassOptimizationAsyncBySymbol": {
+              "uniqueName": "ExecuteMassOptimizationAsyncBySymbol",
+              "name": "ExecuteMassOptimizationAsync",
+              "httpMethod": "POST",
+              "url": "api/app/trading/execute-mass-optimization",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "symbol",
+                  "typeAsString": "System.String, System.Private.CoreLib",
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "symbol",
+                  "name": "symbol",
+                  "jsonName": null,
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "System.Void",
+                "typeSimple": "System.Void"
               },
               "allowAnonymous": false,
               "implementFrom": "Verge.Trading.ITradingAppService"
@@ -2368,6 +2882,526 @@
               },
               "allowAnonymous": true,
               "implementFrom": "Verge.Trading.ITradingAppService"
+            },
+            "GetOptimizationMatrixAsync": {
+              "uniqueName": "GetOptimizationMatrixAsync",
+              "name": "GetOptimizationMatrixAsync",
+              "httpMethod": "GET",
+              "url": "api/app/trading/optimization-matrix",
+              "supportedVersions": [],
+              "parametersOnMethod": [],
+              "parameters": [],
+              "returnValue": {
+                "type": "System.String",
+                "typeSimple": "string"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Trading.TradingAppService"
+            },
+            "RunComparativeEvaluationAsyncBySymbolsAndRunInBackground": {
+              "uniqueName": "RunComparativeEvaluationAsyncBySymbolsAndRunInBackground",
+              "name": "RunComparativeEvaluationAsync",
+              "httpMethod": "POST",
+              "url": "api/app/trading/run-comparative-evaluation",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "symbols",
+                  "typeAsString": "System.Collections.Generic.List`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                  "type": "System.Collections.Generic.List<System.String>",
+                  "typeSimple": "[string]",
+                  "isOptional": false,
+                  "defaultValue": null
+                },
+                {
+                  "name": "runInBackground",
+                  "typeAsString": "System.Boolean, System.Private.CoreLib",
+                  "type": "System.Boolean",
+                  "typeSimple": "boolean",
+                  "isOptional": true,
+                  "defaultValue": true
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "symbols",
+                  "name": "symbols",
+                  "jsonName": null,
+                  "type": "System.Collections.Generic.List<System.String>",
+                  "typeSimple": "[string]",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "Body",
+                  "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "runInBackground",
+                  "name": "runInBackground",
+                  "jsonName": null,
+                  "type": "System.Boolean",
+                  "typeSimple": "boolean",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "System.Void",
+                "typeSimple": "System.Void"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Trading.ITradingAppService"
+            },
+            "GetComparativeReportAsync": {
+              "uniqueName": "GetComparativeReportAsync",
+              "name": "GetComparativeReportAsync",
+              "httpMethod": "GET",
+              "url": "api/app/trading/comparative-report",
+              "supportedVersions": [],
+              "parametersOnMethod": [],
+              "parameters": [],
+              "returnValue": {
+                "type": "Verge.Trading.ComparativeEvaluationReportDto",
+                "typeSimple": "Verge.Trading.ComparativeEvaluationReportDto"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Trading.ITradingAppService"
+            },
+            "RunExhaustiveValidationAsyncBySymbolsAndRunInBackground": {
+              "uniqueName": "RunExhaustiveValidationAsyncBySymbolsAndRunInBackground",
+              "name": "RunExhaustiveValidationAsync",
+              "httpMethod": "POST",
+              "url": "api/app/trading/run-exhaustive-validation",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "symbols",
+                  "typeAsString": "System.Collections.Generic.List`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                  "type": "System.Collections.Generic.List<System.String>",
+                  "typeSimple": "[string]",
+                  "isOptional": false,
+                  "defaultValue": null
+                },
+                {
+                  "name": "runInBackground",
+                  "typeAsString": "System.Boolean, System.Private.CoreLib",
+                  "type": "System.Boolean",
+                  "typeSimple": "boolean",
+                  "isOptional": true,
+                  "defaultValue": true
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "symbols",
+                  "name": "symbols",
+                  "jsonName": null,
+                  "type": "System.Collections.Generic.List<System.String>",
+                  "typeSimple": "[string]",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "Body",
+                  "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "runInBackground",
+                  "name": "runInBackground",
+                  "jsonName": null,
+                  "type": "System.Boolean",
+                  "typeSimple": "boolean",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "System.Void",
+                "typeSimple": "System.Void"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Trading.ITradingAppService"
+            }
+          }
+        },
+        "Verge.Trading.ValidationAppService": {
+          "controllerName": "Validation",
+          "controllerGroupName": "Validation",
+          "isRemoteService": true,
+          "isIntegrationService": false,
+          "apiVersion": null,
+          "type": "Verge.Trading.ValidationAppService",
+          "interfaces": [
+            {
+              "type": "Verge.Trading.IValidationAppService",
+              "name": "IValidationAppService",
+              "methods": [
+                {
+                  "name": "RunWalkForwardAnalysisAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "symbol",
+                      "typeAsString": "System.String, System.Private.CoreLib",
+                      "type": "System.String",
+                      "typeSimple": "string",
+                      "isOptional": false,
+                      "defaultValue": null
+                    },
+                    {
+                      "name": "style",
+                      "typeAsString": "Verge.Trading.TradingStyle, Verge.Domain.Shared",
+                      "type": "Verge.Trading.TradingStyle",
+                      "typeSimple": "enum",
+                      "isOptional": false,
+                      "defaultValue": null
+                    },
+                    {
+                      "name": "runInBackground",
+                      "typeAsString": "System.Boolean, System.Private.CoreLib",
+                      "type": "System.Boolean",
+                      "typeSimple": "boolean",
+                      "isOptional": true,
+                      "defaultValue": true
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "Verge.Trading.WalkForwardReportDto",
+                    "typeSimple": "Verge.Trading.WalkForwardReportDto"
+                  }
+                },
+                {
+                  "name": "RunMonteCarloSimulationAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "symbol",
+                      "typeAsString": "System.String, System.Private.CoreLib",
+                      "type": "System.String",
+                      "typeSimple": "string",
+                      "isOptional": false,
+                      "defaultValue": null
+                    },
+                    {
+                      "name": "style",
+                      "typeAsString": "Verge.Trading.TradingStyle, Verge.Domain.Shared",
+                      "type": "Verge.Trading.TradingStyle",
+                      "typeSimple": "enum",
+                      "isOptional": false,
+                      "defaultValue": null
+                    },
+                    {
+                      "name": "iterations",
+                      "typeAsString": "System.Int32, System.Private.CoreLib",
+                      "type": "System.Int32",
+                      "typeSimple": "number",
+                      "isOptional": true,
+                      "defaultValue": 10000
+                    },
+                    {
+                      "name": "runInBackground",
+                      "typeAsString": "System.Boolean, System.Private.CoreLib",
+                      "type": "System.Boolean",
+                      "typeSimple": "boolean",
+                      "isOptional": true,
+                      "defaultValue": true
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "Verge.Trading.MonteCarloReportDto",
+                    "typeSimple": "Verge.Trading.MonteCarloReportDto"
+                  }
+                },
+                {
+                  "name": "RunStressTestAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "symbol",
+                      "typeAsString": "System.String, System.Private.CoreLib",
+                      "type": "System.String",
+                      "typeSimple": "string",
+                      "isOptional": false,
+                      "defaultValue": null
+                    },
+                    {
+                      "name": "style",
+                      "typeAsString": "Verge.Trading.TradingStyle, Verge.Domain.Shared",
+                      "type": "Verge.Trading.TradingStyle",
+                      "typeSimple": "enum",
+                      "isOptional": false,
+                      "defaultValue": null
+                    },
+                    {
+                      "name": "runInBackground",
+                      "typeAsString": "System.Boolean, System.Private.CoreLib",
+                      "type": "System.Boolean",
+                      "typeSimple": "boolean",
+                      "isOptional": true,
+                      "defaultValue": true
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "Verge.Trading.StressTestReportDto",
+                    "typeSimple": "Verge.Trading.StressTestReportDto"
+                  }
+                }
+              ]
+            }
+          ],
+          "actions": {
+            "RunWalkForwardAnalysisAsyncBySymbolAndStyleAndRunInBackground": {
+              "uniqueName": "RunWalkForwardAnalysisAsyncBySymbolAndStyleAndRunInBackground",
+              "name": "RunWalkForwardAnalysisAsync",
+              "httpMethod": "POST",
+              "url": "api/app/validation/run-walk-forward-analysis",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "symbol",
+                  "typeAsString": "System.String, System.Private.CoreLib",
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null
+                },
+                {
+                  "name": "style",
+                  "typeAsString": "Verge.Trading.TradingStyle, Verge.Domain.Shared",
+                  "type": "Verge.Trading.TradingStyle",
+                  "typeSimple": "enum",
+                  "isOptional": false,
+                  "defaultValue": null
+                },
+                {
+                  "name": "runInBackground",
+                  "typeAsString": "System.Boolean, System.Private.CoreLib",
+                  "type": "System.Boolean",
+                  "typeSimple": "boolean",
+                  "isOptional": true,
+                  "defaultValue": true
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "symbol",
+                  "name": "symbol",
+                  "jsonName": null,
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "style",
+                  "name": "style",
+                  "jsonName": null,
+                  "type": "Verge.Trading.TradingStyle",
+                  "typeSimple": "enum",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "runInBackground",
+                  "name": "runInBackground",
+                  "jsonName": null,
+                  "type": "System.Boolean",
+                  "typeSimple": "boolean",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "Verge.Trading.WalkForwardReportDto",
+                "typeSimple": "Verge.Trading.WalkForwardReportDto"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.IValidationAppService"
+            },
+            "RunMonteCarloSimulationAsyncBySymbolAndStyleAndIterationsAndRunInBackground": {
+              "uniqueName": "RunMonteCarloSimulationAsyncBySymbolAndStyleAndIterationsAndRunInBackground",
+              "name": "RunMonteCarloSimulationAsync",
+              "httpMethod": "POST",
+              "url": "api/app/validation/run-monte-carlo-simulation",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "symbol",
+                  "typeAsString": "System.String, System.Private.CoreLib",
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null
+                },
+                {
+                  "name": "style",
+                  "typeAsString": "Verge.Trading.TradingStyle, Verge.Domain.Shared",
+                  "type": "Verge.Trading.TradingStyle",
+                  "typeSimple": "enum",
+                  "isOptional": false,
+                  "defaultValue": null
+                },
+                {
+                  "name": "iterations",
+                  "typeAsString": "System.Int32, System.Private.CoreLib",
+                  "type": "System.Int32",
+                  "typeSimple": "number",
+                  "isOptional": true,
+                  "defaultValue": 10000
+                },
+                {
+                  "name": "runInBackground",
+                  "typeAsString": "System.Boolean, System.Private.CoreLib",
+                  "type": "System.Boolean",
+                  "typeSimple": "boolean",
+                  "isOptional": true,
+                  "defaultValue": true
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "symbol",
+                  "name": "symbol",
+                  "jsonName": null,
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "style",
+                  "name": "style",
+                  "jsonName": null,
+                  "type": "Verge.Trading.TradingStyle",
+                  "typeSimple": "enum",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "iterations",
+                  "name": "iterations",
+                  "jsonName": null,
+                  "type": "System.Int32",
+                  "typeSimple": "number",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "runInBackground",
+                  "name": "runInBackground",
+                  "jsonName": null,
+                  "type": "System.Boolean",
+                  "typeSimple": "boolean",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "Verge.Trading.MonteCarloReportDto",
+                "typeSimple": "Verge.Trading.MonteCarloReportDto"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.IValidationAppService"
+            },
+            "RunStressTestAsyncBySymbolAndStyleAndRunInBackground": {
+              "uniqueName": "RunStressTestAsyncBySymbolAndStyleAndRunInBackground",
+              "name": "RunStressTestAsync",
+              "httpMethod": "POST",
+              "url": "api/app/validation/run-stress-test",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "symbol",
+                  "typeAsString": "System.String, System.Private.CoreLib",
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null
+                },
+                {
+                  "name": "style",
+                  "typeAsString": "Verge.Trading.TradingStyle, Verge.Domain.Shared",
+                  "type": "Verge.Trading.TradingStyle",
+                  "typeSimple": "enum",
+                  "isOptional": false,
+                  "defaultValue": null
+                },
+                {
+                  "name": "runInBackground",
+                  "typeAsString": "System.Boolean, System.Private.CoreLib",
+                  "type": "System.Boolean",
+                  "typeSimple": "boolean",
+                  "isOptional": true,
+                  "defaultValue": true
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "symbol",
+                  "name": "symbol",
+                  "jsonName": null,
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "style",
+                  "name": "style",
+                  "jsonName": null,
+                  "type": "Verge.Trading.TradingStyle",
+                  "typeSimple": "enum",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "runInBackground",
+                  "name": "runInBackground",
+                  "jsonName": null,
+                  "type": "System.Boolean",
+                  "typeSimple": "boolean",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "Verge.Trading.StressTestReportDto",
+                "typeSimple": "Verge.Trading.StressTestReportDto"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.IValidationAppService"
             }
           }
         }
@@ -5442,6 +6476,18 @@
           "regex": null
         },
         {
+          "name": "ProfitFactor",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
           "name": "MaxDrawdown",
           "jsonName": null,
           "type": "System.Decimal",
@@ -5466,10 +6512,208 @@
           "regex": null
         },
         {
+          "name": "SortinoRatio",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
           "name": "EquityCurveJson",
           "jsonName": null,
           "type": "System.String",
           "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "InitialCapital",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "TotalFeesPaid",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "TotalSlippageLoss",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Expectancy",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "TradeFrequencyPerDay",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.ComparativeEvaluationReportDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Results",
+          "jsonName": null,
+          "type": "[Verge.Trading.ComparativeEvaluationResultDto]",
+          "typeSimple": "[Verge.Trading.ComparativeEvaluationResultDto]",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "EvaluationDate",
+          "jsonName": null,
+          "type": "System.DateTime",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.ComparativeEvaluationResultDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Symbol",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "TradingStyle",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Baseline",
+          "jsonName": null,
+          "type": "Verge.Trading.BacktestResultDto",
+          "typeSimple": "Verge.Trading.BacktestResultDto",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Optimized",
+          "jsonName": null,
+          "type": "Verge.Trading.BacktestResultDto",
+          "typeSimple": "Verge.Trading.BacktestResultDto",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "WinRateImprovement",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "ProfitFactorImprovement",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "SharpeRatioImprovement",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
           "isRequired": false,
           "minLength": null,
           "maxLength": null,
@@ -6133,6 +7377,87 @@
         }
       ]
     },
+    "Verge.Trading.LiveShadowReportDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "EvaluationDate",
+          "jsonName": null,
+          "type": "System.DateTime",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Symbol",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "TotalSignalsGenerated",
+          "jsonName": null,
+          "type": "System.Int32",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "AverageLatentDelay",
+          "jsonName": null,
+          "type": "System.TimeSpan",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "SignalDeviationPercentage",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "PassedLiveShadow",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
     "Verge.Trading.MarketAnalysisDto": {
       "baseType": null,
       "isEnum": false,
@@ -6351,6 +7676,111 @@
       "genericArguments": null,
       "properties": null
     },
+    "Verge.Trading.MonteCarloReportDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "EvaluationDate",
+          "jsonName": null,
+          "type": "System.DateTime",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Symbol",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Iterations",
+          "jsonName": null,
+          "type": "System.Int32",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "InitialCapital",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "AverageEndingCapital",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "WorstCaseDrawdown",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "ProbabilityOfRuin",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "PassedRuinRisk",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
     "Verge.Trading.OpportunityDto": {
       "baseType": null,
       "isEnum": false,
@@ -6470,6 +7900,123 @@
       "genericArguments": null,
       "properties": null
     },
+    "Verge.Trading.PaperTradingReportDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "EvaluationDate",
+          "jsonName": null,
+          "type": "System.DateTime",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Symbol",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Environment",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "SimulatedDays",
+          "jsonName": null,
+          "type": "System.Int32",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "TotalExecutedTrades",
+          "jsonName": null,
+          "type": "System.Int32",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "TheoreticalBacktest",
+          "jsonName": null,
+          "type": "Verge.Trading.BacktestResultDto",
+          "typeSimple": "Verge.Trading.BacktestResultDto",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "RealizedProfitFactor",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "DeviationPercentage",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "PassedPaperTrading",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
     "Verge.Trading.RecommendedStyleDto": {
       "baseType": null,
       "isEnum": false,
@@ -6585,6 +8132,78 @@
           "minimum": null,
           "maximum": null,
           "regex": null
+        },
+        {
+          "name": "WeightOverrides",
+          "jsonName": null,
+          "type": "{System.String:System.Single}",
+          "typeSimple": "{string:number}",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "EntryThresholdOverride",
+          "jsonName": null,
+          "type": "System.Int32?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "TrailingMultiplierOverride",
+          "jsonName": null,
+          "type": "System.Single?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "FeePercentage",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "SlippagePercentage",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "InitialCapital",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
         }
       ]
     },
@@ -6620,6 +8239,216 @@
       "genericArguments": null,
       "properties": null
     },
+    "Verge.Trading.SignalRegimeStatDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Regime",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Wins",
+          "jsonName": null,
+          "type": "System.Int32",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Losses",
+          "jsonName": null,
+          "type": "System.Int32",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "WinRate",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "TotalPnL",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.SignalStatsDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Symbol",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "TotalSignals",
+          "jsonName": null,
+          "type": "System.Int32",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Wins",
+          "jsonName": null,
+          "type": "System.Int32",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Losses",
+          "jsonName": null,
+          "type": "System.Int32",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "WinRate",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "TotalRealizedPnL",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "AveragePnLPerTrade",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Expectancy",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "AverageDurationMinutes",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "EquityCurve",
+          "jsonName": null,
+          "type": "[System.Decimal]",
+          "typeSimple": "[number]",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "ByRegime",
+          "jsonName": null,
+          "type": "[Verge.Trading.SignalRegimeStatDto]",
+          "typeSimple": "[Verge.Trading.SignalRegimeStatDto]",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
     "Verge.Trading.StartSessionDto": {
       "baseType": null,
       "isEnum": false,
@@ -6644,6 +8473,132 @@
           "jsonName": null,
           "type": "System.String",
           "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.StressTestEventDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "EventName",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "StartDate",
+          "jsonName": null,
+          "type": "System.DateTime",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "EndDate",
+          "jsonName": null,
+          "type": "System.DateTime",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Result",
+          "jsonName": null,
+          "type": "Verge.Trading.BacktestResultDto",
+          "typeSimple": "Verge.Trading.BacktestResultDto",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Survived",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.StressTestReportDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "EvaluationDate",
+          "jsonName": null,
+          "type": "System.DateTime",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Symbol",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Events",
+          "jsonName": null,
+          "type": "[Verge.Trading.StressTestEventDto]",
+          "typeSimple": "[Verge.Trading.StressTestEventDto]",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "PassedAllEvents",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
           "isRequired": false,
           "minLength": null,
           "maxLength": null,
@@ -7560,6 +9515,90 @@
           "minimum": null,
           "maximum": null,
           "regex": null
+        },
+        {
+          "name": "RealizedPnL",
+          "jsonName": null,
+          "type": "System.Decimal?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Regime",
+          "jsonName": null,
+          "type": "Verge.Trading.MarketRegimeType?",
+          "typeSimple": "enum?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "ExitPrice",
+          "jsonName": null,
+          "type": "System.Decimal?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "ExitTime",
+          "jsonName": null,
+          "type": "System.DateTime?",
+          "typeSimple": "string?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "DurationMinutes",
+          "jsonName": null,
+          "type": "System.Int32?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "EquityAfter",
+          "jsonName": null,
+          "type": "System.Decimal?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Score",
+          "jsonName": null,
+          "type": "System.Int32?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
         }
       ]
     },
@@ -8119,6 +10158,180 @@
           "jsonName": null,
           "type": "System.String",
           "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.WalkForwardReportDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "EvaluationDate",
+          "jsonName": null,
+          "type": "System.DateTime",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Symbol",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "TradingStyle",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Windows",
+          "jsonName": null,
+          "type": "[Verge.Trading.WalkForwardWindowDto]",
+          "typeSimple": "[Verge.Trading.WalkForwardWindowDto]",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "PassedAllWindows",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.WalkForwardWindowDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "WindowName",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "TrainingStart",
+          "jsonName": null,
+          "type": "System.DateTime",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "TrainingEnd",
+          "jsonName": null,
+          "type": "System.DateTime",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "TestingStart",
+          "jsonName": null,
+          "type": "System.DateTime",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "TestingEnd",
+          "jsonName": null,
+          "type": "System.DateTime",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "TrainingResult",
+          "jsonName": null,
+          "type": "Verge.Trading.BacktestResultDto",
+          "typeSimple": "Verge.Trading.BacktestResultDto",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "TestingResult",
+          "jsonName": null,
+          "type": "Verge.Trading.BacktestResultDto",
+          "typeSimple": "Verge.Trading.BacktestResultDto",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "PassedProfitFactor",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
           "isRequired": false,
           "minLength": null,
           "maxLength": null,

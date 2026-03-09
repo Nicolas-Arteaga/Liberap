@@ -31,9 +31,31 @@ export interface BacktestResultDto extends FullAuditedEntityDto<string> {
   losingTrades: number;
   winRate: number;
   totalProfit: number;
+  profitFactor: number;
   maxDrawdown: number;
   sharpeRatio: number;
+  sortinoRatio: number;
   equityCurveJson?: string;
+  initialCapital: number;
+  totalFeesPaid: number;
+  totalSlippageLoss: number;
+  expectancy: number;
+  tradeFrequencyPerDay: number;
+}
+
+export interface ComparativeEvaluationReportDto {
+  results: ComparativeEvaluationResultDto[];
+  evaluationDate?: string;
+}
+
+export interface ComparativeEvaluationResultDto {
+  symbol?: string;
+  tradingStyle?: string;
+  baseline: BacktestResultDto;
+  optimized: BacktestResultDto;
+  winRateImprovement: number;
+  profitFactorImprovement: number;
+  sharpeRatioImprovement: number;
 }
 
 export interface ConnectExchangeDto {
@@ -100,6 +122,15 @@ export interface GetSignalsInput extends PagedAndSortedResultRequestDto {
   confidence?: SignalConfidence;
 }
 
+export interface LiveShadowReportDto {
+  evaluationDate?: string;
+  symbol?: string;
+  totalSignalsGenerated: number;
+  averageLatentDelay?: string;
+  signalDeviationPercentage: number;
+  passedLiveShadow: boolean;
+}
+
 export interface MarketAnalysisDto {
   symbol?: string;
   rsi: number;
@@ -121,6 +152,17 @@ export interface MarketCandleDto {
   close: number;
 }
 
+export interface MonteCarloReportDto {
+  evaluationDate?: string;
+  symbol?: string;
+  iterations: number;
+  initialCapital: number;
+  averageEndingCapital: number;
+  worstCaseDrawdown: number;
+  probabilityOfRuin: number;
+  passedRuinRisk: boolean;
+}
+
 export interface OpportunityDto {
   symbol?: string;
   confidence: number;
@@ -130,6 +172,18 @@ export interface OpportunityDto {
   entryMaxPrice?: number;
   entryMin?: number;
   entryMax?: number;
+}
+
+export interface PaperTradingReportDto {
+  evaluationDate?: string;
+  symbol?: string;
+  environment?: string;
+  simulatedDays: number;
+  totalExecutedTrades: number;
+  theoreticalBacktest: BacktestResultDto;
+  realizedProfitFactor: number;
+  deviationPercentage: number;
+  passedPaperTrading: boolean;
 }
 
 export interface RecommendedStyleDto {
@@ -143,11 +197,54 @@ export interface RunBacktestDto {
   timeframe?: string;
   startDate?: string;
   endDate?: string;
+  weightOverrides: Record<string, number>;
+  entryThresholdOverride?: number;
+  trailingMultiplierOverride?: number;
+  feePercentage: number;
+  slippagePercentage: number;
+  initialCapital: number;
+}
+
+export interface SignalRegimeStatDto {
+  regime?: string;
+  wins: number;
+  losses: number;
+  winRate: number;
+  totalPnL: number;
+}
+
+export interface SignalStatsDto {
+  symbol?: string;
+  totalSignals: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  totalRealizedPnL: number;
+  averagePnLPerTrade: number;
+  expectancy: number;
+  averageDurationMinutes: number;
+  equityCurve: number[];
+  byRegime: SignalRegimeStatDto[];
 }
 
 export interface StartSessionDto {
   symbol?: string;
   timeframe?: string;
+}
+
+export interface StressTestEventDto {
+  eventName?: string;
+  startDate?: string;
+  endDate?: string;
+  result: BacktestResultDto;
+  survived: boolean;
+}
+
+export interface StressTestReportDto {
+  evaluationDate?: string;
+  symbol?: string;
+  events: StressTestEventDto[];
+  passedAllEvents: boolean;
 }
 
 export interface TargetZoneDto {
@@ -234,6 +331,13 @@ export interface TradingSignalDto extends EntityDto<string> {
   profitPotential: number;
   analyzedDate?: string;
   status?: TradeStatus;
+  realizedPnL?: number;
+  regime?: MarketRegimeType;
+  exitPrice?: number;
+  exitTime?: string;
+  durationMinutes?: number;
+  equityAfter?: number;
+  score?: number;
 }
 
 export interface TradingStrategyDto extends FullAuditedEntityDto<string> {
@@ -284,4 +388,23 @@ export interface VergeAlertDto {
   liquidityZones: number[];
   severity?: string;
   icon?: string;
+}
+
+export interface WalkForwardReportDto {
+  evaluationDate?: string;
+  symbol?: string;
+  tradingStyle?: string;
+  windows: WalkForwardWindowDto[];
+  passedAllWindows: boolean;
+}
+
+export interface WalkForwardWindowDto {
+  windowName?: string;
+  trainingStart?: string;
+  trainingEnd?: string;
+  testingStart?: string;
+  testingEnd?: string;
+  trainingResult: BacktestResultDto;
+  testingResult: BacktestResultDto;
+  passedProfitFactor: boolean;
 }

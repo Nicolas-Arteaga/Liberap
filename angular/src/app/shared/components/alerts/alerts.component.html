@@ -32,100 +32,68 @@
   </div>
 </div>
 
-<!-- MODO OVERLAY (Para el Dashboard - Premium Institutional) -->
-<div *ngIf="mode === 'overlay' && activeOverlayAlert"
-  class="opportunity-overlay-card position-absolute top-50 start-50 translate-middle rounded-4 shadow-2xl">
+<!-- MODO OVERLAY (V6: Horizontal, High Contrast, 2 Lines) -->
+<div *ngIf="mode === 'overlay' && activeOverlayAlert" class="opportunity-overlay-card shadow-lg"
+  (mousedown)="onMouseDown($event)" [style.transform]="'translate(' + position.x + 'px, ' + position.y + 'px)'"
+  [class.border-success-vision]="activeOverlayAlert.direction === 0"
+  [class.border-danger-custom]="activeOverlayAlert.direction === 1">
 
   <div class="glass-shine"></div>
 
-  <!-- Header -->
-  <div class="overlay-header d-flex justify-content-between align-items-center mb-4">
-    <div class="d-flex align-items-center gap-3">
-      <div class="status-indicator">
-        <div class="status-dot pulsing" [ngClass]="getSeverityClass(activeOverlayAlert.severity)"></div>
-      </div>
-      <div class="header-meta">
-        <span class="overlay-label">ALGORITMO VERGE V1</span>
-        <span class="overlay-time">{{ activeOverlayAlert.timestamp | date:'HH:mm:ss' }}</span>
-      </div>
+  <!-- Row 1: Header & Control -->
+  <div class="alert-row header-row">
+    <div class="d-flex align-items-center gap-2">
+      <div class="status-dot pulsing" [ngClass]="'bg-' + activeOverlayAlert.severity"
+        *ngIf="activeOverlayAlert.severity"></div>
+      <span class="overlay-label text-white fw-black">SIGNAL {{ activeOverlayAlert.crypto || 'AUTO' }}</span>
+      <span class="overlay-time text-info-light ms-2 opacity-75">{{ activeOverlayAlert.timestamp | date:'HH:mm:ss'
+        }}</span>
     </div>
-    <button class="close-btn" (click)="onMarkAsReadClick($event, activeOverlayAlert.id)" title="Cerrar notificación">
+    <div class="close-btn" (click)="onMarkAsReadClick($event, activeOverlayAlert.id)">
       <ion-icon name="close-outline"></ion-icon>
+    </div>
+  </div>
+
+  <!-- Row 2: Main Tactical Info (Compact) -->
+  <div class="alert-row body-row mt-2">
+    <!-- Left: Direction -->
+    <div class="direction-badge" [class.text-success]="activeOverlayAlert.direction === 0"
+      [class.text-danger]="activeOverlayAlert.direction === 1"
+      [class.text-white]="activeOverlayAlert.direction !== 0 && activeOverlayAlert.direction !== 1">
+      <ion-icon
+        [name]="activeOverlayAlert.direction === 0 ? 'trending-up' : (activeOverlayAlert.direction === 1 ? 'trending-down' : 'pause-circle-outline')"></ion-icon>
+      <span class="fw-black">{{ activeOverlayAlert.direction === 0 ? 'LONG' : (activeOverlayAlert.direction === 1 ?
+        'SHORT' : 'WAIT') }}</span>
+    </div>
+
+    <!-- Center: Signal Reason/Message -->
+    <div class="message-area">
+      <div class="text-xs text-uppercase fw-bold text-info-light opacity-75">{{ getOverlayTitle(activeOverlayAlert.type)
+        }}</div>
+      <div class="text-white fw-bold truncate-msg italic" title="{{ activeOverlayAlert.message }}">
+        "{{ activeOverlayAlert.message }}"
+      </div>
+    </div>
+
+    <!-- Right: Stats -->
+    <div class="stats-area d-flex align-items-center gap-3">
+      <div class="mini-stat">
+        <span class="label">WINPROB</span>
+        <span class="value text-success">{{ (activeOverlayAlert.winProbability || 0.5) | percent:'1.0-0' }}</span>
+      </div>
+      <div class="mini-stat">
+        <span class="label">RR</span>
+        <span class="value text-warning">1:{{ (activeOverlayAlert.riskRewardRatio || 0) | number:'1.1-1' }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 3: Final Actions -->
+  <div class="alert-row action-row mt-3 pt-2 border-top border-white-10">
+    <button class="btn btn-sm btn-outline-light border-0 opacity-50 text-xs"
+      (click)="onMarkAsReadClick($event, activeOverlayAlert.id)">IGNORAR</button>
+    <button class="btn btn-sm btn-success-vision px-4 py-2" (click)="onAlertClick(activeOverlayAlert.id)">
+      <ion-icon name="flash-outline" class="me-1"></ion-icon> EJECUTAR
     </button>
-  </div>
-
-  <!-- Body -->
-  <div class="overlay-body">
-    <div class="main-info d-flex align-items-center gap-4 mb-4">
-      <div class="crypto-icon-wrapper">
-        <ion-icon [name]="activeOverlayAlert.icon" [ngClass]="getSeverityClass(activeOverlayAlert.severity)"
-          class="main-icon"></ion-icon>
-      </div>
-      <div class="signal-info">
-        <h2 class="main-title">{{ getOverlayTitle(activeOverlayAlert.type) }}</h2>
-        <div class="crypto-badge">
-          <span class="symbol">{{ activeOverlayAlert.crypto }}</span>
-          <span class="price" *ngIf="activeOverlayAlert.price">${{ activeOverlayAlert.price | number:'1.2-2' }}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Institutional Metrics (The 1% Tier) -->
-    <div *ngIf="activeOverlayAlert.winProbability || activeOverlayAlert.riskRewardRatio"
-      class="institutional-metrics d-grid gap-3 mb-4">
-      <div *ngIf="activeOverlayAlert.winProbability" class="metric-card">
-        <span class="metric-label">PROBABILIDAD</span>
-        <div class="metric-value-wrapper">
-          <span class="metric-value">{{ (activeOverlayAlert.winProbability || 0) | percent:'1.0-0' }}</span>
-          <div class="metric-progress">
-            <div class="progress-bar" [style.width.%]="activeOverlayAlert.winProbability * 100"></div>
-          </div>
-        </div>
-      </div>
-
-      <div *ngIf="activeOverlayAlert.riskRewardRatio" class="metric-card">
-        <span class="metric-label">RISK / REWARD</span>
-        <div class="metric-value-wrapper">
-          <span class="metric-value">1 : {{ (activeOverlayAlert.riskRewardRatio || 0) | number:'1.1-1' }}</span>
-          <span class="metric-sub">{{ getRRRating(activeOverlayAlert.riskRewardRatio) }}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Market Structure (Sprint 2) -->
-    <div *ngIf="activeOverlayAlert.structure || activeOverlayAlert.bosDetected || activeOverlayAlert.chochDetected"
-      class="structure-ribbon mb-4" [ngClass]="activeOverlayAlert.structure?.toLowerCase()">
-      <div class="structure-label d-flex align-items-center gap-2">
-        <ion-icon
-          [name]="activeOverlayAlert.bosDetected || activeOverlayAlert.chochDetected ? 'flash-outline' : 'prism-outline'"></ion-icon>
-        <span class="text-uppercase fw-bold">{{ activeOverlayAlert.structure || 'Neutral' }} Structure</span>
-      </div>
-      <div class="structure-meta d-flex gap-2">
-        <span *ngIf="activeOverlayAlert.bosDetected" class="badge bg-primary text-white">BOS Detectado</span>
-        <span *ngIf="activeOverlayAlert.chochDetected" class="badge bg-warning text-dark">CHOCH Detectado</span>
-      </div>
-    </div>
-
-
-    <!-- Zona Operativa -->
-    <div *ngIf="activeOverlayAlert.targetZone" class="zone-box">
-      <div class="zone-header d-flex justify-content-between align-items-center mb-2">
-        <span class="label">ZONA DE ENTRADA IDEAL</span>
-        <ion-icon name="locate-outline" class="text-primary"></ion-icon>
-      </div>
-      <div class="zone-value">
-        <span class="low">${{ activeOverlayAlert.targetZone.low | number:'1.2-2' }}</span>
-        <span class="separator">/</span>
-        <span class="high">${{ activeOverlayAlert.targetZone.high | number:'1.2-2' }}</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Footer Insight -->
-  <div class="overlay-footer mt-4 pt-3 border-top border-white border-opacity-10">
-    <p class="insight-text">
-      <ion-icon name="bulb-outline" class="me-1"></ion-icon>
-      {{ activeOverlayAlert.message }}
-    </p>
   </div>
 </div>

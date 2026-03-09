@@ -165,9 +165,7 @@ export class ExecuteTradeComponent implements OnInit {
   }
 
   onStyleSelect(style: TradingStyle) {
-    if (this.isAutoSelected && this.isRecommending) return;
     this.request.style = style;
-    this.isAutoSelected = style === TradingStyle.Auto;
     this.applyStyleDefaults(style);
   }
 
@@ -236,7 +234,6 @@ export class ExecuteTradeComponent implements OnInit {
         this.recommendationReason = res.reason;
         this.applyStyleDefaults(res.style);
         this.isRecommending = false;
-        this.isAutoSelected = true;
       },
       error: (err) => {
         console.error('Error recommending style', err);
@@ -297,7 +294,7 @@ export class ExecuteTradeComponent implements OnInit {
         console.log('✅ Estrategia creada:', strategy);
 
         // 2. Iniciar Sesión (siempre, auto o no)
-        const sessionSymbol = this.isAutoSelected ? 'AUTO' : this.request.symbol;
+        const sessionSymbol = this.request.symbol;
         const timeframe = this.getTimeframeForStyle(this.request.style);
 
         this.tradingService.startSession({

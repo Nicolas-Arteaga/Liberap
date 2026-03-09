@@ -9,7 +9,7 @@ import { IconService } from 'src/shared/services/icon.service';
 import { createChart, IChartApi, ISeriesApi, CandlestickData, CandlestickSeries, LineSeries } from 'lightweight-charts';
 import { MarketDataService } from '../proxy/trading/market-data.service';
 import { TradingService } from '../proxy/trading/trading.service';
-import { TradingSessionDto, AnalysisLogDto, MarketAnalysisDto, OpportunityDto } from '../proxy/trading/models';
+import { TradingSessionDto, AnalysisLogDto, MarketAnalysisDto, OpportunityDto, SignalStatsDto } from '../proxy/trading/models';
 import { AnalysisLogType } from '../proxy/trading/analysis-log-type.enum';
 import { DialogComponent } from 'src/shared/components/dialog/dialog.component';
 import { CardContentComponent } from "src/shared/components/card-content/card-content.component";
@@ -91,7 +91,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   AnalysisLogType = AnalysisLogType; // Expose enum to template
 
   // Tabs & Categorized Data (Institutional Overhaul)
-  activeTab: 'events' | 'whales' | 'liquidations' | 'scanner' = 'events';
+  activeTab: 'events' | 'whales' | 'liquidations' | 'scanner' | 'performance' = 'events';
   whaleLogs: any[] = [];
   liquidationLogs: any[] = [];
   scannerData: Map<string, any> = new Map(); // Real-time grid data
@@ -100,6 +100,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   headerWhales: any[] = [];
   headerSqueezes: any[] = [];
   headerHeatmapCoins: any[] = [];
+  performanceStats: SignalStatsDto | null = null;
 
   // Toast de notificación de stage
   stageNotification: { message: string; icon: string; color: string; visible: boolean } | null = null;
@@ -268,30 +269,68 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private processInstitutionalAlert(alert: any) {
     if (!this.currentSession) return;
 
-    // 1. Update Scanner (Grid Data)
-    if (alert.crypto) {
-      this.scannerData.set(alert.crypto, {
-        symbol: alert.crypto,
-        score: alert.score || 0,
-        confidence: alert.confidence || 0,
-        direction: alert.direction,
-        winProb: alert.winProbability || 0,
-        whaleInfluence: alert.whaleInfluenceScore || 0,
-        regime: alert.structure || 'N/A',
-        isSqueeze: alert.title?.toLowerCase().includes('squeeze') || false
-      });
+    // Normalize signal/direction names
+    const symbol = alert.crypto || alert.symbol;
+    if (!symbol) return;
+
+    const winProb = alert.winProbability !== undefined ? alert.winProbability : (alert.WinProbability !== undefined ? alert.WinProbability : 0.5);
+    const score = alert.score !== undefined ? alert.score : (alert.Score !== undefined ? alert.Score : 0);
+    const confidence = alert.confidence !== undefined ? alert.confidence : (alert.Confidence !== undefined ? alert.Confidence : 0);
+
+    // Normalize direction with fallback
+    let direction = alert.direction !== undefined ? alert.direction : alert.Direction;
+
+    // FALLBACK: If direction is missing but score is decent, try to infer intention
+    if (direction === undefined || direction === null) {
+      if (winProb > 0.55) direction = 0; // Bias LONG
+      else if (winProb < 0.45 && winProb > 0) direction = 1; // Bias SHORT
     }
 
+    const regime = alert.structure || alert.regime || alert.Regime || 'N/A';
+    let isSqueeze = alert.title?.toLowerCase().includes('squeeze') || alert.isSqueeze || alert.IsSqueeze || false;
+    let whaleScore = alert.whaleInfluenceScore || alert.whaleInfluence || alert.WhaleInfluence || 0;
+    const factorBreakdown = alert.patternSignal || alert.PatternSignal || '';
+    const timeWindow = alert.timeWindow || alert.TimeWindow || '2-4h';
+    const historicProb = winProb != null ? winProb * 100 : 0;
+
+    // Keyword matching for generic logs without structured data
+    if (alert.message) {
+      const msg = alert.message.toLowerCase();
+      if (msg.includes('ballena') || msg.includes('whale') || msg.includes('acumulación')) {
+        if (whaleScore === 0) whaleScore = 65; // Default score if keyword matched
+      }
+      if (msg.includes('squeeze') || msg.includes('liquidación') || msg.includes('cluster')) {
+        isSqueeze = true;
+      }
+    }
+
+    // 1. Update Scanner (Grid Data)
+    this.scannerData.set(symbol, {
+      symbol: symbol,
+      score: score,
+      confidence: confidence,
+      direction: direction,
+      winProb: winProb,
+      whaleInfluence: whaleScore,
+      regime: regime,
+      isSqueeze: isSqueeze,
+      factorBreakdown: factorBreakdown,
+      timeWindow: timeWindow,
+      historicProb: historicProb,
+      rrRatio: alert.riskRewardRatio || 0,
+      sampleSize: alert.historicSampleSize || 0
+    });
+
     // 2. Whale Tab
-    if (alert.whaleInfluenceScore > 0) {
+    if (whaleScore > 0) {
       this.whaleLogs.unshift({
-        symbol: alert.crypto,
-        influence: alert.whaleInfluenceScore,
-        sentiment: alert.whaleSentiment,
+        symbol: symbol,
+        influence: whaleScore,
+        sentiment: alert.whaleSentiment || 'Neutral',
         message: alert.message,
-        timestamp: new Date()
+        timestamp: alert.timestamp ? new Date(alert.timestamp) : new Date()
       });
-      this.whaleLogs = this.whaleLogs.slice(0, 50);
+      this.whaleLogs = this.uniqueBy(this.whaleLogs, (w: any) => w.symbol + w.timestamp.getTime()).slice(0, 50);
 
       // Update Header Whales (Top 3)
       this.headerWhales = this.whaleLogs
@@ -300,29 +339,60 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     // 3. Liquidations Tab
-    if (alert.title?.toLowerCase().includes('squeeze') || alert.message?.toLowerCase().includes('liquidación')) {
+    if (isSqueeze || alert.message?.toLowerCase().includes('liquidación')) {
       this.liquidationLogs.unshift({
-        symbol: alert.crypto,
+        symbol: symbol,
         message: alert.message,
-        confidence: alert.confidence || 80,
-        timestamp: new Date()
+        confidence: confidence || 80,
+        timestamp: alert.timestamp ? new Date(alert.timestamp) : new Date()
       });
-      this.liquidationLogs = this.liquidationLogs.slice(0, 50);
+      this.liquidationLogs = this.uniqueBy(this.liquidationLogs, (l: any) => l.symbol + l.timestamp.getTime()).slice(0, 50);
 
       // Update Header Squeezes
       this.headerSqueezes = this.liquidationLogs.slice(0, 2);
     }
 
-    // 4. Update Header Heatmap (Sprint 5 Enhancement)
-    if (alert.score > 0) {
-      const existing = this.headerHeatmapCoins.find(c => c.symbol === alert.crypto);
+    // 4. Update Header Heatmap
+    if (score > 0) {
+      const existing = this.headerHeatmapCoins.find(c => c.symbol === symbol);
       if (existing) {
-        existing.score = alert.score;
+        existing.score = score;
       } else {
-        this.headerHeatmapCoins.push({ symbol: alert.crypto, score: alert.score });
+        this.headerHeatmapCoins.push({ symbol: symbol, score: score });
       }
-      this.headerHeatmapCoins.sort((a, b) => b.score - a.score);
+      this.headerHeatmapCoins.sort((a, b: any) => b.score - a.score);
       this.headerHeatmapCoins = this.headerHeatmapCoins.slice(0, 3);
+    }
+
+    // 5. Check for Stagnation and Automatic Rotation
+    this.checkStagnationAndRotate(symbol, score);
+  }
+
+  private uniqueBy(arr: any[], keyFn: (item: any) => string) {
+    const seen = new Set();
+    return arr.filter(item => {
+      const key = keyFn(item);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  private checkStagnationAndRotate(symbol: string, score: number) {
+    if (!this.currentSession || !this.isHunting) return;
+
+    // Only rotate if the current symbol is weak and we find a much better one
+    if (symbol === this.selectedSymbol && score < 60) {
+      const bestAlternative = this.getScannerList().find(c => c.score > 75);
+      if (bestAlternative && bestAlternative.symbol !== this.selectedSymbol) {
+        console.log(`🔄 Rotando automáticamente a ${bestAlternative.symbol} (Score: ${bestAlternative.score})`);
+        this.selectedSymbol = bestAlternative.symbol;
+        this.onSymbolChange();
+        this.showStageToast(1); // Reset toast message for the new target
+
+        // Notify user about auto-rotation
+        this.lastMotorSignal = `🔄 Rotando a ${bestAlternative.symbol} (score ${bestAlternative.score}) - Mejor oportunidad detectada.`;
+      }
     }
   }
 
@@ -481,6 +551,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   startRefreshTimer() {
     // Carga inicial rápida
     this.loadAnalysisLogs();
+    this.loadLivePerformance();
 
     this.refreshInterval = setInterval(() => {
       // Ya NO llamamos a checkActiveSession() incondicionalmente cada 10s
@@ -489,8 +560,19 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       if (this.isHunting) {
         this.loadData();
         this.loadAnalysisLogs();
+        this.loadLivePerformance();
       }
     }, 10000);
+  }
+
+  loadLivePerformance() {
+    this.tradingService.getSignalStats(this.selectedSymbol === 'AUTO' ? undefined : this.selectedSymbol).subscribe({
+      next: (stats) => {
+        this.performanceStats = stats;
+        console.log('[Dashboard] 📈 Live Performance loaded:', stats);
+      },
+      error: (err) => console.error('[Dashboard] Error loading signal stats', err)
+    });
   }
 
   loadAnalysisLogs() {
@@ -519,8 +601,12 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.marketAnalyses = [];
     if (!logs || logs.length === 0) return;
 
+    // Deduplicate logs to reduce UI noise
+    const cleanLogs = this.deduplicateLogs(logs);
+    this.analysisLogs = cleanLogs;
+
     // Process most recent logs first
-    const sortedLogs = [...logs].sort((a, b) =>
+    const sortedLogs = [...cleanLogs].sort((a, b) =>
       new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
 
@@ -528,12 +614,21 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       if (!log.message) continue;
 
       // Handle Opportunity Ranking (Phase 3)
+      // Handle Opportunity Ranking (Phase 3)
       if (log.logType === AnalysisLogType.OpportunityRanking) {
         const data = this.parseJson(log.dataJson);
-        if (data?.rankings && this.topOpportunities.length === 0) {
+        if (data?.rankings) {
           this.topOpportunities = data.rankings;
+          // Populate Scanner with each ranked coin
+          data.rankings.forEach((rank: any) => {
+            this.processInstitutionalAlert({
+              ...rank,
+              timestamp: log.timestamp,
+              message: `Oportunidad detectada por ranking (#${rank.symbol})`
+            });
+          });
         }
-        continue; // Don't process ranking logs as market signals
+        continue;
       }
 
       // Parse structured data from dataJson field (set by backend CreateAnalysisLogAsync)
@@ -586,6 +681,16 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
             macroReason: data.macroReason
           } as any);
         }
+      }
+
+      // --- Institutional Processing (Seed historical data) ---
+      if (data) {
+        this.processInstitutionalAlert({
+          ...data,
+          symbol: log.symbol,
+          message: log.message,
+          timestamp: log.timestamp
+        });
       }
 
       // --- Detect opportunity (score >= 70 or Entry/Prepare decision) ---
@@ -945,5 +1050,29 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   clearAlerts() {
     this.alertService.clearAllAlerts();
+  }
+
+  private deduplicateLogs(logs: AnalysisLogDto[]): AnalysisLogDto[] {
+    const seen = new Set();
+    return logs.filter(log => {
+      // Create a key based on symbol, message, and minute-precision timestamp
+      // This allows seeing the SAME message if it happens in different minutes,
+      // providing a sense of "activity" without spamming the EXACT same thing in a second.
+      const date = new Date(log.timestamp);
+      const minuteKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-${date.getHours()}-${date.getMinutes()}`;
+
+      let msg = log.message || '';
+      if (msg.includes('CACERÍA ESTANCADA')) {
+        msg = msg.split('señales claras en')[0]; // Strip the time part
+      }
+      const messageKey = msg.split('|')[0].trim();
+
+      // Key: Symbol + MessagePrefix + LogType + Minute
+      const key = `${log.symbol}-${messageKey}-${log.logType}-${minuteKey}`;
+
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 }

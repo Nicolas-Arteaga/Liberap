@@ -1,4 +1,5 @@
-import type { AnalysisLogDto, BacktestResultDto, ConnectExchangeDto, CreateUpdateTradingAlertDto, CreateUpdateTradingStrategyDto, ExchangeConnectionDto, ExecuteTradeDto, GetHistoryInput, GetSignalsInput, MarketAnalysisDto, OpportunityDto, RecommendedStyleDto, RunBacktestDto, StartSessionDto, TradeOrderDto, TraderProfileDto, TradingAlertDto, TradingSessionDto, TradingSignalDto, TradingStrategyDto, UpdateTraderProfileDto, VergeAlertDto } from './models';
+import type { MarketRegimeType } from './market-regime-type.enum';
+import type { AnalysisLogDto, BacktestResultDto, ComparativeEvaluationReportDto, ConnectExchangeDto, CreateUpdateTradingAlertDto, CreateUpdateTradingStrategyDto, ExchangeConnectionDto, ExecuteTradeDto, GetHistoryInput, GetSignalsInput, MarketAnalysisDto, OpportunityDto, RecommendedStyleDto, RunBacktestDto, SignalStatsDto, StartSessionDto, TradeOrderDto, TraderProfileDto, TradingAlertDto, TradingSessionDto, TradingSignalDto, TradingStrategyDto, UpdateTraderProfileDto, VergeAlertDto } from './models';
 import { RestService, Rest } from '@abp/ng.core';
 import type { PagedResultDto } from '@abp/ng.core';
 import { Injectable, inject } from '@angular/core';
@@ -62,6 +63,15 @@ export class TradingService {
     { apiName: this.apiName,...config });
   
 
+  executeMassOptimization = (symbol: string, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'POST',
+      url: '/api/app/trading/execute-mass-optimization',
+      params: { symbol },
+    },
+    { apiName: this.apiName,...config });
+  
+
   executeTrade = (input: ExecuteTradeDto, config?: Partial<Rest.Config>) =>
     this.restService.request<any, TradeOrderDto>({
       method: 'POST',
@@ -92,6 +102,14 @@ export class TradingService {
       method: 'GET',
       url: `/api/app/trading/analysis-logs/${sessionId}`,
       params: { limit },
+    },
+    { apiName: this.apiName,...config });
+  
+
+  getComparativeReport = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, ComparativeEvaluationReportDto>({
+      method: 'GET',
+      url: '/api/app/trading/comparative-report',
     },
     { apiName: this.apiName,...config });
   
@@ -128,6 +146,15 @@ export class TradingService {
     { apiName: this.apiName,...config });
   
 
+  getOptimizationMatrix = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, string>({
+      method: 'GET',
+      responseType: 'text',
+      url: '/api/app/trading/optimization-matrix',
+    },
+    { apiName: this.apiName,...config });
+  
+
   getOrderHistory = (input: GetHistoryInput, config?: Partial<Rest.Config>) =>
     this.restService.request<any, PagedResultDto<TradeOrderDto>>({
       method: 'GET',
@@ -141,6 +168,15 @@ export class TradingService {
     this.restService.request<any, TraderProfileDto>({
       method: 'GET',
       url: '/api/app/trading/profile',
+    },
+    { apiName: this.apiName,...config });
+  
+
+  getSignalStats = (symbol?: string, regime?: MarketRegimeType, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, SignalStatsDto>({
+      method: 'GET',
+      url: '/api/app/trading/signal-stats',
+      params: { symbol, regime },
     },
     { apiName: this.apiName,...config });
   
@@ -170,6 +206,15 @@ export class TradingService {
     { apiName: this.apiName,...config });
   
 
+  optimizeRegime = (regime: string, symbol: string, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'POST',
+      url: '/api/app/trading/optimize-regime',
+      params: { regime, symbol },
+    },
+    { apiName: this.apiName,...config });
+  
+
   recommendTradingStyle = (symbol: string, config?: Partial<Rest.Config>) =>
     this.restService.request<any, RecommendedStyleDto>({
       method: 'POST',
@@ -184,6 +229,26 @@ export class TradingService {
       method: 'POST',
       url: '/api/app/trading/run-backtest',
       body: input,
+    },
+    { apiName: this.apiName,...config });
+  
+
+  runComparativeEvaluation = (symbols: string[], runInBackground: boolean = true, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'POST',
+      url: '/api/app/trading/run-comparative-evaluation',
+      params: { runInBackground },
+      body: symbols,
+    },
+    { apiName: this.apiName,...config });
+  
+
+  runExhaustiveValidation = (symbols: string[], runInBackground: boolean = true, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'POST',
+      url: '/api/app/trading/run-exhaustive-validation',
+      params: { runInBackground },
+      body: symbols,
     },
     { apiName: this.apiName,...config });
   

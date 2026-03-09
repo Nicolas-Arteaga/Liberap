@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, HostListener, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule } from '@ionic/angular';
 import { VergeAlert } from './alerts.types';
@@ -26,9 +26,44 @@ export class AlertsComponent {
 
     get activeOverlayAlert(): VergeAlert | undefined {
         // Mostramos la alerta más reciente que coincida con lo operativo o sistema y no esté leída
-        return this.alerts.find(a =>
+        const alert = this.alerts.find(a =>
             (a.type.startsWith('Stage') || a.type === 'Custom' || a.type === 'System') && !a.read
         );
+        return alert;
+    }
+
+    // --- Drag & Drop Logic ---
+    position = { x: 0, y: 0 };
+    private dragging = false;
+    private initialMousePos = { x: 0, y: 0 };
+
+    constructor(private cdr: ChangeDetectorRef) { }
+
+    onMouseDown(event: MouseEvent) {
+        // Ignorar si se hace clic en botones
+        if ((event.target as HTMLElement).closest('.close-btn') ||
+            (event.target as HTMLElement).closest('button')) return;
+
+        this.dragging = true;
+        this.initialMousePos = {
+            x: event.clientX - this.position.x,
+            y: event.clientY - this.position.y
+        };
+        event.preventDefault();
+    }
+
+    @HostListener('document:mousemove', ['$event'])
+    onMouseMove(event: MouseEvent) {
+        if (!this.dragging) return;
+
+        this.position.x = event.clientX - this.initialMousePos.x;
+        this.position.y = event.clientY - this.initialMousePos.y;
+        this.cdr.detectChanges();
+    }
+
+    @HostListener('document:mouseup')
+    onMouseUp() {
+        this.dragging = false;
     }
 
     onAlertClick(alertId: string) {
@@ -38,21 +73,25 @@ export class AlertsComponent {
     onMarkAsReadClick(event: Event, alertId: string) {
         event.stopPropagation();
         this.markAsRead.emit(alertId);
+        // Reset position for the next alert if this one is closed
+        this.position = { x: 0, y: 0 };
+        this.cdr.detectChanges();
     }
 
     getOverlayTitle(type: string): string {
         switch (type) {
             case 'Stage1':
+                return 'CONTEXTO DE MERCADO';
             case 'Stage2':
-                return '¡PREPÁRATE!';
+                return 'PREPARACIÓN TÁCTICA';
             case 'Stage3':
-                return '¡COMPRA AQUÍ!';
+                return 'ENTRADA CONFIRMADA';
             case 'Stage4':
-                return '¡SESIÓN FINALIZADA!';
+                return 'OPERACIÓN FINALIZADA';
             case 'System':
-                return 'ANÁLISIS DE MERCADO';
+                return 'INTELIGENCIA DE MERCADO';
             default:
-                return '¡AVISO!';
+                return 'ALERTA INSTITUCIONAL';
         }
     }
 

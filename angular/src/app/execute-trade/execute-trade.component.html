@@ -60,7 +60,8 @@
                 <!-- Botón IA Recomendación -->
                 <div class="mb-3">
                     <app-glass-button variant="primary" class="w-100 py-2 border-primary" (click)="recommendStyle()"
-                        [disabled]="isRecommending" [style.--bs-bg-opacity]="isAutoSelected ? '0.3' : '1'">
+                        [disabled]="isRecommending"
+                        [style.--bs-bg-opacity]="request.style === TradingStyle.Auto ? '0.3' : '1'">
                         <div class="d-flex align-items-center justify-content-center gap-2">
                             <span *ngIf="isRecommending" class="spinner-border spinner-border-sm" role="status"></span>
                             <ion-icon *ngIf="!isRecommending" name="color-wand-outline"></ion-icon>
@@ -68,12 +69,12 @@
                                 }}</span>
                         </div>
                     </app-glass-button>
-                    <div *ngIf="isAutoSelected && recommendationReason"
+                    <div *ngIf="request.style === TradingStyle.Auto && recommendationReason"
                         class="text-success small mt-2 d-flex align-items-start gap-1 p-2 bg-success bg-opacity-10 rounded border border-success border-opacity-25">
                         <ion-icon name="checkmark-circle-outline" class="mt-1 flex-shrink-0"></ion-icon>
                         <span>{{ recommendationReason }}</span>
                     </div>
-                    <div *ngIf="!isAutoSelected && recommendationReason && isRecommending"
+                    <div *ngIf="request.style !== TradingStyle.Auto && recommendationReason && isRecommending"
                         class="text-info small mt-2 d-flex align-items-start gap-1">
                         <ion-icon name="information-circle-outline" class="mt-1 flex-shrink-0"></ion-icon>
                         <span>{{ recommendationReason }}</span>
@@ -84,17 +85,17 @@
                 <div class="row g-2">
                     <div class="col-6 mb-2" *ngFor="let s of tradingStyles">
                         <div class="card bg-dark border h-100 transition-all" style="cursor: pointer;"
-                            [class.border-primary]="request.style === s.value && !isAutoSelected"
-                            [class.border-success]="request.style === s.value && isAutoSelected"
+                            [class.border-primary]="request.style === s.value && request.style !== TradingStyle.Auto"
+                            [class.border-success]="request.style === s.value && request.style === TradingStyle.Auto"
                             [class.border-secondary]="request.style !== s.value"
-                            [class.bg-primary]="request.style === s.value && !isAutoSelected"
+                            [class.bg-primary]="request.style === s.value && request.style !== TradingStyle.Auto"
                             [style.--bs-bg-opacity]="request.style === s.value ? '0.2' : '1'"
                             (click)="onStyleSelect(s.value)">
                             <div
                                 class="card-body p-2 text-center d-flex flex-column align-items-center justify-content-center">
                                 <ion-icon [name]="s.icon" class="fs-4 mb-1"
-                                    [class.text-primary]="request.style === s.value && !isAutoSelected"
-                                    [class.text-success]="request.style === s.value && isAutoSelected"
+                                    [class.text-primary]="request.style === s.value && request.style !== TradingStyle.Auto"
+                                    [class.text-success]="request.style === s.value && request.style === TradingStyle.Auto"
                                     [class.text-white-50]="request.style !== s.value"></ion-icon>
                                 <span class="text-white small fw-medium mb-0">{{ s.label }}</span>
                                 <span class="text-white-50" style="font-size: 0.65rem;">{{ s.desc }}</span>
@@ -114,7 +115,7 @@
                 </div>
             </div>
 
-            <div class="row mb-3" *ngIf="!isAutoSelected">
+            <div class="row mb-3">
                 <div class="col-12">
                     <app-label>Dirección</app-label>
                     <div class="d-flex gap-2">
@@ -134,15 +135,16 @@
                 </div>
             </div>
 
-            <div class="row mb-3 text-center" *ngIf="isAutoSelected || request.direction === 'auto'">
+            <div class="row mb-3 text-center"
+                *ngIf="request.symbol === 'AUTO' || request.style === TradingStyle.Auto || request.direction === 'auto'">
                 <div class="col-12">
                     <div class="p-3 bg-primary bg-opacity-10 rounded border border-primary border-opacity-25 mt-2">
                         <p
                             class="text-primary-emphasis small mb-0 d-flex align-items-center justify-content-center gap-2">
                             <ion-icon name="sparkles-outline"></ion-icon>
                             <span>
-                                Modo <strong>AUTO</strong> Multidimensional: El motor evaluará activos, estilos y
-                                direcciones para encontrar la mejor entrada.
+                                Modo <strong>AUTO</strong> Híbrido: El motor completará inteligentemente las dimensiones
+                                que dejes en automático.
                             </span>
                         </p>
                     </div>

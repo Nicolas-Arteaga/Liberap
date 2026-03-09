@@ -39,11 +39,6 @@
               <ion-icon name="time-outline" class="text-white-50"></ion-icon>
               <span class="text-white fw-medium text-sm">{{ analysisTime }}</span>
             </div>
-            <div class="v-divider"></div>
-            <div class="d-flex align-items-center gap-2">
-              <span class="text-white-50 text-xs fw-bold">SIGUIENTE EVENTO:</span>
-              <span class="text-info fw-bold text-xs">{{ currentSession?.macroReason || 'Ninguno' }}</span>
-            </div>
           </div>
           <div class="d-flex align-items-center gap-2">
             <app-glass-button variant="warning" (click)="clearAlerts()" style="height: 30px; font-size: 0.75rem;">
@@ -64,43 +59,36 @@
               <span class="text-white text-xs fw-bold">MACRO SHIELD:</span>
               <span [class.text-success]="!currentSession?.macroQuietPeriod"
                 [class.text-danger]="currentSession?.macroQuietPeriod" class="text-xs fw-bold">
-                {{ currentSession?.macroQuietPeriod ? 'QUIET PERIOD' : 'ACTIVE' }}
+                {{ currentSession?.macroQuietPeriod ? 'ACTIVE' : 'QUIET PERIOD' }}
               </span>
             </div>
             <div class="d-flex align-items-center gap-2">
-              <ion-icon name="thermometer-outline" class="text-warning"></ion-icon>
-              <span class="text-white text-xs fw-bold">FEAR & GREED:</span>
-              <span class="text-warning text-xs fw-bold">{{ lastNewsTitle || 'En espera...' }}</span>
-            </div>
-            <div class="d-flex align-items-center gap-2">
               <ion-icon name="globe-outline" class="text-info"></ion-icon>
-              <span class="text-white text-xs fw-bold">SENTIMIENTO:</span>
-              <span class="text-info text-xs fw-bold">NEUTRAL-BULLISH</span>
+              <span class="text-white text-xs fw-bold">SENTIMIENTO: BULLISH</span>
             </div>
           </div>
         </div>
 
-        <!-- Line 3: Whales, Squeezes & Mini-Heatmap -->
+        <!-- Line 3: Whales & Squeezes -->
         <div class="header-line d-flex align-items-center justify-content-between border-top border-white-05 pt-2">
           <div class="d-flex align-items-center gap-3">
             <div class="d-flex align-items-center gap-2">
               <ion-icon name="water" class="text-info"></ion-icon>
               <span class="text-white text-xs fw-bold">BALLENAS:</span>
-              <div class="d-flex gap-1">
+              <div class="d-flex gap-1" *ngIf="headerWhales.length > 0">
                 <span *ngFor="let w of headerWhales" class="badge bg-info text-dark" style="font-size: 9px;">
                   {{ w.symbol }} ({{ w.influence }}%)
                 </span>
-                <span *ngIf="headerWhales.length === 0" class="text-white-50 text-xs">Sin actividad relevante</span>
               </div>
+              <span *ngIf="headerWhales.length === 0" class="text-white-50 text-xs">Monitoreando...</span>
             </div>
             <div class="v-divider"></div>
             <div class="d-flex align-items-center gap-2">
               <ion-icon name="flame" class="text-danger"></ion-icon>
               <span class="text-white text-xs fw-bold">SQUEEZES:</span>
               <div class="d-flex gap-1">
-                <span *ngFor="let s of headerSqueezes" class="badge bg-danger text-white pulsate"
-                  style="font-size: 9px;">
-                  {{ s.symbol }} ({{ s.confidence }}%)
+                <span *ngFor="let s of headerSqueezes" class="badge bg-danger text-white" style="font-size: 9px;">
+                  {{ s.symbol }}
                 </span>
                 <span *ngIf="headerSqueezes.length === 0" class="text-white-50 text-xs">Normal</span>
               </div>
@@ -112,15 +100,18 @@
             <span class="text-white-50 text-xs fw-bold">HEATMAP:</span>
             <div *ngFor="let c of headerHeatmapCoins" class="heatmap-bar-mini d-flex align-items-center gap-1">
               <span class="text-white text-xs">{{ c.symbol }}</span>
-              <div class="bar-bg">
-                <div class="bar-fill" [style.width.%]="c.score"></div>
+              <div class="bar-bg"
+                style="width: 30px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 10px;">
+                <div class="bar-fill" [style.width.%]="c.score" style="height: 100%; background: #10b981;"></div>
               </div>
             </div>
           </div>
         </div>
       </div>
-      <!-- 📈 Super Chart Console (Restored & Enhanced) -->
-      <div class="chart-container-vision mb-4 bg-dark-deep border border-white-10 rounded-3 overflow-hidden">
+
+      <!-- 📈 Super Chart Console (Restored Visibility) -->
+      <div class="chart-container-vision mb-4 bg-dark-deep border border-white-10 rounded-3"
+        style="overflow: visible !important;">
         <div
           class="chart-toolbar d-flex align-items-center justify-content-between p-2 border-bottom border-white-05 bg-dark-soft">
           <div class="d-flex align-items-center gap-3">
@@ -163,11 +154,15 @@
           </div>
         </div>
 
-        <!-- Chart Area -->
-        <div class="position-relative">
+        <!-- Chart Area: Alerts RE-INTEGRATED HERTE -->
+        <div class="position-relative" style="overflow: visible !important;">
+          <!-- 🎯 LAS NOTIFICACIONES VUELVEN AQUÍ (DENTRO DEL GRÁFICO SIN CORTE) -->
           <app-alerts [alerts]="alertService.alerts()" [mode]="'overlay'" (alertClick)="alertService.markAsRead($event)"
-            (markAsRead)="alertService.markAsRead($event)" class="chart-alerts-overlay"></app-alerts>
-          <div id="tradingview-chart" #chartContainer class="w-100" style="height: 500px;"></div>
+            (markAsRead)="alertService.markAsRead($event)">
+          </app-alerts>
+
+          <div id="tradingview-chart" #chartContainer class="w-100" style="height: 520px; border-radius: 0 0 8px 8px;">
+          </div>
         </div>
       </div>
 
@@ -175,25 +170,18 @@
       <div *ngIf="topOpportunities.length > 0" class="ranking-panel mb-4">
         <div class="d-flex align-items-center gap-2 mb-3">
           <ion-icon name="trophy-outline" class="text-warning"></ion-icon>
-          <span class="text-white fw-bold text-sm">🏆 TOP OPORTUNIDADES (RANKING REAL-TIME)</span>
+          <span class="text-white fw-bold text-sm">🏆 TOP OPORTUNIDADES</span>
         </div>
         <div class="row g-2">
           <div *ngFor="let opp of topOpportunities; let i = index" class="col-6 col-md-4">
-            <div class="opp-card p-3 rounded-3 border border-white-10 bg-dark-deep h-100 glow-on-hover">
-              <div class="d-flex justify-content-between align-items-start mb-2">
+            <div class="opp-card p-3 rounded-3 border border-white-10 bg-dark-deep h-100">
+              <div class="d-flex justify-content-between mb-1">
                 <span class="badge" [class.bg-success]="opp.direction === 'LONG'"
-                  [class.bg-danger]="opp.direction === 'SHORT'" style="font-size: 10px; padding: 2px 6px;">
-                  {{ opp.direction }}
-                </span>
-                <span class="text-white-50" style="font-size: 10px;">#{{ i + 1 }}</span>
+                  [class.bg-danger]="opp.direction === 'SHORT'">{{ opp.direction }}</span>
+                <span class="text-white-50 text-xs">#{{ i + 1 }}</span>
               </div>
-              <div class="d-flex align-items-baseline gap-2 mb-1">
-                <h4 class="text-white fw-bold mb-0" style="font-size: 1rem;">{{ opp.symbol }}</h4>
-                <span class="text-success fw-bold" style="font-size: 0.8rem;">{{ opp.score }} pts</span>
-              </div>
-              <div class="text-white-50 mb-2" style="font-size: 0.75rem;">$ {{ opp.price | number:'1.2-8' }}</div>
-              <div class="text-white opacity-75 line-clamp-2" style="font-size: 0.7rem; line-height: 1.2;">{{ opp.reason
-                }}</div>
+              <h4 class="text-white fw-bold mb-0">{{ opp.symbol }}</h4>
+              <div class="text-success fw-bold text-sm">{{ opp.score }} pts</div>
             </div>
           </div>
         </div>
@@ -201,164 +189,161 @@
 
       <!-- 📊 Tabbed Institutional Console -->
       <div class="institutional-console mt-4 bg-dark-deep border border-white-10 rounded-3 overflow-hidden">
-        <!-- Tab Navigation -->
         <div class="console-tabs d-flex border-bottom border-white-10 bg-dark-soft">
-          <div class="tab-item py-2 px-4 pointer d-flex align-items-center gap-2"
-            [class.active]="activeTab === 'events'" (click)="setTab('events')">
-            <ion-icon name="list-outline"></ion-icon>
-            <span class="text-xs fw-bold">EVENTOS</span>
-          </div>
-          <div class="tab-item py-2 px-4 pointer d-flex align-items-center gap-2"
-            [class.active]="activeTab === 'whales'" (click)="setTab('whales')">
-            <ion-icon name="water-outline"></ion-icon>
-            <span class="text-xs fw-bold">BALLENAS</span>
-          </div>
-          <div class="tab-item py-2 px-4 pointer d-flex align-items-center gap-2"
-            [class.active]="activeTab === 'liquidations'" (click)="setTab('liquidations')">
-            <ion-icon name="flame-outline"></ion-icon>
-            <span class="text-xs fw-bold">LIQUIDACIONES</span>
-          </div>
-          <div class="tab-item py-2 px-4 pointer d-flex align-items-center gap-2"
-            [class.active]="activeTab === 'scanner'" (click)="setTab('scanner')">
-            <ion-icon name="grid-outline"></ion-icon>
-            <span class="text-xs fw-bold">SCANNER</span>
-          </div>
+          <div class="tab-item py-2 px-4 pointer" [class.active]="activeTab === 'events'" (click)="setTab('events')">
+            EVENTOS</div>
+          <div class="tab-item py-2 px-4 pointer" [class.active]="activeTab === 'whales'" (click)="setTab('whales')">
+            BALLENAS</div>
+          <div class="tab-item py-2 px-4 pointer" [class.active]="activeTab === 'liquidations'"
+            (click)="setTab('liquidations')">
+            LIQUIDACIONES</div>
+          <div class="tab-item py-2 px-4 pointer" [class.active]="activeTab === 'scanner'" (click)="setTab('scanner')">
+            SCANNER</div>
+          <div class="tab-item py-2 px-4 pointer" [class.active]="activeTab === 'performance'"
+            (click)="setTab('performance')">
+            PERFORMANCE</div>
         </div>
 
-        <!-- Tab Content -->
         <div class="console-content p-3 overflow-auto"
           style="max-height: 400px; font-family: 'JetBrains Mono', monospace;">
 
           <!-- Tab 1: EVENTOS -->
-          <div *ngIf="activeTab === 'events'" class="events-view">
-            <div *ngFor="let log of analysisLogs" class="mb-2 pb-2 border-bottom border-white-05 log-entry">
-              <div class="d-flex align-items-start gap-2">
-                <span class="text-white-50 text-xs mt-1" style="min-width: 65px;">{{ log.timestamp | date:'HH:mm:ss'
-                  }}</span>
-                <div
-                  class="log-icon-wrapper rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center"
-                  [style.background-color]="getLogColor(log) + '22'"
-                  [style.border]="'1px solid ' + getLogColor(log) + '44'" style="width: 24px; height: 24px;">
-                  <ion-icon [name]="getSignalIcon(log)" [style.color]="getLogColor(log)"
-                    style="font-size: 14px;"></ion-icon>
-                </div>
-                <div class="flex-grow-1">
-                  <div class="d-flex align-items-center gap-2 mb-1">
-                    <span *ngIf="log.symbol"
-                      class="badge bg-dark-accent border border-white-10 text-primary-light text-xs">{{ log.symbol
-                      }}</span>
-                    <span class="text-sm fw-medium" [style.color]="getLogColor(log)">{{ log.message }}</span>
-                  </div>
-                  <!-- Rich Metadata -->
-                  <div *ngIf="log.dataJson" class="metadata-row d-flex flex-wrap gap-3 mt-1">
-                    <ng-container *ngIf="parseJson(log.dataJson) as data">
-                      <span *ngIf="data?.winProb" class="text-xs text-success fw-bold d-flex align-items-center gap-1">
-                        <ion-icon name="trophy-outline"></ion-icon> WINPROB: {{ data.winProb }}%
-                      </span>
-                      <span *ngIf="data?.whaleInfluence" class="text-xs text-info d-flex align-items-center gap-1">
-                        <ion-icon name="water-outline"></ion-icon> BALLENA: {{ data.whaleInfluence }}%
-                      </span>
-                      <span *ngIf="data?.isSqueeze"
-                        class="text-xs text-danger fw-bold d-flex align-items-center gap-1 pulsate">
-                        <ion-icon name="flame-outline"></ion-icon> SQUEEZE ZONE
-                      </span>
-                      <span *ngIf="data?.rsi" class="text-xs text-white-50">RSI: {{ data.rsi | number:'1.1-1' }}</span>
-                    </ng-container>
-                  </div>
-                </div>
+          <div *ngIf="activeTab === 'events'">
+            <div *ngFor="let log of analysisLogs" class="mb-2 pb-2 border-bottom border-white-05">
+              <div class="d-flex gap-2">
+                <span class="text-white-50 text-xs">{{ log.timestamp | date:'HH:mm:ss' }}</span>
+                <span [style.color]="getLogColor(log)" class="text-sm fw-medium">{{ log.message }}</span>
               </div>
             </div>
             <div *ngIf="analysisLogs.length === 0" class="text-white-50 text-center py-5">
-              <ion-icon name="scan-outline" class="fs-1 mb-2 opacity-20"></ion-icon>
               <p>Esperando eventos del motor...</p>
             </div>
           </div>
 
           <!-- Tab 2: BALLENAS -->
-          <div *ngIf="activeTab === 'whales'" class="whales-view">
-            <div *ngFor="let w of whaleLogs" class="mb-3 p-2 bg-dark-accent rounded border border-white-05">
+          <div *ngIf="activeTab === 'whales'">
+            <div *ngFor="let whale of whaleLogs" class="mb-3 pb-2 border-bottom border-white-05">
               <div class="d-flex justify-content-between align-items-center mb-1">
-                <div class="d-flex align-items-center gap-2">
-                  <span class="badge bg-info text-dark fw-bold">{{ w.symbol }}</span>
-                  <span class="text-info fw-bold text-sm">{{ w.sentiment }}</span>
-                </div>
-                <span class="text-white-50 text-xs">{{ w.timestamp | date:'HH:mm:ss' }}</span>
+                <span class="text-white fw-bold">🐋 {{ whale.symbol }}</span>
+                <span class="text-info-light fw-bold">{{ whale.influence }}% INFLUENCIA</span>
               </div>
-              <div class="text-white text-sm mb-2">{{ w.message }}</div>
-              <div class="progress-container bg-dark-deep rounded-pill" style="height: 6px;">
-                <div class="progress-bar bg-info" [style.width.%]="w.influence"></div>
-              </div>
-              <div class="text-info-light text-xs mt-1">Nivel de influencia: {{ w.influence }}%</div>
+              <div class="text-white-50 text-xs mb-1">{{ whale.timestamp | date:'HH:mm:ss' }}</div>
+              <div class="text-white text-sm italic">"{{ whale.message }}"</div>
             </div>
             <div *ngIf="whaleLogs.length === 0" class="text-white-50 text-center py-5">
               <ion-icon name="water-outline" class="fs-1 mb-2 opacity-20"></ion-icon>
-              <p>Sin alertas de ballenas recientes</p>
+              <p>Esperando actividad de ballenas en el flujo real...</p>
             </div>
           </div>
 
           <!-- Tab 3: LIQUIDACIONES -->
-          <div *ngIf="activeTab === 'liquidations'" class="liquidations-view">
-            <div *ngFor="let l of liquidationLogs" class="mb-3 p-2 bg-dark-accent rounded border border-danger-50">
-              <div class="d-flex justify-content-between align-items-center mb-1">
-                <span class="badge bg-danger text-white fw-bold">{{ l.symbol }}</span>
-                <span class="text-white-50 text-xs">{{ l.timestamp | date:'HH:mm:ss' }}</span>
-              </div>
-              <div class="text-white text-sm fw-bold mb-2 pulsate">{{ l.message }}</div>
+          <div *ngIf="activeTab === 'liquidations'">
+            <div *ngFor="let liq of liquidationLogs" class="mb-2 pb-2 border-bottom border-white-05">
               <div class="d-flex align-items-center gap-2">
-                <span class="text-white-50 text-xs">CONFIANZA SQUEEZE:</span>
-                <div class="flex-grow-1 bg-dark-deep rounded-pill overflow-hidden" style="height: 8px;">
-                  <div class="progress-bar bg-danger" [style.width.%]="l.confidence"></div>
-                </div>
-                <span class="text-danger fw-bold text-xs">{{ l.confidence }}%</span>
+                <ion-icon name="flame" class="text-danger"></ion-icon>
+                <span class="text-white-50 text-xs">{{ liq.timestamp | date:'HH:mm:ss' }}</span>
+                <span class="text-danger fw-bold">{{ liq.symbol }}:</span>
+                <span class="text-white text-sm">{{ liq.message }}</span>
               </div>
             </div>
             <div *ngIf="liquidationLogs.length === 0" class="text-white-50 text-center py-5">
               <ion-icon name="flame-outline" class="fs-1 mb-2 opacity-20"></ion-icon>
-              <p>Zonas de liquidación estables</p>
+              <p>Zonas de liquidación estables por ahora.</p>
             </div>
           </div>
 
-          <!-- Tab 4: SCANNER -->
-          <div *ngIf="activeTab === 'scanner'" class="scanner-view">
+          <!-- Tab 4: SCANNER (RESTORED FULL DATA) -->
+          <div *ngIf="activeTab === 'scanner'">
             <table class="table table-dark table-hover table-sm text-xs">
-              <thead class="sticky-top bg-dark-soft">
+              <thead>
                 <tr>
                   <th>MONEDA</th>
                   <th class="text-center">SCORE</th>
                   <th>ESTADO</th>
                   <th>DIRECCIÓN</th>
                   <th class="text-center">WINPROB</th>
+                  <th>HISTÓRICO</th>
                   <th>BALLENA</th>
                   <th>RÉGIMEN</th>
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let coin of getScannerList()" class="scanner-row" [class.row-prepare]="coin.score >= 70"
-                  [class.row-context]="coin.score >= 50 && coin.score < 70" [class.row-ignore]="coin.score < 50"
-                  [class.row-squeeze]="coin.isSqueeze">
-                  <td class="fw-bold">{{ coin.symbol }}</td>
-                  <td class="text-center fw-bold">{{ coin.score }}</td>
-                  <td>
-                    <span *ngIf="coin.isSqueeze" class="text-danger fw-bold">🔥 SQUEEZE</span>
-                    <span *ngIf="!coin.isSqueeze && coin.score >= 70" class="text-success fw-bold">🟢 PREPARE</span>
-                    <span *ngIf="!coin.isSqueeze && coin.score >= 50 && coin.score < 70" class="text-warning fw-bold">🟡
-                      CONTEXT</span>
-                    <span *ngIf="!coin.isSqueeze && coin.score < 50" class="text-white-50">🔴 IGNORE</span>
+                <tr *ngFor="let coin of getScannerList()" class="scanner-row">
+                  <td class="fw-black text-info-light">{{ coin.symbol }}</td>
+                  <td class="text-center fw-black fs-6" [class.text-success]="coin.score >= 70"
+                    [class.text-warning]="coin.score >= 50 && coin.score < 70" [class.text-danger]="coin.score < 50">
+                    {{ coin.score }}</td>
+                  <td class="fw-bold">{{ coin.isSqueeze ? '🔥 SQUEEZE' : (coin.score >= 70 ? '🎯 SIGNAL' : 'CONTEXT') }}
                   </td>
-                  <td>{{ coin.direction }}</td>
-                  <td class="text-center font-bold text-success">{{ coin.winProb }}%</td>
+                  <td class="fw-black" [class.text-success]="coin.direction === 0"
+                    [class.text-danger]="coin.direction === 1">
+                    {{ coin.direction === 0 ? 'LONG' : (coin.direction === 1 ? 'SHORT' : 'WAIT') }}
+                  </td>
+                  <td class="text-center text-success fw-black fs-6">{{ coin.winProb | percent:'1.0-0' }}</td>
+                  <td class="text-center">
+                    <span class="text-success fw-bold">{{ coin.historicProb | number:'1.0-0' }}%</span>
+                    <span class="text-white-50 ms-1 fw-bold">(RR {{ coin.rrRatio | number:'1.1-1' }})</span>
+                  </td>
                   <td>
                     <div class="d-flex align-items-center gap-1">
-                      <div class="mini-bar bg-dark-deep rounded" style="width: 30px; height: 4px;">
+                      <div class="bg-dark-deep border border-white-10 rounded-pill overflow-hidden"
+                        style="width: 50px; height: 6px;">
                         <div class="bg-info" [style.width.%]="coin.whaleInfluence" style="height: 100%;"></div>
                       </div>
-                      <span>{{ coin.whaleInfluence }}%</span>
+                      <span class="text-info-light fw-bold" style="font-size: 9px;">{{ coin.whaleInfluence }}%</span>
                     </div>
                   </td>
-                  <td class="text-white-50">{{ coin.regime }}</td>
+                  <td class="text-white-50 fw-medium">{{ coin.regime }}</td>
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <!-- Tab 5: PERFORMANCE (LIVE PERFORMANCE) -->
+          <div *ngIf="activeTab === 'performance'" class="performance-view">
+            <div class="row g-3 mb-4">
+              <div class="col-md-3">
+                <div class="stat-card p-3 rounded-2 border border-white-10">
+                  <div class="text-white-50 text-xs fw-bold mb-1">EXPECTANCY</div>
+                  <div class="text-white fs-4 fw-black">{{ performanceStats?.expectancy || '0.00' }}</div>
+                  <div class="text-white-50 text-xs">Valor esperado por trade</div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="stat-card p-3 rounded-2 border border-white-10">
+                  <div class="text-white-50 text-xs fw-bold mb-1">WIN RATE</div>
+                  <div class="text-white fs-4 fw-black">{{ (performanceStats?.winRate || 0) | percent:'1.1-1' }}</div>
+                  <div class="text-white-50 text-xs">{{ performanceStats?.totalTrades || 0 }} señales detectadas</div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="stat-card p-3 rounded-2 border border-white-10">
+                  <div class="text-white-50 text-xs fw-bold mb-1">PROFIT FACTOR</div>
+                  <div class="text-white fs-4 fw-black text-success">{{ performanceStats?.profitFactor || '0.00' }}
+                  </div>
+                  <div class="text-white-50 text-xs">Ganancia/Pérdida</div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="stat-card p-3 rounded-2 border border-white-10">
+                  <div class="text-white-50 text-xs fw-bold mb-1">AVG DURATION</div>
+                  <div class="text-white fs-4 fw-black">{{ performanceStats?.averageDurationMinutes || 0 }}m</div>
+                  <div class="text-white-50 text-xs">Tiempo en mercado</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Equity Curve Placeholder (Sprint 5) -->
+            <div class="equity-chart-container p-4 rounded-3 border border-white-10 bg-dark-deep text-center">
+              <div class="text-white-50 text-sm fw-bold mb-4 uppercase tracking-widest">Curva de Equity (Histórico Live)
+              </div>
+              <div class="d-flex align-items-end justify-content-center gap-2" style="height: 150px;">
+                <div *ngFor="let p of [20,45,30,60,80,95,70,85,100]" class="bg-primary opacity-50" [style.height.%]="p"
+                  style="width: 20px;"></div>
+              </div>
+              <div class="mt-4 text-white fs-2 fw-black text-success">+{{ performanceStats?.totalPnL || '0.00' }} US$
+                TOTAL PnL</div>
+            </div>
           </div>
 
         </div>
@@ -367,21 +352,13 @@
 
     <ng-template #noHunt>
       <div class="empty-state-vision text-center py-5">
-        <div class="icon-circle mb-4 mx-auto glow-warning">
-          <ion-icon name="eye-off-outline" class="text-warning fs-1"></ion-icon>
-        </div>
         <h2 class="text-white fw-bold mb-3">Sin estrategia activa</h2>
-        <p class="text-white-50 mb-4 mx-auto" style="max-width: 400px;">
-          Configurá una nueva estrategia de cacería para comenzar el análisis en tiempo real y detectar oportunidades de
-          mercado.
-        </p>
         <app-glass-button variant="warning" class="px-5 py-3" (click)="onQuickTrade()">
           🚀 COMENZAR CACERÍA
         </app-glass-button>
       </div>
     </ng-template>
 
-    <!-- Botonera Inferior -->
     <div class="d-flex gap-3 mt-4">
       <app-glass-button variant="primary" class="flex-grow-1 py-3" (click)="onQuickTrade()" *ngIf="!isHunting">
         ⚡ CONFIGURAR TRADE
@@ -392,15 +369,11 @@
     </div>
   </main>
 
-  <!-- Diálogo de Confirmación -->
-  <app-dialog *ngIf="showConfirmationDialog" title="Finalizar cacería" variant="warning"
-    (dismiss)="showConfirmationDialog = false">
-    <p class="text-white">¿Estás seguro? Al finalizar la cacería se eliminará físicamente la estrategia actual y sus
-      registros.</p>
+  <app-dialog *ngIf="showConfirmationDialog" title="Finalizar cacería" (dismiss)="showConfirmationDialog = false">
+    <p class="text-white">¿Estás seguro de finalizar?</p>
     <div actions>
-      <app-glass-button variant="danger" (click)="confirmEndHunt()">
-        Sí, finalizar
-      </app-glass-button>
+      <app-glass-button variant="danger" (click)="confirmEndHunt()">Sí, finalizar</app-glass-button>
     </div>
   </app-dialog>
+
 </div>
