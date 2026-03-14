@@ -1,0 +1,51 @@
+<div class="modal-backdrop d-flex align-items-center justify-content-center" (click)="onClose()">
+  <div class="leverage-modal-container bg-dark-deep rounded border border-white-05 p-0" (click)="$event.stopPropagation()">
+    <!-- Header -->
+    <div class="modal-header p-3 border-bottom border-white-05 d-flex justify-content-between align-items-center">
+      <h6 class="m-0 text-white fw-bold">Ajustar apalancamiento</h6>
+      <ion-icon name="close-outline" class="text-white-50 pointer fs-4" (click)="onClose()"></ion-icon>
+    </div>
+
+    <!-- Content -->
+    <div class="modal-body p-4">
+      <div class="mb-4">
+        <label class="text-white-50 text-xs mb-2 d-block text-uppercase fw-bold ls-1">Apalancamiento</label>
+        
+        <!-- Input Selector -->
+        <div class="leverage-input-box d-flex align-items-center justify-content-between bg-dark-accent p-2 rounded border border-white-10 mb-4">
+          <button class="btn btn-dark-light btn-sm px-3" (click)="adjust(-1)">
+            <ion-icon name="remove-outline"></ion-icon>
+          </button>
+          <div class="text-white fw-bold fs-5">{{ tempLeverage }}x</div>
+          <button class="btn btn-dark-light btn-sm px-3" (click)="adjust(1)">
+            <ion-icon name="add-outline"></ion-icon>
+          </button>
+        </div>
+
+        <!-- Slider -->
+        <div class="custom-slider-container mb-2">
+          <input type="range" min="1" max="150" [(ngModel)]="tempLeverage" (input)="updateLeverage(tempLeverage)" class="custom-slider">
+          <div class="slider-marks d-flex justify-content-between mt-1 px-1">
+            <span *ngFor="let opt of quickOptions" class="mark-label" (click)="updateLeverage(opt)">{{ opt }}x</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Risk Warning Box -->
+      <div class="risk-info-box p-3 bg-dark-deep rounded border border-white-05 mb-4 text-xs lh-base">
+        <ul class="m-0 ps-3 text-white-50">
+          <li>Posición máxima con el apalancamiento actual: <span class="text-white">500,000 USDT</span></li>
+          <li>La modificación se aplicará a todas las posiciones y órdenes abiertas.</li>
+          <li class="mt-2 text-warning">Seleccionar un mayor apalancamiento aumenta el riesgo de liquidación. Gestiona siempre tu nivel de riesgo.</li>
+        </ul>
+      </div>
+
+      <!-- Footer Buttons -->
+      <div class="footer-actions">
+        <button class="btn btn-warning w-100 py-2 fw-bold text-dark shadow-sm" (click)="onConfirm()">
+          Confirmar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

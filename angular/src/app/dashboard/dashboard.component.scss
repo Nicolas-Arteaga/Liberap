@@ -169,4 +169,79 @@
 ::-webkit-scrollbar { width: 3px; height: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #2b3139; border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: #4a5461; }
+::-webkit-scrollbar-thumb:hover { background: #4a5461; }
+
+/* Premium Symbol Selector */
+.symbol-selector-root {
+  z-index: 1000;
+  
+  .selected-symbol-container {
+    padding: 6px 12px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid transparent;
+    
+    &:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    .symbol-name { font-size: 16px; letter-spacing: 0.5px; }
+    .symbol-price { font-size: 15px; font-weight: 600; font-family: 'Roboto Mono', monospace; }
+    .symbol-change { font-weight: 500; }
+  }
+}
+
+.symbol-dropdown-container {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 320px;
+  background: #1e2329;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+
+  .search-box {
+    background: #1e2329;
+    .input-group {
+      background: #2b3139;
+      transition: all 0.2s;
+      &:focus-within {
+        border-color: #f0b90b;
+      }
+    }
+  }
+
+  .tickers-list {
+    &::-webkit-scrollbar { width: 4px; }
+    &::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 2px; }
+    
+    .ticker-item {
+      transition: background 0.1s;
+      &:hover {
+        background: rgba(255, 255, 255, 0.03);
+      }
+      &.active {
+        background: rgba(240, 185, 11, 0.05);
+      }
+    }
+  }
+}
+
+/* Animations */
+.animate-fade-in {
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.text-xxs { font-size: 9px; }
+.text-white-30 { color: rgba(255, 255, 255, 0.3); }
+.text-white-05 { color: rgba(255, 255, 255, 0.05); }
+.hover\:bg-white-05:hover { background: rgba(255, 255, 255, 0.05); }

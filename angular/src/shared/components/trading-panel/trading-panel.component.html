@@ -2,9 +2,17 @@
   <!-- Top Buttons: Margin & Leverage -->
   <div class="d-flex gap-1 mb-3">
     <button class="btn btn-dark btn-sm flex-grow-1 text-xs py-1">{{ marginType }}</button>
-    <button class="btn btn-dark btn-sm flex-grow-1 text-xs py-1">{{ leverage }}x</button>
+    <button class="btn btn-dark btn-sm flex-grow-1 text-xs py-1" (click)="showLeverageModal = true">{{ leverage }}x</button>
     <button class="btn btn-dark btn-sm px-2 text-xs py-1">S</button>
   </div>
+
+  <!-- Leverage Modal -->
+  <app-leverage-modal 
+    *ngIf="showLeverageModal"
+    [currentLeverage]="leverage"
+    (confirm)="leverage = $event; showLeverageModal = false"
+    (close)="showLeverageModal = false">
+  </app-leverage-modal>
 
   <!-- Order Type Tabs -->
   <div class="trade-type-tabs d-flex border-bottom border-white-05 mb-3">

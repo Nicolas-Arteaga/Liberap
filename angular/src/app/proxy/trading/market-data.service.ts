@@ -1,4 +1,4 @@
-import type { GetMarketCandlesInput, GetMarketDataInput, MarketCandleDto, MarketOrderBookDto, RecentTradeDto } from './models';
+import type { GetMarketCandlesInput, GetMarketDataInput, MarketCandleDto, MarketOrderBookDto, RecentTradeDto, SymbolTickerDto } from './models';
 import { RestService, Rest } from '@abp/ng.core';
 import { Injectable, inject } from '@angular/core';
 
@@ -33,6 +33,13 @@ export class MarketDataService {
       method: 'GET',
       url: '/api/app/market-data/recent-trades',
       params: { symbol: input.symbol, limit: input.limit },
+    },
+    { apiName: this.apiName,...config });
+
+  getTickers = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, SymbolTickerDto[]>({
+      method: 'GET',
+      url: '/api/app/market-data/tickers',
     },
     { apiName: this.apiName,...config });
 }

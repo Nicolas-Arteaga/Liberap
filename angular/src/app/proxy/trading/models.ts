@@ -361,3 +361,12 @@ export interface WalkForwardWindowDto {
   testingResult: BacktestResultDto;
   passedProfitFactor: boolean;
 }
+export interface SymbolTickerDto {
+  symbol?: string;
+  lastPrice: number;
+  priceChange: number;
+  priceChangePercent: number;
+  volume: number;
+  highPrice: number;
+  lowPrice: number;
+}

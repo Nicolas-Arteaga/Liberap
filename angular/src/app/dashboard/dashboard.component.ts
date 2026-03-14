@@ -9,7 +9,7 @@ import { IconService } from 'src/shared/services/icon.service';
 import { createChart, IChartApi, ISeriesApi, CandlestickData, CandlestickSeries, LineSeries } from 'lightweight-charts';
 import { MarketDataService } from '../proxy/trading/market-data.service';
 import { TradingService } from '../proxy/trading/trading.service';
-import { TradingSessionDto, AnalysisLogDto, MarketAnalysisDto, OpportunityDto } from '../proxy/trading/models';
+import { TradingSessionDto, AnalysisLogDto, MarketAnalysisDto, OpportunityDto, SymbolTickerDto } from '../proxy/trading/models';
 import { SignalStatsDto } from '../proxy/trading/dtos/models';
 import { AnalysisLogType } from '../proxy/trading/analysis-log-type.enum';
 import { DialogComponent } from 'src/shared/components/dialog/dialog.component';
@@ -155,6 +155,13 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     { value: '1M', label: '1M' }
   ];
 
+  // Tickers para el buscador
+  tickers: SymbolTickerDto[] = [];
+  filteredTickers: SymbolTickerDto[] = [];
+  selectedTicker?: SymbolTickerDto;
+  searchTerm: string = '';
+  showSymbolSelector: boolean = false;
+
   // Señales activas (reemplazado por logs reales)
   activeSignals: TradingSignal[] = [];
 
@@ -205,16 +212,20 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   ];
 
-  // Precios simulados para cálculo de posición
+  // Precios para cálculo de posición y visualización
   chartPrices = {
-    min: 67000,
-    max: 70000,
-    current: 68500
+    min: 0,
+    max: 0,
+    current: 0,
+    last: 0,
+    change: 0,
+    changePercent: 0
   };
 
   ngOnInit() {
     console.log('[Dashboard] 🚀 ngOnInit ejecutado');
     this.checkActiveSession();
+    this.loadTickers();
 
     // Verificar si hay sesión cacheada en SignalR (para el caso donde el evento ya llegó)
     const cachedSession = this.signalrService.getLastSession();
@@ -224,6 +235,14 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     this.subscribeToNotifications();
+
+    // Polling de datos
+    setInterval(() => {
+      this.loadData();
+      this.loadOrderBook();
+      this.loadRecentTrades();
+      this.loadTickers();
+    }, 5000);
   }
 
   private subscribeToNotifications() {
@@ -575,7 +594,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   loadOrderBook() {
     this.marketDataService.getOrderBook({
       symbol: this.selectedSymbol,
-      limit: 30
+      limit: 20
     }).subscribe({
       next: (data) => {
         // Calculate totals for Bids (high to low)
@@ -908,6 +927,50 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // startHunt() removed - now handled in ExecuteTradeComponent
 
+  loadTickers() {
+    this.marketDataService.getTickers().subscribe({
+      next: (data) => {
+        this.tickers = data;
+        this.filterTickers();
+        
+        // Actualizar el ticker seleccionado para mostrar precio en el header
+        this.selectedTicker = this.tickers.find(t => t.symbol === this.selectedSymbol);
+      },
+      error: (err) => console.error('Error al cargar tickers:', err)
+    });
+  }
+
+  filterTickers() {
+    if (!this.searchTerm) {
+      this.filteredTickers = this.tickers.slice(0, 50); // Mostrar top 50 por defecto
+    } else {
+      const term = this.searchTerm.toUpperCase();
+      this.filteredTickers = this.tickers.filter(t => t.symbol.includes(term));
+    }
+  }
+
+  selectSymbol(symbol: string) {
+    this.selectedSymbol = symbol;
+    this.showSymbolSelector = false;
+    this.onSymbolChange();
+  }
+
+  onSymbolChange() {
+    console.log('Cambiando a símbolo:', this.selectedSymbol);
+    
+    // Resetear datos previos
+    this.chartPrices = { min: 0, max: 0, current: 0, last: 0, change: 0, changePercent: 0 };
+    this.orderBook = { bids: [], asks: [] };
+    this.recentTrades = [];
+    
+    // Actualizar ticker seleccionado
+    this.selectedTicker = this.tickers.find(t => t.symbol === this.selectedSymbol);
+
+    this.loadData();
+    this.loadOrderBook();
+    this.loadRecentTrades();
+  }
+
   // Métodos de control
   toggleAnalysis() {
     this.isAnalyzing = !this.isAnalyzing;
@@ -1127,9 +1190,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // --- UI Handlers ---
 
-  onSymbolChange() {
-    this.loadData();
-  }
 
   onTimeframeChange(tf: string) {
     this.selectedTimeframe = tf;

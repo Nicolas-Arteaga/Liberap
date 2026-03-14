@@ -9,4 +9,5 @@ public interface IMarketDataAppService : IApplicationService
     Task<List<MarketCandleDto>> GetCandlesAsync(GetMarketCandlesInput input);
     Task<MarketOrderBookDto> GetOrderBookAsync(GetMarketDataInput input);
     Task<List<RecentTradeDto>> GetRecentTradesAsync(GetMarketDataInput input);
+    Task<List<SymbolTickerDto>> GetTickersAsync();
 }

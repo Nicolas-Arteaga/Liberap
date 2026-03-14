@@ -45,3 +45,13 @@ public class RecentTradeDto
     public long Time { get; set; }
     public bool IsBuyerMaker { get; set; }
 }
+public class SymbolTickerDto
+{
+    public string Symbol { get; set; } = string.Empty;
+    public decimal LastPrice { get; set; }
+    public decimal PriceChange { get; set; }
+    public decimal PriceChangePercent { get; set; }
+    public decimal Volume { get; set; }
+    public decimal HighPrice { get; set; }
+    public decimal LowPrice { get; set; }
+}

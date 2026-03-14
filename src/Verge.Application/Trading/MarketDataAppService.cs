@@ -51,4 +51,19 @@ public class MarketDataAppService : ApplicationService, IMarketDataAppService
             IsBuyerMaker = t.IsBuyerMaker
         }).ToList();
     }
+
+    public async Task<List<SymbolTickerDto>> GetTickersAsync()
+    {
+        var tickers = await _marketDataManager.GetTickersAsync();
+        return tickers.Select(t => new SymbolTickerDto
+        {
+            Symbol = t.Symbol,
+            LastPrice = t.LastPrice,
+            PriceChange = t.PriceChange,
+            PriceChangePercent = t.PriceChangePercent,
+            Volume = t.Volume,
+            HighPrice = t.HighPrice,
+            LowPrice = t.LowPrice
+        }).ToList();
+    }
 }

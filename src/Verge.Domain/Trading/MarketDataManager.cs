@@ -55,8 +55,8 @@ public class MarketDataManager : DomainService
         try
         {
             var client = _httpClientFactory.CreateClient();
-            // Para obtener el TOP por volumen, usamos ticker/24hr
-            var url = $"{BinanceBaseUrl}/api/v3/ticker/24hr";
+            // Para obtener el TOP por volumen, usamos fapi/v1/ticker/24hr
+            var url = $"{FuturesBaseUrl}/fapi/v1/ticker/24hr";
             var response = await client.GetAsync(url);
             
             if (!response.IsSuccessStatusCode) return new List<string> { "BTCUSDT", "ETHUSDT", "SOLUSDT" };
@@ -114,7 +114,7 @@ public class MarketDataManager : DomainService
             // LOG: a qué se convirtió
             Logger.LogInformation($"🔄 Interval convertido: '{interval}' -> '{binanceInterval}'");
             
-            var url = $"{BinanceBaseUrl}/api/v3/klines?symbol={symbol}&interval={binanceInterval}&limit={limit}";
+            var url = $"{FuturesBaseUrl}/fapi/v1/klines?symbol={symbol}&interval={binanceInterval}&limit={limit}";
             Logger.LogInformation($"📡 URL final: {url}");
 
             var response = await client.GetAsync(url);
@@ -138,11 +138,11 @@ public class MarketDataManager : DomainService
                     result.Add(new MarketCandleModel
                     {
                         Timestamp = raw[0].GetInt64(),
-                        Open = decimal.Parse(raw[1].GetString()!, System.Globalization.CultureInfo.InvariantCulture),
-                        High = decimal.Parse(raw[2].GetString()!, System.Globalization.CultureInfo.InvariantCulture),
-                        Low = decimal.Parse(raw[3].GetString()!, System.Globalization.CultureInfo.InvariantCulture),
-                        Close = decimal.Parse(raw[4].GetString()!, System.Globalization.CultureInfo.InvariantCulture),
-                        Volume = decimal.Parse(raw[5].GetString()!, System.Globalization.CultureInfo.InvariantCulture)
+                        Open = ParseDecimal(raw[1]),
+                        High = ParseDecimal(raw[2]),
+                        Low = ParseDecimal(raw[3]),
+                        Close = ParseDecimal(raw[4]),
+                        Volume = ParseDecimal(raw[5])
                     });
                 }
             }
@@ -163,7 +163,7 @@ public class MarketDataManager : DomainService
             var client = _httpClientFactory.CreateClient();
             symbol = symbol.ToUpper().Replace("/", "").Replace("-", "").Trim();
             
-            var url = $"{BinanceBaseUrl}/api/v3/depth?symbol={symbol}&limit={limit}";
+            var url = $"{FuturesBaseUrl}/fapi/v1/depth?symbol={symbol}&limit={limit}";
             var response = await client.GetAsync(url);
             
             if (!response.IsSuccessStatusCode) return new MarketOrderBookModel();
@@ -177,16 +177,16 @@ public class MarketDataManager : DomainService
             foreach (var bid in root.GetProperty("bids").EnumerateArray())
             {
                 result.Bids.Add(new OrderBookEntryModel { 
-                    Price = decimal.Parse(bid[0].GetString()!, System.Globalization.CultureInfo.InvariantCulture),
-                    Amount = decimal.Parse(bid[1].GetString()!, System.Globalization.CultureInfo.InvariantCulture)
+                    Price = ParseDecimal(bid[0]),
+                    Amount = ParseDecimal(bid[1])
                 });
             }
 
             foreach (var ask in root.GetProperty("asks").EnumerateArray())
             {
                 result.Asks.Add(new OrderBookEntryModel { 
-                    Price = decimal.Parse(ask[0].GetString()!, System.Globalization.CultureInfo.InvariantCulture),
-                    Amount = decimal.Parse(ask[1].GetString()!, System.Globalization.CultureInfo.InvariantCulture)
+                    Price = ParseDecimal(ask[0]),
+                    Amount = ParseDecimal(ask[1])
                 });
             }
 
@@ -206,7 +206,7 @@ public class MarketDataManager : DomainService
             var client = _httpClientFactory.CreateClient();
             symbol = symbol.ToUpper().Replace("/", "").Replace("-", "").Trim();
             
-            var url = $"{BinanceBaseUrl}/api/v3/trades?symbol={symbol}&limit={limit}";
+            var url = $"{FuturesBaseUrl}/fapi/v1/trades?symbol={symbol}&limit={limit}";
             var response = await client.GetAsync(url);
             
             if (!response.IsSuccessStatusCode) return new List<RecentTradeModel>();
@@ -223,8 +223,8 @@ public class MarketDataManager : DomainService
                     result.Add(new RecentTradeModel
                     {
                         Id = trade.GetProperty("id").GetInt64(),
-                        Price = decimal.Parse(trade.GetProperty("price").GetString()!, System.Globalization.CultureInfo.InvariantCulture),
-                        Amount = decimal.Parse(trade.GetProperty("qty").GetString()!, System.Globalization.CultureInfo.InvariantCulture),
+                        Price = ParseDecimal(trade.GetProperty("price")),
+                        Amount = ParseDecimal(trade.GetProperty("qty")),
                         Time = trade.GetProperty("time").GetInt64(),
                         IsBuyerMaker = trade.GetProperty("isBuyerMaker").GetBoolean()
                     });
@@ -238,6 +238,51 @@ public class MarketDataManager : DomainService
             Logger.LogError($"💥 Error al obtener Trades para {symbol}: {ex.Message}");
             return new List<RecentTradeModel>();
         }
+    }
+
+    public async Task<List<SymbolTickerModel>> GetTickersAsync()
+    {
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            var url = $"{FuturesBaseUrl}/fapi/v1/ticker/24hr";
+            var response = await client.GetAsync(url);
+            
+            if (!response.IsSuccessStatusCode) return new List<SymbolTickerModel>();
+
+            var content = await response.Content.ReadAsStringAsync();
+            var tickers = JsonSerializer.Deserialize<List<JsonElement>>(content);
+
+            if (tickers == null) return new List<SymbolTickerModel>();
+
+            return tickers
+                .Where(x => x.GetProperty("symbol").GetString()!.EndsWith("USDT"))
+                .Select(x => new SymbolTickerModel
+                {
+                    Symbol = x.GetProperty("symbol").GetString()!,
+                    LastPrice = ParseDecimal(x.GetProperty("lastPrice")),
+                    PriceChange = ParseDecimal(x.GetProperty("priceChange")),
+                    PriceChangePercent = ParseDecimal(x.GetProperty("priceChangePercent")),
+                    Volume = ParseDecimal(x.GetProperty("quoteVolume")),
+                    HighPrice = ParseDecimal(x.GetProperty("highPrice")),
+                    LowPrice = ParseDecimal(x.GetProperty("lowPrice"))
+                })
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"💥 Error al obtener tickers: {ex.Message}");
+            return new List<SymbolTickerModel>();
+        }
+    }
+    
+    private decimal ParseDecimal(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.String)
+        {
+            return decimal.Parse(element.GetString()!, System.Globalization.CultureInfo.InvariantCulture);
+        }
+        return element.GetDecimal();
     }
 }
 
@@ -277,4 +322,15 @@ public class RecentTradeModel
     public decimal Amount { get; set; }
     public long Time { get; set; }
     public bool IsBuyerMaker { get; set; }
+}
+
+public class SymbolTickerModel
+{
+    public string Symbol { get; set; } = string.Empty;
+    public decimal LastPrice { get; set; }
+    public decimal PriceChange { get; set; }
+    public decimal PriceChangePercent { get; set; }
+    public decimal Volume { get; set; }
+    public decimal HighPrice { get; set; }
+    public decimal LowPrice { get; set; }
 }

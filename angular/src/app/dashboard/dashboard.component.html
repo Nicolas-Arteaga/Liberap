@@ -97,10 +97,68 @@
             <div class="d-flex align-items-center gap-3">
               <div class="symbol-select d-flex align-items-center gap-2">
                 <ion-icon name="search-outline" class="text-info-light"></ion-icon>
-                <select [(ngModel)]="selectedSymbol" (change)="onSymbolChange()"
-                  class="bg-transparent border-0 text-white text-sm fw-bold outline-none cursor-pointer">
-                  <option *ngFor="let s of symbols" [value]="s.value" class="bg-dark-deep">{{ s.label }}</option>
-                </select>
+                <!-- Premium Symbol Selector -->
+                <div class="symbol-selector-root position-relative">
+                  <div class="selected-symbol-container d-flex align-items-center gap-2 cursor-pointer" 
+                       (click)="showSymbolSelector = !showSymbolSelector">
+                    <span class="symbol-name text-white fw-bold">{{ selectedTicker?.symbol || selectedSymbol }}</span>
+                    <span class="symbol-price ms-1" [class.text-success]="(selectedTicker?.priceChangePercent || 0) >= 0" 
+                          [class.text-danger]="(selectedTicker?.priceChangePercent || 0) < 0">
+                      {{ selectedTicker?.lastPrice | number:'1.2-8' }}
+                    </span>
+                    <span class="symbol-change text-xs" [class.text-success]="(selectedTicker?.priceChangePercent || 0) >= 0" 
+                          [class.text-danger]="(selectedTicker?.priceChangePercent || 0) < 0">
+                      {{ (selectedTicker?.priceChangePercent || 0) >= 0 ? '+' : '' }}{{ selectedTicker?.priceChangePercent | number:'1.2-2' }}%
+                    </span>
+                    <ion-icon name="chevron-down-outline" class="text-white-50 ms-1"></ion-icon>
+                  </div>
+
+                  <!-- Backdrop to close dropdown -->
+                  <div *ngIf="showSymbolSelector" class="dropdown-backdrop position-fixed top-0 start-0 w-100 h-100" 
+                       style="z-index: 999; background: transparent;"
+                       (click)="showSymbolSelector = false"></div>
+
+                  <!-- Dropdown Searcher -->
+                  <div *ngIf="showSymbolSelector" class="symbol-dropdown-container animate-fade-in shadow-xl" style="z-index: 1000;">
+                    <div class="search-box p-3 border-bottom border-white-05">
+                      <div class="input-group bg-dark-soft rounded-pill px-3 border border-white-10">
+                        <ion-icon name="search-outline" class="text-white-30 mt-2"></ion-icon>
+                        <input type="text" [(ngModel)]="searchTerm" (input)="filterTickers()" placeholder="Buscar moneda..."
+                               class="form-control bg-transparent border-0 text-white text-xs py-2 outline-none shadow-none">
+                      </div>
+                    </div>
+                    
+                    <div class="tickers-list overflow-auto" style="max-height: 400px;">
+                      <div class="ticker-item-header d-flex text-white-30 text-xs px-3 py-2">
+                        <div class="flex-grow-1">Moneda</div>
+                        <div class="w-1/3 text-end" style="width: 80px;">Precio</div>
+                        <div class="w-1/3 text-end" style="width: 80px;">Cambio</div>
+                      </div>
+                      
+                      <div *ngFor="let t of filteredTickers" 
+                           (click)="selectSymbol(t.symbol)"
+                           class="ticker-item d-flex align-items-center px-3 py-2 cursor-pointer hover:bg-white-05 border-bottom border-white-03">
+                        <div class="flex-grow-1">
+                          <div class="text-white fw-bold text-sm">{{ t.symbol }}</div>
+                          <div class="text-white-30 text-xxs">Perpetuo</div>
+                        </div>
+                        <div class="text-end" style="width: 80px;">
+                          <div class="text-white text-xs fw-medium">{{ t.lastPrice | number:'1.2-4' }}</div>
+                        </div>
+                        <div class="text-end" style="width: 80px;">
+                          <div class="text-xs fw-medium" [class.text-success]="t.priceChangePercent >= 0" 
+                               [class.text-danger]="t.priceChangePercent < 0">
+                            {{ t.priceChangePercent >= 0 ? '+' : '' }}{{ t.priceChangePercent | number:'1.2-2' }}%
+                          </div>
+                        </div>
+                      </div>
+
+                      <div *ngIf="filteredTickers.length === 0" class="p-4 text-center text-white-30 text-xs">
+                        No se encontraron monedas
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
               <div class="v-divider"></div>
               <div class="timeframe-selector d-flex gap-1 overflow-auto">
