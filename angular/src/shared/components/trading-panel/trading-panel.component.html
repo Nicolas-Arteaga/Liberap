@@ -1,0 +1,108 @@
+<div class="trading-panel-container h-100">
+  <!-- Top Buttons: Margin & Leverage -->
+  <div class="d-flex gap-1 mb-3">
+    <button class="btn btn-dark btn-sm flex-grow-1 text-xs py-1">{{ marginType }}</button>
+    <button class="btn btn-dark btn-sm flex-grow-1 text-xs py-1">{{ leverage }}x</button>
+    <button class="btn btn-dark btn-sm px-2 text-xs py-1">S</button>
+  </div>
+
+  <!-- Order Type Tabs -->
+  <div class="trade-type-tabs d-flex border-bottom border-white-05 mb-3">
+    <div class="tab-item py-1 px-2 text-xs pointer flex-grow-0" 
+         [class.active]="orderType === 'limit'" 
+         (click)="setOrderType('limit')">Limit</div>
+    <div class="tab-item py-1 px-2 text-xs pointer flex-grow-0" 
+         [class.active]="orderType === 'market'" 
+         (click)="setOrderType('market')">Mercado</div>
+    <div class="tab-item py-1 px-2 text-xs pointer flex-grow-0" 
+         [class.active]="orderType === 'stop-limit'" 
+         (click)="setOrderType('stop-limit')">Stop limit <ion-icon name="caret-down-outline" style="font-size: 8px;"></ion-icon></div>
+    <div class="ms-auto pt-1 pointer">
+      <ion-icon name="information-circle-outline" class="text-white-50"></ion-icon>
+    </div>
+  </div>
+
+  <!-- Dynamic Fields -->
+  <div class="mb-3">
+    <!-- Balance -->
+    <div class="d-flex justify-content-between text-xs mb-1">
+      <span class="text-white-50">Disp.</span>
+      <span class="text-white">{{ balance | number:'1.2-2' }} USDT <ion-icon name="swap-horizontal-outline" class="text-primary pointer"></ion-icon></span>
+    </div>
+
+    <!-- Stop Price (Only for Stop Limit) -->
+    <div *ngIf="orderType === 'stop-limit'" class="input-group-binance p-2 bg-dark-accent rounded border border-white-05 mb-2">
+      <label class="text-white-50 text-xs d-block mb-1">Precio Stop</label>
+      <div class="d-flex align-items-center">
+        <input type="number" [(ngModel)]="stopPrice" class="bg-transparent border-0 text-white w-100 outline-none fw-bold" placeholder="0.00">
+        <span class="text-white text-xs ms-2">Último <ion-icon name="caret-down-outline"></ion-icon></span>
+      </div>
+    </div>
+
+    <!-- Price (Hidden for Market) -->
+    <div *ngIf="orderType !== 'market'" class="input-group-binance p-2 bg-dark-accent rounded border border-white-05 mb-2">
+      <label class="text-white-50 text-xs d-block mb-1">Precio</label>
+      <div class="d-flex align-items-center">
+        <input type="number" [(ngModel)]="price" class="bg-transparent border-0 text-white w-100 outline-none fw-bold">
+        <span class="text-white text-xs ms-2">USDT</span>
+        <button class="btn btn-link btn-sm text-white-50 text-xs p-0 ms-2 text-decoration-none border border-white-05 px-1 bg-dark">BBO</button>
+      </div>
+    </div>
+
+    <!-- Amount / Quantity -->
+    <div class="input-group-binance p-2 bg-dark-accent rounded border border-white-05">
+      <label class="text-white-50 text-xs d-block mb-1">Monto</label>
+      <div class="d-flex align-items-center justify-content-between">
+        <input type="number" [(ngModel)]="amount" class="bg-transparent border-0 text-white w-50 outline-none" placeholder="0.00">
+        <span class="text-white-50 text-xs">USDT <ion-icon name="caret-down-outline"></ion-icon></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leverage Slider -->
+  <div class="leverage-slider-binance mb-3">
+    <div class="row g-0 align-items-center">
+      <div class="col" *ngFor="let i of [0,1,2,3,4]">
+        <div class="slider-dot" [class.active]="i === 0"></div>
+      </div>
+    </div>
+    <div class="slider-line mt-1" style="height: 2px; background: rgba(255,255,255,0.1);"></div>
+  </div>
+
+  <!-- Checkboxes -->
+  <div class="mb-3">
+    <div class="d-flex align-items-center gap-2 mb-2">
+      <input type="checkbox" class="form-check-input bg-dark border-white-10">
+      <span class="text-white-50" style="font-size: 11px;">TP/SL</span>
+    </div>
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <input type="checkbox" class="form-check-input bg-dark border-white-10">
+      <span class="text-white-50" style="font-size: 11px;">Reduce-Only</span>
+      <span class="ms-auto text-white-50 text-xs">TIF GTC <ion-icon name="caret-down-outline"></ion-icon></span>
+    </div>
+  </div>
+
+  <!-- Action Buttons -->
+  <button class="btn btn-success w-100 mb-2 py-2 fw-bold text-dark" (click)="onBuy()">Comprar/Long</button>
+  <button class="btn btn-danger w-100 py-2 fw-bold" (click)="onSell()">Vender/Short</button>
+
+  <!-- Footer Stats -->
+  <div class="mt-3 text-white-50" style="font-size: 10px;">
+    <div class="d-flex justify-content-between border-bottom border-white-05 pb-1 mb-1">
+      <span>Precio de liq.</span>
+      <span>-- USDT</span>
+    </div>
+    <div class="d-flex justify-content-between border-bottom border-white-05 pb-1 mb-1">
+      <span>Costo</span>
+      <span>0,00 USDT</span>
+    </div>
+    <div class="d-flex justify-content-between mb-2">
+      <span>Máx</span>
+      <span>0,00 USDT</span>
+    </div>
+    <div class="d-flex align-items-center gap-1 opacity-50">
+      <ion-icon name="pie-chart-outline"></ion-icon>
+      <span>Nivel de comisión</span>
+    </div>
+  </div>
+</div>

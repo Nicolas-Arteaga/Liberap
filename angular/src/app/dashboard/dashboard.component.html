@@ -1,6 +1,6 @@
-<div class="min-vh-100 pb-5 dashboard-vision">
+<div class="min-vh-100 pb-5 dashboard-vision bg-black">
 
-  <!-- Toast de Notificación de Stage -->
+  <!-- Toast de Notificación de Stage (Restored) -->
   <div *ngIf="stageNotification?.visible"
     class="stage-toast position-fixed top-0 end-0 m-3 p-3 rounded-3 shadow-lg d-flex align-items-center gap-3"
     [class.toast-warning]="stageNotification?.color === 'warning'"
@@ -15,7 +15,7 @@
     <ion-icon name="close-outline" class="pointer opacity-50" (click)="stageNotification = null"></ion-icon>
   </div>
 
-  <!-- Header Branding -->
+  <!-- Header Branding (REVERSED TO ORIGINAL) -->
   <header class="d-flex align-items-center justify-content-between px-4 py-3 border-bottom border-white-10">
     <div class="d-flex align-items-center gap-2">
       <ion-icon name="settings-outline" class="text-primary fs-4"></ion-icon>
@@ -24,351 +24,299 @@
   </header>
 
   <main class="container-fluid px-4 py-3">
-    <ng-container *ngIf="isHunting; else noHunt">
-      <!-- 🏆 Institutional Header (3 Lines) -->
-      <div class="institutional-header bg-dark-soft border border-white-10 rounded-3 p-3 mb-4 glow-border">
-        <!-- Line 1: Status & Time -->
-        <div class="header-line d-flex align-items-center justify-content-between mb-2">
-          <div class="d-flex align-items-center gap-3">
-            <div class="status-indicator d-flex align-items-center gap-2">
-              <div class="status-dot pulsing"></div>
-              <span class="text-success fw-bold text-sm tracking-wider">MOTOR ACTIVO</span>
-            </div>
-            <div class="v-divider"></div>
-            <div class="d-flex align-items-center gap-2">
-              <ion-icon name="time-outline" class="text-white-50"></ion-icon>
-              <span class="text-white fw-medium text-sm">{{ analysisTime }}</span>
-            </div>
+    <!-- 🏆 Institutional Header (Restored 3 Lines - No borders) -->
+    <div class="institutional-header bg-dark-soft p-3 mb-4">
+      <div class="header-line d-flex align-items-center justify-content-between mb-2">
+        <div class="d-flex align-items-center gap-3">
+          <div class="status-indicator d-flex align-items-center gap-2">
+            <div class="status-dot pulsing"></div>
+            <span class="text-success fw-bold text-sm tracking-wider">MOTOR ACTIVO</span>
+          </div>
+          <div class="v-divider"></div>
+          <div class="d-flex align-items-center gap-2">
+            <ion-icon name="time-outline" class="text-white-50"></ion-icon>
+            <span class="text-white fw-medium text-sm">{{ analysisTime }}</span>
+          </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <app-glass-button variant="warning" (click)="clearAlerts()" style="height: 30px; font-size: 0.75rem;">Borrar alertas</app-glass-button>
+          <app-glass-button variant="danger" (click)="finalizeHunt()" style="height: 30px; font-size: 0.75rem;">Finalizar</app-glass-button>
+        </div>
+      </div>
+
+      <div class="header-line d-flex align-items-center justify-content-between mb-2 py-2 border-top border-white-05">
+        <div class="d-flex align-items-center gap-4">
+          <div class="d-flex align-items-center gap-2">
+            <ion-icon name="shield-checkmark" class="text-success"></ion-icon>
+            <span class="text-white text-xs fw-bold">MACRO SHIELD:</span>
+            <span class="text-success text-xs fw-bold">QUIET PERIOD</span>
           </div>
           <div class="d-flex align-items-center gap-2">
-            <app-glass-button variant="warning" (click)="clearAlerts()" style="height: 30px; font-size: 0.75rem;">
-              <ion-icon name="trash-outline"></ion-icon> Borrar alertas
-            </app-glass-button>
-            <app-glass-button variant="danger" (click)="finalizeHunt()" style="height: 30px; font-size: 0.75rem;">
-              <ion-icon name="stop-circle-outline"></ion-icon> Finalizar
-            </app-glass-button>
-          </div>
-        </div>
-
-        <!-- Line 2: Macro & Sentiment -->
-        <div class="header-line d-flex align-items-center justify-content-between mb-2 py-2 border-top border-white-05">
-          <div class="d-flex align-items-center gap-4">
-            <div class="d-flex align-items-center gap-2">
-              <ion-icon name="shield-checkmark" [class.text-success]="!currentSession?.macroQuietPeriod"
-                [class.text-danger]="currentSession?.macroQuietPeriod"></ion-icon>
-              <span class="text-white text-xs fw-bold">MACRO SHIELD:</span>
-              <span [class.text-success]="!currentSession?.macroQuietPeriod"
-                [class.text-danger]="currentSession?.macroQuietPeriod" class="text-xs fw-bold">
-                {{ currentSession?.macroQuietPeriod ? 'ACTIVE' : 'QUIET PERIOD' }}
-              </span>
-            </div>
-            <div class="d-flex align-items-center gap-2">
-              <ion-icon name="globe-outline" class="text-info"></ion-icon>
-              <span class="text-white text-xs fw-bold">SENTIMIENTO: BULLISH</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Line 3: Whales & Squeezes -->
-        <div class="header-line d-flex align-items-center justify-content-between border-top border-white-05 pt-2">
-          <div class="d-flex align-items-center gap-3">
-            <div class="d-flex align-items-center gap-2">
-              <ion-icon name="water" class="text-info"></ion-icon>
-              <span class="text-white text-xs fw-bold">BALLENAS:</span>
-              <div class="d-flex gap-1" *ngIf="headerWhales.length > 0">
-                <span *ngFor="let w of headerWhales" class="badge bg-info text-dark" style="font-size: 9px;">
-                  {{ w.symbol }} ({{ w.influence }}%)
-                </span>
-              </div>
-              <span *ngIf="headerWhales.length === 0" class="text-white-50 text-xs">Monitoreando...</span>
-            </div>
-            <div class="v-divider"></div>
-            <div class="d-flex align-items-center gap-2">
-              <ion-icon name="flame" class="text-danger"></ion-icon>
-              <span class="text-white text-xs fw-bold">SQUEEZES:</span>
-              <div class="d-flex gap-1">
-                <span *ngFor="let s of headerSqueezes" class="badge bg-danger text-white" style="font-size: 9px;">
-                  {{ s.symbol }}
-                </span>
-                <span *ngIf="headerSqueezes.length === 0" class="text-white-50 text-xs">Normal</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Mini Heatmap -->
-          <div class="mini-heatmap d-flex align-items-center gap-2">
-            <span class="text-white-50 text-xs fw-bold">HEATMAP:</span>
-            <div *ngFor="let c of headerHeatmapCoins" class="heatmap-bar-mini d-flex align-items-center gap-1">
-              <span class="text-white text-xs">{{ c.symbol }}</span>
-              <div class="bar-bg"
-                style="width: 30px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 10px;">
-                <div class="bar-fill" [style.width.%]="c.score" style="height: 100%; background: #10b981;"></div>
-              </div>
-            </div>
+            <ion-icon name="globe-outline" class="text-info"></ion-icon>
+            <span class="text-white text-xs fw-bold">SENTIMIENTO: BULLISH</span>
           </div>
         </div>
       </div>
 
-      <!-- 📈 Super Chart Console (Restored Visibility) -->
-      <div class="chart-container-vision mb-4 bg-dark-deep border border-white-10 rounded-3"
-        style="overflow: visible !important;">
-        <div
-          class="chart-toolbar d-flex align-items-center justify-content-between p-2 border-bottom border-white-05 bg-dark-soft">
-          <div class="d-flex align-items-center gap-3">
-            <!-- Symbol Selector -->
-            <div class="symbol-select d-flex align-items-center gap-2">
-              <ion-icon name="search-outline" class="text-info-light"></ion-icon>
-              <select [(ngModel)]="selectedSymbol" (change)="onSymbolChange()"
-                class="bg-transparent border-0 text-white text-sm fw-bold outline-none cursor-pointer">
-                <option *ngFor="let s of symbols" [value]="s.value" class="bg-dark-deep">{{ s.label }}</option>
-              </select>
+      <div class="header-line d-flex align-items-center justify-content-between border-top border-white-05 pt-2">
+        <div class="d-flex align-items-center gap-3">
+          <div class="d-flex align-items-center gap-2">
+            <ion-icon name="water" class="text-info"></ion-icon>
+            <span class="text-white text-xs fw-bold">BALLENAS:</span>
+            <div class="d-flex gap-1" *ngIf="headerWhales.length > 0">
+              <span *ngFor="let w of headerWhales" class="badge bg-info text-dark" style="font-size: 9px;">{{ w.symbol }} ({{ w.influence }}%)</span>
             </div>
-
-            <div class="v-divider" style="width: 1px; height: 20px; background: rgba(255,255,255,0.1);"></div>
-
-            <!-- Timeframe selector -->
-            <div class="timeframe-selector d-flex gap-1 overflow-auto" style="max-width: 400px; scrollbar-width: none;">
-              <button *ngFor="let tf of timeframes" (click)="onTimeframeChange(tf.value)"
-                [class.active]="selectedTimeframe === tf.value"
-                class="tf-btn px-2 py-1 rounded text-xs border-0 transition-all">
-                {{ tf.label }}
-              </button>
+            <span *ngIf="headerWhales.length === 0" class="text-white-50 text-xs">Monitoreando...</span>
+          </div>
+          <div class="v-divider"></div>
+          <div class="d-flex align-items-center gap-2">
+            <ion-icon name="flame" class="text-danger"></ion-icon>
+            <span class="text-white text-xs fw-bold">SQUEEZES:</span>
+            <span class="text-white-50 text-xs">Normal</span>
+          </div>
+        </div>
+        <div class="mini-heatmap d-flex align-items-center gap-2">
+          <span class="text-white-50 text-xs fw-bold">HEATMAP:</span>
+          <div *ngFor="let c of headerHeatmapCoins" class="heatmap-bar-mini d-flex align-items-center gap-1">
+            <span class="text-white text-xs">{{ c.symbol }}</span>
+            <div class="bar-bg" style="width: 30px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 10px;">
+              <div class="bar-fill" [style.width.%]="c.score" style="height: 100%; background: #10b981;"></div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
 
-          <div class="d-flex align-items-center gap-3">
-            <!-- HMA Settings -->
-            <div
-              class="hma-settings d-flex align-items-center gap-2 px-2 py-1 rounded bg-dark-accent border border-white-05">
-              <span class="text-white-50" style="font-size: 9px;">INDICADOR: HMA</span>
-              <input type="number" [(ngModel)]="hmaPeriod" (change)="onHmaChange()"
-                class="bg-transparent border-0 text-info font-monospace text-xs w-16 outline-none text-center"
-                style="width: 40px;" min="1" max="500">
+    <!-- Main Content Row -->
+    <div class="row g-4">
+      <!-- Left Column: Chart, Positions, Console -->
+      <div class="col-xl-8">
+        <!-- 📈 Super Chart Console (No borders) -->
+        <div class="chart-container-vision mb-2 bg-dark-deep position-relative">
+          <div class="chart-toolbar d-flex align-items-center justify-content-between p-2 border-bottom border-white-05 bg-dark-soft">
+            <div class="d-flex align-items-center gap-3">
+              <div class="symbol-select d-flex align-items-center gap-2">
+                <ion-icon name="search-outline" class="text-info-light"></ion-icon>
+                <select [(ngModel)]="selectedSymbol" (change)="onSymbolChange()"
+                  class="bg-transparent border-0 text-white text-sm fw-bold outline-none cursor-pointer">
+                  <option *ngFor="let s of symbols" [value]="s.value" class="bg-dark-deep">{{ s.label }}</option>
+                </select>
+              </div>
+              <div class="v-divider"></div>
+              <div class="timeframe-selector d-flex gap-1 overflow-auto">
+                <button *ngFor="let tf of timeframes" (click)="onTimeframeChange(tf.value)"
+                  [class.active]="selectedTimeframe === tf.value" class="tf-btn px-2 py-1 rounded text-xs border-0">
+                  {{ tf.label }}
+                </button>
+              </div>
             </div>
-
-            <!-- Chart Status -->
-            <div class="chart-status d-flex align-items-center gap-2 border-start border-white-05 ps-3">
+            <div class="d-flex align-items-center gap-3">
+              <div class="hma-settings d-flex align-items-center gap-2 px-2 py-1 rounded bg-dark-accent border border-white-05">
+                <span class="text-white-50 text-xs">HMA</span>
+                <input type="number" [(ngModel)]="hmaPeriod" (change)="onHmaChange()"
+                  class="bg-transparent border-0 text-info text-xs w-16 outline-none text-center" style="width: 40px;">
+              </div>
               <div class="status-dot pulsing"></div>
-              <span class="text-success text-xs fw-bold tracking-widest" style="font-size: 9px;">REAL-TIME</span>
             </div>
+          </div>
+          <div class="position-relative">
+            <app-alerts [alerts]="alertService.alerts()" [mode]="'overlay'"></app-alerts>
+            <div id="tradingview-chart" #chartContainer class="w-100" style="height: 480px;"></div>
           </div>
         </div>
 
-        <!-- Chart Area: Alerts RE-INTEGRATED HERTE -->
-        <div class="position-relative" style="overflow: visible !important;">
-          <!-- 🎯 LAS NOTIFICACIONES VUELVEN AQUÍ (DENTRO DEL GRÁFICO SIN CORTE) -->
-          <app-alerts [alerts]="alertService.alerts()" [mode]="'overlay'" (alertClick)="alertService.markAsRead($event)"
-            (markAsRead)="alertService.markAsRead($event)">
-          </app-alerts>
-
-          <div id="tradingview-chart" #chartContainer class="w-100" style="height: 520px; border-radius: 0 0 8px 8px;">
-          </div>
-        </div>
-      </div>
-
-      <!-- Ranking Panel (Phase 3) -->
-      <div *ngIf="topOpportunities.length > 0" class="ranking-panel mb-4">
-        <div class="d-flex align-items-center gap-2 mb-3">
-          <ion-icon name="trophy-outline" class="text-warning"></ion-icon>
-          <span class="text-white fw-bold text-sm">🏆 TOP OPORTUNIDADES</span>
-        </div>
-        <div class="row g-2">
-          <div *ngFor="let opp of topOpportunities; let i = index" class="col-6 col-md-4">
-            <div class="opp-card p-3 rounded-3 border border-white-10 bg-dark-deep h-100">
-              <div class="d-flex justify-content-between mb-1">
-                <span class="badge" [class.bg-success]="opp.direction === 'LONG'"
-                  [class.bg-danger]="opp.direction === 'SHORT'">{{ opp.direction }}</span>
-                <span class="text-white-50 text-xs">#{{ i + 1 }}</span>
-              </div>
-              <h4 class="text-white fw-bold mb-0">{{ opp.symbol }}</h4>
-              <div class="text-success fw-bold text-sm">{{ opp.score }} pts</div>
+        <!-- 💰 Positions & Orders Table (New) -->
+        <div class="positions-console bg-dark-deep mb-4 overflow-hidden">
+          <div class="console-tabs d-flex border-bottom border-white-05 bg-dark-soft">
+            <div class="tab-item py-2 px-3 pointer text-xs uppercase active text-primary border-bottom border-primary">Posiciones(0)</div>
+            <div class="tab-item py-2 px-3 pointer text-xs uppercase text-white-50">Órdenes abiertas(0)</div>
+            <div class="tab-item py-2 px-3 pointer text-xs uppercase text-white-50 d-none d-md-block">Historial de órdenes</div>
+            <div class="tab-item py-2 px-3 pointer text-xs uppercase text-white-50 d-none d-lg-block">Historial de trades</div>
+            <div class="ms-auto d-flex align-items-center px-3 gap-2">
+              <input type="checkbox" class="form-check-input bg-dark border-white-10" style="width: 12px; height: 12px;">
+              <span class="text-white-50" style="font-size: 10px;">Ocultar otros símbolos</span>
             </div>
           </div>
-        </div>
-      </div>
-
-      <!-- 📊 Tabbed Institutional Console -->
-      <div class="institutional-console mt-4 bg-dark-deep border border-white-10 rounded-3 overflow-hidden">
-        <div class="console-tabs d-flex border-bottom border-white-10 bg-dark-soft">
-          <div class="tab-item py-2 px-4 pointer" [class.active]="activeTab === 'events'" (click)="setTab('events')">
-            EVENTOS</div>
-          <div class="tab-item py-2 px-4 pointer" [class.active]="activeTab === 'whales'" (click)="setTab('whales')">
-            BALLENAS</div>
-          <div class="tab-item py-2 px-4 pointer" [class.active]="activeTab === 'liquidations'"
-            (click)="setTab('liquidations')">
-            LIQUIDACIONES</div>
-          <div class="tab-item py-2 px-4 pointer" [class.active]="activeTab === 'scanner'" (click)="setTab('scanner')">
-            SCANNER</div>
-          <div class="tab-item py-2 px-4 pointer" [class.active]="activeTab === 'performance'"
-            (click)="setTab('performance')">
-            PERFORMANCE</div>
-        </div>
-
-        <div class="console-content p-3 overflow-auto"
-          style="max-height: 400px; font-family: 'JetBrains Mono', monospace;">
-
-          <!-- Tab 1: EVENTOS -->
-          <div *ngIf="activeTab === 'events'">
-            <div *ngFor="let log of analysisLogs" class="mb-2 pb-2 border-bottom border-white-05">
-              <div class="d-flex gap-2">
-                <span class="text-white-50 text-xs">{{ log.timestamp | date:'HH:mm:ss' }}</span>
-                <span [style.color]="getLogColor(log)" class="text-sm fw-medium">{{ log.message }}</span>
-              </div>
-            </div>
-            <div *ngIf="analysisLogs.length === 0" class="text-white-50 text-center py-5">
-              <p>Esperando eventos del motor...</p>
-            </div>
-          </div>
-
-          <!-- Tab 2: BALLENAS -->
-          <div *ngIf="activeTab === 'whales'">
-            <div *ngFor="let whale of whaleLogs" class="mb-3 pb-2 border-bottom border-white-05">
-              <div class="d-flex justify-content-between align-items-center mb-1">
-                <span class="text-white fw-bold">🐋 {{ whale.symbol }}</span>
-                <span class="text-info-light fw-bold">{{ whale.influence }}% INFLUENCIA</span>
-              </div>
-              <div class="text-white-50 text-xs mb-1">{{ whale.timestamp | date:'HH:mm:ss' }}</div>
-              <div class="text-white text-sm italic">"{{ whale.message }}"</div>
-            </div>
-            <div *ngIf="whaleLogs.length === 0" class="text-white-50 text-center py-5">
-              <ion-icon name="water-outline" class="fs-1 mb-2 opacity-20"></ion-icon>
-              <p>Esperando actividad de ballenas en el flujo real...</p>
-            </div>
-          </div>
-
-          <!-- Tab 3: LIQUIDACIONES -->
-          <div *ngIf="activeTab === 'liquidations'">
-            <div *ngFor="let liq of liquidationLogs" class="mb-2 pb-2 border-bottom border-white-05">
-              <div class="d-flex align-items-center gap-2">
-                <ion-icon name="flame" class="text-danger"></ion-icon>
-                <span class="text-white-50 text-xs">{{ liq.timestamp | date:'HH:mm:ss' }}</span>
-                <span class="text-danger fw-bold">{{ liq.symbol }}:</span>
-                <span class="text-white text-sm">{{ liq.message }}</span>
-              </div>
-            </div>
-            <div *ngIf="liquidationLogs.length === 0" class="text-white-50 text-center py-5">
-              <ion-icon name="flame-outline" class="fs-1 mb-2 opacity-20"></ion-icon>
-              <p>Zonas de liquidación estables por ahora.</p>
-            </div>
-          </div>
-
-          <!-- Tab 4: SCANNER (RESTORED FULL DATA) -->
-          <div *ngIf="activeTab === 'scanner'">
-            <table class="table table-dark table-hover table-sm text-xs">
+          <div class="table-responsive p-0" style="min-height: 200px;">
+            <table class="table table-dark table-sm mb-0 position-table" style="font-size: 10px;">
               <thead>
-                <tr>
-                  <th>MONEDA</th>
-                  <th class="text-center">SCORE</th>
-                  <th>ESTADO</th>
-                  <th>DIRECCIÓN</th>
-                  <th class="text-center">WINPROB</th>
-                  <th>HISTÓRICO</th>
-                  <th>BALLENA</th>
-                  <th>RÉGIMEN</th>
+                <tr class="text-white-50">
+                  <th>Símbolo</th>
+                  <th>Tamaño</th>
+                  <th>Precio de entrada</th>
+                  <th>Precio de equilibrio</th>
+                  <th>Precio de marca</th>
+                  <th>Precio de Liq.</th>
+                  <th>Tasa de margen</th>
+                  <th>Margen</th>
+                  <th>PnL (%ROI)</th>
+                  <th class="d-none d-xl-table-cell">Comisión de financiación est.</th>
+                  <th>ADL / Inversa</th>
+                  <th>TP/SL para la posición</th>
+                  <th>Cerrar todo</th>
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let coin of getScannerList()" class="scanner-row">
-                  <td class="fw-black text-info-light">{{ coin.symbol }}</td>
-                  <td class="text-center fw-black fs-6" [class.text-success]="coin.score >= 70"
-                    [class.text-warning]="coin.score >= 50 && coin.score < 70" [class.text-danger]="coin.score < 50">
-                    {{ coin.score }}</td>
-                  <td class="fw-bold">{{ coin.isSqueeze ? '🔥 SQUEEZE' : (coin.score >= 70 ? '🎯 SIGNAL' : 'CONTEXT') }}
-                  </td>
-                  <td class="fw-black" [class.text-success]="coin.direction === 0"
-                    [class.text-danger]="coin.direction === 1">
-                    {{ coin.direction === 0 ? 'LONG' : (coin.direction === 1 ? 'SHORT' : 'WAIT') }}
-                  </td>
-                  <td class="text-center text-success fw-black fs-6">{{ coin.winProb | percent:'1.0-0' }}</td>
-                  <td class="text-center">
-                    <span class="text-success fw-bold">{{ coin.historicProb | number:'1.0-0' }}%</span>
-                    <span class="text-white-50 ms-1 fw-bold">(RR {{ coin.rrRatio | number:'1.1-1' }})</span>
-                  </td>
-                  <td>
-                    <div class="d-flex align-items-center gap-1">
-                      <div class="bg-dark-deep border border-white-10 rounded-pill overflow-hidden"
-                        style="width: 50px; height: 6px;">
-                        <div class="bg-info" [style.width.%]="coin.whaleInfluence" style="height: 100%;"></div>
+                <tr>
+                  <td colspan="13" class="text-center py-5 border-0">
+                    <div class="empty-positions text-center opacity-40">
+                      <ion-icon name="document-text-outline" style="font-size: 40px;" class="mb-2"></ion-icon>
+                      <p class="mb-0">No tienes posiciones.</p>
+                      <div class="d-flex justify-content-center gap-2 mt-2">
+                        <span class="text-xs">Mercado</span>
+                        <span class="text-xs text-info">Límite</span>
                       </div>
-                      <span class="text-info-light fw-bold" style="font-size: 9px;">{{ coin.whaleInfluence }}%</span>
                     </div>
                   </td>
-                  <td class="text-white-50 fw-medium">{{ coin.regime }}</td>
                 </tr>
               </tbody>
             </table>
           </div>
+        </div>
 
-          <!-- Tab 5: PERFORMANCE (LIVE PERFORMANCE) -->
-          <div *ngIf="activeTab === 'performance'" class="performance-view">
-            <div class="row g-3 mb-4">
-              <div class="col-md-3">
-                <div class="stat-card p-3 rounded-2 border border-white-10">
-                  <div class="text-white-50 text-xs fw-bold mb-1">EXPECTANCY</div>
-                  <div class="text-white fs-4 fw-black">{{ performanceStats?.expectancy || '0.00' }}</div>
-                  <div class="text-white-50 text-xs">Valor esperado por trade</div>
-                </div>
+        <!-- Institutional Console (Events, Whales, etc.) -->
+        <div class="institutional-console bg-dark-deep border-top border-white-05 overflow-hidden">
+          <div class="console-tabs d-flex border-bottom border-white-05 bg-dark-soft">
+            <div *ngFor="let tab of ['events', 'whales', 'liquidations', 'scanner', 'performance']" 
+              class="tab-item py-2 px-4 pointer text-xs uppercase" [class.active]="activeTab === tab" (click)="setTab(tab)">
+              {{ tab }}
+            </div>
+          </div>
+          <div class="console-content p-3 overflow-auto" style="height: 250px;">
+            <div *ngIf="activeTab === 'events'">
+              <div *ngFor="let log of analysisLogs" class="text-xs mb-1">
+                <span class="text-white-50 pe-2">{{ log.timestamp | date:'HH:mm:ss' }}</span>
+                <span [style.color]="getLogColor(log)">{{ log.message }}</span>
               </div>
-              <div class="col-md-3">
-                <div class="stat-card p-3 rounded-2 border border-white-10">
-                  <div class="text-white-50 text-xs fw-bold mb-1">WIN RATE</div>
-                  <div class="text-white fs-4 fw-black">{{ (performanceStats?.winRate || 0) | percent:'1.1-1' }}</div>
-                  <div class="text-white-50 text-xs">{{ performanceStats?.totalTrades || 0 }} señales detectadas</div>
-                </div>
-              </div>
-              <div class="col-md-3">
-                <div class="stat-card p-3 rounded-2 border border-white-10">
-                  <div class="text-white-50 text-xs fw-bold mb-1">PROFIT FACTOR</div>
-                  <div class="text-white fs-4 fw-black text-success">{{ performanceStats?.profitFactor || '0.00' }}
+            </div>
+            <div *ngIf="activeTab === 'scanner'">
+               <table class="table table-dark table-sm text-xs">
+                  <thead><tr><th>MONEDA</th><th>SCORE</th><th>ESTADO</th><th>DYNAMIC</th></tr></thead>
+                  <tbody>
+                    <tr *ngFor="let coin of getScannerList()">
+                      <td class="text-info">{{ coin.symbol }}</td>
+                      <td [class.text-success]="coin.score > 70">{{ coin.score }}</td>
+                      <td>{{ coin.isSqueeze ? '🔥 SQUEEZE' : 'CONTEXT' }}</td>
+                      <td>{{ coin.winProb | percent }}</td>
+                    </tr>
+                  </tbody>
+               </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Sidebar (2 sub-columns - No borders) -->
+      <div class="col-xl-4">
+        <div class="row g-2 sticky-top" style="top: 20px;">
+          <!-- Sub-col 1: Order Book, Trades & Ranking -->
+          <div class="col-6">
+            <!-- Order Book Section -->
+            <div class="side-panel bg-dark-deep mb-2">
+              <div class="panel-header p-2 border-bottom border-white-05 text-white fw-bold text-xs uppercase d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-3">
+                  <span>Libro de Órdenes</span>
+                  <div class="view-filters">
+                    <div class="filter-btn filter-mixed" [class.active]="orderBookViewMode === 'mixed'" (click)="orderBookViewMode = 'mixed'">
+                      <div class="bar"></div>
+                      <div class="bar"></div>
+                    </div>
+                    <div class="filter-btn filter-bids" [class.active]="orderBookViewMode === 'bids'" (click)="orderBookViewMode = 'bids'">
+                      <div class="bar"></div>
+                      <div class="bar"></div>
+                    </div>
+                    <div class="filter-btn filter-asks" [class.active]="orderBookViewMode === 'asks'" (click)="orderBookViewMode = 'asks'">
+                      <div class="bar"></div>
+                      <div class="bar"></div>
+                    </div>
                   </div>
-                  <div class="text-white-50 text-xs">Ganancia/Pérdida</div>
                 </div>
+                <span class="text-white-50">0.1</span>
               </div>
-              <div class="col-md-3">
-                <div class="stat-card p-3 rounded-2 border border-white-10">
-                  <div class="text-white-50 text-xs fw-bold mb-1">AVG DURATION</div>
-                  <div class="text-white fs-4 fw-black">{{ performanceStats?.averageDurationMinutes || 0 }}m</div>
-                  <div class="text-white-50 text-xs">Tiempo en mercado</div>
-                </div>
+              <div class="panel-content p-1" style="height: 320px; overflow: hidden;">
+                <table class="data-table-compact w-100">
+                  <thead>
+                    <tr class="text-white-50 uppercase" style="font-size: 9px;">
+                      <th>Precio (USDT)</th>
+                      <th class="text-center">Cantidad</th>
+                      <th class="text-end">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- Asks (Venta) - Balanceado 6 y 6 -->
+                    <ng-container *ngIf="orderBookViewMode === 'mixed' || orderBookViewMode === 'asks'">
+                      <tr *ngFor="let ask of (orderBookViewMode === 'asks' ? orderBook.asks.slice(0, 18) : orderBook.asks.slice(0, 6).reverse())" class="text-danger text-xs">
+                        <td>{{ ask.price | number:'1.2-2' }}</td>
+                        <td class="text-center text-white">{{ ask.amount | number:'1.3-3' }}</td>
+                        <td class="text-end text-white-50">{{ ask.total | number:'1.2-2' }}</td>
+                      </tr>
+                    </ng-container>
+
+                    <!-- Current Price Row -->
+                    <tr class="text-success fw-bold text-sm">
+                      <td colspan="3" class="text-center py-2 border-top border-bottom border-white-05">
+                        <span class="fs-6">{{ chartPrices.current | number:'1.2-2' }}</span>
+                        <ion-icon [name]="'arrow-up-outline'" class="ms-1"></ion-icon>
+                        <span class="text-white-50 ms-2 fw-normal" style="font-size: 10px;">$71,039.3</span>
+                      </td>
+                    </tr>
+
+                    <!-- Bids (Compra) - Balanceado 6 y 6 -->
+                    <ng-container *ngIf="orderBookViewMode === 'mixed' || orderBookViewMode === 'bids'">
+                      <tr *ngFor="let bid of (orderBookViewMode === 'bids' ? orderBook.bids.slice(0, 18) : orderBook.bids.slice(0, 6))" class="text-success text-xs">
+                        <td>{{ bid.price | number:'1.2-2' }}</td>
+                        <td class="text-center text-white">{{ bid.amount | number:'1.3-3' }}</td>
+                        <td class="text-end text-white-50">{{ bid.total | number:'1.2-2' }}</td>
+                      </tr>
+                    </ng-container>
+                  </tbody>
+                </table>
               </div>
             </div>
 
-            <!-- Equity Curve Placeholder (Sprint 5) -->
-            <div class="equity-chart-container p-4 rounded-3 border border-white-10 bg-dark-deep text-center">
-              <div class="text-white-50 text-sm fw-bold mb-4 uppercase tracking-widest">Curva de Equity (Histórico Live)
+            <!-- Trades Section -->
+            <div class="side-panel bg-dark-deep mb-2">
+              <div class="panel-header p-2 border-bottom border-white-05 text-white fw-bold text-xs uppercase">Trades</div>
+              <div class="panel-content p-1" style="height: 200px; overflow-y: auto;">
+                <table class="data-table-compact w-100">
+                   <thead><tr class="text-white-50" style="font-size: 9px;"><th class="text-start">Precio</th><th class="text-end">Monto</th><th class="text-end">Tiempo</th></tr></thead>
+                   <tbody>
+                      <tr *ngFor="let trade of recentTrades" class="text-xs">
+                        <td [class.text-danger]="trade.isBuyerMaker" [class.text-success]="!trade.isBuyerMaker" class="text-start">
+                          {{ trade.price | number:'1.2-2' }}
+                        </td>
+                        <td class="text-end text-white-50">{{ trade.amount | number:'1.3-3' }}</td>
+                        <td class="text-end text-white-50" style="font-size: 8px;">{{ trade.time | date:'HH:mm:ss' }}</td>
+                      </tr>
+                   </tbody>
+                </table>
               </div>
-              <div class="d-flex align-items-end justify-content-center gap-2" style="height: 150px;">
-                <div *ngFor="let p of [20,45,30,60,80,95,70,85,100]" class="bg-primary opacity-50" [style.height.%]="p"
-                  style="width: 20px;"></div>
+            </div>
+
+            <!-- Ranking Panel (Relocated here) -->
+            <div class="side-ranking-panel bg-dark-deep p-2">
+              <div class="mb-2 border-bottom border-white-05 pb-1">
+                <span class="text-white-50 fw-bold" style="font-size: 9px;">🏆 TOP OPORTUNIDADES</span>
               </div>
-              <div class="mt-4 text-white fs-2 fw-black text-success">+{{ performanceStats?.totalPnL || '0.00' }} US$
-                TOTAL PnL</div>
+              <div class="d-flex flex-column gap-1">
+                <div *ngFor="let opp of topOpportunities" class="mini-opp-card p-2 rounded bg-dark-accent d-flex justify-content-between align-items-center">
+                  <span class="text-white fw-bold" style="font-size: 10px;">{{ opp.symbol }}</span>
+                  <span class="text-success fw-bold text-xs">{{ opp.score }} pts</span>
+                </div>
+              </div>
             </div>
           </div>
 
-        </div>
-      </div>
-    </ng-container>
-
-    <ng-template #noHunt>
-      <div class="empty-state-vision text-center py-5">
-        <h2 class="text-white fw-bold mb-3">Sin estrategia activa</h2>
-        <app-glass-button variant="warning" class="px-5 py-3" (click)="onQuickTrade()">
-          🚀 COMENZAR CACERÍA
-        </app-glass-button>
-      </div>
-    </ng-template>
-
-    <div class="d-flex gap-3 mt-4">
-      <app-glass-button variant="primary" class="flex-grow-1 py-3" (click)="onQuickTrade()" *ngIf="!isHunting">
-        ⚡ CONFIGURAR TRADE
-      </app-glass-button>
-      <app-glass-button variant="outline" class="flex-grow-1 py-3" (click)="onOpenAdvanced()">
-        📊 AVANZADO
-      </app-glass-button>
-    </div>
+          <!-- Sub-col 2: Trading Panel -->
+          <div class="col-6">
+            <app-trading-panel [balance]="0"></app-trading-panel>
+          </div>
+        </div> <!-- End of sidebar row -->
+      </div> <!-- End of col-xl-4 -->
+    </div> <!-- End of main row -->
   </main>
 
+  <!-- Dialog for ending hunt -->
   <app-dialog *ngIf="showConfirmationDialog" title="Finalizar cacería" (dismiss)="showConfirmationDialog = false">
     <p class="text-white">¿Estás seguro de finalizar?</p>
     <div actions>
@@ -377,3 +325,7 @@
   </app-dialog>
 
 </div>
+
+
+
+

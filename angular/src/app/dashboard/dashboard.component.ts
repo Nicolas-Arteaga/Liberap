@@ -9,7 +9,8 @@ import { IconService } from 'src/shared/services/icon.service';
 import { createChart, IChartApi, ISeriesApi, CandlestickData, CandlestickSeries, LineSeries } from 'lightweight-charts';
 import { MarketDataService } from '../proxy/trading/market-data.service';
 import { TradingService } from '../proxy/trading/trading.service';
-import { TradingSessionDto, AnalysisLogDto, MarketAnalysisDto, OpportunityDto, SignalStatsDto } from '../proxy/trading/models';
+import { TradingSessionDto, AnalysisLogDto, MarketAnalysisDto, OpportunityDto } from '../proxy/trading/models';
+import { SignalStatsDto } from '../proxy/trading/dtos/models';
 import { AnalysisLogType } from '../proxy/trading/analysis-log-type.enum';
 import { DialogComponent } from 'src/shared/components/dialog/dialog.component';
 import { CardContentComponent } from "src/shared/components/card-content/card-content.component";
@@ -17,6 +18,7 @@ import { TradingSignalrService } from '../services/trading-signalr.service';
 import { AUTH_TOKEN_KEY } from '../core/auth.service';
 import { AlertsComponent } from '../shared/components/alerts/alerts.component';
 import { AlertService } from '../services/alert.service';
+import { TradingPanelComponent } from 'src/shared/components/trading-panel/trading-panel.component';
 
 interface TradingSignal {
   id: number;
@@ -48,7 +50,8 @@ interface StageInfo {
     GlassButtonComponent,
     IonIcon,
     DialogComponent,
-    AlertsComponent
+    AlertsComponent,
+    TradingPanelComponent
   ],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss']
@@ -101,6 +104,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   headerSqueezes: any[] = [];
   headerHeatmapCoins: any[] = [];
   performanceStats: SignalStatsDto | null = null;
+  orderBook: any = { bids: [], asks: [] };
+  recentTrades: any[] = [];
+  orderBookViewMode: 'mixed' | 'bids' | 'asks' = 'mixed';
 
   // Toast de notificación de stage
   stageNotification: { message: string; icon: string; color: string; visible: boolean } | null = null;
@@ -200,7 +206,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   ];
 
   // Precios simulados para cálculo de posición
-  private chartPrices = {
+  chartPrices = {
     min: 67000,
     max: 70000,
     current: 68500
@@ -414,7 +420,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  setTab(tab: 'events' | 'whales' | 'liquidations' | 'scanner') {
+  setTab(tab: 'events' | 'whales' | 'liquidations' | 'scanner' | 'performance') {
     this.activeTab = tab;
   }
 
@@ -566,6 +572,44 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
+  loadOrderBook() {
+    this.marketDataService.getOrderBook({
+      symbol: this.selectedSymbol,
+      limit: 30
+    }).subscribe({
+      next: (data) => {
+        // Calculate totals for Bids (high to low)
+        let bidTotal = 0;
+        const bids = (data.bids || []).map(b => {
+          bidTotal += b.amount;
+          return { ...b, total: bidTotal };
+        });
+
+        // Calculate totals for Asks (low to high)
+        let askTotal = 0;
+        const asks = (data.asks || []).map(a => {
+          askTotal += a.amount;
+          return { ...a, total: askTotal };
+        });
+
+        this.orderBook = { bids, asks };
+      },
+      error: (err) => console.error('Error fetching order book', err)
+    });
+  }
+
+  loadRecentTrades() {
+    this.marketDataService.getRecentTrades({
+      symbol: this.selectedSymbol,
+      limit: 20
+    }).subscribe({
+      next: (data) => {
+        this.recentTrades = data;
+      },
+      error: (err) => console.error('Error fetching recent trades', err)
+    });
+  }
+
   startRefreshTimer() {
     // Carga inicial rápida
     this.loadAnalysisLogs();
@@ -579,6 +623,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         this.loadData();
         this.loadAnalysisLogs();
         this.loadLivePerformance();
+        this.loadOrderBook();
+        this.loadRecentTrades();
       }
     }, 10000);
   }
@@ -875,6 +921,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   changeSymbol(symbol: string) {
     this.selectedSymbol = symbol;
     this.loadData();
+    this.loadOrderBook();
+    this.loadRecentTrades();
   }
 
   changeTimeframe(timeframe: string) {

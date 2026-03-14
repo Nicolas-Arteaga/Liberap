@@ -1,5 +1,6 @@
+import type { SignalStatsDto, TradingSignalDto, VergeAlertDto } from './dtos/models';
 import type { MarketRegimeType } from './market-regime-type.enum';
-import type { AnalysisLogDto, BacktestResultDto, ComparativeEvaluationReportDto, ConnectExchangeDto, CreateUpdateTradingAlertDto, CreateUpdateTradingStrategyDto, ExchangeConnectionDto, ExecuteTradeDto, GetHistoryInput, GetSignalsInput, MarketAnalysisDto, OpportunityDto, RecommendedStyleDto, RunBacktestDto, SignalStatsDto, StartSessionDto, TradeOrderDto, TraderProfileDto, TradingAlertDto, TradingSessionDto, TradingSignalDto, TradingStrategyDto, UpdateTraderProfileDto, VergeAlertDto } from './models';
+import type { AnalysisLogDto, BacktestResultDto, ComparativeEvaluationReportDto, ConnectExchangeDto, CreateUpdateTradingAlertDto, CreateUpdateTradingStrategyDto, ExchangeConnectionDto, ExecuteTradeDto, GetHistoryInput, GetSignalsInput, MarketAnalysisDto, OpportunityDto, RecommendedStyleDto, RunBacktestDto, StartSessionDto, TradeOrderDto, TraderProfileDto, TradingAlertDto, TradingSessionDto, TradingStrategyDto, UpdateTraderProfileDto } from './models';
 import { RestService, Rest } from '@abp/ng.core';
 import type { PagedResultDto } from '@abp/ng.core';
 import { Injectable, inject } from '@angular/core';

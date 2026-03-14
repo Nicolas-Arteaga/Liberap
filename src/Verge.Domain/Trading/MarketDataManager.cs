@@ -155,6 +155,90 @@ public class MarketDataManager : DomainService
             return new List<MarketCandleModel>(); // Devuelvo vacío
         }
     }
+
+    public async Task<MarketOrderBookModel> GetOrderBookAsync(string symbol, int limit = 20)
+    {
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            symbol = symbol.ToUpper().Replace("/", "").Replace("-", "").Trim();
+            
+            var url = $"{BinanceBaseUrl}/api/v3/depth?symbol={symbol}&limit={limit}";
+            var response = await client.GetAsync(url);
+            
+            if (!response.IsSuccessStatusCode) return new MarketOrderBookModel();
+
+            var content = await response.Content.ReadAsStringAsync();
+            var doc = JsonDocument.Parse(content);
+            var root = doc.RootElement;
+
+            var result = new MarketOrderBookModel();
+
+            foreach (var bid in root.GetProperty("bids").EnumerateArray())
+            {
+                result.Bids.Add(new OrderBookEntryModel { 
+                    Price = decimal.Parse(bid[0].GetString()!, System.Globalization.CultureInfo.InvariantCulture),
+                    Amount = decimal.Parse(bid[1].GetString()!, System.Globalization.CultureInfo.InvariantCulture)
+                });
+            }
+
+            foreach (var ask in root.GetProperty("asks").EnumerateArray())
+            {
+                result.Asks.Add(new OrderBookEntryModel { 
+                    Price = decimal.Parse(ask[0].GetString()!, System.Globalization.CultureInfo.InvariantCulture),
+                    Amount = decimal.Parse(ask[1].GetString()!, System.Globalization.CultureInfo.InvariantCulture)
+                });
+            }
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"💥 Error al obtener Depth para {symbol}: {ex.Message}");
+            return new MarketOrderBookModel();
+        }
+    }
+
+    public async Task<List<RecentTradeModel>> GetRecentTradesAsync(string symbol, int limit = 20)
+    {
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            symbol = symbol.ToUpper().Replace("/", "").Replace("-", "").Trim();
+            
+            var url = $"{BinanceBaseUrl}/api/v3/trades?symbol={symbol}&limit={limit}";
+            var response = await client.GetAsync(url);
+            
+            if (!response.IsSuccessStatusCode) return new List<RecentTradeModel>();
+
+            var content = await response.Content.ReadAsStringAsync();
+            var trades = JsonSerializer.Deserialize<List<JsonElement>>(content);
+
+            var result = new List<RecentTradeModel>();
+
+            if (trades != null)
+            {
+                foreach (var trade in trades)
+                {
+                    result.Add(new RecentTradeModel
+                    {
+                        Id = trade.GetProperty("id").GetInt64(),
+                        Price = decimal.Parse(trade.GetProperty("price").GetString()!, System.Globalization.CultureInfo.InvariantCulture),
+                        Amount = decimal.Parse(trade.GetProperty("qty").GetString()!, System.Globalization.CultureInfo.InvariantCulture),
+                        Time = trade.GetProperty("time").GetInt64(),
+                        IsBuyerMaker = trade.GetProperty("isBuyerMaker").GetBoolean()
+                    });
+                }
+            }
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"💥 Error al obtener Trades para {symbol}: {ex.Message}");
+            return new List<RecentTradeModel>();
+        }
+    }
 }
 
 public class MarketCandleModel
@@ -172,4 +256,25 @@ public class MarketOpenInterestModel
     public string Symbol { get; set; } = string.Empty;
     public decimal OpenInterest { get; set; }
     public long Timestamp { get; set; }
+}
+
+public class MarketOrderBookModel
+{
+    public List<OrderBookEntryModel> Bids { get; set; } = new();
+    public List<OrderBookEntryModel> Asks { get; set; } = new();
+}
+
+public class OrderBookEntryModel
+{
+    public decimal Price { get; set; }
+    public decimal Amount { get; set; }
+}
+
+public class RecentTradeModel
+{
+    public long Id { get; set; }
+    public decimal Price { get; set; }
+    public decimal Amount { get; set; }
+    public long Time { get; set; }
+    public bool IsBuyerMaker { get; set; }
 }

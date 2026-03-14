@@ -1,0 +1,88 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+.trading-panel-container {
+  background: #1e2329;
+  font-family: 'Inter', sans-serif;
+}
+
+.trade-type-tabs {
+  position: relative;
+  .tab-item {
+    color: #848e9c;
+    font-weight: 500;
+    transition: all 0.2s;
+    user-select: none;
+    padding-bottom: 8px !important;
+    margin-bottom: -1px;
+    z-index: 1;
+
+    &.active {
+      color: #f0b90b;
+      font-weight: 600;
+      border-bottom: 2px solid #f0b90b;
+    }
+    &:hover:not(.active) {
+      color: #eaecef;
+    }
+  }
+}
+
+.input-group-binance {
+  background: #2b3139;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+  &:focus-within {
+    border-color: #f0b90b;
+  }
+  
+  input {
+    font-size: 13px;
+    &::placeholder {
+      color: #848e9c;
+    }
+  }
+}
+
+.leverage-slider-binance {
+  .slider-dot {
+    width: 5px;
+    height: 5px;
+    background: #474d57;
+    border-radius: 1px;
+    transform: rotate(45deg);
+    margin: 0 auto;
+    &.active {
+      background: #f0b90b;
+    }
+  }
+}
+
+.form-check-input {
+  width: 14px;
+  height: 14px;
+  &:checked {
+    background-color: #f0b90b;
+    border-color: #f0b90b;
+  }
+}
+
+.btn-success {
+  background-color: #2ebd85;
+  border: none;
+  &:hover { background-color: #36d392; }
+}
+
+.btn-danger {
+  background-color: #f6465d;
+  border: none;
+  &:hover { background-color: #ff5a71; }
+}
+
+.text-xs { font-size: 11px; }
+.bg-dark-accent { background-color: #2b3139; }
+.border-white-05 { border-color: rgba(255,255,255,0.05) !important; }
+.pointer { cursor: pointer; }
+.outline-none { outline: none; }

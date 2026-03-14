@@ -28,4 +28,27 @@ public class MarketDataAppService : ApplicationService, IMarketDataAppService
             Close = c.Close
         }).ToList();
     }
+
+    public async Task<MarketOrderBookDto> GetOrderBookAsync(GetMarketDataInput input)
+    {
+        var model = await _marketDataManager.GetOrderBookAsync(input.Symbol, input.Limit);
+        return new MarketOrderBookDto
+        {
+            Bids = model.Bids.Select(b => new OrderBookEntryDto { Price = b.Price, Amount = b.Amount }).ToList(),
+            Asks = model.Asks.Select(a => new OrderBookEntryDto { Price = a.Price, Amount = a.Amount }).ToList()
+        };
+    }
+
+    public async Task<List<RecentTradeDto>> GetRecentTradesAsync(GetMarketDataInput input)
+    {
+        var trades = await _marketDataManager.GetRecentTradesAsync(input.Symbol, input.Limit);
+        return trades.Select(t => new RecentTradeDto
+        {
+            Id = t.Id,
+            Price = t.Price,
+            Amount = t.Amount,
+            Time = t.Time,
+            IsBuyerMaker = t.IsBuyerMaker
+        }).ToList();
+    }
 }

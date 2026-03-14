@@ -1,5 +1,5 @@
 import type { AnalysisLogType } from './analysis-log-type.enum';
-import type { EntityDto, FullAuditedEntityDto, PagedAndSortedResultRequestDto } from '@abp/ng.core';
+import type { FullAuditedEntityDto, PagedAndSortedResultRequestDto } from '@abp/ng.core';
 import type { AlertType } from './alert-type.enum';
 import type { SignalDirection } from './signal-direction.enum';
 import type { RiskTolerance } from './risk-tolerance.enum';
@@ -117,6 +117,11 @@ export interface GetMarketCandlesInput {
   limit: number;
 }
 
+export interface GetMarketDataInput {
+  symbol?: string;
+  limit: number;
+}
+
 export interface GetSignalsInput extends PagedAndSortedResultRequestDto {
   status?: TradeStatus;
   confidence?: SignalConfidence;
@@ -152,6 +157,11 @@ export interface MarketCandleDto {
   close: number;
 }
 
+export interface MarketOrderBookDto {
+  bids: OrderBookEntryDto[];
+  asks: OrderBookEntryDto[];
+}
+
 export interface MonteCarloReportDto {
   evaluationDate?: string;
   symbol?: string;
@@ -174,6 +184,11 @@ export interface OpportunityDto {
   entryMax?: number;
 }
 
+export interface OrderBookEntryDto {
+  price: number;
+  amount: number;
+}
+
 export interface PaperTradingReportDto {
   evaluationDate?: string;
   symbol?: string;
@@ -184,6 +199,14 @@ export interface PaperTradingReportDto {
   realizedProfitFactor: number;
   deviationPercentage: number;
   passedPaperTrading: boolean;
+}
+
+export interface RecentTradeDto {
+  id: number;
+  price: number;
+  amount: number;
+  time: number;
+  isBuyerMaker: boolean;
 }
 
 export interface RecommendedStyleDto {
@@ -205,28 +228,6 @@ export interface RunBacktestDto {
   initialCapital: number;
 }
 
-export interface SignalRegimeStatDto {
-  regime?: string;
-  wins: number;
-  losses: number;
-  winRate: number;
-  totalPnL: number;
-}
-
-export interface SignalStatsDto {
-  symbol?: string;
-  totalSignals: number;
-  wins: number;
-  losses: number;
-  winRate: number;
-  totalRealizedPnL: number;
-  averagePnLPerTrade: number;
-  expectancy: number;
-  averageDurationMinutes: number;
-  equityCurve: number[];
-  byRegime: SignalRegimeStatDto[];
-}
-
 export interface StartSessionDto {
   symbol?: string;
   timeframe?: string;
@@ -245,11 +246,6 @@ export interface StressTestReportDto {
   symbol?: string;
   events: StressTestEventDto[];
   passedAllEvents: boolean;
-}
-
-export interface TargetZoneDto {
-  low: number;
-  high: number;
 }
 
 export interface TradeOrderDto extends FullAuditedEntityDto<string> {
@@ -323,23 +319,6 @@ export interface TradingSessionDto extends FullAuditedEntityDto<string> {
   macroReason?: string;
 }
 
-export interface TradingSignalDto extends EntityDto<string> {
-  symbol?: string;
-  direction?: SignalDirection;
-  entryPrice: number;
-  confidence?: SignalConfidence;
-  profitPotential: number;
-  analyzedDate?: string;
-  status?: TradeStatus;
-  realizedPnL?: number;
-  regime?: MarketRegimeType;
-  exitPrice?: number;
-  exitTime?: string;
-  durationMinutes?: number;
-  equityAfter?: number;
-  score?: number;
-}
-
 export interface TradingStrategyDto extends FullAuditedEntityDto<string> {
   traderProfileId?: string;
   name?: string;
@@ -362,32 +341,6 @@ export interface UpdateTraderProfileDto {
   name?: string;
   level?: TradingLevel;
   riskTolerance?: RiskTolerance;
-}
-
-export interface VergeAlertDto {
-  id?: string;
-  type?: string;
-  title?: string;
-  message?: string;
-  timestamp?: string;
-  read: boolean;
-  crypto?: string;
-  price?: number;
-  confidence?: SignalConfidence;
-  direction?: SignalDirection;
-  stage?: TradingStage;
-  score?: number;
-  targetZone: TargetZoneDto;
-  riskRewardRatio?: number;
-  winProbability?: number;
-  historicSampleSize?: number;
-  patternSignal?: string;
-  structure?: string;
-  bosDetected: boolean;
-  chochDetected: boolean;
-  liquidityZones: number[];
-  severity?: string;
-  icon?: string;
 }
 
 export interface WalkForwardReportDto {

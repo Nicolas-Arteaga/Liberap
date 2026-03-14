@@ -7,7 +7,7 @@ import { Router } from '@angular/router';
     providedIn: 'root'
 })
 export class AlertService {
-    private alerts = signal<VergeAlert[]>([]);
+    public alerts = signal<VergeAlert[]>([]);
     public readonly alerts$ = toObservable(this.alerts);
 
     constructor(private router: Router) {
