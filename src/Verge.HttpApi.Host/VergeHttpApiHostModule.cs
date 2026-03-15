@@ -77,6 +77,13 @@ public class VergeHttpApiHostModule : AbpModule
             });
         });
 
+        PreConfigure<OpenIddictServerBuilder>(builder =>
+        {
+            builder.SetAccessTokenLifetime(TimeSpan.FromHours(12));
+            builder.SetRefreshTokenLifetime(TimeSpan.FromDays(30));
+            builder.SetAuthorizationCodeLifetime(TimeSpan.FromMinutes(5));
+        });
+
         if (!hostingEnvironment.IsDevelopment())
         {
             PreConfigure<AbpOpenIddictAspNetCoreOptions>(options =>
@@ -137,6 +144,12 @@ public class VergeHttpApiHostModule : AbpModule
         context.Services.AddHostedService<MarketScannerService>();
         context.Services.AddHostedService<LiveSignalCollectorJob>();
         context.Services.AddHostedService<SimulationMarkPriceWorker>();
+
+        context.Services.ConfigureApplicationCookie(options =>
+        {
+            options.ExpireTimeSpan = TimeSpan.FromDays(30);
+            options.SlidingExpiration = true;
+        });
     }
 
     private void ConfigureAuthentication(ServiceConfigurationContext context)
