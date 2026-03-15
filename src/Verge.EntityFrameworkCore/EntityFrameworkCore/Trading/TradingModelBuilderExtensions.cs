@@ -107,5 +107,15 @@ public static class TradingModelBuilderExtensions
             b.Property(x => x.WeightsJson).IsRequired();
             b.HasIndex(x => new { x.Regime, x.Symbol });
         });
+
+        builder.Entity<SimulatedTrade>(b =>
+        {
+            b.ToTable("SimulatedTrades");
+            b.ConfigureByConvention();
+            b.Property(x => x.Symbol).IsRequired().HasMaxLength(20);
+            b.HasIndex(x => x.UserId);
+            b.HasIndex(x => x.Symbol);
+            b.HasIndex(x => x.Status);
+        });
     }
 }

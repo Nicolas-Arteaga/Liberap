@@ -8,6 +8,10 @@ import { GlassButtonComponent } from 'src/shared/components/glass-button/glass-b
 import { IonIcon } from '@ionic/angular/standalone';
 import { IconService } from 'src/shared/services/icon.service';
 import { LabelComponent } from "src/shared/components/label/label.component";
+import { SimulatedTradeService } from '../proxy/trading/simulated-trade.service';
+import { TradingSignalrService } from '../services/trading-signalr.service';
+import { SimulatedTradeDto, SimulationPerformanceDto } from '../proxy/trading/dtos/models';
+import { Subscription } from 'rxjs';
 
 interface FilterOption {
   value: string;
@@ -19,16 +23,7 @@ interface ChartData {
   amount: number;
 }
 
-interface TradeHistoryItem {
-  id: number;
-  cryptoPair: string;
-  action: 'win' | 'loss' | 'breakeven' | 'open';
-  amount: number;
-  profitLoss: number;
-  date: string;
-  direction: 'LONG' | 'SHORT';
-  leverage: number;
-}
+// Interface removed as we use DTOs
 
 @Component({
   selector: 'app-history',
@@ -49,6 +44,15 @@ export class HistoryComponent {
   @Output() back = new EventEmitter<void>();
 
   private iconService = inject(IconService);
+  private simulatedTradeService = inject(SimulatedTradeService);
+  private signalrService = inject(TradingSignalrService);
+  // Datos del gráfico de performance
+  chartData: ChartData[] = [];
+  private subs = new Subscription();
+
+  // Datos Reales
+  performanceStats?: SimulationPerformanceDto;
+  realTrades: SimulatedTradeDto[] = [];
 
   // Filtros
   tradeType: string = 'all';
@@ -70,61 +74,75 @@ export class HistoryComponent {
     { value: 'custom', label: 'Personalizado' }
   ];
 
-  // Datos del gráfico de performance
-  chartData: ChartData[] = [
-    { month: 'Sep', amount: 850 },
-    { month: 'Oct', amount: 1250 },
-    { month: 'Nov', amount: 1800 },
-    { month: 'Dic', amount: 2450 },
-    { month: 'Ene', amount: 3250 }
-  ];
-
-  // Datos del historial de trades
-  tradeHistory: TradeHistoryItem[] = [
-    { id: 1, cryptoPair: 'BTC/USDT', action: 'win', amount: 1000, profitLoss: +245, date: 'Hoy 15:30', direction: 'LONG', leverage: 3 },
-    { id: 2, cryptoPair: 'ETH/USDT', action: 'loss', amount: 500, profitLoss: -85, date: 'Hoy 14:15', direction: 'SHORT', leverage: 2 },
-    { id: 3, cryptoPair: 'SOL/USDT', action: 'win', amount: 750, profitLoss: +180, date: 'Ayer 22:45', direction: 'LONG', leverage: 5 },
-    { id: 4, cryptoPair: 'BNB/USDT', action: 'breakeven', amount: 300, profitLoss: 0, date: '15/01 18:20', direction: 'SHORT', leverage: 2 },
-    { id: 5, cryptoPair: 'XRP/USDT', action: 'win', amount: 420, profitLoss: +95, date: '15/01 10:30', direction: 'LONG', leverage: 3 },
-    { id: 6, cryptoPair: 'ADA/USDT', action: 'open', amount: 600, profitLoss: +42, date: '14/01 16:45', direction: 'LONG', leverage: 2 },
-    { id: 7, cryptoPair: 'DOT/USDT', action: 'win', amount: 350, profitLoss: +78, date: '13/01 09:15', direction: 'SHORT', leverage: 3 },
-    { id: 8, cryptoPair: 'AVAX/USDT', action: 'loss', amount: 450, profitLoss: -62, date: '12/01 21:30', direction: 'LONG', leverage: 4 },
-  ];
+// Duplicate removed
 
   // Historial filtrado
-  get filteredTrades(): TradeHistoryItem[] {
-    return this.tradeHistory.filter(item => {
-      if (this.tradeType !== 'all' && item.action !== this.tradeType) {
-        return false;
-      }
-      // Aquí iría la lógica de filtrado por fecha en una app real
+  get filteredTrades(): SimulatedTradeDto[] {
+    return this.realTrades.filter(item => {
+      if (this.tradeType === 'win' && item.status !== 1) return false; // Win = 1
+      if (this.tradeType === 'loss' && item.status !== 2) return false; // Loss = 2
+      if (this.tradeType === 'open' && item.status !== 0) return false; // Open = 0
       return true;
     });
   }
 
-  // Estadísticas
+  // Estadísticas basadas en backend si están disponibles, sino calculadas
   get totalProfit(): number {
-    return this.tradeHistory
-      .filter(item => item.action !== 'open')
-      .reduce((sum, item) => sum + item.profitLoss, 0);
+    return Number(this.performanceStats?.totalGain || 0);
   }
 
   get winRate(): number {
-    const closedTrades = this.tradeHistory.filter(item => item.action !== 'open');
-    const winningTrades = closedTrades.filter(item => item.action === 'win');
-    return closedTrades.length > 0 ? Math.round((winningTrades.length / closedTrades.length) * 100) : 0;
+    return Math.round(Number(this.performanceStats?.winRate || 0));
   }
 
   get totalTrades(): number {
-    return this.tradeHistory.length;
+    return this.performanceStats?.totalTrades || 0;
   }
 
   get averageProfit(): number {
-    const closedTrades = this.tradeHistory.filter(item => item.action !== 'open');
-    return closedTrades.length > 0 ? this.totalProfit / closedTrades.length : 0;
+    return Number(this.performanceStats?.avgPerTrade || 0);
   }
 
   constructor(private router: Router) {}
+
+  ngOnInit() {
+    this.loadData();
+    
+    // Refresh on any trade activity
+    this.subs.add(this.signalrService.tradeOpened$.subscribe(() => this.loadData()));
+    this.subs.add(this.signalrService.tradeClosed$.subscribe(() => this.loadData()));
+
+    // Keep PnL/Status updated in real-time
+    this.subs.add(this.signalrService.tradeUpdate$.subscribe(update => {
+      const index = this.realTrades.findIndex(t => t.id === update.id);
+      if (index !== -1) {
+        this.realTrades[index] = { ...this.realTrades[index], ...update };
+      }
+    }));
+  }
+
+  ngOnDestroy() {
+    this.subs.unsubscribe();
+  }
+
+  loadData() {
+    this.simulatedTradeService.getPerformanceStats().subscribe(stats => {
+      this.performanceStats = stats;
+      this.chartData = stats.equityCurve.map(p => ({
+        month: this.formatDateLabel(p.timestamp),
+        amount: Math.round(Number(p.balance))
+      }));
+    });
+
+    this.simulatedTradeService.getRecentTrades(50).subscribe(trades => {
+      this.realTrades = trades;
+    });
+  }
+
+  private formatDateLabel(date: string): string {
+    const d = new Date(date);
+    return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+  }
 
   ngAfterViewInit() {
     this.iconService.fixMissingIcons();
@@ -143,62 +161,72 @@ export class HistoryComponent {
     return `$${Math.abs(amount).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 
-  getTradeStatusClass(action: 'win' | 'loss' | 'breakeven' | 'open') {
-    switch (action) {
-      case 'win':
+  getTradeStatusClass(status: number) {
+    switch (status) {
+      case 1: // Win (TradeStatus.Win = 1)
         return {
           circleClass: 'payment-circle-success',
           textClass: 'text-success small fw-medium',
           icon: 'trending-up-outline'
         };
-      case 'loss':
+      case 2: // Loss (TradeStatus.Loss = 2)
+      case 6: // Liquidated (TradeStatus.Liquidated = 6)
         return {
           circleClass: 'payment-circle-danger',
           textClass: 'text-danger small fw-medium',
           icon: 'trending-down-outline'
         };
-      case 'breakeven':
-        return {
-          circleClass: 'payment-circle-warning',
-          textClass: 'text-warning small fw-medium',
-          icon: 'remove-outline'
-        };
-      case 'open':
+      case 0: // Open (TradeStatus.Open = 0)
         return {
           circleClass: 'payment-circle-primary',
           textClass: 'text-primary small fw-medium',
           icon: 'time-outline'
         };
-      default:
+      default: // Canceled, Expired, BreakEven
         return {
-          circleClass: 'payment-circle-success',
-          textClass: 'text-success small fw-medium',
-          icon: 'trending-up-outline'
+          circleClass: 'payment-circle-warning',
+          textClass: 'text-warning small fw-medium',
+          icon: 'remove-outline'
         };
     }
   }
 
-  getTradeStatusLabel(action: 'win' | 'loss' | 'breakeven' | 'open'): string {
-    switch (action) {
-      case 'win':
-        return 'Trade Ganador';
-      case 'loss':
-        return 'Trade Perdedor';
-      case 'breakeven':
-        return 'Break Even';
-      case 'open':
-        return 'Trade Abierto';
-      default:
-        return action;
+  getTradeStatusLabel(status: number): string {
+    switch (status) {
+      case 1: return 'Trade Ganador';
+      case 2: return 'Trade Perdedor';
+      case 6: return 'Liquidado';
+      case 0: return 'Trade Abierto';
+      default: return 'Cerrado';
     }
   }
 
-  getDirectionColor(direction: 'LONG' | 'SHORT'): string {
-    return direction === 'LONG' ? 'text-success' : 'text-danger';
+  getDirectionColor(side: number): string {
+    return side === 0 ? 'text-success' : 'text-danger';
+  }
+
+  getDirectionLabel(side: number): string {
+    return side === 0 ? 'LONG' : 'SHORT';
   }
 
   getProfitColor(profitLoss: number): string {
     return profitLoss > 0 ? 'text-success' : profitLoss < 0 ? 'text-danger' : 'text-white-50';
+  }
+
+  getProfitValue(trade: SimulatedTradeDto): number {
+    return Number(trade.realizedPnl ?? trade.unrealizedPnl ?? 0);
+  }
+
+  formatDate(dateStr?: string): string {
+    if (!dateStr) return '--:--';
+    const date = new Date(dateStr);
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    
+    if (isToday) {
+      return `Hoy ${date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`;
+    }
+    return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
   }
 }
 

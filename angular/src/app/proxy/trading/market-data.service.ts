@@ -35,6 +35,7 @@ export class MarketDataService {
       params: { symbol: input.symbol, limit: input.limit },
     },
     { apiName: this.apiName,...config });
+  
 
   getTickers = (config?: Partial<Rest.Config>) =>
     this.restService.request<any, SymbolTickerDto[]>({

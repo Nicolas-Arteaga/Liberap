@@ -10,6 +10,8 @@ import { createChart, IChartApi, ISeriesApi, CandlestickData, CandlestickSeries,
 import { MarketDataService } from '../proxy/trading/market-data.service';
 import { TradingService } from '../proxy/trading/trading.service';
 import { TradingSessionDto, AnalysisLogDto, MarketAnalysisDto, OpportunityDto, SymbolTickerDto } from '../proxy/trading/models';
+import { SimulatedTradeDto } from '../proxy/trading/dtos/models';
+import { SimulatedTradeService } from '../proxy/trading/simulated-trade.service';
 import { SignalStatsDto } from '../proxy/trading/dtos/models';
 import { AnalysisLogType } from '../proxy/trading/analysis-log-type.enum';
 import { DialogComponent } from 'src/shared/components/dialog/dialog.component';
@@ -162,6 +164,12 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   searchTerm: string = '';
   showSymbolSelector: boolean = false;
 
+  // Simulation Simulation
+  activeTrades: SimulatedTradeDto[] = [];
+  tradeHistory: SimulatedTradeDto[] = [];
+  consoleTab: 'positions' | 'orders' | 'history' = 'positions';
+  private simulatedTradeService = inject(SimulatedTradeService);
+
   // Señales activas (reemplazado por logs reales)
   activeSignals: TradingSignal[] = [];
 
@@ -226,6 +234,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     console.log('[Dashboard] 🚀 ngOnInit ejecutado');
     this.checkActiveSession();
     this.loadTickers();
+    this.loadActiveTrades();
+    this.loadTradeHistory();
 
     // Verificar si hay sesión cacheada en SignalR (para el caso donde el evento ya llegó)
     const cachedSession = this.signalrService.getLastSession();
@@ -267,6 +277,22 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       this.updateStagePrices(session);
       if (this.currentStage !== prevStage) {
         this.showStageToast(this.currentStage);
+      }
+    });
+
+    // --- Simulated Trading Subscriptions ---
+    this.signalrService.tradeOpened$.pipe(takeUntil(this.destroy$)).subscribe(trade => {
+      this.activeTrades = [trade, ...this.activeTrades];
+    });
+
+    this.signalrService.tradeClosed$.pipe(takeUntil(this.destroy$)).subscribe(trade => {
+      this.activeTrades = this.activeTrades.filter(t => t.id !== trade.id);
+    });
+
+    this.signalrService.tradeUpdate$.pipe(takeUntil(this.destroy$)).subscribe(update => {
+      const index = this.activeTrades.findIndex(t => t.id === update.id);
+      if (index !== -1) {
+        this.activeTrades[index] = { ...this.activeTrades[index], ...update };
       }
     });
 
@@ -655,6 +681,39 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         console.log('[Dashboard] 📈 Live Performance loaded:', stats);
       },
       error: (err) => console.error('[Dashboard] Error loading signal stats', err)
+    });
+  }
+
+  loadActiveTrades() {
+    this.simulatedTradeService.getActiveTrades().subscribe({
+      next: (trades) => this.activeTrades = trades,
+      error: (err) => console.error('Error loading active trades', err)
+    });
+  }
+
+  loadTradeHistory() {
+    this.simulatedTradeService.getTradeHistory().subscribe({
+      next: (history) => this.tradeHistory = history,
+      error: (err) => console.error('Error loading trade history', err)
+    });
+  }
+
+  setConsoleTab(tab: 'positions' | 'orders' | 'history') {
+    this.consoleTab = tab;
+    if (tab === 'history') {
+      this.loadTradeHistory();
+    } else if (tab === 'positions') {
+      this.loadActiveTrades();
+    }
+  }
+
+  closePosition(tradeId: string) {
+    this.simulatedTradeService.closeTrade(tradeId).subscribe({
+      next: () => {
+        // SignalR will handle the list update, but we can proactively filter
+        this.activeTrades = this.activeTrades.filter(t => t.id !== tradeId);
+      },
+      error: (err) => console.error('Error closing trade', err)
     });
   }
 

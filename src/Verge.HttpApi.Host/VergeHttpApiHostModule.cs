@@ -136,6 +136,7 @@ public class VergeHttpApiHostModule : AbpModule
         context.Services.AddHostedService<MacroCalendarJob>();
         context.Services.AddHostedService<MarketScannerService>();
         context.Services.AddHostedService<LiveSignalCollectorJob>();
+        context.Services.AddHostedService<SimulationMarkPriceWorker>();
     }
 
     private void ConfigureAuthentication(ServiceConfigurationContext context)

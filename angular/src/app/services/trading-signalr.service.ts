@@ -21,10 +21,19 @@ export class TradingSignalrService {
     private sessionStartedSource = new BehaviorSubject<TradingSessionDto | null>(null);
     private sessionEndedSource = new Subject<string>();
     private stageAdvancedSource = new Subject<TradingSessionDto>();
+    
+    // Trade Simulation Events
+    private tradeOpenedSource = new Subject<any>();
+    private tradeClosedSource = new Subject<any>();
+    private tradeUpdateSource = new Subject<any>();
 
     sessionStarted$ = this.sessionStartedSource.asObservable();
     sessionEnded$ = this.sessionEndedSource.asObservable();
     stageAdvanced$ = this.stageAdvancedSource.asObservable();
+    
+    tradeOpened$ = this.tradeOpenedSource.asObservable();
+    tradeClosed$ = this.tradeClosedSource.asObservable();
+    tradeUpdate$ = this.tradeUpdateSource.asObservable();
 
     private connection: signalR.HubConnection | null = null;
     private lastNotifiedState: Record<string, string> = {};
@@ -79,6 +88,25 @@ export class TradingSignalrService {
         this.connection.on('StageAdvanced', (session: TradingSessionDto) => {
             console.log('[SignalR] 📈 Etapa Avanzada:', session);
             this.stageAdvancedSource.next(session);
+        });
+
+        // --- Trade Simulation Handlers ---
+        this.connection.on('ReceiveTradeOpened', (trade: any) => {
+            console.log('[SignalR] 🚀 Operación Abierta:', trade);
+            this.tradeOpenedSource.next(trade);
+            this.toaster.success(`Posición abierta: ${trade.side === 0 ? 'LONG' : 'SHORT'} ${trade.symbol}`, 'Trading Simulado');
+        });
+
+        this.connection.on('ReceiveTradeClosed', (trade: any) => {
+            console.log('[SignalR] 🏁 Operación Cerrada:', trade);
+            this.tradeClosedSource.next(trade);
+            const pnlColor = trade.realizedPnl >= 0 ? 'success' : 'danger';
+            this.toaster.info(`Posición cerrada: ${trade.symbol}. PnL: ${trade.realizedPnl.toFixed(2)} USDT`, 'Trading Simulado');
+        });
+
+        this.connection.on('ReceiveTradeUpdate', (trade: any) => {
+            // High frequency update - no toast here
+            this.tradeUpdateSource.next(trade);
         });
 
         this.connection.on('ReceiveAlert', (alert: any) => {

@@ -13,6 +13,7 @@ public class TraderProfile : FullAuditedAggregateRoot<Guid>
     public decimal TotalProfit { get; set; }
     public double Accuracy { get; set; }
     public int ActiveStrategiesCount { get; set; }
+    public decimal VirtualBalance { get; set; }
 
     protected TraderProfile() { }
 
@@ -27,5 +28,6 @@ public class TraderProfile : FullAuditedAggregateRoot<Guid>
         TotalProfit = 0;
         Accuracy = 0;
         ActiveStrategiesCount = 0;
+        VirtualBalance = 10000;
     }
 }

@@ -47,13 +47,19 @@
       </div>
     </div>
 
-    <!-- Price (Hidden for Market) -->
-    <div *ngIf="orderType !== 'market'" class="input-group-binance p-2 bg-dark-accent rounded border border-white-05 mb-2">
-      <label class="text-white-50 text-xs d-block mb-1">Precio</label>
+    <!-- Price Field -->
+    <div class="input-group-binance p-2 bg-dark-accent rounded border border-white-05 mb-2">
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <label class="text-white-50 text-xs">Precio</label>
+        <span *ngIf="orderType === 'market'" class="text-primary" style="font-size: 9px;">Mercado</span>
+      </div>
       <div class="d-flex align-items-center">
-        <input type="number" [(ngModel)]="price" class="bg-transparent border-0 text-white w-100 outline-none fw-bold">
+        <input type="number" 
+               [ngModel]="price" 
+               (ngModelChange)="price = $event"
+               [disabled]="orderType === 'market'"
+               class="bg-transparent border-0 text-white w-100 outline-none fw-bold">
         <span class="text-white text-xs ms-2">USDT</span>
-        <button class="btn btn-link btn-sm text-white-50 text-xs p-0 ms-2 text-decoration-none border border-white-05 px-1 bg-dark">BBO</button>
       </div>
     </div>
 
@@ -101,8 +107,12 @@
       <span>-- USDT</span>
     </div>
     <div class="d-flex justify-content-between border-bottom border-white-05 pb-1 mb-1">
-      <span>Costo</span>
-      <span>0,00 USDT</span>
+      <span>Exposición (Total)</span>
+      <span class="text-white">{{ (amount || 0) * leverage | number:'1.2-2' }} USDT</span>
+    </div>
+    <div class="d-flex justify-content-between border-bottom border-white-05 pb-1 mb-1">
+      <span>Costo (Margen)</span>
+      <span class="text-white">{{ (amount || 0) | number:'1.2-2' }} USDT</span>
     </div>
     <div class="d-flex justify-content-between mb-2">
       <span>Máx</span>

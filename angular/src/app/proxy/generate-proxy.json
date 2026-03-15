@@ -1299,6 +1299,14 @@
                     "type": "System.Collections.Generic.List<Verge.Trading.RecentTradeDto>",
                     "typeSimple": "[Verge.Trading.RecentTradeDto]"
                   }
+                },
+                {
+                  "name": "GetTickersAsync",
+                  "parametersOnMethod": [],
+                  "returnValue": {
+                    "type": "System.Collections.Generic.List<Verge.Trading.SymbolTickerDto>",
+                    "typeSimple": "[Verge.Trading.SymbolTickerDto]"
+                  }
                 }
               ]
             }
@@ -1462,6 +1470,293 @@
               },
               "allowAnonymous": null,
               "implementFrom": "Verge.Trading.IMarketDataAppService"
+            },
+            "GetTickersAsync": {
+              "uniqueName": "GetTickersAsync",
+              "name": "GetTickersAsync",
+              "httpMethod": "GET",
+              "url": "api/app/market-data/tickers",
+              "supportedVersions": [],
+              "parametersOnMethod": [],
+              "parameters": [],
+              "returnValue": {
+                "type": "System.Collections.Generic.List<Verge.Trading.SymbolTickerDto>",
+                "typeSimple": "[Verge.Trading.SymbolTickerDto]"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.IMarketDataAppService"
+            }
+          }
+        },
+        "Verge.Trading.SimulatedTradeAppService": {
+          "controllerName": "SimulatedTrade",
+          "controllerGroupName": "SimulatedTrade",
+          "isRemoteService": true,
+          "isIntegrationService": false,
+          "apiVersion": null,
+          "type": "Verge.Trading.SimulatedTradeAppService",
+          "interfaces": [
+            {
+              "type": "Verge.Trading.ISimulatedTradeAppService",
+              "name": "ISimulatedTradeAppService",
+              "methods": [
+                {
+                  "name": "OpenTradeAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "input",
+                      "typeAsString": "Verge.Trading.DTOs.OpenTradeInputDto, Verge.Application.Contracts",
+                      "type": "Verge.Trading.DTOs.OpenTradeInputDto",
+                      "typeSimple": "Verge.Trading.DTOs.OpenTradeInputDto",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "Verge.Trading.DTOs.SimulatedTradeDto",
+                    "typeSimple": "Verge.Trading.DTOs.SimulatedTradeDto"
+                  }
+                },
+                {
+                  "name": "CloseTradeAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "tradeId",
+                      "typeAsString": "System.Guid, System.Private.CoreLib",
+                      "type": "System.Guid",
+                      "typeSimple": "string",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "Verge.Trading.DTOs.SimulatedTradeDto",
+                    "typeSimple": "Verge.Trading.DTOs.SimulatedTradeDto"
+                  }
+                },
+                {
+                  "name": "GetActiveTradesAsync",
+                  "parametersOnMethod": [],
+                  "returnValue": {
+                    "type": "System.Collections.Generic.List<Verge.Trading.DTOs.SimulatedTradeDto>",
+                    "typeSimple": "[Verge.Trading.DTOs.SimulatedTradeDto]"
+                  }
+                },
+                {
+                  "name": "GetTradeHistoryAsync",
+                  "parametersOnMethod": [],
+                  "returnValue": {
+                    "type": "System.Collections.Generic.List<Verge.Trading.DTOs.SimulatedTradeDto>",
+                    "typeSimple": "[Verge.Trading.DTOs.SimulatedTradeDto]"
+                  }
+                },
+                {
+                  "name": "GetVirtualBalanceAsync",
+                  "parametersOnMethod": [],
+                  "returnValue": {
+                    "type": "System.Decimal",
+                    "typeSimple": "number"
+                  }
+                },
+                {
+                  "name": "GetPerformanceStatsAsync",
+                  "parametersOnMethod": [],
+                  "returnValue": {
+                    "type": "Verge.Trading.DTOs.SimulationPerformanceDto",
+                    "typeSimple": "Verge.Trading.DTOs.SimulationPerformanceDto"
+                  }
+                },
+                {
+                  "name": "GetRecentTradesAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "limit",
+                      "typeAsString": "System.Int32, System.Private.CoreLib",
+                      "type": "System.Int32",
+                      "typeSimple": "number",
+                      "isOptional": true,
+                      "defaultValue": 20
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "System.Collections.Generic.List<Verge.Trading.DTOs.SimulatedTradeDto>",
+                    "typeSimple": "[Verge.Trading.DTOs.SimulatedTradeDto]"
+                  }
+                }
+              ]
+            }
+          ],
+          "actions": {
+            "OpenTradeAsyncByInput": {
+              "uniqueName": "OpenTradeAsyncByInput",
+              "name": "OpenTradeAsync",
+              "httpMethod": "POST",
+              "url": "api/app/simulated-trade/open-trade",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "input",
+                  "typeAsString": "Verge.Trading.DTOs.OpenTradeInputDto, Verge.Application.Contracts",
+                  "type": "Verge.Trading.DTOs.OpenTradeInputDto",
+                  "typeSimple": "Verge.Trading.DTOs.OpenTradeInputDto",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "input",
+                  "name": "input",
+                  "jsonName": null,
+                  "type": "Verge.Trading.DTOs.OpenTradeInputDto",
+                  "typeSimple": "Verge.Trading.DTOs.OpenTradeInputDto",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "Body",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "Verge.Trading.DTOs.SimulatedTradeDto",
+                "typeSimple": "Verge.Trading.DTOs.SimulatedTradeDto"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.ISimulatedTradeAppService"
+            },
+            "CloseTradeAsyncByTradeId": {
+              "uniqueName": "CloseTradeAsyncByTradeId",
+              "name": "CloseTradeAsync",
+              "httpMethod": "POST",
+              "url": "api/app/simulated-trade/close-trade/{tradeId}",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "tradeId",
+                  "typeAsString": "System.Guid, System.Private.CoreLib",
+                  "type": "System.Guid",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "tradeId",
+                  "name": "tradeId",
+                  "jsonName": null,
+                  "type": "System.Guid",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": [],
+                  "bindingSourceId": "Path",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "Verge.Trading.DTOs.SimulatedTradeDto",
+                "typeSimple": "Verge.Trading.DTOs.SimulatedTradeDto"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.ISimulatedTradeAppService"
+            },
+            "GetActiveTradesAsync": {
+              "uniqueName": "GetActiveTradesAsync",
+              "name": "GetActiveTradesAsync",
+              "httpMethod": "GET",
+              "url": "api/app/simulated-trade/active-trades",
+              "supportedVersions": [],
+              "parametersOnMethod": [],
+              "parameters": [],
+              "returnValue": {
+                "type": "System.Collections.Generic.List<Verge.Trading.DTOs.SimulatedTradeDto>",
+                "typeSimple": "[Verge.Trading.DTOs.SimulatedTradeDto]"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.ISimulatedTradeAppService"
+            },
+            "GetTradeHistoryAsync": {
+              "uniqueName": "GetTradeHistoryAsync",
+              "name": "GetTradeHistoryAsync",
+              "httpMethod": "GET",
+              "url": "api/app/simulated-trade/trade-history",
+              "supportedVersions": [],
+              "parametersOnMethod": [],
+              "parameters": [],
+              "returnValue": {
+                "type": "System.Collections.Generic.List<Verge.Trading.DTOs.SimulatedTradeDto>",
+                "typeSimple": "[Verge.Trading.DTOs.SimulatedTradeDto]"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.ISimulatedTradeAppService"
+            },
+            "GetVirtualBalanceAsync": {
+              "uniqueName": "GetVirtualBalanceAsync",
+              "name": "GetVirtualBalanceAsync",
+              "httpMethod": "GET",
+              "url": "api/app/simulated-trade/virtual-balance",
+              "supportedVersions": [],
+              "parametersOnMethod": [],
+              "parameters": [],
+              "returnValue": {
+                "type": "System.Decimal",
+                "typeSimple": "number"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.ISimulatedTradeAppService"
+            },
+            "GetPerformanceStatsAsync": {
+              "uniqueName": "GetPerformanceStatsAsync",
+              "name": "GetPerformanceStatsAsync",
+              "httpMethod": "GET",
+              "url": "api/app/simulated-trade/performance-stats",
+              "supportedVersions": [],
+              "parametersOnMethod": [],
+              "parameters": [],
+              "returnValue": {
+                "type": "Verge.Trading.DTOs.SimulationPerformanceDto",
+                "typeSimple": "Verge.Trading.DTOs.SimulationPerformanceDto"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.ISimulatedTradeAppService"
+            },
+            "GetRecentTradesAsyncByLimit": {
+              "uniqueName": "GetRecentTradesAsyncByLimit",
+              "name": "GetRecentTradesAsync",
+              "httpMethod": "GET",
+              "url": "api/app/simulated-trade/recent-trades",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "limit",
+                  "typeAsString": "System.Int32, System.Private.CoreLib",
+                  "type": "System.Int32",
+                  "typeSimple": "number",
+                  "isOptional": true,
+                  "defaultValue": 20
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "limit",
+                  "name": "limit",
+                  "jsonName": null,
+                  "type": "System.Int32",
+                  "typeSimple": "number",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "System.Collections.Generic.List<Verge.Trading.DTOs.SimulatedTradeDto>",
+                "typeSimple": "[Verge.Trading.DTOs.SimulatedTradeDto]"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.ISimulatedTradeAppService"
             }
           }
         },
@@ -7203,6 +7498,108 @@
         }
       ]
     },
+    "Verge.Trading.DTOs.EquityPointDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Timestamp",
+          "jsonName": null,
+          "type": "System.DateTime",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Balance",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.DTOs.OpenTradeInputDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Symbol",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Side",
+          "jsonName": null,
+          "type": "Verge.Trading.SignalDirection",
+          "typeSimple": "enum",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Amount",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Leverage",
+          "jsonName": null,
+          "type": "System.Int32",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "TradingSignalId",
+          "jsonName": null,
+          "type": "System.Guid?",
+          "typeSimple": "string?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
     "Verge.Trading.DTOs.SentimentAnalysisDto": {
       "baseType": null,
       "isEnum": false,
@@ -7449,6 +7846,348 @@
           "jsonName": null,
           "type": "[Verge.Trading.DTOs.SignalRegimeStatDto]",
           "typeSimple": "[Verge.Trading.DTOs.SignalRegimeStatDto]",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.DTOs.SimulatedTradeDto": {
+      "baseType": "Volo.Abp.Application.Dtos.EntityDto<System.Guid>",
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "UserId",
+          "jsonName": null,
+          "type": "System.Guid",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Symbol",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Side",
+          "jsonName": null,
+          "type": "Verge.Trading.SignalDirection",
+          "typeSimple": "enum",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Leverage",
+          "jsonName": null,
+          "type": "System.Int32",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Size",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Amount",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "EntryPrice",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "MarkPrice",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "LiquidationPrice",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Margin",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "MarginRate",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "UnrealizedPnl",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "ROIPercentage",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Status",
+          "jsonName": null,
+          "type": "Verge.Trading.TradeStatus",
+          "typeSimple": "enum",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "ClosePrice",
+          "jsonName": null,
+          "type": "System.Decimal?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "RealizedPnl",
+          "jsonName": null,
+          "type": "System.Decimal?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "EntryFee",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "ExitFee",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "TotalFundingPaid",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "OpenedAt",
+          "jsonName": null,
+          "type": "System.DateTime",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "ClosedAt",
+          "jsonName": null,
+          "type": "System.DateTime?",
+          "typeSimple": "string?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "TradingSignalId",
+          "jsonName": null,
+          "type": "System.Guid?",
+          "typeSimple": "string?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.DTOs.SimulationPerformanceDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "TotalGain",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "WinRate",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "TotalTrades",
+          "jsonName": null,
+          "type": "System.Int32",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "AvgPerTrade",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "EquityCurve",
+          "jsonName": null,
+          "type": "[Verge.Trading.DTOs.EquityPointDto]",
+          "typeSimple": "[Verge.Trading.DTOs.EquityPointDto]",
           "isRequired": false,
           "minLength": null,
           "maxLength": null,
@@ -9427,6 +10166,99 @@
         }
       ]
     },
+    "Verge.Trading.SymbolTickerDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Symbol",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "LastPrice",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "PriceChange",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "PriceChangePercent",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Volume",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "HighPrice",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "LowPrice",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
     "Verge.Trading.TradeOrderDto": {
       "baseType": "Volo.Abp.Application.Dtos.FullAuditedEntityDto<System.Guid>",
       "isEnum": false,
@@ -9706,7 +10538,8 @@
         "Loss",
         "BreakEven",
         "Canceled",
-        "Expired"
+        "Expired",
+        "Liquidated"
       ],
       "enumValues": [
         0,
@@ -9714,7 +10547,8 @@
         2,
         3,
         4,
-        5
+        5,
+        6
       ],
       "genericArguments": null,
       "properties": null

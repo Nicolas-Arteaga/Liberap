@@ -186,46 +186,111 @@
         <!-- 💰 Positions & Orders Table (New) -->
         <div class="positions-console bg-dark-deep mb-4 overflow-hidden">
           <div class="console-tabs d-flex border-bottom border-white-05 bg-dark-soft">
-            <div class="tab-item py-2 px-3 pointer text-xs uppercase active text-primary border-bottom border-primary">Posiciones(0)</div>
-            <div class="tab-item py-2 px-3 pointer text-xs uppercase text-white-50">Órdenes abiertas(0)</div>
-            <div class="tab-item py-2 px-3 pointer text-xs uppercase text-white-50 d-none d-md-block">Historial de órdenes</div>
-            <div class="tab-item py-2 px-3 pointer text-xs uppercase text-white-50 d-none d-lg-block">Historial de trades</div>
+            <div class="tab-item py-2 px-3 pointer text-xs uppercase" 
+                 [class.active]="consoleTab === 'positions'" 
+                 (click)="setConsoleTab('positions')">Posiciones({{ activeTrades.length }})</div>
+            <div class="tab-item py-2 px-3 pointer text-xs uppercase"
+                 [class.active]="consoleTab === 'history'" 
+                 (click)="setConsoleTab('history')">Historial de trades</div>
             <div class="ms-auto d-flex align-items-center px-3 gap-2">
               <input type="checkbox" class="form-check-input bg-dark border-white-10" style="width: 12px; height: 12px;">
               <span class="text-white-50" style="font-size: 10px;">Ocultar otros símbolos</span>
             </div>
           </div>
           <div class="table-responsive p-0" style="min-height: 200px;">
-            <table class="table table-dark table-sm mb-0 position-table" style="font-size: 10px;">
+            <!-- Positions Table -->
+            <table *ngIf="consoleTab === 'positions'" class="table table-dark table-sm mb-0 position-table" style="font-size: 10px;">
               <thead>
                 <tr class="text-white-50">
                   <th>Símbolo</th>
                   <th>Tamaño</th>
                   <th>Precio de entrada</th>
-                  <th>Precio de equilibrio</th>
                   <th>Precio de marca</th>
                   <th>Precio de Liq.</th>
-                  <th>Tasa de margen</th>
-                  <th>Margen</th>
+                  <th>Margen (Aislado)</th>
                   <th>PnL (%ROI)</th>
-                  <th class="d-none d-xl-table-cell">Comisión de financiación est.</th>
-                  <th>ADL / Inversa</th>
-                  <th>TP/SL para la posición</th>
-                  <th>Cerrar todo</th>
+                  <th>Cerrar</th>
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td colspan="13" class="text-center py-5 border-0">
+                <tr *ngFor="let trade of activeTrades">
+                  <td class="align-middle">
+                    <div class="d-flex align-items-center gap-1">
+                      <span [class.text-success]="trade.side === 0" [class.text-danger]="trade.side === 1">
+                        {{ trade.side === 0 ? 'Long' : 'Short' }}
+                      </span>
+                      <span class="text-white fw-bold">{{ trade.symbol }}</span>
+                      <span class="badge bg-dark-accent text-white-50">{{ trade.leverage }}x</span>
+                    </div>
+                  </td>
+                  <td class="align-middle">
+                    <div class="text-white">{{ trade.amount | number:'1.2-2' }} USDT</div>
+                    <div class="text-white-50" style="font-size: 9px;">{{ trade.size | number:'1.3-3' }} {{ trade.symbol.replace('USDT', '') }}</div>
+                  </td>
+                  <td class="align-middle text-white">{{ trade.entryPrice | number:'1.2-4' }}</td>
+                  <td class="align-middle text-white">{{ trade.markPrice | number:'1.2-4' }}</td>
+                  <td class="align-middle text-warning fw-bold">{{ trade.liquidationPrice | number:'1.2-4' }}</td>
+                  <td class="align-middle text-white">
+                    <div>{{ trade.margin | number:'1.2-2' }} USDT</div>
+                    <div class="text-white-50" style="font-size: 8px;">(1x: {{ (trade.amount / trade.leverage) | number:'1.2-2' }})</div>
+                  </td>
+                  <td class="align-middle" [class.text-success]="trade.unrealizedPnl >= 0" [class.text-danger]="trade.unrealizedPnl < 0">
+                    <div class="fw-bold">{{ trade.unrealizedPnl | number:'1.2-2' }} USDT</div>
+                    <div style="font-size: 9px;">({{ trade.roiPercentage | number:'1.2-2' }}%)</div>
+                  </td>
+                  <td class="align-middle">
+                    <button class="btn btn-dark btn-sm text-xxs px-2 py-0 border-white-05 hover:bg-white-10" (click)="closePosition(trade.id)">
+                      Mercado
+                    </button>
+                  </td>
+                </tr>
+                <tr *ngIf="activeTrades.length === 0">
+                  <td colspan="8" class="text-center py-5 border-0">
                     <div class="empty-positions text-center opacity-40">
                       <ion-icon name="document-text-outline" style="font-size: 40px;" class="mb-2"></ion-icon>
-                      <p class="mb-0">No tienes posiciones.</p>
+                      <p class="mb-0">No tienes posiciones activas.</p>
                       <div class="d-flex justify-content-center gap-2 mt-2">
-                        <span class="text-xs">Mercado</span>
-                        <span class="text-xs text-info">Límite</span>
+                        <span class="text-xs">Usa el panel de la derecha para abrir una operación.</span>
                       </div>
                     </div>
                   </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <!-- Trade History Table -->
+            <table *ngIf="consoleTab === 'history'" class="table table-dark table-sm mb-0 position-table" style="font-size: 10px;">
+              <thead>
+                <tr class="text-white-50">
+                  <th>Símbolo</th>
+                  <th>Lado</th>
+                  <th>Apal.</th>
+                  <th>Precio Entrada</th>
+                  <th>Precio Cierre</th>
+                  <th>PnL Realizado</th>
+                  <th>ROI%</th>
+                  <th>Fecha</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let trade of tradeHistory">
+                  <td class="text-white fw-bold">{{ trade.symbol }}</td>
+                  <td [class.text-success]="trade.side === 0" [class.text-danger]="trade.side === 1">
+                    {{ trade.side === 0 ? 'Long' : 'Short' }}
+                  </td>
+                  <td class="text-white-50">{{ trade.leverage }}x</td>
+                  <td class="text-white">{{ trade.entryPrice | number:'1.2-4' }}</td>
+                  <td class="text-white">{{ trade.closePrice | number:'1.2-4' }}</td>
+                  <td [class.text-success]="trade.realizedPnl >= 0" [class.text-danger]="trade.realizedPnl < 0">
+                    {{ trade.realizedPnl | number:'1.2-2' }} USDT
+                  </td>
+                  <td [class.text-success]="trade.roiPercentage >= 0" [class.text-danger]="trade.roiPercentage < 0">
+                    {{ trade.roiPercentage | number:'1.2-2' }}%
+                  </td>
+                  <td class="text-white-50">{{ trade.closedAt | date:'MM/dd HH:mm' }}</td>
+                </tr>
+                <tr *ngIf="tradeHistory.length === 0">
+                  <td colspan="8" class="text-center py-5 opacity-40">No hay historial de trades.</td>
                 </tr>
               </tbody>
             </table>
@@ -367,7 +432,10 @@
 
           <!-- Sub-col 2: Trading Panel -->
           <div class="col-6">
-            <app-trading-panel [balance]="0"></app-trading-panel>
+            <app-trading-panel 
+              [symbol]="selectedTicker?.symbol || selectedSymbol"
+              [price]="selectedTicker?.lastPrice || 0">
+            </app-trading-panel>
           </div>
         </div> <!-- End of sidebar row -->
       </div> <!-- End of col-xl-4 -->

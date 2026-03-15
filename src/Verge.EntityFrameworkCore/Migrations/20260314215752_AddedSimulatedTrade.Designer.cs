@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Verge.EntityFrameworkCore;
@@ -12,9 +13,11 @@ using Volo.Abp.EntityFrameworkCore;
 namespace Verge.Migrations
 {
     [DbContext(typeof(VergeDbContext))]
-    partial class VergeDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260314215752_AddedSimulatedTrade")]
+    partial class AddedSimulatedTrade
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -543,132 +546,6 @@ namespace Verge.Migrations
                     b.ToTable("TemporalOptimizationResults", (string)null);
                 });
 
-            modelBuilder.Entity("Verge.Trading.SimulatedTrade", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal?>("ClosePrice")
-                        .HasColumnType("numeric");
-
-                    b.Property<DateTime?>("ClosedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ConcurrencyStamp")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("ConcurrencyStamp");
-
-                    b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("CreationTime");
-
-                    b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("CreatorId");
-
-                    b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("DeleterId");
-
-                    b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("DeletionTime");
-
-                    b.Property<decimal>("EntryFee")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal>("EntryPrice")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal>("ExitFee")
-                        .HasColumnType("numeric");
-
-                    b.Property<string>("ExtraProperties")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("ExtraProperties");
-
-                    b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("IsDeleted");
-
-                    b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("LastModificationTime");
-
-                    b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("LastModifierId");
-
-                    b.Property<int>("Leverage")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("LiquidationPrice")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal>("Margin")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal>("MarginRate")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal>("MarkPrice")
-                        .HasColumnType("numeric");
-
-                    b.Property<DateTime>("OpenedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal>("ROIPercentage")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal?>("RealizedPnl")
-                        .HasColumnType("numeric");
-
-                    b.Property<int>("Side")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("Size")
-                        .HasColumnType("numeric");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Symbol")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<decimal>("TotalFundingPaid")
-                        .HasColumnType("numeric");
-
-                    b.Property<Guid?>("TradingSignalId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("UnrealizedPnl")
-                        .HasColumnType("numeric");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Status");
-
-                    b.HasIndex("Symbol");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("SimulatedTrades", (string)null);
-                });
-
             modelBuilder.Entity("Verge.Trading.TradeOrder", b =>
                 {
                     b.Property<Guid>("Id")
@@ -841,9 +718,6 @@ namespace Verge.Migrations
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
-
-                    b.Property<decimal>("VirtualBalance")
-                        .HasColumnType("numeric");
 
                     b.HasKey("Id");
 

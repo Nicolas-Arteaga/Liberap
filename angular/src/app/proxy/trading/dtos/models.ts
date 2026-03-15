@@ -1,7 +1,7 @@
-import type { EntityDto } from '@abp/ng.core';
 import type { SignalDirection } from '../signal-direction.enum';
-import type { SignalConfidence } from '../signal-confidence.enum';
+import type { EntityDto } from '@abp/ng.core';
 import type { TradeStatus } from '../trade-status.enum';
+import type { SignalConfidence } from '../signal-confidence.enum';
 import type { MarketRegimeType } from '../market-regime-type.enum';
 import type { TradingStage } from '../trading-stage.enum';
 
@@ -10,6 +10,19 @@ export interface EnhancedAnalysisDto {
   sentiment: SentimentAnalysisDto;
   summary?: string;
   recommendation?: string;
+}
+
+export interface EquityPointDto {
+  timestamp?: string;
+  balance: number;
+}
+
+export interface OpenTradeInputDto {
+  symbol?: string;
+  side?: SignalDirection;
+  amount: number;
+  leverage: number;
+  tradingSignalId?: string;
 }
 
 export interface SentimentAnalysisDto {
@@ -38,6 +51,39 @@ export interface SignalStatsDto {
   averageDurationMinutes: number;
   equityCurve: number[];
   byRegime: SignalRegimeStatDto[];
+}
+
+export interface SimulatedTradeDto extends EntityDto<string> {
+  userId?: string;
+  symbol?: string;
+  side?: SignalDirection;
+  leverage: number;
+  size: number;
+  amount: number;
+  entryPrice: number;
+  markPrice: number;
+  liquidationPrice: number;
+  margin: number;
+  marginRate: number;
+  unrealizedPnl: number;
+  roiPercentage: number;
+  status?: TradeStatus;
+  closePrice?: number;
+  realizedPnl?: number;
+  entryFee: number;
+  exitFee: number;
+  totalFundingPaid: number;
+  openedAt?: string;
+  closedAt?: string;
+  tradingSignalId?: string;
+}
+
+export interface SimulationPerformanceDto {
+  totalGain: number;
+  winRate: number;
+  totalTrades: number;
+  avgPerTrade: number;
+  equityCurve: EquityPointDto[];
 }
 
 export interface TargetZoneDto {

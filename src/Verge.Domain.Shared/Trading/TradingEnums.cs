@@ -68,7 +68,8 @@ public enum TradeStatus
     Loss,
     BreakEven,
     Canceled,
-    Expired
+    Expired,
+    Liquidated
 }
 
 public enum OrderType

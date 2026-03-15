@@ -7,6 +7,7 @@ export enum TradeStatus {
   BreakEven = 3,
   Canceled = 4,
   Expired = 5,
+  Liquidated = 6,
 }
 
 export const tradeStatusOptions = mapEnumToOptions(TradeStatus);

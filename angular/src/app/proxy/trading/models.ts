@@ -248,6 +248,16 @@ export interface StressTestReportDto {
   passedAllEvents: boolean;
 }
 
+export interface SymbolTickerDto {
+  symbol?: string;
+  lastPrice: number;
+  priceChange: number;
+  priceChangePercent: number;
+  volume: number;
+  highPrice: number;
+  lowPrice: number;
+}
+
 export interface TradeOrderDto extends FullAuditedEntityDto<string> {
   symbol?: string;
   direction?: SignalDirection;
@@ -360,13 +370,4 @@ export interface WalkForwardWindowDto {
   trainingResult: BacktestResultDto;
   testingResult: BacktestResultDto;
   passedProfitFactor: boolean;
-}
-export interface SymbolTickerDto {
-  symbol?: string;
-  lastPrice: number;
-  priceChange: number;
-  priceChangePercent: number;
-  volume: number;
-  highPrice: number;
-  lowPrice: number;
 }
