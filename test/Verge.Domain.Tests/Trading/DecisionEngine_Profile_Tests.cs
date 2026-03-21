@@ -20,10 +20,16 @@ public class DecisionEngine_Profile_Tests
     public DecisionEngine_Profile_Tests()
     {
         _probEngine = Substitute.For<IProbabilisticEngine>();
+        _probEngine.GetWinRateAsync(Arg.Any<TradingStyle>(), Arg.Any<string>(), Arg.Any<MarketRegimeType>(), Arg.Any<int>(), Arg.Any<DateTime>())
+            .Returns(new WinRateResult { Probability = 0.5, SampleSize = 0 });
         var calibRepo = Substitute.For<IRepository<StrategyCalibration, Guid>>();
         var whaleTracker = Substitute.For<IWhaleTrackerService>();
         var instService = Substitute.For<IInstitutionalDataService>();
         var macroService = Substitute.For<IMacroSentimentService>();
+
+        var aiConsensus = Substitute.For<IMultiAgentConsensusService>();
+        aiConsensus.GetConsensusAsync(Arg.Any<MarketContext>(), Arg.Any<TradingStyle>())
+            .Returns(new AgentConsensusResult { Score = 50, Reasoning = "Test AI Opinion" });
 
         _engine = new TradingDecisionEngine(
             NullLogger<TradingDecisionEngine>.Instance,
@@ -31,7 +37,8 @@ public class DecisionEngine_Profile_Tests
             calibRepo,
             whaleTracker,
             instService,
-            macroService);
+            macroService,
+            aiConsensus);
     }
 
     [Fact]
