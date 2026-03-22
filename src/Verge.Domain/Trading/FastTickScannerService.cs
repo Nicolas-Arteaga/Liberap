@@ -87,11 +87,22 @@ public class FastTickScannerService : BackgroundService
 
         foreach (var symbol in activeSymbols)
         {
-            var candles = await _marketDataManager.GetCandlesAsync(symbol, "1m", 2); // Get latest mini-candle
-            if (!candles.Any()) continue;
+            decimal currentPrice;
 
-            var currentPrice = candles.Last().Close;
-            
+            // 🚀 PRIMARY: Read price from WebSocket in-memory cache (ZERO REST calls)
+            var wsPrice = _marketDataManager.GetWebSocketPrice(symbol);
+            if (wsPrice.HasValue)
+            {
+                currentPrice = wsPrice.Value;
+            }
+            else
+            {
+                // Fallback to REST only if WebSocket hasn't received this symbol yet (startup)
+                var candles = await _marketDataManager.GetCandlesAsync(symbol, "1m", 2);
+                if (!candles.Any()) continue;
+                currentPrice = candles.Last().Close;
+            }
+
             if (lastPrices.TryGetValue(symbol, out var lastPrice))
             {
                 var delta = (double)Math.Abs((currentPrice - lastPrice) / lastPrice);

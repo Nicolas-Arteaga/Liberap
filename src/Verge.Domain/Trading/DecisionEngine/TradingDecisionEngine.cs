@@ -47,6 +47,7 @@
             float? trailingMultiplierOverride = null)
         {
             _logger.LogInformation("🧠 Profile-Based Evaluation: Session {SessionId} | Style: {Style} | AutoAdapt: {AutoAdapt}", session.Id, style, isAutoMode);
+            context.Symbol = session.Symbol;
 
             // 0. Update Direction based on Market Structure (Sprint 2 Adaptive)
             if (isAutoMode)
@@ -60,7 +61,7 @@
             // 2. Setup Invalidation Check (Phase 2)
             if (session.CurrentStage == TradingStage.Prepared)
             {
-                if (profile.IsInvalidated(context, out string invalidReason))
+                if (profile.IsInvalidated(session, context, out string invalidReason))
                 {
                     var invalidResult = new DecisionResult
                     {
@@ -122,7 +123,7 @@
             int? entryThresholdCalibrated = calibration?.EntryThreshold;
             
             // 6. Apply Profile Penalties
-            finalScore = profile.ApplyPenalties(context, finalScore, out string penaltyReason);
+            finalScore = profile.ApplyPenalties(session, context, finalScore, out string penaltyReason);
 
             // 6.1 Apply Setup Decay (Institutional 1% Sprint 1)
             finalScore = ApplySetupDecay(session, profile, finalScore, ref penaltyReason);
@@ -130,7 +131,7 @@
             int roundedScore = (int)Math.Clamp(finalScore, 0, 100);
 
             // 3. Hard Setup Validation (Setup Validator Phase)
-            if (!profile.ValidateEntry(context, out string setupInvalidReason))
+            if (!profile.ValidateEntry(session, context, out string setupInvalidReason))
             {
                 var setupInvalidResult = new DecisionResult
                 {
@@ -146,7 +147,14 @@
                 {
                     var earlyDir = session.SelectedDirection;
                     if (earlyDir == null || earlyDir == SignalDirection.Auto)
-                        earlyDir = context.MarketRegime?.Structure == "Bearish" ? SignalDirection.Short : SignalDirection.Long;
+                    {
+                        var regime = context.MarketRegime?.Regime;
+                        var structure = context.MarketRegime?.Structure;
+                        
+                        if (regime == MarketRegimeType.BearTrend || structure == "Bearish") earlyDir = SignalDirection.Short;
+                        else if (regime == MarketRegimeType.BullTrend || structure == "Bullish") earlyDir = SignalDirection.Long;
+                        else earlyDir = SignalDirection.Ignore;
+                    }
 
                     var earlyAtr = (decimal)(context.Technicals?.Atr ?? 0);
                     var earlyRisk = earlyAtr > 0 ? earlyAtr * 1.5m : earlyPrice * 0.015m;
@@ -265,8 +273,23 @@
                 var effectiveDirection = session.SelectedDirection;
                 if (effectiveDirection == null || effectiveDirection == SignalDirection.Auto)
                 {
-                    // Fallback to structure or momentum if still Auto/null
-                    effectiveDirection = context.MarketRegime?.Structure == "Bearish" ? SignalDirection.Short : SignalDirection.Long;
+                    var regime = context.MarketRegime?.Regime;
+                    var structure = context.MarketRegime?.Structure;
+                    
+                    if (regime == MarketRegimeType.BearTrend || structure == "Bearish")
+                    {
+                        effectiveDirection = SignalDirection.Short;
+                    }
+                    else if (regime == MarketRegimeType.BullTrend || structure == "Bullish")
+                    {
+                        effectiveDirection = SignalDirection.Long;
+                    }
+                    else
+                    {
+                        effectiveDirection = SignalDirection.Ignore;
+                        result.Decision = TradingDecision.Ignore;
+                        penaltyReason += " [Direction Unclear: Ignored]";
+                    }
                     session.SelectedDirection = effectiveDirection; // Persist for this session
                 }
 
@@ -337,27 +360,34 @@
             if (context.MarketRegime == null) return;
 
             var structure = context.MarketRegime.Structure;
+            var regime = context.MarketRegime.Regime;
             var bos = context.MarketRegime.BosDetected;
             var choch = context.MarketRegime.ChochDetected;
 
-            // Adaptive Direction Logic (Sprint 2)
-            // If we detect a clear structural break (BOS or CHOCH), we flip the session direction
-            if (structure == "Bullish" && (bos || choch))
-            {
-                if (session.SelectedDirection != SignalDirection.Long)
-                {
-                    _logger.LogInformation("🔄 AUTO ADAPT: Changing direction to LONG due to {Type} detected for {Symbol} (Session: {Id})", 
-                        bos ? "BOS" : "CHOCH", session.Symbol, session.Id);
-                    session.SelectedDirection = SignalDirection.Long;
-                }
-            }
-            else if (structure == "Bearish" && (bos || choch))
+            // Adaptive Direction Logic (Sprint 2) - Redesigned to prevent counter-trend bugs
+            if (regime == MarketRegimeType.BearTrend || structure == "Bearish")
             {
                 if (session.SelectedDirection != SignalDirection.Short)
                 {
-                    _logger.LogInformation("🔄 AUTO ADAPT: Changing direction to SHORT due to {Type} detected for {Symbol} (Session: {Id})", 
-                        bos ? "BOS" : "CHOCH", session.Symbol, session.Id);
+                    _logger.LogInformation("🔄 AUTO ADAPT: Changing direction to SHORT due to Bearish context for {Symbol} (Session: {Id})", session.Symbol, session.Id);
                     session.SelectedDirection = SignalDirection.Short;
+                }
+            }
+            else if (regime == MarketRegimeType.BullTrend || structure == "Bullish")
+            {
+                if (session.SelectedDirection != SignalDirection.Long)
+                {
+                    _logger.LogInformation("🔄 AUTO ADAPT: Changing direction to LONG due to Bullish context for {Symbol} (Session: {Id})", session.Symbol, session.Id);
+                    session.SelectedDirection = SignalDirection.Long;
+                }
+            }
+            else
+            {
+                // Ambiguous or Neutral regime
+                if (session.SelectedDirection != SignalDirection.Ignore)
+                {
+                    _logger.LogWarning("⚠️ AUTO ADAPT: Ambiguous market structure. Forcing direction to IGNORE to protect capital for {Symbol} (Session: {Id})", session.Symbol, session.Id);
+                    session.SelectedDirection = SignalDirection.Ignore;
                 }
             }
         }

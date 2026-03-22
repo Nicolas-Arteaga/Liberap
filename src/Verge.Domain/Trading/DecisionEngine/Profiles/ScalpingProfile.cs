@@ -28,7 +28,7 @@ public class ScalpingProfile : ITradingStyleProfile
 
     public string GetConfirmationTimeframe(string primaryTimeframe) => "15m";
 
-    public bool IsInvalidated(MarketContext context, out string reason)
+    public bool IsInvalidated(TradingSession session, MarketContext context, out string reason)
     {
         reason = string.Empty;
         if (context.Technicals == null) return false;
@@ -54,16 +54,29 @@ public class ScalpingProfile : ITradingStyleProfile
         return false;
     }
 
-    public bool ValidateEntry(MarketContext context, out string reason)
+    public bool ValidateEntry(TradingSession session, MarketContext context, out string reason)
     {
         reason = string.Empty;
         if (context.Technicals == null) return true;
 
-        // RSI Momentum Check (60-75)
-        if (context.Technicals.Rsi < 60 || context.Technicals.Rsi > 75)
+        var direction = session.SelectedDirection ?? SignalDirection.Long; // Default to old behavior if not set, but Engine won't let it be null soon.
+
+        // RSI Momentum Check
+        if (direction == SignalDirection.Long)
         {
-            reason = $"Scalping RSI {context.Technicals.Rsi:F1} outside momentum range (60-75)";
-            return false;
+            if (context.Technicals.Rsi < 60 || context.Technicals.Rsi > 75)
+            {
+                reason = $"IGNORE: Scalping LONG RSI {context.Technicals.Rsi:F1} outside momentum range (60-75)";
+                return false;
+            }
+        }
+        else if (direction == SignalDirection.Short)
+        {
+            if (context.Technicals.Rsi < 30 || context.Technicals.Rsi > 40)
+            {
+                reason = $"Scalping SHORT RSI {context.Technicals.Rsi:F1} outside momentum range (30-40)";
+                return false;
+            }
         }
 
         // ADX Trend Strength Check
@@ -76,7 +89,7 @@ public class ScalpingProfile : ITradingStyleProfile
         return true;
     }
 
-    public float ApplyPenalties(MarketContext context, float score, out string reason)
+    public float ApplyPenalties(TradingSession session, MarketContext context, float score, out string reason)
     {
         reason = string.Empty;
         

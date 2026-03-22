@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -17,6 +19,11 @@ public class MultiAgentConsensusService : DomainService, IMultiAgentConsensusSer
     private readonly IConfiguration _configuration;
     private readonly ILogger<MultiAgentConsensusService> _logger;
 
+    // 🚀 AI Response Cache (Sprint 5 Optimization)
+    // Key: {Symbol}_{Style}
+    private static readonly ConcurrentDictionary<string, (AgentConsensusResult Result, DateTime Expiry)> _consensusCache = new();
+    private const int CacheDurationMinutes = 10;
+
     public MultiAgentConsensusService(
         HttpClient httpClient,
         IConfiguration configuration,
@@ -29,11 +36,21 @@ public class MultiAgentConsensusService : DomainService, IMultiAgentConsensusSer
 
     public async Task<AgentConsensusResult> GetConsensusAsync(MarketContext context, TradingStyle style)
     {
+        var cacheKey = $"{context.Symbol}_{style}";
+        
+        // 1. Check Cache first to save AI tokens (429 Protection)
+        if (_consensusCache.TryGetValue(cacheKey, out var cacheItem) && DateTime.UtcNow < cacheItem.Expiry)
+        {
+            _logger.LogInformation("🧠 [AI CACHE] Using cached consensus for {Symbol} ({Style})", context.Symbol, style);
+            return cacheItem.Result;
+        }
+
         var result = new AgentConsensusResult();
+        bool anyRateLimitHit = false;
         
         try
         {
-            // 1. Dispatch Specialized Agents
+            // 2. Dispatch Specialized Agents
             var techTask = GetTechnicalOpinionAsync(context, style);
             var sentimentTask = GetSentimentOpinionAsync(context, style);
 
@@ -42,29 +59,70 @@ public class MultiAgentConsensusService : DomainService, IMultiAgentConsensusSer
             var techOpinion = await techTask;
             var sentimentOpinion = await sentimentTask;
 
-            result.AgentOpinions.Add("TechnicalAgent", techOpinion.Reasoning);
-            result.AgentOpinions.Add("SentimentAgent", sentimentOpinion.Reasoning);
+            // Detect 429/Rate limit from reasoning strings (set in CallGroq/CallGemini)
+            if (techOpinion.Reasoning.Contains("429") || sentimentOpinion.Reasoning.Contains("429"))
+            {
+                anyRateLimitHit = true;
+            }
 
-            // 2. Devil's Advocate (Challenges the leading bias)
-            float leadingScore = (techOpinion.Score + sentimentOpinion.Score) / 2;
-            var devilOpinion = await GetDevilAdvocateOpinionAsync(context, style, leadingScore, result.AgentOpinions);
-            result.AgentOpinions.Add("DevilAdvocate", devilOpinion.Reasoning);
+            if (anyRateLimitHit)
+            {
+                _logger.LogWarning("⚠️ [AI LIMIT] Rate limit detected. Activating Technical Fallback Mode for {Symbol}...", context.Symbol);
+                result = CalculateTechnicalFallback(context, style);
+            }
+            else
+            {
+                result.AgentOpinions.Add("TechnicalAgent", techOpinion.Reasoning);
+                result.AgentOpinions.Add("SentimentAgent", sentimentOpinion.Reasoning);
 
-            // 3. Final Aggregation
-            // We give 40% tech, 40% sentiment, 20% devil (correction)
-            result.Score = (techOpinion.Score * 0.4f) + (sentimentOpinion.Score * 0.4f) + (devilOpinion.Score * 0.2f);
-            
-            result.Reasoning = $"[AI Consensus] Final Score: {result.Score:F1}. " +
-                               $"Tech: {techOpinion.Score:F0}, Sent: {sentimentOpinion.Score:F0}. " +
-                               $"Devil: {devilOpinion.Reasoning.Take(50)}...";
+                // 2. Devil's Advocate (Challenges the leading bias)
+                float leadingScore = (techOpinion.Score + sentimentOpinion.Score) / 2;
+                var devilOpinion = await GetDevilAdvocateOpinionAsync(context, style, leadingScore, result.AgentOpinions);
+                result.AgentOpinions.Add("DevilAdvocate", devilOpinion.Reasoning);
+
+                // 3. Final Aggregation
+                result.Score = (techOpinion.Score * 0.4f) + (sentimentOpinion.Score * 0.4f) + (devilOpinion.Score * 0.2f);
+                
+                result.Reasoning = $"[AI Consensus] Final Score: {result.Score:F1}. " +
+                                   $"Tech: {techOpinion.Score:F0}, Sent: {sentimentOpinion.Score:F0}. " +
+                                   $"Devil: {devilOpinion.Reasoning.Take(50)}...";
+            }
+
+            // 4. Update Cache
+            _consensusCache[cacheKey] = (result, DateTime.UtcNow.AddMinutes(CacheDurationMinutes));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in MultiAgentConsensusService");
-            result.Score = 50; // Neutral fallback
-            result.Reasoning = "AI Consensus unavailable due to connection error.";
+            result = CalculateTechnicalFallback(context, style); // Fallback on exception too
         }
 
+        return result;
+    }
+
+    private AgentConsensusResult CalculateTechnicalFallback(MarketContext context, TradingStyle style)
+    {
+        var result = new AgentConsensusResult();
+        float score = 50;
+
+        if (context.Technicals != null)
+        {
+            float rsiScore = 50;
+            if (context.Technicals.Rsi < 35) rsiScore = 80; // Oversold -> High Long bias
+            else if (context.Technicals.Rsi > 65) rsiScore = 20; // Overbought -> High Short bias
+
+            float trendScore = 50;
+            if (context.MarketRegime?.Regime == MarketRegimeType.BullTrend) trendScore = 80;
+            else if (context.MarketRegime?.Regime == MarketRegimeType.BearTrend) trendScore = 20;
+
+            // Simple weighted average for technical fallback
+            score = (rsiScore * 0.5f) + (trendScore * 0.5f);
+        }
+
+        result.Score = score;
+        result.Reasoning = $"⚠️ [TECH-FALLBACK] AI Limited by Quota. Score calculated via RSI/Regime. (Score: {score:F1})";
+        result.AgentOpinions.Add("EmergencySystem", "AI Rate limited. Using deterministic technical rules.");
+        
         return result;
     }
 
@@ -91,7 +149,7 @@ public class MultiAgentConsensusService : DomainService, IMultiAgentConsensusSer
     {
         var bias = currentScore > 50 ? "BULLISH" : "BEARISH";
         var prompt = $"You are a Skeptic Trader. The current consensus is {bias} (Score: {currentScore}). " +
-                     $"Opinions: {string.Join(" | ", opinions.Values)}. " +
+                     $"Opinions: {string.Join(" | ", opinions.Values)}. " + bias +
                      $"Challenge this bias. Find risks. Return a adjusted 'score' (0-100) and 'reasoning'.";
 
         return await CallGroqAsync(prompt, "Devil's Advocate");
@@ -139,6 +197,10 @@ public class MultiAgentConsensusService : DomainService, IMultiAgentConsensusSer
                          return (parsed.Score, $"[{role}] {parsed.Reasoning}");
                     }
                 }
+            }
+            else if (response.StatusCode == HttpStatusCode.TooManyRequests)
+            {
+                return (50, $"[{role}] ERROR 429: Rate limit hit.");
             }
             else
             {
@@ -208,6 +270,10 @@ public class MultiAgentConsensusService : DomainService, IMultiAgentConsensusSer
                         }
                     }
                 }
+            }
+            else if (response.StatusCode == HttpStatusCode.TooManyRequests)
+            {
+                return (50, $"[{role}] ERROR 429: Rate limit hit.");
             }
             else
             {

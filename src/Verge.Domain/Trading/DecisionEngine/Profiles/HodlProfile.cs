@@ -30,13 +30,13 @@ public class HodlProfile : ITradingStyleProfile
 
     public string GetConfirmationTimeframe(string primaryTimeframe) => primaryTimeframe; // No HTF for HODL
 
-    public bool IsInvalidated(MarketContext context, out string reason)
+    public bool IsInvalidated(TradingSession session, MarketContext context, out string reason)
     {
         reason = string.Empty;
         return false; // HODL never invalidates
     }
 
-    public bool ValidateEntry(MarketContext context, out string reason)
+    public bool ValidateEntry(TradingSession session, MarketContext context, out string reason)
     {
         reason = string.Empty;
 
@@ -72,7 +72,7 @@ public class HodlProfile : ITradingStyleProfile
         return true;
     }
 
-    public float ApplyPenalties(MarketContext context, float score, out string reason)
+    public float ApplyPenalties(TradingSession session, MarketContext context, float score, out string reason)
     {
         reason = string.Empty;
         // HODL usually doesn't apply penalties, it accumulates

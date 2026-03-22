@@ -27,7 +27,7 @@ public class PositionTradingProfile : ITradingStyleProfile
 
     public string GetConfirmationTimeframe(string primaryTimeframe) => "1d";
 
-    public bool IsInvalidated(MarketContext context, out string reason)
+    public bool IsInvalidated(TradingSession session, MarketContext context, out string reason)
     {
         reason = string.Empty;
         if (context.MarketRegime?.Regime == MarketRegimeType.Ranging)
@@ -45,7 +45,7 @@ public class PositionTradingProfile : ITradingStyleProfile
         return false;
     }
 
-    public bool ValidateEntry(MarketContext context, out string reason)
+    public bool ValidateEntry(TradingSession session, MarketContext context, out string reason)
     {
         reason = string.Empty;
 
@@ -76,7 +76,7 @@ public class PositionTradingProfile : ITradingStyleProfile
         return true;
     }
 
-    public float ApplyPenalties(MarketContext context, float score, out string reason)
+    public float ApplyPenalties(TradingSession session, MarketContext context, float score, out string reason)
     {
         reason = string.Empty;
 

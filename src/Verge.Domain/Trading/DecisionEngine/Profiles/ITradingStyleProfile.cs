@@ -27,13 +27,13 @@ public interface ITradingStyleProfile
     // Phase 2: Signal Quality
     int RequiredConfirmations { get; }
     string GetConfirmationTimeframe(string primaryTimeframe);
-    bool IsInvalidated(MarketContext context, out string reason);
+    bool IsInvalidated(TradingSession session, MarketContext context, out string reason);
     
     // Hard entry validation (setups)
-    bool ValidateEntry(MarketContext context, out string reason);
+    bool ValidateEntry(TradingSession session, MarketContext context, out string reason);
     
     // Contextual penalties / bonuses
-    float ApplyPenalties(MarketContext context, float score, out string reason);
+    float ApplyPenalties(TradingSession session, MarketContext context, float score, out string reason);
 
     // Dynamic Thresholds (Sprint 4)
     (int Entry, int Prepare, int Context) GetAdjustedThresholds(double? winRate);

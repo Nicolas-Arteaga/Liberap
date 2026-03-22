@@ -6,19 +6,28 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Volo.Abp.Domain.Services;
+using Verge.Trading.Integrations;
 
 namespace Verge.Trading;
 
 public class MarketDataManager : DomainService
 {
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly BinanceWebSocketService _webSocketService;
     private const string BinanceBaseUrl = "https://api.binance.com";
     private const string FuturesBaseUrl = "https://fapi.binance.com";
 
-    public MarketDataManager(IHttpClientFactory httpClientFactory)
+    public MarketDataManager(IHttpClientFactory httpClientFactory, BinanceWebSocketService webSocketService)
     {
         _httpClientFactory = httpClientFactory;
+        _webSocketService = webSocketService;
     }
+
+    /// <summary>
+    /// Returns the live price from the WebSocket in-memory cache (zero REST calls).
+    /// Returns null if data is not yet available (e.g., on startup before WebSocket connects).
+    /// </summary>
+    public decimal? GetWebSocketPrice(string symbol) => _webSocketService.GetLastPrice(symbol);
 
     public async Task<MarketOpenInterestModel?> GetOpenInterestAsync(string symbol)
     {

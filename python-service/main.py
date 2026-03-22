@@ -198,7 +198,7 @@ async def detect_regime(request: MarketDataRequest):
             else:
                 regime = "BearTrend"
                 
-        if volatility_score > 1.8: # Umbral ajustado
+        if volatility_score > 1.8 and regime == "Ranging": # Umbral ajustado
             regime = "VolatileBreakout"
             
         # 4. Liquidity Zones (Basic)

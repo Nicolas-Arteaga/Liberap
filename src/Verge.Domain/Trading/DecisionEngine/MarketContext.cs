@@ -8,6 +8,8 @@ namespace Verge.Trading.DecisionEngine;
 
 public class MarketContext
 {
+    public string Symbol { get; set; } = string.Empty;
+
     // Macro
     public FearAndGreedResult? FearAndGreed { get; set; }
     

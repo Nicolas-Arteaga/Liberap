@@ -41,8 +41,8 @@ public class MarketScannerService : BackgroundService
                 _logger.LogError(ex, "❌ Error in market scanner cycle");
             }
 
-            _logger.LogInformation("😴 Scanner sleeping for 1 minute...");
-            await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
+            _logger.LogInformation("😴 Scanner sleeping for 3 minutes...");
+            await Task.Delay(TimeSpan.FromMinutes(3), stoppingToken);
         }
     }
 
@@ -71,9 +71,9 @@ public class MarketScannerService : BackgroundService
             _logger.LogWarning("🌍 QUIET PERIOD ACTIVE: {reason}. Skipping scanners or dampening entries...", macroData.QuietPeriodReason);
         }
 
-        // 1. Obtener Top 30
-        var topSymbols = await marketDataManager.GetTopSymbolsAsync(30);
-        _logger.LogInformation("📊 Top 30 symbols obtained ({count}). Analyzing...", topSymbols.Count);
+        // Top 15 symbols by volume — reduced from 30 to minimize Binance REST rate limit usage
+        var topSymbols = await marketDataManager.GetTopSymbolsAsync(15);
+        _logger.LogInformation("📊 Top 15 symbols to analyze ({count}). Analyzing...", topSymbols.Count);
 
         int analyzedCount = 0;
         foreach (var symbol in topSymbols)

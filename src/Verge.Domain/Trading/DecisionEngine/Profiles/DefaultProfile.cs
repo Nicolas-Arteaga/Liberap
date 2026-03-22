@@ -29,19 +29,19 @@ public class DefaultProfile : ITradingStyleProfile
 
     public string GetConfirmationTimeframe(string primaryTimeframe) => primaryTimeframe;
 
-    public bool IsInvalidated(MarketContext context, out string reason)
+    public bool IsInvalidated(TradingSession session, MarketContext context, out string reason)
     {
         reason = string.Empty;
         return false;
     }
 
-    public bool ValidateEntry(MarketContext context, out string reason)
+    public bool ValidateEntry(TradingSession session, MarketContext context, out string reason)
     {
         reason = string.Empty;
         return true; // No hard conditions by default
     }
 
-    public float ApplyPenalties(MarketContext context, float score, out string reason)
+    public float ApplyPenalties(TradingSession session, MarketContext context, float score, out string reason)
     {
         reason = string.Empty;
         return score;

@@ -21,7 +21,8 @@ public enum SignalDirection
 {
     Long,
     Short,
-    Auto
+    Auto,
+    Ignore  // No clear directional bias — skip this trade
 }
 
 public enum SignalConfidence
