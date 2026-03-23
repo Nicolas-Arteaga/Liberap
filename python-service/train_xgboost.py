@@ -1,83 +1,91 @@
 import pandas as pd
+import numpy as np
 import xgboost as xgb
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, f1_score, classification_report
+import lightgbm as lgb
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import f1_score, classification_report, precision_score
+from sklearn.model_selection import TimeSeriesSplit
+from imblearn.over_sampling import SMOTE
+import joblib
+import json
 import os
+from datetime import datetime
 
-def train_verge_model(data_path):
-    """
-    Trains the XGBoost model for Verge based on historical CSV data.
-    """
+def train_ensemble(data_path):
     if not os.path.exists(data_path):
-        print(f"❌ Error: {data_path} not found. Run train_model.py first.")
+        print("❌ Dataset not found.")
         return
 
     df = pd.read_csv(data_path)
-    
-    # Feature Selection (must match inference in main.py)
-    features = ['rsi', 'macd_diff', 'adx', 'vol_ratio', 'roc', 'atr', 'volatility']
+    features = ['rsi', 'adx', 'atr', 'funding_rate', 'oi_change', 'vol_ratio', 'fng_value', 'trend_4h', 'liq_proxy']
     X = df[features]
     y = df['label']
     
-    # Split (Chronological split for time-series)
     split_idx = int(len(X) * 0.8)
     X_train, X_test = X.iloc[:split_idx], X.iloc[split_idx:]
     y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
     
-    print(f"🚀 Training XGBoost on {len(X_train)} samples...")
-    print(f"Class distribution: {y_train.value_counts().to_dict()}")
-    
-    # Calculate scale_pos_weight for imbalance
-    pos_count = sum(y_train == 1)
-    neg_count = sum(y_train == 0)
-    spw = neg_count / pos_count if pos_count > 0 else 1
-    print(f"⚖️ Using scale_pos_weight: {spw:.2f}")
+    print(f"🚀 Training Ensemble on {len(X_train)} samples...")
+    smote = SMOTE(sampling_strategy=0.4, random_state=42)
+    X_train_bal, y_train_bal = smote.fit_resample(X_train, y_train)
 
-    model = xgb.XGBClassifier(
-        n_estimators=150,
-        max_depth=6,
-        learning_rate=0.03,
-        scale_pos_weight=spw,
-        objective='binary:logistic',
-        random_state=42
-    )
+    # 1. XGBoost
+    print("🌲 Training XGBoost...")
+    model_xgb = xgb.XGBClassifier(n_estimators=200, max_depth=6, learning_rate=0.03, random_state=42)
+    model_xgb.fit(X_train_bal, y_train_bal)
     
-    model.fit(X_train, y_train)
+    # 2. LightGBM
+    print("🌿 Training LightGBM...")
+    model_lgb = lgb.LGBMClassifier(n_estimators=200, max_depth=6, learning_rate=0.03, random_state=42, verbose=-1)
+    model_lgb.fit(X_train_bal, y_train_bal)
     
-    # Threshold Optimization (Find best threshold for F1)
-    import numpy as np
-    probs = model.predict_proba(X_test)[:, 1]
+    # 3. Random Forest
+    print("🌳 Training Random Forest...")
+    model_rf = RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42)
+    model_rf.fit(X_train_bal, y_train_bal)
     
-    best_threshold = 0.5
+    # Ensemble Probability (Average)
+    prob_xgb = model_xgb.predict_proba(X_test)[:, 1]
+    prob_lgb = model_lgb.predict_proba(X_test)[:, 1]
+    prob_rf = model_rf.predict_proba(X_test)[:, 1]
+    
+    ensemble_prob = (prob_xgb + prob_lgb + prob_rf) / 3
+    
+    # Find Optimal Strong Threshold
     best_f1 = 0
+    opt_threshold = 0.4
+    for th in np.arange(0.2, 0.7, 0.05):
+        f1 = f1_score(y_test, (ensemble_prob >= th).astype(int))
+        if f1 > best_f1:
+            best_f1, opt_threshold = f1, th
+
+    print(f"\n🎯 Optimal Ensemble Threshold: {opt_threshold:.2f} (F1: {best_f1:.4f})")
     
-    for th in np.arange(0.1, 0.9, 0.05):
-        current_preds = (probs >= th).astype(int)
-        current_f1 = f1_score(y_test, current_preds)
-        if current_f1 > best_f1:
-            best_f1 = current_f1
-            best_threshold = th
-            
-    print(f"\n🎯 Optimal Threshold found: {best_threshold:.2f} (Max F1: {best_f1:.4f})")
+    # Stats
+    preds = (ensemble_prob >= opt_threshold).astype(int)
+    print("\n--- Ensemble Performance ---")
+    print(classification_report(y_test, preds))
     
-    final_preds = (probs >= best_threshold).astype(int)
-    acc = accuracy_score(y_test, final_preds)
+    # Save Models
+    model_xgb.save_model("ensemble_xgb.json")
+    model_lgb.booster_.save_model("ensemble_lgb.txt")
+    joblib.dump(model_rf, "ensemble_rf.joblib")
     
-    print("\n--- Final Model Performance ---")
-    print(f"Accuracy: {acc:.1%}")
-    print(f"F1 Score (Pos Class): {best_f1:.4f}")
-    print("\nClassification Report:")
-    print(classification_report(y_test, final_preds))
-    
-    # Save model and meta-data (threshold)
-    model.save_model("xgboost_v1.json")
+    # Save Metadata
+    meta = {
+        "features": features,
+        "thresholds": {
+            "weak": float(opt_threshold * 0.8),
+            "medium": float(opt_threshold),
+            "strong": float(opt_threshold * 1.3)
+        },
+        "f1_score": float(best_f1),
+        "last_training": datetime.now().isoformat()
+    }
     with open("model_meta.json", "w") as f:
-        import json
-        json.dump({"threshold": float(best_threshold), "features": features}, f)
+        json.dump(meta, f)
         
-    print("✅ Model and Metadata saved. Ready for production.")
+    print("✅ Ensemble Models saved. Ready for Millionaire Mode.")
 
 if __name__ == "__main__":
-    # symbol = "BTC/USDT"
-    data_file = "historical_BTC_USDT.csv"
-    train_verge_model(data_file)
+    train_ensemble("millionaire_dataset.csv")

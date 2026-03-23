@@ -4,10 +4,12 @@ pandas
 ta
 uvicorn
 python-dotenv
-tensorflow
 scikit-learn
 ccxt
 numpy
 xgboost
 praw
 redis
+imbalanced-learn
+lightgbm
+joblib
