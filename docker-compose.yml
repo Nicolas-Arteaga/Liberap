@@ -1,19 +1,47 @@
+version: '3.8'
+
 services:
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: Verge
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+  redis:
+    image: redis:7-alpine
+    container_name: verge-redis
     ports:
-      - "5433:5432"
+      - "6379:6379"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - redis_data:/data
+    restart: always
+
+  python-ai:
+    build:
+      context: ./python-service
+    container_name: verge-python-ai
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MODEL_PATH=xgboost_v1.json
+    depends_on:
+      - redis
+    restart: always
+
+  dotnet-backend:
+    build:
+      context: .
+      dockerfile: src/Verge.HttpApi.Host/Dockerfile
+    container_name: verge-dotnet-backend
+    ports:
+      - "5000:80"
+      - "5001:443"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - Redis:Configuration=redis:6379
+      - RemoteServices:PythonAI:BaseUrl=http://python-ai:8000
+      - BINANCE_API_KEY=${BINANCE_API_KEY}
+      - BINANCE_API_SECRET=${BINANCE_API_SECRET}
+    depends_on:
+      - redis
+      - python-ai
+    restart: always
 
 volumes:
-  postgres_data:
+  redis_data:

@@ -57,6 +57,11 @@ def extract_features(df):
     df['macd_diff'] = macd.macd_diff()
     df['adx'] = ta.trend.ADXIndicator(df['high'], df['low'], df['close']).adx()
     
+    # NEW: Volatility and Momentum
+    df['roc'] = ta.momentum.ROCIndicator(df['close'], window=12).roc()
+    df['atr'] = ta.volatility.AverageTrueRange(df['high'], df['low'], df['close'], window=14).average_true_range()
+    df['volatility'] = df['close'].rolling(window=24).std() / df['close'] # Normalizado
+    
     # Volume Relative to Moving Average
     df['vol_ma'] = df['volume'].rolling(window=20).mean()
     df['vol_ratio'] = df['volume'] / df['vol_ma']
@@ -66,7 +71,7 @@ def extract_features(df):
 if __name__ == "__main__":
     # Example Workflow
     symbol = "BTC/USDT"
-    data = download_historical_data(symbol, limit=2000)
+    data = download_historical_data(symbol, limit=5000)
     data = extract_features(data)
     data = label_data(data)
     

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <Import Project="..\..\common.props" />
 
@@ -45,6 +45,12 @@
     <ProjectReference Include="..\Verge.Application\Verge.Application.csproj" />
     <ProjectReference Include="..\Verge.HttpApi\Verge.HttpApi.csproj" />
     <ProjectReference Include="..\Verge.EntityFrameworkCore\Verge.EntityFrameworkCore.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="StackExchange.Redis" Version="2.7.33" />
+    <PackageReference Include="Binance.Net" Version="9.8.0" />
+    <PackageReference Include="CryptoExchange.Net" Version="7.2.0" />
   </ItemGroup>
 
   <ItemGroup>

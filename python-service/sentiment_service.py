@@ -1,9 +1,9 @@
 import os
 import time
 import logging
-import praw
-import requests
-from datetime import datetime, timedelta
+import json
+import redis
+from datetime import datetime
 
 logger = logging.getLogger("VERGE_SENTIMENT")
 
@@ -19,7 +19,11 @@ class SentimentService:
         self.reddit_client_secret = os.environ.get("REDDIT_CLIENT_SECRET")
         self.reddit_user_agent = "VergeAI/1.0"
         
-        self.cache = {"score": 0.5, "last_update": datetime.min}
+        # Redis Connection
+        redis_host = os.environ.get("REDIS_HOST", "localhost")
+        redis_port = int(os.environ.get("REDIS_PORT", 6379))
+        self.r = redis.Redis(host=redis_host, port=redis_port, db=0, decode_responses=True)
+        
         self.reddit = None
         if self.reddit_client_id and self.reddit_client_secret:
             try:
@@ -32,29 +36,32 @@ class SentimentService:
                 logger.error(f"Reddit init failed: {e}")
 
     def get_combined_sentiment(self, symbol="BTC"):
-        # Cache TTL: 5 minutes
-        if datetime.now() - self.cache["last_update"] < timedelta(minutes=5):
-            return self.cache["score"]
+        cache_key = f"sentiment:{symbol.upper()}"
+        
+        # Check Redis Cache First
+        cached_score = self.r.get(cache_key)
+        if cached_score:
+            return float(cached_score)
 
         try:
             scores = []
             
-            # 1. Reddit Sentiment (r/CryptoCurrency)
+            # 1. Reddit Sentiment
             if self.reddit:
                 subreddit = self.reddit.subreddit("CryptoCurrency")
                 for post in subreddit.hot(limit=10):
                     if symbol.lower() in post.title.lower() or symbol.lower() in post.selftext.lower():
-                        # Simple scoring based on title sentiment (could be improved with TextBlob/VADER)
                         scores.append(0.6 if post.score > 100 else 0.5)
             
-            # 2. Twitter Sentiment (Mocking for now as Tier Gratuito requires specific setup)
-            # In a real scenario, this uses requests.get("https://api.twitter.com/2/tweets/search/recent?query=#BTC")
+            # 2. Twitter Sentiment (Placeholder)
             if self.twitter_bearer_token:
-                logger.info(f"Fetching Twitter sentiment for #{symbol}...")
-                scores.append(0.55) # Placeholder
+                scores.append(0.55)
             
             final_score = sum(scores) / len(scores) if scores else 0.5
-            self.cache = {"score": final_score, "last_update": datetime.now()}
+            
+            # Set Redis Cache with 5 min TTL
+            self.r.setex(cache_key, 300, str(final_score))
+            
             return final_score
 
         except Exception as e:

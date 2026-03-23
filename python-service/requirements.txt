@@ -10,3 +10,4 @@ ccxt
 numpy
 xgboost
 praw
+redis

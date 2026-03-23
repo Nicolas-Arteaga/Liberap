@@ -44,6 +44,7 @@ using Volo.Abp.Studio.Client.AspNetCore;
 using Volo.Abp.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
 using Volo.Abp.AspNetCore.SignalR;
+using StackExchange.Redis;
 
 namespace Verge;
 
@@ -144,6 +145,18 @@ public class VergeHttpApiHostModule : AbpModule
         context.Services.AddHostedService<MarketScannerService>();
         context.Services.AddHostedService<LiveSignalCollectorJob>();
         context.Services.AddHostedService<SimulationMarkPriceWorker>();
+
+        // Redis Configuration (Graceful startup)
+        var redisConfig = configuration["Redis:Configuration"] ?? "localhost:6379";
+        if (!redisConfig.Contains("abortConnect")) 
+        {
+            redisConfig += redisConfig.Contains(",") ? ",abortConnect=false" : ",abortConnect=false";
+        }
+        
+        context.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConfig));
+
+        // Execution Service
+        context.Services.AddSingleton<BinanceFuturesExecutionService>();
 
         context.Services.ConfigureApplicationCookie(options =>
         {

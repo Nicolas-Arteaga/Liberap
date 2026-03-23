@@ -21,8 +21,10 @@
      <PackageReference Include="Volo.Abp.Account.Application" Version="10.0.1" />
      <PackageReference Include="Volo.Abp.Identity.Application" Version="10.0.1" />
      <PackageReference Include="Volo.Abp.TenantManagement.Application" Version="10.0.1" />
- 		<PackageReference Include="Volo.Abp.AutoMapper" Version="10.0.1" />
- 	</ItemGroup>
+     <PackageReference Include="Volo.Abp.AutoMapper" Version="10.0.1" />
+     <PackageReference Include="Binance.Net" Version="9.8.0" />
+     <PackageReference Include="CryptoExchange.Net" Version="7.2.0" />
+   </ItemGroup>
  
    <ItemGroup>
      <FrameworkReference Include="Microsoft.AspNetCore.App" />

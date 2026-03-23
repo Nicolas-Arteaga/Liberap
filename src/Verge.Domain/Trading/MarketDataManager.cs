@@ -5,6 +5,8 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Http;
+using StackExchange.Redis;
 using Volo.Abp.Domain.Services;
 using Verge.Trading.Integrations;
 
@@ -17,12 +19,13 @@ public class MarketDataManager : DomainService
     private const string BinanceBaseUrl = "https://api.binance.com";
     private const string FuturesBaseUrl = "https://fapi.binance.com";
 
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (DateTime Expiry, List<MarketCandleModel> Data)> _candleCache = new();
+    private readonly IDatabase _redis;
 
-    public MarketDataManager(IHttpClientFactory httpClientFactory, BinanceWebSocketService webSocketService)
+    public MarketDataManager(IHttpClientFactory httpClientFactory, BinanceWebSocketService webSocketService, IConnectionMultiplexer redis)
     {
         _httpClientFactory = httpClientFactory;
         _webSocketService = webSocketService;
+        _redis = redis.GetDatabase();
     }
 
     /// <summary>
@@ -114,11 +117,12 @@ public class MarketDataManager : DomainService
                 _ => interval 
             };
 
-            var cacheKey = $"{cleanSymbol}_{binanceInterval}_{limit}";
+            var cacheKey = $"price:{cleanSymbol}:{binanceInterval}";
 
-            if (_candleCache.TryGetValue(cacheKey, out var cached) && cached.Expiry > DateTime.UtcNow)
+            var cached = await _redis.StringGetAsync(cacheKey);
+            if (cached.HasValue)
             {
-                return cached.Data;
+                return JsonSerializer.Deserialize<List<MarketCandleModel>>((string)cached!)!;
             }
 
             var client = _httpClientFactory.CreateClient();
@@ -160,14 +164,14 @@ public class MarketDataManager : DomainService
             }
 
 
-            // TTL Strategy: 30s (1m), 2m (5m), 5m (15m+)
+            // Redis Cache with TTL
             var ttlSeconds = binanceInterval switch {
                 "1m" => 30,
                 "5m" => 120,
                 _ => 300
             };
 
-            _candleCache[cacheKey] = (DateTime.UtcNow.AddSeconds(ttlSeconds), result);
+            await _redis.StringSetAsync(cacheKey, JsonSerializer.Serialize(result), TimeSpan.FromSeconds(ttlSeconds));
 
             return result;
         }

@@ -157,6 +157,8 @@ class XGBoostPredictor:
     def __init__(self, model_path=None):
         self.model = None
         self.model_path = model_path
+        self.threshold = 0.5 # Default
+        self.features = ['rsi', 'macd_diff', 'adx', 'vol_ratio', 'roc', 'atr', 'volatility']
         self.load_model()
 
     def load_model(self):
@@ -165,18 +167,29 @@ class XGBoostPredictor:
                 self.model = xgb.Booster()
                 self.model.load_model(self.model_path)
                 logger.info(f"✅ Model loaded successfully from {self.model_path}")
+                
+                # Load metadata
+                meta_path = "model_meta.json"
+                if os.path.exists(meta_path):
+                    with open(meta_path, "r") as f:
+                        meta = json.load(f)
+                        self.threshold = meta.get("threshold", 0.5)
+                        self.features = meta.get("features", self.features)
+                        logger.info(f"🎯 Threshold set to {self.threshold}")
+
             except Exception as e:
                 logger.error(f"❌ Failed to load model from {self.model_path}: {e}")
                 self.model = None
         else:
             logger.warning(f"⚠️ Model file NOT FOUND at {self.model_path}. Inference disabled.")
 
-    def predict(self, features):
+    def predict(self, feature_values):
         if not self.model:
             return None
         
-        dmatrix = xgb.DMatrix([features])
-        return self.model.predict(dmatrix)[0]
+        dmatrix = xgb.DMatrix([feature_values], feature_names=self.features)
+        prob = self.model.predict(dmatrix)[0]
+        return prob
 
 # Global Predictor Instance
 predictor = XGBoostPredictor(MODEL_PATH)
@@ -221,29 +234,45 @@ async def analyze_super(request: SuperAnalysisRequest):
         rsi1m = ta.momentum.RSIIndicator(df1m["close"]).rsi().iloc[-1]
         rsi5m = ta.momentum.RSIIndicator(df5m["close"]).rsi().iloc[-1]
         
-        # 2. XGBoost Prediction
-        features = [
-            (rsi1m - 50) / 50,
-            (rsi5m - 50) / 50,
-            (v_sentiment - 0.5) * 2,
-            1.0 if (df1m["volume"].iloc[-1] > df5m["volume"].mean() * 2.5) else 0.0
+        # 2. XGBoost Prediction (Features must match train_model.py exactly)
+        # Using 5m as the primary timeframe for features
+        rsi = ta.momentum.RSIIndicator(df5m["close"]).rsi().iloc[-1]
+        macd_diff = ta.trend.MACD(df5m["close"]).macd_diff().iloc[-1]
+        adx = ta.trend.ADXIndicator(df5m["high"], df5m["low"], df5m["close"]).adx().iloc[-1]
+        vol_ma = df5m['volume'].rolling(window=20).mean().iloc[-1]
+        vol_ratio = df5m['volume'].iloc[-1] / vol_ma if vol_ma > 0 else 1
+        
+        roc = ta.momentum.ROCIndicator(df5m["close"], window=12).roc().iloc[-1]
+        atr = ta.volatility.AverageTrueRange(df5m["high"], df5m["low"], df5m["close"], window=14).average_true_range().iloc[-1]
+        volatility = df5m["close"].tail(24).std() / df5m["close"].iloc[-1]
+        
+        feature_values = [
+            rsi,
+            macd_diff,
+            adx,
+            vol_ratio,
+            roc,
+            atr,
+            volatility
         ]
         
-        prob = predictor.predict(features)
+        prob = predictor.predict(feature_values)
         
         if prob is None:
              raise HTTPException(status_code=503, detail="Error en inferencia del modelo.")
 
-        # 3. Decision Logic
+        # 3. Decision Logic (Using Optimized Threshold)
         signal = "Hold"
-        confidence = abs(prob - 0.5) * 2
+        confidence = abs(prob - predictor.threshold) * 2
         
-        if prob > 0.6: signal = "Buy"
-        elif prob < 0.4: signal = "Sell"
+        if prob > predictor.threshold: signal = "Buy"
+        elif prob < (predictor.threshold * 0.8): signal = "Sell" # Risk avoid for now
         
         reasons = []
-        if prob > 0.6: reasons.append(f"XGBoost: High probability of price increase ({prob:.1%})")
-        if prob < 0.4: reasons.append(f"XGBoost: High probability of price decrease ({prob:.1%})")
+        if prob > predictor.threshold: 
+            reasons.append(f"XGBoost: Probability of increase ({prob:.1%}) exceeds optimized threshold ({predictor.threshold:.2f})")
+        if prob < (predictor.threshold * 0.8):
+            reasons.append(f"XGBoost: Low probability of increase ({prob:.1%}) suggests risk avoidance.")
 
         # Log for Monitoring
         monitor.log_prediction(signal, prob, {"symbol": request.symbol})
