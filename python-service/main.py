@@ -15,11 +15,7 @@ from sentiment_service import SentimentService
 from dotenv import load_dotenv
 
 # Initialize logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', handlers=[logging.StreamHandler(sys.stdout)])
 logger = logging.getLogger("VERGE_AI")
 
 # Graceful Imports
@@ -28,13 +24,11 @@ try:
     HAS_JOBLIB = True
 except ImportError:
     HAS_JOBLIB = False
-
 try:
     import lightgbm as lgb
     HAS_LGB = True
 except ImportError:
     HAS_LGB = False
-
 try:
     import xgboost as xgb
     HAS_XGB = True
@@ -43,15 +37,9 @@ except ImportError:
 
 load_dotenv()
 
-app = FastAPI(title="VERGE AI - Full Stable Suite", version="1.8.1")
+app = FastAPI(title="VERGE AI - Phase 2.0 Multi-Style", version="2.0.0")
 
-# Models Paths
-XGB_PATH = "ensemble_xgb.json"
-LGB_PATH = "ensemble_lgb.txt"
-RF_PATH = "ensemble_rf.joblib"
-META_PATH = "model_meta.json"
-
-# --- Models ---
+# --- Helper Models & Schema ---
 
 class OHLCV(BaseModel):
     timestamp: str
@@ -64,36 +52,15 @@ class OHLCV(BaseModel):
 class MultiTimeframeOHLCV(BaseModel):
     tf1m: Optional[List[OHLCV]] = []
     tf5m: Optional[List[OHLCV]] = []
+    tf15m: Optional[List[OHLCV]] = []
     tf1h: Optional[List[OHLCV]] = []
     tf4h: Optional[List[OHLCV]] = []
-
-class MarketDataRequest(BaseModel):
-    symbol: str
-    timeframe: str
-    data: List[OHLCV]
-
-class RegimeResponse(BaseModel):
-    regime: str
-    volatility_score: float
-    trend_strength: float
-    structure: str = "Neutral"
-
-class TechnicalsResponse(BaseModel):
-    macd_histogram: float
-    bb_width: float
-    adx: float
-    rsi: float
-
-class WhaleData(BaseModel):
-    whale_score: float
-    recent_large_tx_count: int
-    sentiment: str
 
 class SuperAnalysisRequest(BaseModel):
     symbol: str
     ohlcv: MultiTimeframeOHLCV
     sentiment_score: float
-    whale_activity: Optional[WhaleData] = None
+    timeframe: Optional[str] = "1h" # New parameter for style detection
     funding_rate: Optional[float] = 0.0
     oi_change: Optional[float] = 0.0
 
@@ -104,130 +71,117 @@ class SuperAnalysisResponse(BaseModel):
     reasoning: List[str]
     suggested_leverage: int
     multi_tf_bias: str
-    whale_alert: bool = False
+    style_active: str
 
-# --- Core Logic ---
+# --- Multi-Style Intelligence Engine ---
 
-class EnsemblePredictor:
+class MultiStylePredictor:
     def __init__(self):
-        self.xgb = None; self.lgb = None; self.rf = None; self.meta = {}
-        self.features = ['rsi', 'adx', 'atr', 'funding_rate', 'oi_change', 'vol_ratio', 'fng_value', 'trend_4h', 'liq_proxy']
-        self.load_all()
+        self.predictors = {} # Cache for {style: Ensemble}
+        self.style_map = {"5m": "scalping", "15m": "day", "30m": "day", "1h": "swing", "4h": "swing"}
 
-    def load_all(self):
+    def _load_style(self, style):
+        if style in self.predictors: return self.predictors[style]
+        
+        path = f"models/{style}/"
+        if not os.path.exists(path): 
+            # Fallback to root models if specific dir doesn't exist (backward compatibility)
+            if style == "swing": path = "./" 
+            else: return None
+            
         try:
-            if HAS_XGB and os.path.exists(XGB_PATH):
-                self.xgb = xgb.Booster(); self.xgb.load_model(XGB_PATH)
-            if HAS_LGB and os.path.exists(LGB_PATH):
-                self.lgb = lgb.Booster(model_file=LGB_PATH)
-            if HAS_JOBLIB and os.path.exists(RF_PATH):
-                self.rf = joblib.load(RF_PATH)
-            if os.path.exists(META_PATH):
-                with open(META_PATH, "r") as f: self.meta = json.load(f)
-            logger.info("✅ Models loaded successfully.")
-        except Exception as e: logger.error(f"❌ Error loading models: {e}")
+            p = {"xgb": None, "lgb": None, "rf": None, "meta": {}}
+            if HAS_XGB and os.path.exists(f"{path}ensemble_xgb.json"):
+                p["xgb"] = xgb.Booster(); p["xgb"].load_model(f"{path}ensemble_xgb.json")
+            if HAS_LGB and os.path.exists(f"{path}ensemble_lgb.txt"):
+                p["lgb"] = lgb.Booster(model_file=f"{path}ensemble_lgb.txt")
+            if HAS_JOBLIB and os.path.exists(f"{path}ensemble_rf.joblib"):
+                p["rf"] = joblib.load(f"{path}ensemble_rf.joblib")
+            if os.path.exists(f"{path}model_meta.json"):
+                with open(f"{path}model_meta.json", "r") as f: p["meta"] = json.load(f)
+            
+            if p["xgb"] or p["lgb"] or p["rf"]:
+                self.predictors[style] = p
+                return p
+        except Exception as e:
+            logger.error(f"Error loading {style}: {e}")
+        return None
 
-    def predict(self, feature_values):
+    def predict(self, style_key, features):
+        p = self._load_style(style_key)
+        if not p: return None
+        
         probs = []
-        if self.xgb:
-            dm = xgb.DMatrix([feature_values], feature_names=self.features)
-            probs.append(self.xgb.predict(dm)[0])
-        if self.lgb: probs.append(self.lgb.predict([feature_values])[0])
-        if self.rf: probs.append(self.rf.predict_proba([feature_values])[0][1])
-        return sum(probs) / len(probs) if probs else None
+        w = p["meta"].get("weights", {"xgb": 0.33, "lgb": 0.33, "rf": 0.33})
+        try:
+            if p["xgb"]:
+                dm = xgb.DMatrix([features], feature_names=p["meta"].get("features", []))
+                probs.append(p["xgb"].predict(dm)[0] * w.get("xgb", 0.33))
+            if p["lgb"]:
+                probs.append(p["lgb"].predict([features])[0] * w.get("lgb", 0.33))
+            if p["rf"]:
+                probs.append(p["rf"].predict_proba([features])[0][1] * w.get("rf", 0.33))
+            return sum(probs) if probs else None
+        except: return None
 
-predictor = EnsemblePredictor()
-sentiment_svc = SentimentService()
-
-def get_fng_realtime():
-    try:
-        r = requests.get("https://api.alternative.me/fng/", timeout=3)
-        return float(r.json()['data'][0]['value'])
-    except: return 50.0
-
-# --- Endpoints ---
-
-@app.get("/model-status")
-async def model_status():
-    return {
-        "xgb": predictor.xgb is not None,
-        "lgb": predictor.lgb is not None,
-        "rf": predictor.rf is not None,
-        "meta_loaded": bool(predictor.meta),
-        "last_training": predictor.meta.get("last_training", "N/A"),
-        "features": predictor.features
-    }
-
-@app.post("/analyze-technicals", response_model=TechnicalsResponse)
-async def analyze_technicals(request: MarketDataRequest):
-    df = pd.DataFrame([d.model_dump() for d in request.data])
-    if len(df) < 20: return TechnicalsResponse(macd_histogram=0, bb_width=0, adx=0, rsi=50)
-    
-    rsi = ta.momentum.RSIIndicator(df["close"]).rsi().iloc[-1]
-    macd = ta.trend.MACD(df["close"]).macd_diff().iloc[-1]
-    adx = ta.trend.ADXIndicator(df["high"], df["low"], df["close"]).adx().iloc[-1]
-    bb_w = ta.volatility.BollingerBands(df["close"]).bollinger_wband().iloc[-1]
-    
-    return TechnicalsResponse(macd_histogram=float(macd), bb_width=float(bb_w), adx=float(adx), rsi=float(rsi))
-
-@app.post("/detect-regime", response_model=RegimeResponse)
-async def detect_regime(request: MarketDataRequest):
-    df = pd.DataFrame([d.model_dump() for d in request.data])
-    if len(df) < 20: return RegimeResponse(regime="Ranging", volatility_score=0, trend_strength=0)
-    
-    adx = ta.trend.ADXIndicator(df["high"], df["low"], df["close"]).adx().iloc[-1]
-    atr = ta.volatility.AverageTrueRange(df["high"], df["low"], df["close"]).average_true_range().iloc[-1] / df["close"].iloc[-1]
-    
-    regime = "Ranging"
-    if adx > 25: regime = "BullTrend" if df["close"].iloc[-1] > df["close"].rolling(20).mean().iloc[-1] else "BearTrend"
-    
-    return RegimeResponse(regime=regime, volatility_score=float(atr*100), trend_strength=float(adx))
+predictor = MultiStylePredictor()
 
 @app.post("/analyze-super", response_model=SuperAnalysisResponse)
 async def analyze_super(request: SuperAnalysisRequest):
     try:
-        # Data Preparation
-        df1h = pd.DataFrame([d.model_dump() for d in (request.ohlcv.tf1h or [])])
-        if len(df1h) < 20: df1h = pd.DataFrame([d.model_dump() for d in (request.ohlcv.tf5m or [])])
-        if len(df1h) < 10: # Extra lenient for testing
-             return SuperAnalysisResponse(signal_type="Hold", strength="None", confidence=0.0, reasoning=["Insufficient Data"], suggested_leverage=1, multi_tf_bias="Neutral")
+        # 1. Style Selection
+        tf = request.timeframe or "1h"
+        style = predictor.style_map.get(tf, "swing")
+        
+        # 2. Data Selection
+        df_map = {"1h": request.ohlcv.tf1h, "15m": request.ohlcv.tf15m, "5m": request.ohlcv.tf5m}
+        raw_data = df_map.get(tf, request.ohlcv.tf1h)
+        if not raw_data or len(raw_data) < 10: raw_data = request.ohlcv.tf5m # Last try
+        
+        df = pd.DataFrame([d.model_dump() for d in raw_data])
+        if len(df) < 5: return SuperAnalysisResponse(signal_type="Hold", strength="None", confidence=0.0, reasoning=["No Data"], suggested_leverage=1, multi_tf_bias="Neutral", style_active=style)
 
+        # 3. Feature Prep (Fast Scale)
+        rsi = ta.momentum.RSIIndicator(df["close"]).rsi().iloc[-1]
+        adx = ta.trend.ADXIndicator(df["high"], df["low"], df["close"]).adx().iloc[-1] if len(df) > 14 else 20
+        atr = ta.volatility.AverageTrueRange(df["high"], df["low"], df["close"]).average_true_range().iloc[-1] / df["close"].iloc[-1]
+        vol_ma = df['volume'].rolling(min(len(df), 20)).mean().iloc[-1]
+        vol_ratio = df['volume'].iloc[-1] / (vol_ma or 1)
+        shadow = (df['high'] - df['low']) / df['close']
+        liq_proxy = shadow * df['volume'].iloc[-1] / (df['volume'].mean() * 10 or 1)
+        
         df4h = pd.DataFrame([d.model_dump() for d in (request.ohlcv.tf4h or [])])
         trend_4h = 1 if (not df4h.empty and len(df4h) >= 20 and df4h['close'].iloc[-1] > df4h['close'].rolling(20).mean().iloc[-1]) else 0
         
-        # Features
-        rsi = ta.momentum.RSIIndicator(df1h["close"]).rsi().iloc[-1]
-        adx = ta.trend.ADXIndicator(df1h["high"], df1h["low"], df1h["close"]).adx().iloc[-1]
-        atr = ta.volatility.AverageTrueRange(df1h["high"], df1h["low"], df1h["close"]).average_true_range().iloc[-1] / df1h["close"].iloc[-1]
-        vol_ma = df1h['volume'].rolling(20).mean().iloc[-1]
-        vol_ratio = df1h['volume'].iloc[-1] / (vol_ma or 1)
-        shadow = (df1h['high'].iloc[-1] - df1h['low'].iloc[-1]) / df1h['close'].iloc[-1]
-        liq_proxy = shadow * df1h['volume'].iloc[-1] / (df1h['volume'].mean() * 10 or 1)
-        fng = get_fng_realtime()
-
-        fe_vals = [rsi, adx, atr, request.funding_rate or 0, request.oi_change or 0, vol_ratio, fng, trend_4h, liq_proxy]
-        avg_prob = predictor.predict(fe_vals) if predictor.xgb else 0.45
+        fe_vals = [rsi, adx, atr, request.funding_rate or 0, request.oi_change or 0, vol_ratio, 50.0, trend_4h, liq_proxy]
         
-        # Millionaire Filter Layer
-        base_threshold = 0.50
+        # 4. Predict
+        avg_prob = predictor.predict(style, fe_vals)
+        if avg_prob is None: avg_prob = 0.45 # Fallback
+
+        # 5. Elite Filter
+        p_meta = predictor.predictors.get(style, {}).get("meta", {})
+        base_th = p_meta.get("thresholds", {}).get("medium", 0.55)
+        
         signal, strength = "Hold", "None"
-        reasons = [f"Base Probability: {avg_prob:.1%}"]
+        reasons = [f"[{style.upper()}] Prob: {avg_prob:.1%}"]
+        
+        # Strategy Logic
+        if trend_4h == 0 and style == "swing":
+            reasons.append("🚫 Swing Filter: Bearish 4h trend detected.")
+            return SuperAnalysisResponse(signal_type="Hold", strength="Weak", confidence=avg_prob, reasoning=reasons, suggested_leverage=1, multi_tf_bias="Bearish", style_active=style)
 
-        if trend_4h == 0:
-            reasons.append("🚫 Filtered: Bearish 4h Trend.")
-            return SuperAnalysisResponse(signal_type="Hold", strength="Weak", confidence=avg_prob, reasoning=reasons, suggested_leverage=1, multi_tf_bias="Bearish")
-
-        if rsi > 70: base_threshold += 0.10; reasons.append(f"⚠️ RSI High ({rsi:.1f}), threshold increased.")
-        if fng > 75: base_threshold += 0.05; reasons.append("⚠️ Greed adjustment (+5%).")
-
-        if avg_prob >= (base_threshold + 0.10): signal, strength = "Buy", "Strong"
-        elif avg_prob >= base_threshold: signal, strength = "Buy", "Medium"
-        else: signal, strength = "Hold", "Weak"; reasons.append(f"❌ Below target ({base_threshold:.2f})")
+        if rsi > 70: base_th += 0.15; reasons.append("⚠️ Overbought: Threshold raised.")
+        
+        if avg_prob >= (base_th + 0.1): signal, strength = "Buy", "Strong"
+        elif avg_prob >= base_th: signal, strength = "Buy", "Medium"
+        else: signal, strength = "Hold", "Weak"; reasons.append(f"❌ Weak Signal (Target {base_th:.2f})")
 
         return SuperAnalysisResponse(
             signal_type=signal, strength=strength, confidence=round(avg_prob, 2),
             reasoning=reasons, suggested_leverage=5 if strength == "Strong" else 3 if strength == "Medium" else 1,
-            multi_tf_bias="Bullish" if trend_4h else "Bearish"
+            multi_tf_bias="Bullish" if trend_4h else "Bearish",
+            style_active=style
         )
     except Exception as e:
         logger.exception("Error")
