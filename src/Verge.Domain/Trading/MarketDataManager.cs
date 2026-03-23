@@ -17,6 +17,8 @@ public class MarketDataManager : DomainService
     private const string BinanceBaseUrl = "https://api.binance.com";
     private const string FuturesBaseUrl = "https://fapi.binance.com";
 
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (DateTime Expiry, List<MarketCandleModel> Data)> _candleCache = new();
+
     public MarketDataManager(IHttpClientFactory httpClientFactory, BinanceWebSocketService webSocketService)
     {
         _httpClientFactory = httpClientFactory;
@@ -100,16 +102,8 @@ public class MarketDataManager : DomainService
     {
         try
         {
-            var client = _httpClientFactory.CreateClient();
-            
-            // LOG: qué intervalo llegó
-            Logger.LogInformation($"📥 GetCandlesAsync llamado para {symbol} con interval: '{interval}'");
-            
-            // LIMPIEZA DEL SÍMBOLO (saco / y espacios)
-            symbol = symbol.ToUpper().Replace("/", "").Replace("-", "").Trim();
-            
-            // CONVERSIÓN DEL INTERVALO
-            string binanceInterval = interval.ToLower() switch
+            var cleanSymbol = symbol.ToUpper().Replace("/", "").Replace("-", "").Trim();
+            var binanceInterval = interval.ToLower() switch
             {
                 "1" => "1m",
                 "5" => "5m",
@@ -117,13 +111,22 @@ public class MarketDataManager : DomainService
                 "30" => "30m",
                 "60" => "1h",
                 "240" => "4h",
-                _ => interval // handles "1h", "1d", "1w", "1M" etc. directly
+                _ => interval 
             };
+
+            var cacheKey = $"{cleanSymbol}_{binanceInterval}_{limit}";
+
+            if (_candleCache.TryGetValue(cacheKey, out var cached) && cached.Expiry > DateTime.UtcNow)
+            {
+                return cached.Data;
+            }
+
+            var client = _httpClientFactory.CreateClient();
             
             // LOG: a qué se convirtió
             Logger.LogInformation($"🔄 Interval convertido: '{interval}' -> '{binanceInterval}'");
             
-            var url = $"{FuturesBaseUrl}/fapi/v1/klines?symbol={symbol}&interval={binanceInterval}&limit={limit}";
+            var url = $"{FuturesBaseUrl}/fapi/v1/klines?symbol={cleanSymbol}&interval={binanceInterval}&limit={limit}";
             Logger.LogInformation($"📡 URL final: {url}");
 
             var response = await client.GetAsync(url);
@@ -156,12 +159,22 @@ public class MarketDataManager : DomainService
                 }
             }
 
+
+            // TTL Strategy: 30s (1m), 2m (5m), 5m (15m+)
+            var ttlSeconds = binanceInterval switch {
+                "1m" => 30,
+                "5m" => 120,
+                _ => 300
+            };
+
+            _candleCache[cacheKey] = (DateTime.UtcNow.AddSeconds(ttlSeconds), result);
+
             return result;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"💥 EXCEPCIÓN en MarketDataManager: {ex.Message}");
-            return new List<MarketCandleModel>(); // Devuelvo vacío
+            Logger.LogError($"💥 EXCEPCIÓN en MarketDataManager: {ex.Message}");
+            return new List<MarketCandleModel>();
         }
     }
 

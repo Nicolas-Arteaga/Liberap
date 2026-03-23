@@ -1,7 +1,12 @@
-fastapi
-uvicorn
 requests
-pydantic
-python-dotenv
+fastapi
 pandas
 ta
+uvicorn
+python-dotenv
+tensorflow
+scikit-learn
+ccxt
+numpy
+xgboost
+praw

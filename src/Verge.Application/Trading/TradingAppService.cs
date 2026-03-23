@@ -234,7 +234,9 @@ public class TradingAppService : ApplicationService, ITradingAppService
             input.Direction,
             input.Amount,
             input.Leverage,
-            68500 // Mock entry price
+            _marketDataManager.GetWebSocketPrice(input.Symbol) ?? 
+            (await _marketDataManager.GetTickersAsync())
+                .FirstOrDefault(t => t.Symbol == input.Symbol.ToUpper().Replace("/", ""))?.LastPrice ?? 0
         );
         
         order.OrderType = input.OrderType;

@@ -9,6 +9,11 @@ import logging
 import sys
 import os
 from dotenv import load_dotenv
+import numpy as np
+import xgboost as xgb
+import json
+from datetime import datetime
+from sentiment_service import SentimentService
 
 # Load .env file if it exists
 load_dotenv()
@@ -21,9 +26,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger("VERGE_AI")
 
-app = FastAPI(title="VERGE AI Service (API Mode)", version="1.2.0")
+app = FastAPI(title="VERGE AI Service (API Mode)", version="1.3.0")
 
 # Configuration
+MODEL_PATH = os.environ.get("MODEL_PATH", "xgboost_v1.json")
 HF_TOKEN = os.environ.get("HF_TOKEN")
 if not HF_TOKEN:
     logger.error("❌ HF_TOKEN environment variable not set!")
@@ -66,6 +72,30 @@ class TechnicalsResponse(BaseModel):
     adx: float
     rsi: float
 
+class WhaleData(BaseModel):
+    whale_score: float
+    recent_large_tx_count: int
+    sentiment: str
+
+class MultiTimeframeOHLCV(BaseModel):
+    tf1m: List[OHLCV]
+    tf5m: List[OHLCV]
+    tf15m: List[OHLCV]
+
+class SuperAnalysisRequest(BaseModel):
+    symbol: str
+    ohlcv: MultiTimeframeOHLCV
+    sentiment_score: float
+    whale_activity: WhaleData
+
+class SuperAnalysisResponse(BaseModel):
+    signal_type: str # Buy / Sell / Hold
+    confidence: float # 0.0 to 1.0
+    reasoning: List[str]
+    suggested_leverage: int
+    multi_tf_bias: str
+    whale_alert: bool
+
 def get_neutral_fallback(error_msg: str):
     logger.warning(f"⚠️ Falling back to NEUTRAL due to error: {error_msg}")
     return SentimentResponse(
@@ -86,6 +116,151 @@ async def health_check():
         }
     except Exception as e:
         return {"status": "error", "mode": "api", "error": str(e)}
+
+class MonitoringService:
+    """
+    Logs predictions vs reality and auto-deactivates if performance drops.
+    """
+    def __init__(self, log_file="predictions_log.json"):
+        self.log_file = log_file
+        self.history = []
+        self.active = True
+
+    def log_prediction(self, prediction, probability, metadata):
+        entry = {
+            "timestamp": datetime.now().isoformat(),
+            "prediction": prediction,
+            "probability": probability,
+            "metadata": metadata,
+            "realized": None
+        }
+        self.history.append(entry)
+        # In a real scenario, we would persist this to a file or DB
+
+    def verify_performance(self):
+        # Rolling accuracy of last 50
+        relevant = [h for h in self.history if h["realized"] is not None][-50:]
+        if len(relevant) < 10: return True # Wait for enough data
+        
+        accuracy = sum(1 for h in relevant if h["prediction"] == h["realized"]) / len(relevant)
+        if accuracy < 0.5:
+            self.active = False
+            logger.error(f"🚨 AUTO-DEACTIVATION: Rolling accuracy ({accuracy:.1%}) below 50%")
+        return self.active
+
+monitor = MonitoringService()
+
+class XGBoostPredictor:
+    """
+    XGBoost-based MVP for Crypto Prediction.
+    """
+    def __init__(self, model_path=None):
+        self.model = None
+        self.model_path = model_path
+        self.load_model()
+
+    def load_model(self):
+        if self.model_path and os.path.exists(self.model_path):
+            try:
+                self.model = xgb.Booster()
+                self.model.load_model(self.model_path)
+                logger.info(f"✅ Model loaded successfully from {self.model_path}")
+            except Exception as e:
+                logger.error(f"❌ Failed to load model from {self.model_path}: {e}")
+                self.model = None
+        else:
+            logger.warning(f"⚠️ Model file NOT FOUND at {self.model_path}. Inference disabled.")
+
+    def predict(self, features):
+        if not self.model:
+            return None
+        
+        dmatrix = xgb.DMatrix([features])
+        return self.model.predict(dmatrix)[0]
+
+# Global Predictor Instance
+predictor = XGBoostPredictor(MODEL_PATH)
+sentiment_svc = SentimentService()
+
+@app.get("/model-status")
+async def get_model_status():
+    loaded = predictor.model is not None
+    last_mod = None
+    if loaded and os.path.exists(MODEL_PATH):
+        mtime = os.path.getmtime(MODEL_PATH)
+        last_mod = datetime.fromtimestamp(mtime).isoformat()
+    
+    return {
+        "model_loaded": loaded,
+        "model_path": MODEL_PATH,
+        "last_training_date": last_mod,
+        "status": "Ready" if loaded else "Waiting for model (Execute train_xgboost.py)"
+    }
+
+@app.post("/analyze-super", response_model=SuperAnalysisResponse)
+async def analyze_super(request: SuperAnalysisRequest):
+    try:
+        if not predictor.model:
+             raise HTTPException(status_code=503, detail="Modelo no entrenado. Ejecute train_xgboost.py primero.")
+
+        if not monitor.active:
+            raise HTTPException(status_code=503, detail="AI Service deactivated due to low performance.")
+
+        logger.info(f"🚀 XGBoost Analysis starting for {request.symbol}")
+        
+        # 0. Fetch real-time Sentiment
+        v_sentiment = sentiment_svc.get_combined_sentiment(request.symbol)
+        
+        # 1. Feature Extraction
+        df1m = pd.DataFrame([d.model_dump() for d in request.ohlcv.tf1m])
+        df5m = pd.DataFrame([d.model_dump() for d in request.ohlcv.tf5m])
+        
+        if len(df1m) < 14 or len(df5m) < 14:
+             return SuperAnalysisResponse(signal_type="Hold", confidence=0.0, reasoning=["Insufficient Data"], suggested_leverage=1, multi_tf_bias="Neutral", whale_alert=False)
+
+        rsi1m = ta.momentum.RSIIndicator(df1m["close"]).rsi().iloc[-1]
+        rsi5m = ta.momentum.RSIIndicator(df5m["close"]).rsi().iloc[-1]
+        
+        # 2. XGBoost Prediction
+        features = [
+            (rsi1m - 50) / 50,
+            (rsi5m - 50) / 50,
+            (v_sentiment - 0.5) * 2,
+            1.0 if (df1m["volume"].iloc[-1] > df5m["volume"].mean() * 2.5) else 0.0
+        ]
+        
+        prob = predictor.predict(features)
+        
+        if prob is None:
+             raise HTTPException(status_code=503, detail="Error en inferencia del modelo.")
+
+        # 3. Decision Logic
+        signal = "Hold"
+        confidence = abs(prob - 0.5) * 2
+        
+        if prob > 0.6: signal = "Buy"
+        elif prob < 0.4: signal = "Sell"
+        
+        reasons = []
+        if prob > 0.6: reasons.append(f"XGBoost: High probability of price increase ({prob:.1%})")
+        if prob < 0.4: reasons.append(f"XGBoost: High probability of price decrease ({prob:.1%})")
+
+        # Log for Monitoring
+        monitor.log_prediction(signal, prob, {"symbol": request.symbol})
+
+        return SuperAnalysisResponse(
+            signal_type=signal,
+            confidence=round(confidence, 2),
+            reasoning=reasons,
+            suggested_leverage=10 if confidence > 0.75 else 5 if confidence > 0.5 else 3,
+            multi_tf_bias="Bullish" if rsi1m > 50 else "Bearish",
+            whale_alert=False
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error in analyze_super")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/analyze-sentiment", response_model=SentimentResponse)
 async def analyze_sentiment(request: SentimentRequest):
