@@ -98,6 +98,13 @@ public class MarketScannerService : BackgroundService
                 }
 
                 var prices = candles.Select(x => x.Close).ToList();
+                
+                // 🚀 ZOMBIE DATA DETECTION: If price hasn't moved at all, RSI will be fake.
+                bool isStagnant = prices.Distinct().Count() == 1;
+                if (isStagnant) {
+                    _logger.LogWarning("🧟 [ZOMBIE DATA] {symbol} price is stuck at {price}. RSI will be neutral 50.", symbol, prices.First());
+                }
+
                 var rsi = analysisService.CalculateRSI(prices);
                 
                 // Cálculo de tendencia básica
@@ -205,7 +212,11 @@ public class MarketScannerService : BackgroundService
                             Icon = confidence >= 50 ? "search-outline" : "pulse-outline",
                             WhaleInfluenceScore = whaleBonus * 100 / 15,
                             IsSqueeze = instData.IsSqueezeDetected,
-                            Score = confidence
+                            Score = confidence,
+                            // 🚀 NUCLEAR SYNC: Mathematical multiplier ensures Label and Prices are LOCKED
+                            RiskRewardRatio = 2.0,
+                            StopLoss = prices.LastOrDefault() - ( (prices.LastOrDefault() * 0.015m) * (signal == SignalDirection.Long ? 1.0m : -1.0m) ),
+                            TakeProfit = prices.LastOrDefault() + ( (prices.LastOrDefault() * 0.03m) * (signal == SignalDirection.Long ? 1.0m : -1.0m) )
                         }
                     });
                 }

@@ -34,8 +34,7 @@ public class CryptoAnalysisService : DomainService
             avgLoss = (avgLoss * (period - 1) + loss) / period;
         }
 
-        if (avgLoss == 0) return 100;
-        
+        if (avgLoss == 0) return avgGain == 0 ? 50 : 100;
         decimal rs = avgGain / avgLoss;
         return 100 - (100 / (1 + rs));
     }

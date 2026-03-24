@@ -43,11 +43,13 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId)
             ?? throw new UserFriendlyException("Trader profile not found. Please complete your profile first.");
 
-        // 2. Get current mark price from Binance Futures
-        var symbol = input.Symbol.ToUpper().Trim();
+        // 2. Normalize and get current mark price from Binance Futures
+        var symbol = input.Symbol.ToUpper().Replace("/", "").Replace("-", "").Trim();
+        if (!symbol.EndsWith("USDT") && !symbol.Contains("USD")) symbol += "USDT";
+
         var tickers = await _marketDataManager.GetTickersAsync();
         var ticker = tickers.FirstOrDefault(t => t.Symbol == symbol)
-            ?? throw new UserFriendlyException($"Symbol '{symbol}' not found on Binance Futures.");
+            ?? throw new UserFriendlyException($"Symbol '{symbol}' not found on Binance Futures. Asegurate de usar el par con USDT (ej: BTCUSDT)");
 
         var entryPrice = ticker.LastPrice;
 

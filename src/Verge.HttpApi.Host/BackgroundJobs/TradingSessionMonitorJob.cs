@@ -540,7 +540,7 @@ public class TradingSessionMonitorJob : BackgroundService
         };
 
         string logSymbol = overrideSymbol ?? session.Symbol;
-        SignalDirection? logDirection = overrideDirection ?? session.SelectedDirection;
+        SignalDirection? logDirection = overrideDirection ?? result.Direction ?? session.SelectedDirection;
         string dirText = logDirection?.ToString().ToUpper() ?? "WAIT";
         string confidenceLabel = result.Confidence.ToString().ToUpper();
         

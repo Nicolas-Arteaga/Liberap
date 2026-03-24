@@ -227,21 +227,36 @@ public class TradingAppService : ApplicationService, ITradingAppService
     public async Task<TradeOrderDto> ExecuteTradeAsync(ExecuteTradeDto input)
     {
         var profile = await GetProfileAsync();
+        var cleanSymbol = input.Symbol.ToUpper().Replace("/", "").Replace("-", "").Trim();
+        if (!cleanSymbol.EndsWith("USDT") && !cleanSymbol.Contains("USD")) cleanSymbol += "USDT";
+
+        var entryPrice = _marketDataManager.GetWebSocketPrice(cleanSymbol) ?? 
+            (await _marketDataManager.GetTickersAsync())
+                .FirstOrDefault(t => t.Symbol == cleanSymbol)?.LastPrice ?? 0;
+
         var order = new TradeOrder(
             GuidGenerator.Create(),
             profile.Id,
-            input.Symbol,
+            cleanSymbol,
             input.Direction,
             input.Amount,
             input.Leverage,
-            _marketDataManager.GetWebSocketPrice(input.Symbol) ?? 
-            (await _marketDataManager.GetTickersAsync())
-                .FirstOrDefault(t => t.Symbol == input.Symbol.ToUpper().Replace("/", ""))?.LastPrice ?? 0
+            entryPrice
         );
         
         order.OrderType = input.OrderType;
-        order.TakeProfitPrice = order.EntryPrice * (1 + input.TakeProfitPercentage / 100);
-        order.StopLossPrice = order.EntryPrice * (1 - input.StopLossPercentage / 100);
+        
+        // Fix: SL/TP logic must respect direction
+        if (input.Direction == SignalDirection.Long)
+        {
+            order.TakeProfitPrice = order.EntryPrice * (1 + input.TakeProfitPercentage / 100);
+            order.StopLossPrice = order.EntryPrice * (1 - input.StopLossPercentage / 100);
+        }
+        else // Short
+        {
+            order.TakeProfitPrice = order.EntryPrice * (1 - input.TakeProfitPercentage / 100);
+            order.StopLossPrice = order.EntryPrice * (1 + input.StopLossPercentage / 100);
+        }
 
         await _orderRepository.InsertAsync(order);
         return ObjectMapper.Map<TradeOrder, TradeOrderDto>(order);

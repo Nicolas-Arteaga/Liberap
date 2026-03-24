@@ -64,6 +64,7 @@ public class DecisionResult
     public bool? MacroQuietPeriod { get; set; }
     public string? MacroReason { get; set; }
     public float? TrailingMultiplier { get; set; }
+    public SignalDirection? Direction { get; set; }
     public decimal? StopLossPrice { get; set; }
     public decimal? TakeProfitPrice { get; set; }
 }

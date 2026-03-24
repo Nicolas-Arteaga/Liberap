@@ -19,10 +19,10 @@ public enum RiskTolerance
 
 public enum SignalDirection
 {
-    Long,
-    Short,
-    Auto,
-    Ignore  // No clear directional bias — skip this trade
+    Long = 0,
+    Short = 1,
+    Auto = 2,
+    Ignore = 3
 }
 
 public enum SignalConfidence

@@ -97,7 +97,11 @@ public class SimulationMarkPriceWorker : BackgroundService
                 {
                     using var uow = uowManager.Begin();
                     
-                    var price = marketDataManager.GetWebSocketPrice(trade.Symbol);
+                    // 🚀 ROBOTIC NORMALIZATION: Ensure 'ALPHA' becomes 'ALPHAUSDT' for cache hits
+                    var cleanSymbol = trade.Symbol.ToUpper().Replace("/", "").Replace("-", "").Trim();
+                    if (!cleanSymbol.EndsWith("USDT") && !cleanSymbol.Contains("USD")) cleanSymbol += "USDT";
+
+                    var price = marketDataManager.GetWebSocketPrice(cleanSymbol);
                     string source = "WebSocket";
                     
                     if (price == null)
@@ -109,7 +113,7 @@ public class SimulationMarkPriceWorker : BackgroundService
                             fallbackPriceMap = tickers.GroupBy(t => t.Symbol).ToDictionary(g => g.Key, g => g.First().LastPrice);
                         }
                         
-                        if (fallbackPriceMap.TryGetValue(trade.Symbol, out var restPrice))
+                        if (fallbackPriceMap.TryGetValue(cleanSymbol, out var restPrice))
                         {
                             price = restPrice;
                             source = "REST Tickers Fallback";
@@ -118,7 +122,7 @@ public class SimulationMarkPriceWorker : BackgroundService
 
                     if (price == null)
                     {
-                        _logger.LogWarning("❌ [SimulationWorker] PRICE NOT FOUND for {Symbol} (WS=null, REST=null). Skipping update.", trade.Symbol);
+                        _logger.LogWarning("❌ [SimulationWorker] PRICE NOT FOUND for {Symbol} (Cleaned: {Cleaned}) (WS=null, REST=null). Skipping update.", trade.Symbol, cleanSymbol);
                         continue;
                     }
 

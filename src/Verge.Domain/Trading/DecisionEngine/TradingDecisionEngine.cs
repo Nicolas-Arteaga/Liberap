@@ -157,37 +157,38 @@
                 var earlyPrice = earlyCandle?.Close ?? 0;
                 if (earlyPrice > 0)
                 {
-                    var earlyDir = session.SelectedDirection;
-                    if (earlyDir == null || earlyDir == SignalDirection.Auto)
-                    {
-                        var regime = context.MarketRegime?.Regime;
-                        var structure = context.MarketRegime?.Structure;
-                        
-                        if (regime == MarketRegimeType.BearTrend || structure == "Bearish") earlyDir = SignalDirection.Short;
-                        else if (regime == MarketRegimeType.BullTrend || structure == "Bullish") earlyDir = SignalDirection.Long;
-                        else earlyDir = SignalDirection.Ignore;
+                    var earlyDir = session.SelectedDirection ?? SignalDirection.Auto;
+                    var regime = context.MarketRegime?.Regime;
+                    var structure = context.MarketRegime?.Structure;
+
+                    // If Auto, determine best guess direction for the Context alert
+                    if (earlyDir == SignalDirection.Auto || earlyDir == SignalDirection.Ignore) {
+                         if (regime == MarketRegimeType.BearTrend || structure == "Bearish") earlyDir = SignalDirection.Short;
+                         else if (regime == MarketRegimeType.BullTrend || structure == "Bullish") earlyDir = SignalDirection.Long;
+                         else earlyDir = SignalDirection.Long; // Fallback default
                     }
 
                     var earlyAtr = (decimal)(context.Technicals?.Atr ?? 0);
                     var earlyRisk = earlyAtr > 0 ? earlyAtr * 1.5m : earlyPrice * 0.015m;
                     var earlyRR = 2.0m;
 
-                    if (earlyDir == SignalDirection.Long)
-                    {
-                        setupInvalidResult.StopLossPrice = earlyPrice - earlyRisk;
-                        setupInvalidResult.TakeProfitPrice = earlyPrice + earlyRisk * earlyRR;
-                    }
-                    else
-                    {
-                        setupInvalidResult.StopLossPrice = earlyPrice + earlyRisk;
-                        setupInvalidResult.TakeProfitPrice = earlyPrice - earlyRisk * earlyRR;
-                    }
-
-                    setupInvalidResult.RiskRewardRatio = (double?)earlyRR;
-                    setupInvalidResult.WinProbability = 0.5f; // Neutral fallback
+                    // 🚀 NUCLEAR SYNC: No more if/else for prices. Use multipliers.
+                    decimal dirSign = (earlyDir == SignalDirection.Long) ? 1.0m : -1.0m;
+                    
+                    // Long: SL = Entry - Risk, TP = Entry + Risk*RR
+                    // Short: SL = Entry + Risk, TP = Entry - Risk*RR
+                    setupInvalidResult.StopLossPrice = earlyPrice - (earlyRisk * dirSign);
+                    setupInvalidResult.TakeProfitPrice = earlyPrice + (earlyRisk * earlyRR * dirSign);
+                    setupInvalidResult.Direction = earlyDir;
+                    setupInvalidResult.RiskRewardRatio = (double)earlyRR;
+                    setupInvalidResult.WinProbability = 0.5;
                 }
 
-                _logger.LogInformation("✅ Evaluation Result for {Style}: {Decision} | Reason: {Reason} | SL: {SL} | TP: {TP}", style, setupInvalidResult.Decision, setupInvalidResult.Reason, setupInvalidResult.StopLossPrice, setupInvalidResult.TakeProfitPrice);
+                if (session.Symbol == "BTCUSDT") {
+                    _logger.LogCritical("🚨 [CRITICAL BTC] Context Alert Generated | Dir: {Dir} | Entry: {Price} | SL: {SL} | TP: {TP} | RR: {RR} | Score: {Score}", 
+                        setupInvalidResult.Direction, earlyPrice, setupInvalidResult.StopLossPrice, setupInvalidResult.TakeProfitPrice, setupInvalidResult.RiskRewardRatio, setupInvalidResult.Score);
+                }
+
                 return setupInvalidResult;
             }
 
@@ -304,31 +305,21 @@
                     }
                     session.SelectedDirection = effectiveDirection; // Persist for this session
                 }
+                result.Direction = effectiveDirection;
 
                 var atr = (decimal)(context.Technicals?.Atr ?? 0);
                 var riskAmount = atr > 0 ? atr * 1.5m : currentPrice * 0.015m; // 1.5x ATR or 1.5% fixed
                 var rr = (decimal)result.RiskRewardRatio.GetValueOrDefault(2.0);
                 if (rr <= 0) rr = 2.0m;
 
-                if (session.Symbol == "BTCUSDT")
-                {
-                    _logger.LogWarning("🔍 [DEBUG BTC] Params -> ATR: {Atr}, RiskAmount: {RiskAmount}, RR: {RR}, Direction: {Dir}", atr, riskAmount, rr, effectiveDirection);
-                }
+                decimal dirSign = (effectiveDirection == SignalDirection.Long) ? 1.0m : -1.0m;
+                result.StopLossPrice = currentPrice - (riskAmount * dirSign);
+                result.TakeProfitPrice = currentPrice + (riskAmount * rr * dirSign);
 
-                if (effectiveDirection == SignalDirection.Long)
-                {
-                    result.StopLossPrice = currentPrice - riskAmount;
-                    result.TakeProfitPrice = currentPrice + (riskAmount * rr);
-                }
-                else
-                {
-                    result.StopLossPrice = currentPrice + riskAmount;
-                    result.TakeProfitPrice = currentPrice - (riskAmount * rr);
-                }
-                
                 if (session.Symbol == "BTCUSDT")
                 {
-                    _logger.LogWarning("🔍 [DEBUG BTC] Assigned -> SL: {SL}, TP: {TP}", result.StopLossPrice, result.TakeProfitPrice);
+                    _logger.LogCritical("🚨 [CRITICAL BTC-SUCCESS] Symbols: {Symbol}, Dir: {Dir}, Entry: {Price}, SL: {SL}, TP: {TP}, RR: {RR}", 
+                        session.Symbol, result.Direction, currentPrice, result.StopLossPrice, result.TakeProfitPrice, result.RiskRewardRatio);
                 }
             }
 
@@ -364,8 +355,8 @@
                     result.Decision, result.Score, originalBullishness, result.StopLossPrice, result.TakeProfitPrice);
             }
 
-            _logger.LogInformation("✅ Evaluation Result for {Style}: {Decision} (Score: {Score} | IndexBullish: {Bull:F1})", 
-                style, result.Decision, result.Score, originalBullishness);
+            _logger.LogInformation("✅ Evaluation Result for {Style}: {Decision} (Score: {Score} | IndexBullish: {Bull:F1} | Dir: {Dir})", 
+                style, result.Decision, result.Score, originalBullishness, result.Direction);
             return result;
         }
 
