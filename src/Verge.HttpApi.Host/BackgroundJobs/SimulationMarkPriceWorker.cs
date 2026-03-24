@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Uow;
 using Verge.Trading.DTOs;
+using System.IO;
 
 namespace Verge.Trading;
 
@@ -59,76 +60,125 @@ public class SimulationMarkPriceWorker : BackgroundService
 
     private async Task UpdateOpenPositionsAsync()
     {
-        using var scope = _serviceProvider.CreateScope();
-        var tradeRepo = scope.ServiceProvider.GetRequiredService<IRepository<SimulatedTrade, Guid>>();
-        var profileRepo = scope.ServiceProvider.GetRequiredService<IRepository<TraderProfile, Guid>>();
-        var marketDataManager = scope.ServiceProvider.GetRequiredService<MarketDataManager>();
-        var simulationService = scope.ServiceProvider.GetRequiredService<TradingSimulationService>();
-        var uowManager = scope.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
-
-        var openTrades = await tradeRepo.GetListAsync(t => t.Status == TradeStatus.Open);
-        if (!openTrades.Any()) return;
-
-        // Fetch current tickers in one batch
-        var tickers = await marketDataManager.GetTickersAsync();
-        var priceMap = tickers.ToDictionary(t => t.Symbol, t => t.LastPrice);
-
-        bool applyFunding = (DateTime.UtcNow - _lastFundingTime).TotalHours >= 8;
-
-        using var uow = uowManager.Begin();
-
-        foreach (var trade in openTrades)
+        try
         {
-            if (!priceMap.TryGetValue(trade.Symbol, out var markPrice)) continue;
+            using var scope = _serviceProvider.CreateScope();
+            var tradeRepo = scope.ServiceProvider.GetRequiredService<IRepository<SimulatedTrade, Guid>>();
+            var profileRepo = scope.ServiceProvider.GetRequiredService<IRepository<TraderProfile, Guid>>();
+            var marketDataManager = scope.ServiceProvider.GetRequiredService<MarketDataManager>();
+            var simulationService = scope.ServiceProvider.GetRequiredService<TradingSimulationService>();
+            var uowManager = scope.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
 
-            trade.MarkPrice = markPrice;
-
-            // Check liquidation
-            if (simulationService.IsLiquidationTriggered(markPrice, trade.LiquidationPrice, trade.Side))
+            var openTrades = await tradeRepo.GetListAsync(t => t.Status == TradeStatus.Open);
+            
+            // Heartbeat log
+            if (!openTrades.Any())
             {
-                _logger.LogWarning("💀 [SimulationWorker] Liquidating position {Id} for {Symbol} at {Price}", trade.Id, trade.Symbol, markPrice);
-                trade.Status = TradeStatus.Liquidated;
-                trade.ClosePrice = markPrice;
-                trade.ClosedAt = DateTime.UtcNow;
-                trade.RealizedPnl = -trade.Margin; // Total margin loss on liquidation
-
-                // Return remaining margin (0) to user's balance
-                var profile = await profileRepo.FirstOrDefaultAsync(p => p.UserId == trade.UserId);
-                if (profile != null)
-                {
-                    // Balance already minus initial margin at open time — no refund on liquidation
-                }
-
-                await tradeRepo.UpdateAsync(trade);
-                await _hubContext.Clients.User(trade.UserId.ToString()).SendAsync("ReceiveTradeUpdate", MapToDto(trade));
-                continue;
+                // _logger.LogInformation("📊 [SimulationWorker] No open trades found to update.");
+                return;
             }
 
-            // Update unrealized PnL
-            trade.UnrealizedPnl = simulationService.CalculateUnrealizedPnl(trade.EntryPrice, markPrice, trade.Size, trade.Side);
-            trade.ROIPercentage = simulationService.CalculateROI(trade.UnrealizedPnl, trade.Margin);
+            _logger.LogInformation("📊 [SimulationWorker] Updating {Count} open positions...", openTrades.Count);
+            
+            // Screaming debug for the agent to find
+            try { 
+                await File.AppendAllTextAsync("C:\\Users\\Nicolas\\Desktop\\Verge\\Verge\\src\\Verge.HttpApi.Host\\Logs\\heartbeat_debug.txt", 
+                    $"[{DateTime.UtcNow}] Heartbeat: {openTrades.Count} trades. First symbol: {openTrades.First().Symbol}\n"); 
+            } catch { }
 
-            // Apply funding rate every 8h
+            bool applyFunding = (DateTime.UtcNow - _lastFundingTime).TotalHours >= 8;
+
+            Dictionary<string, decimal> fallbackPriceMap = null!;
+
+            foreach (var trade in openTrades)
+            {
+                _logger.LogInformation("🔍 [SimulationWorker] Processing trade {Id} for symbol {Symbol}", trade.Id, trade.Symbol);
+                try
+                {
+                    using var uow = uowManager.Begin();
+                    
+                    var price = marketDataManager.GetWebSocketPrice(trade.Symbol);
+                    string source = "WebSocket";
+                    
+                    if (price == null)
+                    {
+                        if (fallbackPriceMap == null)
+                        {
+                            _logger.LogInformation("[SimulationWorker] WS cache miss, fetching all tickers via REST...");
+                            var tickers = await marketDataManager.GetTickersAsync();
+                            fallbackPriceMap = tickers.GroupBy(t => t.Symbol).ToDictionary(g => g.Key, g => g.First().LastPrice);
+                        }
+                        
+                        if (fallbackPriceMap.TryGetValue(trade.Symbol, out var restPrice))
+                        {
+                            price = restPrice;
+                            source = "REST Tickers Fallback";
+                        }
+                    }
+
+                    if (price == null)
+                    {
+                        _logger.LogWarning("❌ [SimulationWorker] PRICE NOT FOUND for {Symbol} (WS=null, REST=null). Skipping update.", trade.Symbol);
+                        continue;
+                    }
+
+                    var markPrice = price.Value;
+                    _logger.LogInformation("✅ [SimulationWorker] Price resolved for {Symbol}: {Price} (Source: {Source})", trade.Symbol, markPrice, source);
+                    
+                    trade.MarkPrice = markPrice;
+
+                    // Check liquidation
+                    if (simulationService.IsLiquidationTriggered(markPrice, trade.LiquidationPrice, trade.Side))
+                    {
+                        _logger.LogWarning("💀 [SimulationWorker] LIQUIDATION TRIGGERED for {Id} | {Symbol} at {Price}", trade.Id, trade.Symbol, markPrice);
+                        trade.Status = TradeStatus.Liquidated;
+                        trade.ClosePrice = markPrice;
+                        trade.ClosedAt = DateTime.UtcNow;
+                        trade.RealizedPnl = -trade.Margin;
+
+                        await tradeRepo.UpdateAsync(trade);
+                        await uow.CompleteAsync();
+
+                        _logger.LogInformation("📢 [SimulationWorker] SignalR: Sending Liquidation event to user {UserId}", trade.UserId);
+                        await _hubContext.Clients.User(trade.UserId.ToString()).SendAsync("ReceiveTradeUpdate", MapToDto(trade));
+                        continue;
+                    }
+
+                    // Update unrealized PnL
+                    trade.UnrealizedPnl = simulationService.CalculateUnrealizedPnl(trade.EntryPrice, markPrice, trade.Size, trade.Side);
+                    trade.ROIPercentage = simulationService.CalculateROI(trade.UnrealizedPnl, trade.Margin);
+
+                    if (applyFunding)
+                    {
+                        var funding = simulationService.CalculateFundingPayment(trade.Size, markPrice);
+                        trade.TotalFundingPaid += funding;
+                        _logger.LogInformation("💸 [SimulationWorker] Funding applied: {Amount} for {Symbol}", funding, trade.Symbol);
+                    }
+
+                    await tradeRepo.UpdateAsync(trade);
+                    await uow.CompleteAsync();
+
+                    _logger.LogInformation("📢 [SimulationWorker] SignalR: Sending update for {Symbol} (Price: {Price}, PnL: {PnL}) to user {UserId}", 
+                        trade.Symbol, markPrice, trade.UnrealizedPnl, trade.UserId);
+                        
+                    await _hubContext.Clients.User(trade.UserId.ToString()).SendAsync("ReceiveTradeUpdate", MapToDto(trade));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "💥 [SimulationWorker] ERROR updating trade {Id}", trade.Id);
+                }
+            }
+
             if (applyFunding)
             {
-                var funding = simulationService.CalculateFundingPayment(trade.Size, markPrice);
-                trade.TotalFundingPaid += funding;
-                _logger.LogInformation("💸 [Funding] Charged {Amount} USDT for {Symbol} position {Id}", funding, trade.Symbol, trade.Id);
+                _lastFundingTime = DateTime.UtcNow;
+                _logger.LogInformation("⏰ [Funding] Funding rate applied at {Time}", _lastFundingTime);
             }
-
-            await tradeRepo.UpdateAsync(trade);
-
-            // Broadcast to user's clients
-            await _hubContext.Clients.User(trade.UserId.ToString()).SendAsync("ReceiveTradeUpdate", MapToDto(trade));
         }
-
-        if (applyFunding)
+        catch (Exception ex)
         {
-            _lastFundingTime = DateTime.UtcNow;
-            _logger.LogInformation("⏰ [Funding] Funding rate applied at {Time}", _lastFundingTime);
+            _logger.LogError(ex, "❌ [SimulationWorker] General error in UpdateOpenPositionsAsync loop");
         }
-
-        await uow.CompleteAsync();
     }
 
     private static SimulatedTradeDto MapToDto(SimulatedTrade t) => new SimulatedTradeDto

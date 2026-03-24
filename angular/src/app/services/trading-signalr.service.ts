@@ -91,20 +91,23 @@ export class TradingSignalrService {
         });
 
         // --- Trade Simulation Handlers ---
-        this.connection.on('ReceiveTradeOpened', (trade: any) => {
+        this.connection.on('ReceiveTradeOpened', (rawTrade: any) => {
+            const trade = this.normalizeTrade(rawTrade);
             console.log('[SignalR] 🚀 Operación Abierta:', trade);
             this.tradeOpenedSource.next(trade);
             this.toaster.success(`Posición abierta: ${trade.side === 0 ? 'LONG' : 'SHORT'} ${trade.symbol}`, 'Trading Simulado');
         });
 
-        this.connection.on('ReceiveTradeClosed', (trade: any) => {
+        this.connection.on('ReceiveTradeClosed', (rawTrade: any) => {
+            const trade = this.normalizeTrade(rawTrade);
             console.log('[SignalR] 🏁 Operación Cerrada:', trade);
             this.tradeClosedSource.next(trade);
-            const pnlColor = trade.realizedPnl >= 0 ? 'success' : 'danger';
-            this.toaster.info(`Posición cerrada: ${trade.symbol}. PnL: ${trade.realizedPnl.toFixed(2)} USDT`, 'Trading Simulado');
+            const pnl = trade.realizedPnl ?? 0;
+            this.toaster.info(`Posición cerrada: ${trade.symbol}. PnL: ${pnl.toFixed(2)} USDT`, 'Trading Simulado');
         });
 
-        this.connection.on('ReceiveTradeUpdate', (trade: any) => {
+        this.connection.on('ReceiveTradeUpdate', (rawTrade: any) => {
+            const trade = this.normalizeTrade(rawTrade);
             // High frequency update - no toast here
             this.tradeUpdateSource.next(trade);
         });
@@ -140,7 +143,7 @@ export class TradingSignalrService {
         // Mapear campos que pueden venir en PascalCase o camelCase desde C# SignalR
         const normalized: any = { ...alert };
 
-        normalized.timestamp = alert.timestamp ? new Date(alert.timestamp) : new Date();
+        normalized.timestamp = alert.timestamp ?? alert.Timestamp ? new Date(alert.timestamp ?? alert.Timestamp) : new Date();
 
         // Mapeo exhaustivo de campos institucionales
         normalized.crypto = alert.crypto ?? alert.Crypto ?? alert.symbol ?? alert.Symbol ?? 'AUTO';
@@ -175,6 +178,39 @@ export class TradingSignalrService {
 
         console.log('[SignalR] ✅ Alerta NORMALIZADA:', normalized);
         return normalized as VergeAlert;
+    }
+
+    private normalizeTrade(trade: any): any {
+        if (!trade) return null;
+        
+        // C# PascalCase to JS camelCase
+        const normalized: any = { ...trade };
+
+        normalized.id = trade.id ?? trade.Id;
+        normalized.userId = trade.userId ?? trade.UserId;
+        normalized.symbol = trade.symbol ?? trade.Symbol;
+        normalized.side = trade.side ?? trade.Side;
+        normalized.leverage = trade.leverage ?? trade.Leverage;
+        normalized.size = trade.size ?? trade.Size;
+        normalized.amount = trade.amount ?? trade.Amount;
+        normalized.entryPrice = trade.entryPrice ?? trade.EntryPrice;
+        normalized.markPrice = trade.markPrice ?? trade.MarkPrice;
+        normalized.liquidationPrice = trade.liquidationPrice ?? trade.LiquidationPrice;
+        normalized.margin = trade.margin ?? trade.Margin;
+        normalized.marginRate = trade.marginRate ?? trade.MarginRate;
+        normalized.unrealizedPnl = trade.unrealizedPnl ?? trade.UnrealizedPnl;
+        normalized.roiPercentage = trade.roiPercentage ?? trade.ROIPercentage;
+        normalized.status = trade.status ?? trade.Status;
+        normalized.closePrice = trade.closePrice ?? trade.ClosePrice;
+        normalized.realizedPnl = trade.realizedPnl ?? trade.RealizedPnl;
+        normalized.entryFee = trade.entryFee ?? trade.EntryFee;
+        normalized.exitFee = trade.exitFee ?? trade.ExitFee;
+        normalized.totalFundingPaid = trade.totalFundingPaid ?? trade.TotalFundingPaid;
+        normalized.openedAt = trade.openedAt ?? trade.OpenedAt;
+        normalized.closedAt = trade.closedAt ?? trade.ClosedAt;
+        normalized.tradingSignalId = trade.tradingSignalId ?? trade.TradingSignalId;
+
+        return normalized;
     }
 
     private showToastForAlert(alert: VergeAlert) {

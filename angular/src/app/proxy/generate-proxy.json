@@ -1488,6 +1488,168 @@
             }
           }
         },
+        "Verge.Trading.RealTradeAppService": {
+          "controllerName": "RealTrade",
+          "controllerGroupName": "RealTrade",
+          "isRemoteService": true,
+          "isIntegrationService": false,
+          "apiVersion": null,
+          "type": "Verge.Trading.RealTradeAppService",
+          "interfaces": [
+            {
+              "type": "Verge.Trading.IRealTradeAppService",
+              "name": "IRealTradeAppService",
+              "methods": [
+                {
+                  "name": "GetPreviewAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "input",
+                      "typeAsString": "Verge.Trading.TradeRequestDto, Verge.Application.Contracts",
+                      "type": "Verge.Trading.TradeRequestDto",
+                      "typeSimple": "Verge.Trading.TradeRequestDto",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "Verge.Trading.TradePreviewDto",
+                    "typeSimple": "Verge.Trading.TradePreviewDto"
+                  }
+                },
+                {
+                  "name": "ConfirmAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "input",
+                      "typeAsString": "Verge.Trading.TradeConfirmationDto, Verge.Application.Contracts",
+                      "type": "Verge.Trading.TradeConfirmationDto",
+                      "typeSimple": "Verge.Trading.TradeConfirmationDto",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "System.Boolean",
+                    "typeSimple": "boolean"
+                  }
+                }
+              ]
+            }
+          ],
+          "actions": {
+            "GetPreviewAsyncByInput": {
+              "uniqueName": "GetPreviewAsyncByInput",
+              "name": "GetPreviewAsync",
+              "httpMethod": "GET",
+              "url": "api/app/real-trade/preview",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "input",
+                  "typeAsString": "Verge.Trading.TradeRequestDto, Verge.Application.Contracts",
+                  "type": "Verge.Trading.TradeRequestDto",
+                  "typeSimple": "Verge.Trading.TradeRequestDto",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "input",
+                  "name": "Symbol",
+                  "jsonName": null,
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": "input"
+                },
+                {
+                  "nameOnMethod": "input",
+                  "name": "Side",
+                  "jsonName": null,
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": "input"
+                },
+                {
+                  "nameOnMethod": "input",
+                  "name": "Quantity",
+                  "jsonName": null,
+                  "type": "System.Decimal",
+                  "typeSimple": "number",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": "input"
+                },
+                {
+                  "nameOnMethod": "input",
+                  "name": "Leverage",
+                  "jsonName": null,
+                  "type": "System.Int32",
+                  "typeSimple": "number",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": "input"
+                }
+              ],
+              "returnValue": {
+                "type": "Verge.Trading.TradePreviewDto",
+                "typeSimple": "Verge.Trading.TradePreviewDto"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.IRealTradeAppService"
+            },
+            "ConfirmAsyncByInput": {
+              "uniqueName": "ConfirmAsyncByInput",
+              "name": "ConfirmAsync",
+              "httpMethod": "POST",
+              "url": "api/app/real-trade/confirm",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "input",
+                  "typeAsString": "Verge.Trading.TradeConfirmationDto, Verge.Application.Contracts",
+                  "type": "Verge.Trading.TradeConfirmationDto",
+                  "typeSimple": "Verge.Trading.TradeConfirmationDto",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "input",
+                  "name": "input",
+                  "jsonName": null,
+                  "type": "Verge.Trading.TradeConfirmationDto",
+                  "typeSimple": "Verge.Trading.TradeConfirmationDto",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "Body",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "System.Boolean",
+                "typeSimple": "boolean"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.IRealTradeAppService"
+            }
+          }
+        },
         "Verge.Trading.SimulatedTradeAppService": {
           "controllerName": "SimulatedTrade",
           "controllerGroupName": "SimulatedTrade",
@@ -3453,6 +3615,132 @@
               },
               "allowAnonymous": false,
               "implementFrom": "Verge.Trading.ITradingAppService"
+            }
+          }
+        },
+        "Verge.Trading.TradingController": {
+          "controllerName": "Trading",
+          "controllerGroupName": "Trading",
+          "isRemoteService": true,
+          "isIntegrationService": false,
+          "apiVersion": null,
+          "type": "Verge.Trading.TradingController",
+          "interfaces": [
+            {
+              "type": "Verge.Trading.IRealTradeAppService",
+              "name": "IRealTradeAppService",
+              "methods": [
+                {
+                  "name": "GetPreviewAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "input",
+                      "typeAsString": "Verge.Trading.TradeRequestDto, Verge.Application.Contracts",
+                      "type": "Verge.Trading.TradeRequestDto",
+                      "typeSimple": "Verge.Trading.TradeRequestDto",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "Verge.Trading.TradePreviewDto",
+                    "typeSimple": "Verge.Trading.TradePreviewDto"
+                  }
+                },
+                {
+                  "name": "ConfirmAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "input",
+                      "typeAsString": "Verge.Trading.TradeConfirmationDto, Verge.Application.Contracts",
+                      "type": "Verge.Trading.TradeConfirmationDto",
+                      "typeSimple": "Verge.Trading.TradeConfirmationDto",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "System.Boolean",
+                    "typeSimple": "boolean"
+                  }
+                }
+              ]
+            }
+          ],
+          "actions": {
+            "GetPreviewAsyncByInput": {
+              "uniqueName": "GetPreviewAsyncByInput",
+              "name": "GetPreviewAsync",
+              "httpMethod": "POST",
+              "url": "api/trading/preview",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "input",
+                  "typeAsString": "Verge.Trading.TradeRequestDto, Verge.Application.Contracts",
+                  "type": "Verge.Trading.TradeRequestDto",
+                  "typeSimple": "Verge.Trading.TradeRequestDto",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "input",
+                  "name": "input",
+                  "jsonName": null,
+                  "type": "Verge.Trading.TradeRequestDto",
+                  "typeSimple": "Verge.Trading.TradeRequestDto",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "Body",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "Verge.Trading.TradePreviewDto",
+                "typeSimple": "Verge.Trading.TradePreviewDto"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.IRealTradeAppService"
+            },
+            "ConfirmAsyncByInput": {
+              "uniqueName": "ConfirmAsyncByInput",
+              "name": "ConfirmAsync",
+              "httpMethod": "POST",
+              "url": "api/trading/confirm",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "input",
+                  "typeAsString": "Verge.Trading.TradeConfirmationDto, Verge.Application.Contracts",
+                  "type": "Verge.Trading.TradeConfirmationDto",
+                  "typeSimple": "Verge.Trading.TradeConfirmationDto",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "input",
+                  "name": "input",
+                  "jsonName": null,
+                  "type": "Verge.Trading.TradeConfirmationDto",
+                  "typeSimple": "Verge.Trading.TradeConfirmationDto",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "Body",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "System.Boolean",
+                "typeSimple": "boolean"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.IRealTradeAppService"
             }
           }
         },
@@ -8643,6 +8931,30 @@
           "regex": null
         },
         {
+          "name": "WhaleInfluenceScore",
+          "jsonName": null,
+          "type": "System.Int32?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "IsSqueeze",
+          "jsonName": null,
+          "type": "System.Boolean?",
+          "typeSimple": "boolean?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
           "name": "Structure",
           "jsonName": null,
           "type": "System.String",
@@ -9997,12 +10309,14 @@
       "enumNames": [
         "Long",
         "Short",
-        "Auto"
+        "Auto",
+        "Ignore"
       ],
       "enumValues": [
         0,
         1,
-        2
+        2,
+        3
       ],
       "genericArguments": null,
       "properties": null
@@ -10259,6 +10573,27 @@
         }
       ]
     },
+    "Verge.Trading.TradeConfirmationDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "ConfirmationToken",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
     "Verge.Trading.TradeOrderDto": {
       "baseType": "Volo.Abp.Application.Dtos.FullAuditedEntityDto<System.Guid>",
       "isEnum": false,
@@ -10415,6 +10750,156 @@
           "jsonName": null,
           "type": "System.DateTime?",
           "typeSimple": "string?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.TradePreviewDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Symbol",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Side",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Quantity",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "EstimatedPrice",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "NotionalValue",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "EstimatedFee",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "ConfirmationToken",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.TradeRequestDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Symbol",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Side",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Quantity",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Leverage",
+          "jsonName": null,
+          "type": "System.Int32",
+          "typeSimple": "number",
           "isRequired": false,
           "minLength": null,
           "maxLength": null,

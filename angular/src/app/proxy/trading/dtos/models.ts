@@ -128,6 +128,8 @@ export interface VergeAlertDto {
   patternSignal?: string;
   stopLoss?: number;
   takeProfit?: number;
+  whaleInfluenceScore?: number;
+  isSqueeze?: boolean;
   structure?: string;
   bosDetected: boolean;
   chochDetected: boolean;

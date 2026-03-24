@@ -7,6 +7,7 @@ export * from './market-data.service';
 export * from './market-regime-type.enum';
 export * from './models';
 export * from './order-type.enum';
+export * from './real-trade.service';
 export * from './risk-tolerance.enum';
 export * from './signal-confidence.enum';
 export * from './signal-direction.enum';

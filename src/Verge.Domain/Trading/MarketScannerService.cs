@@ -12,6 +12,8 @@ using Volo.Abp.Uow;
 
 using Verge.Trading.Integrations;
 using Verge.Trading.DecisionEngine;
+using Volo.Abp.EventBus.Distributed;
+using Verge.Trading.DTOs;
 
 namespace Verge.Trading;
 
@@ -19,11 +21,16 @@ public class MarketScannerService : BackgroundService
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<MarketScannerService> _logger;
+    private readonly IDistributedEventBus _eventBus;
 
-    public MarketScannerService(IServiceProvider serviceProvider, ILogger<MarketScannerService> logger)
+    public MarketScannerService(
+        IServiceProvider serviceProvider, 
+        ILogger<MarketScannerService> logger,
+        IDistributedEventBus eventBus)
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
+        _eventBus = eventBus;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -57,6 +64,7 @@ public class MarketScannerService : BackgroundService
         var pythonService = scope.ServiceProvider.GetRequiredService<IPythonIntegrationService>();
         var strategyRepository = scope.ServiceProvider.GetRequiredService<IRepository<TradingStrategy, Guid>>();
         var sessionRepository = scope.ServiceProvider.GetRequiredService<IRepository<TradingSession, Guid>>();
+        var profileRepository = scope.ServiceProvider.GetRequiredService<IRepository<TraderProfile, Guid>>();
         var analysisLogRepo = scope.ServiceProvider.GetRequiredService<IRepository<AnalysisLog, Guid>>();
         var whaleTracker = scope.ServiceProvider.GetRequiredService<IWhaleTrackerService>();
         var institutionalService = scope.ServiceProvider.GetRequiredService<IInstitutionalDataService>();
@@ -173,6 +181,35 @@ public class MarketScannerService : BackgroundService
                 await analysisLogRepo.InsertAsync(log);
                 analyzedCount++;
 
+                // 5.5 Publish Real-time Telemetry (SignalR) for Dashboard UI Grids
+                var profiles = await profileRepository.GetListAsync();
+                foreach (var profile in profiles)
+                {
+                    await _eventBus.PublishAsync(new AlertStateChangedEto
+                    {
+                        UserId = profile.UserId,
+                        SessionId = Guid.Empty,
+                        Alert = new VergeAlertDto
+                        {
+                            Id = Guid.NewGuid().ToString(),
+                            Type = confidence >= 50 ? "Stage1" : "ScannerUpdate",
+                            Title = confidence >= 50 ? $"🔍 Oportunidad: {symbol}" : $"Scanner: {symbol}",
+                            Message = $"Confianza: {(int)confidence}% | Tendencia: {trend.ToUpper()} | RSI: {rsi:F2} | 🐋: {whaleData.Summary} | 🔥: {instData.SqueezeType}",
+                            Timestamp = DateTime.UtcNow,
+                            Read = false,
+                            Crypto = symbol,
+                            Price = prices.LastOrDefault(),
+                            Confidence = (SignalConfidence)(int)confidence,
+                            Direction = signal,
+                            Severity = confidence >= 70 ? "success" : (confidence >= 50 ? "warning" : "info"),
+                            Icon = confidence >= 50 ? "search-outline" : "pulse-outline",
+                            WhaleInfluenceScore = whaleBonus * 100 / 15,
+                            IsSqueeze = instData.IsSqueezeDetected,
+                            Score = confidence
+                        }
+                    });
+                }
+
                 // 6. Si Confianza > 2 (Threshold bajo para test), buscar estrategias en AutoMode y activar sesión
                 if (confidence >= 2) {
                     _logger.LogInformation("🔥 OPORTUNIDAD DETECTADA: {symbol} con {confidence}% de confianza!", symbol, confidence);
@@ -197,6 +234,7 @@ public class MarketScannerService : BackgroundService
                     await analysisLogRepo.InsertAsync(opportunityLog);
                     
                     var autoStrategies = await strategyRepository.GetListAsync(x => x.IsActive && x.IsAutoMode);
+
                     foreach (var strategy in autoStrategies) {
                         var existingSession = await sessionRepository.FirstOrDefaultAsync(x => x.TraderProfileId == strategy.TraderProfileId && x.IsActive);
                         if (existingSession == null) {

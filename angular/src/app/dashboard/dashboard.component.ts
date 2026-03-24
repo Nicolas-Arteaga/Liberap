@@ -293,33 +293,34 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       const index = this.activeTrades.findIndex(t => t.id === update.id);
       if (index !== -1) {
         this.activeTrades[index] = { ...this.activeTrades[index], ...update };
+        // Trigger CD by reassigning the array (immutable pattern)
+        this.activeTrades = [...this.activeTrades];
       }
     });
 
-    // Real-time UI updates from alerts (including Score decay and Stagnation)
+    // Real-time UI updates from alerts — ALL symbols populate the scanner tabs
     this.alertService.alerts$.pipe(takeUntil(this.destroy$)).subscribe(alerts => {
-      if (!this.currentSession || alerts.length === 0) return;
+      if (!alerts || alerts.length === 0) return;
 
       const latestAlert = alerts[0]; // Alerts are sorted desc by timestamp in service
 
-      // Update last motor signal from any relevant alert for this session
-      if (latestAlert.crypto === this.currentSession.symbol || latestAlert.type === 'System') {
+      // Update last motor signal for any alert
+      if (latestAlert.message) {
         this.lastMotorSignal = latestAlert.message;
-
-        // Sync stage if it changed
-        if (latestAlert.stage && latestAlert.stage !== this.currentStage) {
-          this.currentStage = latestAlert.stage;
-        }
-
-        // Institutional Data Categorization (Sprint 5 UI)
-        this.processInstitutionalAlert(latestAlert);
       }
+
+      // Sync stage if it changed and we have an active session
+      if (this.currentSession && latestAlert.stage && latestAlert.stage !== this.currentStage) {
+        this.currentStage = latestAlert.stage;
+      }
+
+      // All alerts feed the institutional scanner — no symbol filter here
+      this.processInstitutionalAlert(latestAlert);
     });
   }
 
   private processInstitutionalAlert(alert: any) {
-    if (!this.currentSession) return;
-
+    // Note: no session guard here — scanner tabs populate from all alerts regardless of session state
     // Normalize signal/direction names
     let symbol = alert.crypto || alert.Crypto || alert.symbol || alert.Symbol;
 

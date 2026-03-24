@@ -118,6 +118,18 @@
             // 5.1 Blend with AI Consensus (20% weight to AI Reasoning)
             finalScore = (finalScore * 0.8f) + (aiScore * 0.2f);
 
+            // 🚀 Phase D: Directional Symmetry Fix (Institutional 1% Sprint 5)
+            // Normalize score so that BOTH Long and Short perfect signals can reach > 70
+            float originalBullishness = finalScore;
+            if (session.SelectedDirection == SignalDirection.Short)
+            {
+                finalScore = 100 - finalScore;
+            }
+            else if (session.SelectedDirection == SignalDirection.Ignore)
+            {
+                finalScore = 0; // Forced stop
+            }
+
             // 5.1 Apply Threshold Shift from Calibration (Fallback) or Absolute Optimized Threshold
             int thresholdShift = calibration?.EntryThresholdShift ?? 0;
             int? entryThresholdCalibrated = calibration?.EntryThreshold;
@@ -348,10 +360,12 @@
 
             if (session.Symbol == "BTCUSDT")
             {
-                _logger.LogWarning("🔍 [DEBUG BTC] Returning Result -> Decision: {Decision}, SL: {SL}, TP: {TP}", result.Decision, result.StopLossPrice, result.TakeProfitPrice);
+                _logger.LogWarning("🔍 [DEBUG BTC] Returning Result -> Decision: {Decision}, EntScore: {EntScore}, IndexBullish: {Bull}, SL: {SL}, TP: {TP}", 
+                    result.Decision, result.Score, originalBullishness, result.StopLossPrice, result.TakeProfitPrice);
             }
 
-            _logger.LogInformation("✅ Evaluation Result for {Style}: {Decision} (Score: {Score})", style, result.Decision, result.Score);
+            _logger.LogInformation("✅ Evaluation Result for {Style}: {Decision} (Score: {Score} | IndexBullish: {Bull:F1})", 
+                style, result.Decision, result.Score, originalBullishness);
             return result;
         }
 

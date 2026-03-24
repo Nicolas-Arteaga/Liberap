@@ -9,6 +9,8 @@ using Microsoft.Extensions.Logging;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Uow;
 using Verge.Trading.DecisionEngine;
+using Volo.Abp.EventBus.Distributed;
+using Verge.Trading.DTOs;
 
 namespace Verge.Trading;
 
@@ -18,6 +20,7 @@ public class FastTickScannerService : BackgroundService
     private readonly ILogger<FastTickScannerService> _logger;
     private readonly MarketDataManager _marketDataManager;
     private readonly ITickSpikeAlerter _spikeAlerter;
+    private readonly IDistributedEventBus _eventBus;
     
     // Configurable thresholds for the 1% Tier
     private const double PriceDeltaThreshold = 0.0035; // 0.35% in < 10s
@@ -27,12 +30,14 @@ public class FastTickScannerService : BackgroundService
         IServiceProvider serviceProvider, 
         ILogger<FastTickScannerService> logger,
         MarketDataManager marketDataManager,
-        ITickSpikeAlerter spikeAlerter)
+        ITickSpikeAlerter spikeAlerter,
+        IDistributedEventBus eventBus)
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
         _marketDataManager = marketDataManager;
         _spikeAlerter = spikeAlerter;
+        _eventBus = eventBus;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -49,7 +54,7 @@ public class FastTickScannerService : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ Error in FastTickScanner cycle");
+                _logger.LogError(ex, "❌ Error in fast tick scanner cycle");
             }
 
             await Task.Delay(TimeSpan.FromSeconds(8), stoppingToken);
@@ -59,62 +64,77 @@ public class FastTickScannerService : BackgroundService
     private async Task ScanTicksAsync(Dictionary<string, decimal> lastPrices)
     {
         using var scope = _serviceProvider.CreateScope();
-        using var uow = scope.ServiceProvider.GetRequiredService<Volo.Abp.Uow.IUnitOfWorkManager>().Begin();
-        var sessionRepository = scope.ServiceProvider.GetRequiredService<IRepository<TradingSession, Guid>>();
-        
-        // Resolve all symbols to monitor (Individual and AUTO portfolio)
-        var activeSessions = await sessionRepository.GetListAsync(x => x.IsActive);
         var strategyRepository = scope.ServiceProvider.GetRequiredService<IRepository<TradingStrategy, Guid>>();
-        var activeSymbols = new HashSet<string>();
+        var strategy = (await strategyRepository.GetListAsync()).FirstOrDefault(x => x.IsActive);
+        
+        if (strategy == null) return;
 
-        foreach (var session in activeSessions)
+        var symbols = strategy.GetSelectedCryptos() ?? new List<string> { "BTCUSDT", "ETHUSDT" };
+
+        foreach (var symbol in symbols)
         {
-            if (session.Symbol != "AUTO")
+            try
             {
-                activeSymbols.Add(session.Symbol);
-            }
-            else
-            {
-                var strategy = await strategyRepository.FirstOrDefaultAsync(x => x.TraderProfileId == session.TraderProfileId && x.IsActive);
-                if (strategy != null)
-                {
-                    foreach (var s in strategy.GetSelectedCryptos()) activeSymbols.Add(s);
-                }
-            }
-        }
-
-        if (!activeSymbols.Any()) return;
-
-        foreach (var symbol in activeSymbols)
-        {
-            decimal currentPrice;
-
-            // 🚀 PRIMARY: Read price from WebSocket in-memory cache (ZERO REST calls)
-            var wsPrice = _marketDataManager.GetWebSocketPrice(symbol);
-            if (wsPrice.HasValue)
-            {
-                currentPrice = wsPrice.Value;
-            }
-            else
-            {
-                // Fallback to REST only if WebSocket hasn't received this symbol yet (startup)
-                var candles = await _marketDataManager.GetCandlesAsync(symbol, "1m", 2);
-                if (!candles.Any()) continue;
-                currentPrice = candles.Last().Close;
-            }
-
-            if (lastPrices.TryGetValue(symbol, out var lastPrice))
-            {
-                var delta = (double)Math.Abs((currentPrice - lastPrice) / lastPrice);
+                // 🔥 Optimization: Use WebSocket cache instead of REST
+                var currentPrice = _marketDataManager.GetWebSocketPrice(symbol);
                 
+                // Fallback to REST only if WebSocket is not ready
+                if (currentPrice == null)
+                {
+                    var tickers = await _marketDataManager.GetTickersAsync();
+                    currentPrice = tickers.FirstOrDefault(t => t.Symbol == symbol)?.LastPrice;
+                }
+                
+                if (currentPrice == null) continue;
+
+                if (!lastPrices.ContainsKey(symbol))
+                {
+                    lastPrices[symbol] = currentPrice.Value;
+                    continue;
+                }
+
+                var pricePrevious = lastPrices[symbol];
+                lastPrices[symbol] = currentPrice.Value;
+
+                var delta = (double)Math.Abs((currentPrice.Value - pricePrevious) / pricePrevious);
+
                 if (delta >= PriceDeltaThreshold)
                 {
                     _logger.LogWarning("⚡ [IMPULSE DETECTED] {Symbol} jumped {Delta:P2}! Alerting Engine...", symbol, delta);
                     _spikeAlerter.SignalSpike(symbol);
+
+                    // 🚀 Pulse UI Restore: Send immediate toast to user
+                    var profileRepository = scope.ServiceProvider.GetRequiredService<IRepository<TraderProfile, Guid>>();
+                    var profiles = await profileRepository.GetListAsync();
+                    foreach (var profile in profiles)
+                    {
+                        await _eventBus.PublishAsync(new AlertStateChangedEto
+                        {
+                            UserId = profile.UserId,
+                            SessionId = Guid.Empty,
+                            Alert = new VergeAlertDto
+                            {
+                                Id = Guid.NewGuid().ToString(),
+                                Type = "System", // High priority
+                                Title = $"⚡ PULSO DETECTADO: {symbol}",
+                                Message = $"Movimiento institucional de {delta:P2} detectado en < 10s. ¡Reacción inmediata!",
+                                Timestamp = DateTime.UtcNow,
+                                Read = false,
+                                Crypto = symbol,
+                                Price = currentPrice,
+                                Severity = "warning",
+                                Icon = "flash-outline",
+                                IsSqueeze = true,
+                                WhaleInfluenceScore = 80
+                            }
+                        });
+                    }
                 }
             }
-
-            lastPrices[symbol] = currentPrice;
+            catch (Exception ex)
+            {
+                _logger.LogWarning("⚠️ Error scanning ticks for {Symbol}: {Message}", symbol, ex.Message);
+            }
         }
     }
 }

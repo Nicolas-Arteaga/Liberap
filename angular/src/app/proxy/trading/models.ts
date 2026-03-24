@@ -258,6 +258,10 @@ export interface SymbolTickerDto {
   lowPrice: number;
 }
 
+export interface TradeConfirmationDto {
+  confirmationToken?: string;
+}
+
 export interface TradeOrderDto extends FullAuditedEntityDto<string> {
   symbol?: string;
   direction?: SignalDirection;
@@ -272,6 +276,23 @@ export interface TradeOrderDto extends FullAuditedEntityDto<string> {
   profitLoss: number;
   executionDate?: string;
   closeDate?: string;
+}
+
+export interface TradePreviewDto {
+  symbol?: string;
+  side?: string;
+  quantity: number;
+  estimatedPrice: number;
+  notionalValue: number;
+  estimatedFee: number;
+  confirmationToken?: string;
+}
+
+export interface TradeRequestDto {
+  symbol?: string;
+  side?: string;
+  quantity: number;
+  leverage: number;
 }
 
 export interface TraderProfileDto extends FullAuditedEntityDto<string> {
@@ -370,4 +391,26 @@ export interface WalkForwardWindowDto {
   trainingResult: BacktestResultDto;
   testingResult: BacktestResultDto;
   passedProfitFactor: boolean;
+}
+
+export interface SignalRegimeStatDto {
+  regime?: string;
+  wins: number;
+  losses: number;
+  winRate: number;
+  totalPnL: number;
+}
+
+export interface SignalStatsDto {
+  symbol?: string;
+  totalSignals: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  totalRealizedPnL: number;
+  averagePnLPerTrade: number;
+  expectancy: number;
+  averageDurationMinutes: number;
+  equityCurve: number[];
+  byRegime: SignalRegimeStatDto[];
 }

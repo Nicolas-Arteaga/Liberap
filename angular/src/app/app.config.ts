@@ -109,7 +109,18 @@ import {
   gridOutline,
   swapHorizontalOutline,
   codeOutline,
-  colorWandOutline
+  colorWandOutline,
+  caretDownOutline,
+  pieChartOutline,
+  ellipsisVerticalOutline,
+  chevronDownOutline,
+  chevronForwardOutline,
+  refreshOutline,
+  filterOutline,
+  barChartOutline,
+  repeatOutline,
+  toggleOutline,
+  eyeOutline
 } from 'ionicons/icons';
 
 addIcons({
@@ -185,7 +196,18 @@ addIcons({
   'grid-outline': gridOutline,
   'swap-horizontal-outline': swapHorizontalOutline,
   'code-outline': codeOutline,
-  'color-wand-outline': colorWandOutline
+  'color-wand-outline': colorWandOutline,
+  'caret-down-outline': caretDownOutline,
+  'pie-chart-outline': pieChartOutline,
+  'ellipsis-vertical-outline': ellipsisVerticalOutline,
+  'chevron-down-outline': chevronDownOutline,
+  'chevron-forward-outline': chevronForwardOutline,
+  'refresh-outline': refreshOutline,
+  'filter-outline': filterOutline,
+  'bar-chart-outline': barChartOutline,
+  'repeat-outline': repeatOutline,
+  'toggle-outline': toggleOutline,
+  'eye-outline': eyeOutline
 });
 
 export const appConfig: ApplicationConfig = {
