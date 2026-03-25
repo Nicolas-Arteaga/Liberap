@@ -1,6 +1,8 @@
-import type { AnalysisLogDto, CreateUpdateTradingStrategyDto, RecommendedStyleDto, SignalStatsDto, StartSessionDto, TradeConfirmationDto, TradePreviewDto, TradeRequestDto, TradingSessionDto, TradingStrategyDto } from './models';
+import type { SignalStatsDto, TradingSignalDto, VergeAlertDto } from './dtos/models';
 import type { MarketRegimeType } from './market-regime-type.enum';
+import type { AnalysisLogDto, BacktestResultDto, ComparativeEvaluationReportDto, ConnectExchangeDto, CreateUpdateTradingAlertDto, CreateUpdateTradingStrategyDto, ExchangeConnectionDto, ExecuteTradeDto, GetHistoryInput, GetSignalsInput, MarketAnalysisDto, OpportunityDto, RecommendedStyleDto, RunBacktestDto, StartSessionDto, TradeOrderDto, TraderProfileDto, TradingAlertDto, TradingSessionDto, TradingStrategyDto, UpdateTraderProfileDto } from './models';
 import { RestService, Rest } from '@abp/ng.core';
+import type { PagedResultDto } from '@abp/ng.core';
 import { Injectable, inject } from '@angular/core';
 
 @Injectable({
@@ -11,85 +13,32 @@ export class TradingService {
   apiName = 'Default';
   
 
-  confirm = (input: TradeConfirmationDto, config?: Partial<Rest.Config>) =>
-    this.restService.request<any, boolean>({
-      method: 'POST',
-      url: '/api/trading/confirm',
-      body: input,
-    },
-    { apiName: this.apiName,...config });
-  
-
-  getPreview = (input: TradeRequestDto, config?: Partial<Rest.Config>) =>
-    this.restService.request<any, TradePreviewDto>({
-      method: 'POST',
-      url: '/api/trading/preview',
-      body: input,
-    },
-    { apiName: this.apiName,...config });
-
-  
-  getCurrentSession = (config?: Partial<Rest.Config>) =>
-    this.restService.request<any, TradingSessionDto>({
-      method: 'GET',
-      url: '/api/app/trading/current-session',
-    },
-    { apiName: this.apiName,...config });
-
-  
-  startSession = (input: StartSessionDto, config?: Partial<Rest.Config>) =>
-    this.restService.request<any, TradingSessionDto>({
-      method: 'POST',
-      url: '/api/app/trading/start-session',
-      body: input,
-    },
-    { apiName: this.apiName,...config });
-
-  
   advanceStage = (sessionId: string, config?: Partial<Rest.Config>) =>
     this.restService.request<any, TradingSessionDto>({
       method: 'POST',
       url: `/api/app/trading/advance-stage/${sessionId}`,
     },
     { apiName: this.apiName,...config });
-
   
-  finalizeHunt = (sessionId: string, config?: Partial<Rest.Config>) =>
-    this.restService.request<any, TradingSessionDto>({
+
+  connectExchange = (input: ConnectExchangeDto, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, ExchangeConnectionDto>({
       method: 'POST',
-      url: `/api/app/trading/finalize-hunt/${sessionId}`,
+      url: '/api/app/trading/connect-exchange',
+      body: input,
     },
     { apiName: this.apiName,...config });
-
   
-  getAnalysisLogs = (sessionId: string, limit: number = 50, config?: Partial<Rest.Config>) =>
-    this.restService.request<any, AnalysisLogDto[]>({
-      method: 'GET',
-      url: `/api/app/trading/analysis-logs/${sessionId}`,
-      params: { limit },
-    },
-    { apiName: this.apiName,...config });
 
-  
-  getSignalStats = (symbol?: string, regime?: MarketRegimeType, config?: Partial<Rest.Config>) =>
-    this.restService.request<any, SignalStatsDto>({
-      method: 'GET',
-      url: '/api/app/trading/signal-stats',
-      params: { symbol, regime },
-    },
-    { apiName: this.apiName,...config });
-
-  
-  // POST with symbol as query param (as per generate-proxy.json)
-  recommendTradingStyle = (symbol: string, config?: Partial<Rest.Config>) =>
-    this.restService.request<any, RecommendedStyleDto>({
+  createAlert = (input: CreateUpdateTradingAlertDto, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, TradingAlertDto>({
       method: 'POST',
-      url: '/api/app/trading/recommend-trading-style',
-      params: { symbol },
+      url: '/api/app/trading/alert',
+      body: input,
     },
     { apiName: this.apiName,...config });
-
   
+
   createStrategy = (input: CreateUpdateTradingStrategyDto, config?: Partial<Rest.Config>) =>
     this.restService.request<any, TradingStrategyDto>({
       method: 'POST',
@@ -97,5 +46,253 @@ export class TradingService {
       body: input,
     },
     { apiName: this.apiName,...config });
+  
+
+  deactivateAlert = (id: string, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'POST',
+      url: `/api/app/trading/${id}/deactivate-alert`,
+    },
+    { apiName: this.apiName,...config });
+  
+
+  deleteStrategy = (id: string, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'DELETE',
+      url: `/api/app/trading/${id}/strategy`,
+    },
+    { apiName: this.apiName,...config });
+  
+
+  executeMassOptimization = (symbol: string, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'POST',
+      url: '/api/app/trading/execute-mass-optimization',
+      params: { symbol },
+    },
+    { apiName: this.apiName,...config });
+  
+
+  executeTrade = (input: ExecuteTradeDto, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, TradeOrderDto>({
+      method: 'POST',
+      url: '/api/app/trading/execute-trade',
+      body: input,
+    },
+    { apiName: this.apiName,...config });
+  
+
+  finalizeHunt = (sessionId: string, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, TradingSessionDto>({
+      method: 'POST',
+      url: `/api/app/trading/finalize-hunt/${sessionId}`,
+    },
+    { apiName: this.apiName,...config });
+  
+
+  getActiveAlerts = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, TradingAlertDto[]>({
+      method: 'GET',
+      url: '/api/app/trading/active-alerts',
+    },
+    { apiName: this.apiName,...config });
+  
+
+  getAnalysisLogs = (sessionId: string, limit: number = 50, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, AnalysisLogDto[]>({
+      method: 'GET',
+      url: `/api/app/trading/analysis-logs/${sessionId}`,
+      params: { limit },
+    },
+    { apiName: this.apiName,...config });
+  
+
+  getComparativeReport = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, ComparativeEvaluationReportDto>({
+      method: 'GET',
+      url: '/api/app/trading/comparative-report',
+    },
+    { apiName: this.apiName,...config });
+  
+
+  getConnections = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, ExchangeConnectionDto[]>({
+      method: 'GET',
+      url: '/api/app/trading/connections',
+    },
+    { apiName: this.apiName,...config });
+  
+
+  getCurrentSession = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, TradingSessionDto>({
+      method: 'GET',
+      url: '/api/app/trading/current-session',
+    },
+    { apiName: this.apiName,...config });
+  
+
+  getMarketAnalysisDummy = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, MarketAnalysisDto>({
+      method: 'GET',
+      url: '/api/app/trading/market-analysis-dummy',
+    },
+    { apiName: this.apiName,...config });
+  
+
+  getOpportunityDummy = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, OpportunityDto>({
+      method: 'GET',
+      url: '/api/app/trading/opportunity-dummy',
+    },
+    { apiName: this.apiName,...config });
+  
+
+  getOptimizationMatrix = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, string>({
+      method: 'GET',
+      responseType: 'text',
+      url: '/api/app/trading/optimization-matrix',
+    },
+    { apiName: this.apiName,...config });
+  
+
+  getOrderHistory = (input: GetHistoryInput, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, PagedResultDto<TradeOrderDto>>({
+      method: 'GET',
+      url: '/api/app/trading/order-history',
+      params: { symbol: input.symbol, startDate: input.startDate, endDate: input.endDate, sorting: input.sorting, skipCount: input.skipCount, maxResultCount: input.maxResultCount },
+    },
+    { apiName: this.apiName,...config });
+  
+
+  getProfile = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, TraderProfileDto>({
+      method: 'GET',
+      url: '/api/app/trading/profile',
+    },
+    { apiName: this.apiName,...config });
+  
+
+  getSignalStats = (symbol?: string, regime?: MarketRegimeType, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, SignalStatsDto>({
+      method: 'GET',
+      url: '/api/app/trading/signal-stats',
+      params: { symbol, regime },
+    },
+    { apiName: this.apiName,...config });
+  
+
+  getSignals = (input: GetSignalsInput, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, PagedResultDto<TradingSignalDto>>({
+      method: 'GET',
+      url: '/api/app/trading/signals',
+      params: { status: input.status, confidence: input.confidence, sorting: input.sorting, skipCount: input.skipCount, maxResultCount: input.maxResultCount },
+    },
+    { apiName: this.apiName,...config });
+  
+
+  getStrategies = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, TradingStrategyDto[]>({
+      method: 'GET',
+      url: '/api/app/trading/strategies',
+    },
+    { apiName: this.apiName,...config });
+  
+
+  getVergeAlertDummy = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, VergeAlertDto>({
+      method: 'GET',
+      url: '/get-verge-alert-dummy',
+    },
+    { apiName: this.apiName,...config });
+  
+
+  optimizeRegime = (regime: string, symbol: string, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'POST',
+      url: '/api/app/trading/optimize-regime',
+      params: { regime, symbol },
+    },
+    { apiName: this.apiName,...config });
+  
+
+  recommendTradingStyle = (symbol: string, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, RecommendedStyleDto>({
+      method: 'POST',
+      url: '/api/app/trading/recommend-trading-style',
+      params: { symbol },
+    },
+    { apiName: this.apiName,...config });
+  
+
+  runBacktest = (input: RunBacktestDto, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, BacktestResultDto>({
+      method: 'POST',
+      url: '/api/app/trading/run-backtest',
+      body: input,
+    },
+    { apiName: this.apiName,...config });
+  
+
+  runComparativeEvaluation = (symbols: string[], runInBackground: boolean = true, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'POST',
+      url: '/api/app/trading/run-comparative-evaluation',
+      params: { runInBackground },
+      body: symbols,
+    },
+    { apiName: this.apiName,...config });
+  
+
+  runExhaustiveValidation = (symbols: string[], runInBackground: boolean = true, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'POST',
+      url: '/api/app/trading/run-exhaustive-validation',
+      params: { runInBackground },
+      body: symbols,
+    },
+    { apiName: this.apiName,...config });
+  
+
+  startSession = (input: StartSessionDto, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, TradingSessionDto>({
+      method: 'POST',
+      url: '/api/app/trading/start-session',
+      body: input,
+    },
+    { apiName: this.apiName,...config });
+  
+
+  testSignalR = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'GET',
+      url: '/api/app/trading/test-signalr',
+    },
+    { apiName: this.apiName,...config });
+  
+
+  testSignalRPublic = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'GET',
+      url: '/api/app/trading/test-signalr-public',
+    },
+    { apiName: this.apiName,...config });
+  
+
+  updateProfile = (input: UpdateTraderProfileDto, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, TraderProfileDto>({
+      method: 'PUT',
+      url: '/api/app/trading/profile',
+      body: input,
+    },
+    { apiName: this.apiName,...config });
+  
+
+  updateStrategy = (id: string, input: CreateUpdateTradingStrategyDto, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, TradingStrategyDto>({
+      method: 'PUT',
+      url: `/api/app/trading/${id}/strategy`,
+      body: input,
+    },
+    { apiName: this.apiName,...config });
 }
-

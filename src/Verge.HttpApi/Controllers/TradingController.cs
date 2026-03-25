@@ -5,12 +5,12 @@ using Volo.Abp.AspNetCore.Mvc;
 
 namespace Verge.Trading
 {
-    [Route("api/trading")]
-    public class TradingController : AbpController, IRealTradeAppService
+    [Route("api/app/real-trade")]
+    public class RealTradeController : AbpController, IRealTradeAppService
     {
         private readonly IRealTradeAppService _tradeAppService;
 
-        public TradingController(IRealTradeAppService tradeAppService)
+        public RealTradeController(IRealTradeAppService tradeAppService)
         {
             _tradeAppService = tradeAppService;
         }

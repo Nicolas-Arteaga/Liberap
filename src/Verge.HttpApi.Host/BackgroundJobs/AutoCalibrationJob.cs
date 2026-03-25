@@ -81,21 +81,32 @@ public class AutoCalibrationJob : BackgroundService
                             await calibrationRepository.InsertAsync(calibration);
                         }
 
-                        // Adjustment Logic
+                        // 🏆 Phase 4: Neural Weight Sensitivity Adjustment
+                        var winsWithScores = contextSessions.Where(s => s.Outcome == TradeStatus.Win && !string.IsNullOrEmpty(s.InitialWeightedScoresJson)).ToList();
+                        var lossesWithScores = contextSessions.Where(s => s.Outcome != TradeStatus.Win && !string.IsNullOrEmpty(s.InitialWeightedScoresJson)).ToList();
+
+                        if (winsWithScores.Any() || lossesWithScores.Any())
+                        {
+                            _logger.LogInformation("🧠 [Neural Calibration] {Style} - {Regime}: Analyzing sensitivity across {Count} sessions...", style, regime, winsWithScores.Count + lossesWithScores.Count);
+                            
+                            // Simple Delta Analysis: Increase multiplier if a component was stronger in wins than in losses
+                            AdjustComponentMultiplier(calibration, "Technical", winsWithScores, lossesWithScores, c => c.TechnicalMultiplier, (c, v) => c.TechnicalMultiplier = v);
+                            AdjustComponentMultiplier(calibration, "Sentiment", winsWithScores, lossesWithScores, c => c.SentimentMultiplier, (c, v) => c.SentimentMultiplier = v);
+                            AdjustComponentMultiplier(calibration, "Institutional", winsWithScores, lossesWithScores, c => c.InstitutionalMultiplier, (c, v) => c.InstitutionalMultiplier = v);
+                            AdjustComponentMultiplier(calibration, "Quantitative", winsWithScores, lossesWithScores, c => c.QuantitativeMultiplier, (c, v) => c.QuantitativeMultiplier = v);
+                        }
+
+                        // Threshold adjustments based on raw WinRate
                         if (winRate < 0.45)
                         {
-                            // Performance is poor, tighten thresholds
                             calibration.EntryThresholdShift = Math.Min(30, calibration.EntryThresholdShift + 2);
-                            _logger.LogWarning("🔍 Low WinRate ({winRate:P2}) for {Style} in {Regime}. Tightening thresholds (+2). Total Shift: {Shift}", winRate, style, regime, calibration.EntryThresholdShift);
                         }
                         else if (winRate > 0.65)
                         {
-                            // Performance is great, loosen thresholds slightly
                             calibration.EntryThresholdShift = Math.Max(-15, calibration.EntryThresholdShift - 1);
-                            _logger.LogInformation("🎯 High WinRate ({winRate:P2}) for {Style} in {Regime}. Loosening thresholds (-1). Total Shift: {Shift}", winRate, style, regime, calibration.EntryThresholdShift);
                         }
 
-                        // Weight adjustments based on average score of wins vs losses could be added here
+                        calibration.LastRecalibrated = DateTime.UtcNow;
                         await calibrationRepository.UpdateAsync(calibration);
                     }
                 }
@@ -105,5 +116,38 @@ public class AutoCalibrationJob : BackgroundService
 
             _logger.LogInformation("✅ Strategy Re-Calibration completed.");
         }
+    }
+
+    private void AdjustComponentMultiplier(
+        StrategyCalibration calibration, 
+        string component, 
+        List<TradingSession> wins, 
+        List<TradingSession> losses, 
+        Func<StrategyCalibration, float> getter, 
+        Action<StrategyCalibration, float> setter)
+    {
+        double avgWin = wins.Any() ? wins.Average(s => GetScoreForComponent(s, component)) : 0;
+        double avgLoss = losses.Any() ? losses.Average(s => GetScoreForComponent(s, component)) : 0;
+
+        float current = getter(calibration);
+        if (avgWin > avgLoss + 5) // Strong positive correlation with winning
+        {
+            setter(calibration, Math.Min(2.5f, current + 0.05f));
+        }
+        else if (avgLoss > avgWin + 5) // Component often high in losing sessions
+        {
+            setter(calibration, Math.Max(0.5f, current - 0.05f));
+        }
+    }
+
+    private float GetScoreForComponent(TradingSession session, string key)
+    {
+        try 
+        {
+            if (string.IsNullOrEmpty(session.InitialWeightedScoresJson)) return 0;
+            var scores = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, float>>(session.InitialWeightedScoresJson);
+            return scores != null && scores.TryGetValue(key, out float val) ? val : 0;
+        }
+        catch { return 0; }
     }
 }

@@ -136,4 +136,5 @@ export interface VergeAlertDto {
   liquidityZones: number[];
   severity?: string;
   icon?: string;
+  agentOpinions: Record<string, string>;
 }

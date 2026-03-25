@@ -21,9 +21,9 @@ export class RealTradeService {
 
   getPreview = (input: TradeRequestDto, config?: Partial<Rest.Config>) =>
     this.restService.request<any, TradePreviewDto>({
-      method: 'GET',
+      method: 'POST',
       url: '/api/app/real-trade/preview',
-      params: { symbol: input.symbol, side: input.side, quantity: input.quantity, leverage: input.leverage },
+      body: input,
     },
     { apiName: this.apiName,...config });
 }

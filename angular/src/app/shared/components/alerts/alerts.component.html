@@ -17,6 +17,19 @@
       <div *ngIf="alert.targetZone" class="alert-target">
         🎯 Zona: ${{ alert.targetZone.low | number:'1.2-2' }} - ${{ alert.targetZone.high | number:'1.2-2' }}
       </div>
+      
+      <!-- 🧠 AI Insights for List Mode -->
+      <div class="mt-2 pt-2 border-top border-white-05" *ngIf="alert.agentOpinions && (alert.agentOpinions | keyvalue).length > 0">
+        <button class="btn btn-link p-0 text-info text-xs fw-bold" (click)="toggleAIInsights($event, alert.id)">
+          {{ isAIInsightsExpanded(alert.id) ? 'OCULTAR RAZONAMIENTO' : '¿POR QUÉ?' }} 🧠
+        </button>
+        <div class="ai-insights-list-panel mt-2 animate-fade-in" *ngIf="isAIInsightsExpanded(alert.id)">
+          <div *ngFor="let agent of alert.agentOpinions | keyvalue" class="mb-1">
+            <span class="text-xs fw-black text-success opacity-75">{{ agent.key }}:</span>
+            <p class="text-xs text-white-50 m-0 italic line-height-tight">"{{ agent.value }}"</p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="alert-actions" *ngIf="!alert.read">
@@ -123,12 +136,31 @@
     </div>
   </div>
 
-  <!-- Row 3: Final Actions -->
+    <!-- Row 3: Final Actions -->
   <div class="alert-row action-row mt-3 pt-2 border-top border-white-10">
-    <button class="btn btn-sm btn-outline-light border-0 opacity-50 text-xs"
-      (click)="onMarkAsReadClick($event, activeOverlayAlert.id)">IGNORAR</button>
-    <button class="btn btn-sm btn-success-vision px-4 py-2" (click)="onAlertClick(activeOverlayAlert.id)">
-      <ion-icon name="flash-outline" class="me-1"></ion-icon> EJECUTAR
-    </button>
+    <div class="d-flex justify-content-between align-items-center w-100" style="margin-bottom: 8px;"
+      *ngIf="activeOverlayAlert.agentOpinions && (activeOverlayAlert.agentOpinions | keyvalue).length > 0">
+      <span class="text-xxs text-info-light opacity-50 italic">AI Consensus Reasoning available</span>
+      <button class="btn btn-link p-0 text-info text-xxs fw-bold" (click)="toggleAIInsights($event, activeOverlayAlert.id)">
+        {{ isAIInsightsExpanded(activeOverlayAlert.id) ? 'OCULTAR' : '¿POR QUÉ?' }} 🧠
+      </button>
+    </div>
+
+    <!-- AI Insights Panel -->
+    <div class="ai-insights-panel bg-black-20 p-2 rounded mb-2" *ngIf="isAIInsightsExpanded(activeOverlayAlert.id) && activeOverlayAlert.agentOpinions"
+      style="max-height: 150px; overflow-y: auto; border-left: 2px solid #52ffaf;">
+      <div *ngFor="let agent of activeOverlayAlert.agentOpinions | keyvalue" class="mb-2">
+        <span class="d-block text-xxs fw-black text-success-vision">{{ agent.key }}:</span>
+        <p class="text-xs text-white opacity-75 m-0 italic">"{{ agent.value }}"</p>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center w-100">
+      <button class="btn btn-sm btn-outline-light border-0 opacity-50 text-xs"
+        (click)="onMarkAsReadClick($event, activeOverlayAlert.id)">IGNORAR</button>
+      <button class="btn btn-sm btn-success-vision px-4 py-2" (click)="onAlertClick(activeOverlayAlert.id)">
+        <ion-icon name="flash-outline" class="me-1"></ion-icon> EJECUTAR
+      </button>
+    </div>
   </div>
 </div>

@@ -195,4 +195,13 @@ public class CryptoAnalysisService : DomainService
 
         return (TradingStyle.DayTrading, $"Condiciones de mercado estándar (Volatilidad: {avgVolatility:F2}%, RSI: {rsi:F2}). DAY TRADING balanceado.");
     }
+
+    public bool IsZombieData(List<MarketCandleModel> candles)
+    {
+        if (candles == null || (candles.Count < 10)) return false;
+        var recent = candles.Skip(Math.Max(0, candles.Count - 10)).ToList();
+        var first = recent.First().Close;
+        // If all 10 recent candles have the exact same price, it's a zombie/stagnant symbol
+        return recent.All(c => c.Close == first);
+    }
 }

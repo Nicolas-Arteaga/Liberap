@@ -67,6 +67,7 @@ public class DecisionResult
     public SignalDirection? Direction { get; set; }
     public decimal? StopLossPrice { get; set; }
     public decimal? TakeProfitPrice { get; set; }
+    public Dictionary<string, string> AgentOpinions { get; set; } = new();
 }
 
 public enum TradingDecision

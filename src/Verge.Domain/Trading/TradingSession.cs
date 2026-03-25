@@ -41,6 +41,7 @@ public class TradingSession : FullAuditedAggregateRoot<Guid>
     public decimal? InitialVolumeMcapRatio { get; set; }
     public int? EntryHour { get; set; }
     public DayOfWeek? EntryDayOfWeek { get; set; }
+    public string? InitialWeightedScoresJson { get; set; } // Stores Dictionary<string, float>
 
     // Institutional (Sprint 5)
     public double? WhaleInfluenceScore { get; set; }

@@ -120,8 +120,8 @@ public class MultiAgentConsensusService : DomainService, IMultiAgentConsensusSer
         }
 
         result.Score = score;
-        result.Reasoning = $"⚠️ [TECH-FALLBACK] AI Limited by Quota. Score calculated via RSI/Regime. (Score: {score:F1})";
-        result.AgentOpinions.Add("EmergencySystem", "AI Rate limited. Using deterministic technical rules.");
+        result.Reasoning = $"⚠️ [AI-QUOTA-EXCEEDED] Análisis técnico determinista activado por límites de API. (Score: {score:F1})";
+        result.AgentOpinions.Add("SistemaEmergencia", "Los agentes de IA están descansando (Límite 429). He calculado este score basándome puramente en RSI y Estructura de Mercado para no dejarte a ciegas.");
         
         return result;
     }

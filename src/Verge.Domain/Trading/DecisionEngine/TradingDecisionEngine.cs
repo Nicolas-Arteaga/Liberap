@@ -57,6 +57,10 @@
 
             // 1. Get corresponding Profile
             var profile = TradingStyleProfileFactory.GetProfile(style);
+            
+            // 1.1 Multi-Agent AI Consensus (Pre-fetch for observability in early returns)
+            var aiConsensus = await _multiAgentConsensusService.GetConsensusAsync(context, style);
+            float aiScore = aiConsensus.Score;
 
             // 2. Setup Invalidation Check (Phase 2)
             if (session.CurrentStage == TradingStage.Prepared)
@@ -67,7 +71,8 @@
                     {
                         Decision = TradingDecision.Ignore,
                         Score = 0,
-                        Reason = $"⚠️ SETUP INVALIDATED: {invalidReason}"
+                        Reason = $"⚠️ SETUP INVALIDATED: {invalidReason}",
+                        AgentOpinions = aiConsensus.AgentOpinions // 🧠 Preserve AI insights
                     };
                     _logger.LogWarning("❌ Session {SessionId} invalidated: {Reason}", session.Id, invalidResult.Reason);
                     return invalidResult;
@@ -82,7 +87,8 @@
                 {
                     Decision = TradingDecision.Ignore,
                     Score = 0,
-                    Reason = $"IGNORE: Invalid Regime '{currentRegime}' for {style} style."
+                    Reason = $"IGNORE: Invalid Regime '{currentRegime}' for {style} style.",
+                    AgentOpinions = aiConsensus.AgentOpinions // 🧠 Preserve AI insights
                 };
                 _logger.LogInformation("✅ Evaluation Result for {Style}: {Decision} | Reason: {Reason}", style, invalidRegimeResult.Decision, invalidRegimeResult.Reason);
                 return invalidRegimeResult;
@@ -101,9 +107,8 @@
             
             float institutionalScore = CalculateInstitutionalScore(context);
 
-            // 4.2. Multi-Agent AI Consensus (New Sprint Component)
-            var aiConsensus = await _multiAgentConsensusService.GetConsensusAsync(context, style);
-            float aiScore = aiConsensus.Score;
+            // 4.2 Multi-Agent AI Consensus (Already fetched at start)
+            // float aiScore = aiConsensus.Score; 
 
             // 5. Apply Profile Weights (Sprint 4: Adaptive Weights + Calibration)
             var calibration = await GetCalibrationAsync(style, currentRegime);
@@ -149,7 +154,8 @@
                 {
                     Decision = TradingDecision.Ignore,
                     Score = roundedScore, // Return the decaying score so UI tracks it smoothly
-                    Reason = $"IGNORE: {setupInvalidReason}"
+                    Reason = $"IGNORE: {setupInvalidReason}",
+                    AgentOpinions = aiConsensus.AgentOpinions // 🧠 Preserve AI insights even on invalidation
                 };
 
                 // Always calculate SL/TP even for invalidated results so the UI has real data
@@ -267,7 +273,8 @@
                 WhaleSentiment = context.WhaleData?.Summary,
                 MacroQuietPeriod = context.MacroData?.IsInQuietPeriod ?? false,
                 MacroReason = context.MacroData?.QuietPeriodReason,
-                TrailingMultiplier = trailingMultiplierOverride ?? calibration?.TrailingMultiplier ?? profile.TrailingMultiplier
+                TrailingMultiplier = trailingMultiplierOverride ?? calibration?.TrailingMultiplier ?? profile.TrailingMultiplier,
+                AgentOpinions = aiConsensus.AgentOpinions
             };
 
             // 10.1 Institutional 1% Price Calculation (Sprint 1)

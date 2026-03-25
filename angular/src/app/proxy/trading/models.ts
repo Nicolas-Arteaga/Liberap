@@ -392,25 +392,3 @@ export interface WalkForwardWindowDto {
   testingResult: BacktestResultDto;
   passedProfitFactor: boolean;
 }
-
-export interface SignalRegimeStatDto {
-  regime?: string;
-  wins: number;
-  losses: number;
-  winRate: number;
-  totalPnL: number;
-}
-
-export interface SignalStatsDto {
-  symbol?: string;
-  totalSignals: number;
-  wins: number;
-  losses: number;
-  winRate: number;
-  totalRealizedPnL: number;
-  averagePnLPerTrade: number;
-  expectancy: number;
-  averageDurationMinutes: number;
-  equityCurve: number[];
-  byRegime: SignalRegimeStatDto[];
-}

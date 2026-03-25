@@ -138,7 +138,9 @@ export class TradingSignalrService {
     }
 
     private normalizeAlert(alert: any): VergeAlert {
-        console.log('[SignalR] 🛠️ Normalizando alerta RAW:', alert);
+        console.log('[SignalR] 🛠️ Normalizando alerta RAW de SignalR:', alert);
+        console.warn('[SignalR] 🚨 RAW STRINGIFIED PAYLOAD:', JSON.stringify(alert));
+        console.log('[SignalR] 🛠️ Llaves del objeto RAW:', Object.keys(alert));
 
         // Mapear campos que pueden venir en PascalCase o camelCase desde C# SignalR
         const normalized: any = { ...alert };
@@ -176,6 +178,18 @@ export class TradingSignalrService {
         normalized.whaleInfluenceScore = alert.whaleInfluenceScore ?? alert.WhaleInfluenceScore ?? alert.whaleInfluence ?? 0;
         normalized.isSqueeze = alert.isSqueeze ?? alert.IsSqueeze ?? false;
 
+        // AI Multi-Agent Opinions (Support all common naming conventions from different serializers)
+        normalized.agentOpinions = alert.agentOpinions ?? 
+                                   alert.AgentOpinions ?? 
+                                   alert.agent_opinions ?? 
+                                   alert['agent-opinions'] ?? {};
+        
+        if (Object.keys(normalized.agentOpinions).length > 0) {
+            console.log(`[SignalR] 🧠 AI Opinions detected for ${normalized.crypto}:`, normalized.agentOpinions);
+        } else {
+            console.warn(`[SignalR] ⚠️ NO AI Opinions for ${normalized.crypto}. Raw keys:`, Object.keys(alert));
+        }
+ 
         console.log('[SignalR] ✅ Alerta NORMALIZADA:', normalized);
         return normalized as VergeAlert;
     }

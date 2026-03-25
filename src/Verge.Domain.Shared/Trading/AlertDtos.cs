@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Volo.Abp.EventBus;
+using System.Text.Json.Serialization;
 
 namespace Verge.Trading.DTOs;
 
@@ -42,6 +43,9 @@ public class VergeAlertDto
     // UI
     public string Severity { get; set; } = "info"; 
     public string Icon { get; set; } = string.Empty;
+    
+    [JsonPropertyName("agentOpinions")]
+    public Dictionary<string, string> AgentOpinions { get; set; } = new();
 }
 
 public class TargetZoneDto

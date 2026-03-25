@@ -68,6 +68,7 @@ public class MarketScannerService : BackgroundService
         var analysisLogRepo = scope.ServiceProvider.GetRequiredService<IRepository<AnalysisLog, Guid>>();
         var whaleTracker = scope.ServiceProvider.GetRequiredService<IWhaleTrackerService>();
         var institutionalService = scope.ServiceProvider.GetRequiredService<IInstitutionalDataService>();
+        var multiAgentConsensus = scope.ServiceProvider.GetRequiredService<IMultiAgentConsensusService>();
         var macroService = scope.ServiceProvider.GetRequiredService<IMacroSentimentService>();
         var unitOfWorkManager = scope.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
 
@@ -79,9 +80,9 @@ public class MarketScannerService : BackgroundService
             _logger.LogWarning("🌍 QUIET PERIOD ACTIVE: {reason}. Skipping scanners or dampening entries...", macroData.QuietPeriodReason);
         }
 
-        // Top 15 symbols by volume — reduced from 30 to minimize Binance REST rate limit usage
-        var topSymbols = await marketDataManager.GetTopSymbolsAsync(15);
-        _logger.LogInformation("📊 Top 15 symbols to analyze ({count}). Analyzing...", topSymbols.Count);
+        // Top 30 symbols by volume (Phase 4 Scaling)
+        var topSymbols = await marketDataManager.GetTopSymbolsAsync(30);
+        _logger.LogInformation("📊 Top 30 symbols to analyze ({count}). Analyzing...", topSymbols.Count);
 
         int analyzedCount = 0;
         foreach (var symbol in topSymbols)
@@ -94,6 +95,13 @@ public class MarketScannerService : BackgroundService
                 var candles = await marketDataManager.GetCandlesAsync(symbol, "15", 30);
                 if (candles == null || candles.Count < 20) {
                     _logger.LogWarning("⚠️ No hay suficientes velas para {symbol}", symbol);
+                    continue;
+                }
+
+                // 🚀 Phase 4 Pre-Filter: Zombie Data Check
+                if (analysisService.IsZombieData(candles))
+                {
+                    _logger.LogWarning("🧟 ZOMBIE DATA DETECTED for {symbol}. Skipping to save resources.", symbol);
                     continue;
                 }
 
@@ -190,6 +198,31 @@ public class MarketScannerService : BackgroundService
 
                 // 5.5 Publish Real-time Telemetry (SignalR) for Dashboard UI Grids
                 var profiles = await profileRepository.GetListAsync();
+                // 2. Fetch AI Insights for high-confidence findings (>60% to save quota)
+                Dictionary<string, string> agentOpinions = new();
+                if (confidence >= 60)
+                {
+                    try {
+                        var marketContext = new MarketContext { 
+                            Symbol = symbol,
+                            Technicals = new TechnicalsResponseModel { Rsi = (float)rsi },
+                            MarketRegime = new RegimeResponseModel { 
+                                Regime = trend == "bullish" ? MarketRegimeType.BullTrend : MarketRegimeType.BearTrend,
+                                TrendStrength = 1.0f
+                            },
+                            WhaleData = whaleData,
+                            InstitutionalData = instData,
+                            MacroData = macroData
+                        }; 
+                        _logger.LogInformation("🧠 [Scanner AI] Fetching insights for {symbol} with full context...", symbol);
+                        var aiResult = await multiAgentConsensus.GetConsensusAsync(marketContext, TradingStyle.DayTrading);
+                        agentOpinions = aiResult.AgentOpinions;
+                        _logger.LogInformation("🧠 [Scanner AI] Fetched {count} opinions for {symbol}", agentOpinions.Count, symbol);
+                    } catch (Exception ex) { 
+                        _logger.LogWarning("⚠️ [Scanner AI] Failed to fetch insights for {symbol}: {msg}", symbol, ex.Message);
+                    }
+                }
+
                 foreach (var profile in profiles)
                 {
                     await _eventBus.PublishAsync(new AlertStateChangedEto
@@ -212,7 +245,8 @@ public class MarketScannerService : BackgroundService
                             Icon = confidence >= 50 ? "search-outline" : "pulse-outline",
                             WhaleInfluenceScore = whaleBonus * 100 / 15,
                             IsSqueeze = instData.IsSqueezeDetected,
-                            Score = confidence,
+                            Score = (int)confidence,
+                            AgentOpinions = agentOpinions,
                             // 🚀 NUCLEAR SYNC: Mathematical multiplier ensures Label and Prices are LOCKED
                             RiskRewardRatio = 2.0,
                             StopLoss = prices.LastOrDefault() - ( (prices.LastOrDefault() * 0.015m) * (signal == SignalDirection.Long ? 1.0m : -1.0m) ),

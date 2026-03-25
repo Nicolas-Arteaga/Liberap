@@ -173,6 +173,12 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   // Señales activas (reemplazado por logs reales)
   activeSignals: TradingSignal[] = [];
 
+  get activeHeaderAlert() {
+    return this.alertService.alerts().find(a => 
+      (a.type.startsWith('Stage') || a.type === 'Custom' || a.type === 'System') && !a.read
+    );
+  }
+
   // Sistema de alertas 1-2-3-4
   currentStage = 1;
 

@@ -25,66 +25,182 @@
 
   <main class="container-fluid px-4 py-3">
     <!-- 🏆 Institutional Header (Restored 3 Lines - No borders) -->
-    <div class="institutional-header bg-dark-soft p-3 mb-4">
-      <div class="header-line d-flex align-items-center justify-content-between mb-2">
-        <div class="d-flex align-items-center gap-3">
-          <div class="status-indicator d-flex align-items-center gap-2">
-            <div class="status-dot pulsing"></div>
-            <span class="text-success fw-bold text-sm tracking-wider">MOTOR ACTIVO</span>
-          </div>
-          <div class="v-divider"></div>
-          <div class="d-flex align-items-center gap-2">
-            <ion-icon name="time-outline" class="text-white-50"></ion-icon>
-            <span class="text-white fw-medium text-sm">{{ analysisTime }}</span>
-          </div>
-        </div>
-        <div class="d-flex align-items-center gap-2">
-          <app-glass-button variant="warning" (click)="clearAlerts()" style="height: 30px; font-size: 0.75rem;">Borrar alertas</app-glass-button>
-          <app-glass-button variant="danger" (click)="finalizeHunt()" style="height: 30px; font-size: 0.75rem;">Finalizar</app-glass-button>
-        </div>
-      </div>
-
-      <div class="header-line d-flex align-items-center justify-content-between mb-2 py-2 border-top border-white-05">
-        <div class="d-flex align-items-center gap-4">
-          <div class="d-flex align-items-center gap-2">
-            <ion-icon name="shield-checkmark" class="text-success"></ion-icon>
-            <span class="text-white text-xs fw-bold">MACRO SHIELD:</span>
-            <span class="text-success text-xs fw-bold">QUIET PERIOD</span>
-          </div>
-          <div class="d-flex align-items-center gap-2">
-            <ion-icon name="globe-outline" class="text-info"></ion-icon>
-            <span class="text-white text-xs fw-bold">SENTIMIENTO: BULLISH</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="header-line d-flex align-items-center justify-content-between border-top border-white-05 pt-2">
-        <div class="d-flex align-items-center gap-3">
-          <div class="d-flex align-items-center gap-2">
-            <ion-icon name="water" class="text-info"></ion-icon>
-            <span class="text-white text-xs fw-bold">BALLENAS:</span>
-            <div class="d-flex gap-1" *ngIf="headerWhales.length > 0">
-              <span *ngFor="let w of headerWhales" class="badge bg-info text-dark" style="font-size: 9px;">{{ w.symbol }} ({{ w.influence }}%)</span>
+    <div class="institutional-header bg-dark-soft p-3 mb-4 rounded-3 border border-white-05 shadow-lg overflow-hidden position-relative">
+      
+      <!-- VIEW 1: NORMAL STATE (Image 2) -->
+      <ng-container *ngIf="!activeHeaderAlert; else alertDrivenHeader">
+        <div class="header-line d-flex align-items-center justify-content-between mb-2">
+          <div class="d-flex align-items-center gap-3">
+            <div class="status-indicator d-flex align-items-center gap-2">
+              <div class="status-dot pulsing"></div>
+              <span class="text-success fw-bold text-sm tracking-wider">MOTOR ACTIVO</span>
             </div>
-            <span *ngIf="headerWhales.length === 0" class="text-white-50 text-xs">Monitoreando...</span>
+            <div class="v-divider"></div>
+            <div class="d-flex align-items-center gap-2">
+              <ion-icon name="time-outline" class="text-white-50"></ion-icon>
+              <span class="text-white fw-medium text-sm">{{ analysisTime }}</span>
+            </div>
           </div>
-          <div class="v-divider"></div>
           <div class="d-flex align-items-center gap-2">
-            <ion-icon name="flame" class="text-danger"></ion-icon>
-            <span class="text-white text-xs fw-bold">SQUEEZES:</span>
-            <span class="text-white-50 text-xs">Normal</span>
+            <app-glass-button class="btn-header-sober" variant="warning" (click)="alertService.markAllAsRead()">Borrar alertas</app-glass-button>
+            <app-glass-button class="btn-header-sober" variant="danger" (click)="finalizeHunt()">Finalizar</app-glass-button>
           </div>
         </div>
-        <div class="mini-heatmap d-flex align-items-center gap-2">
-          <span class="text-white-50 text-xs fw-bold">HEATMAP:</span>
-          <div *ngFor="let c of headerHeatmapCoins" class="heatmap-bar-mini d-flex align-items-center gap-1">
-            <span class="text-white text-xs">{{ c.symbol }}</span>
-            <div class="bar-bg" style="width: 30px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 10px;">
-              <div class="bar-fill" [style.width.%]="c.score" style="height: 100%; background: #10b981;"></div>
+
+        <div class="header-line d-flex align-items-center justify-content-between mb-2 py-2 border-top border-white-05">
+          <div class="d-flex align-items-center gap-4">
+            <div class="d-flex align-items-center gap-2">
+              <ion-icon name="shield-checkmark" class="text-success"></ion-icon>
+              <span class="text-white text-xs fw-bold">MACRO SHIELD:</span>
+              <span class="text-success text-xs fw-bold">QUIET PERIOD</span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <ion-icon name="globe-outline" class="text-info"></ion-icon>
+              <span class="text-white text-xs fw-bold">SENTIMIENTO: BULLISH</span>
             </div>
           </div>
         </div>
-      </div>
+
+        <div class="header-line d-flex align-items-center justify-content-between border-top border-white-05 pt-2">
+          <div class="d-flex align-items-center gap-3">
+            <div class="d-flex align-items-center gap-2">
+              <ion-icon name="water" class="text-info"></ion-icon>
+              <span class="text-white text-xs fw-bold">BALLENAS:</span>
+              <div class="d-flex gap-1" *ngIf="headerWhales.length > 0">
+                <span *ngFor="let w of headerWhales" class="badge bg-info text-dark" style="font-size: 9px;">{{ w.symbol }} ({{ w.influence }}%)</span>
+              </div>
+              <span *ngIf="headerWhales.length === 0" class="text-white-50 text-xs">Monitoreando...</span>
+            </div>
+            <div class="v-divider"></div>
+            <div class="d-flex align-items-center gap-2">
+              <ion-icon name="flame" class="text-danger"></ion-icon>
+              <span class="text-white text-xs fw-bold">SQUEEZES:</span>
+              <span class="text-white-50 text-xs">Normal</span>
+            </div>
+          </div>
+          <div class="mini-heatmap d-flex align-items-center gap-2">
+            <span class="text-white-50 text-xs fw-bold">HEATMAP:</span>
+            <div *ngFor="let c of headerHeatmapCoins" class="heatmap-bar-mini d-flex align-items-center gap-1">
+              <span class="text-white text-xs">{{ c.symbol }}</span>
+              <div class="bar-bg" style="width: 30px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 10px;">
+                <div class="bar-fill" [style.width.%]="c.score" style="height: 100%; background: #10b981;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+
+      <!-- VIEW 2: ALERT ACTIVE STATE (3 COLUMNS - Image 1) -->
+      <ng-template #alertDrivenHeader>
+        <div class="alert-driven-header-container d-grid gap-3 h-100" *ngIf="activeHeaderAlert as alert">
+          
+          <!-- COLUMN 1: INTEGRATED ALERT -->
+          <div class="header-col alert-details-col border-end border-white-05 pe-3">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+              <div class="d-flex align-items-center gap-2">
+                <div class="status-dot pulsing bg-success"></div>
+                <span class="text-white-50 text-xxs bold tracking-tighter uppercase">SIGNAL {{ alert.crypto || 'AUTO' }}</span>
+                <span class="text-info-light text-xxs opacity-75">{{ alert.timestamp | date:'HH:mm:ss' }}</span>
+              </div>
+              <ion-icon name="close-outline" class="pointer text-white-30" (click)="alertService.markAsRead(alert.id)"></ion-icon>
+            </div>
+            
+            <div class="d-flex align-items-end gap-3 mb-2">
+              <div class="direction-text text-success fw-black fs-2 line-height-1">{{ alert.direction === 0 ? 'LONG' : 'SHORT' }}</div>
+              <div class="context-info">
+                <div class="text-info-light text-xxs bold uppercase opacity-50">{{ alert.type === 'System' ? 'Intelligence' : 'Market Context' }}</div>
+                <div class="text-white text-xs italic text-truncate" style="max-width: 140px;">"{{ alert.message }}"</div>
+              </div>
+              <div class="alert-stats-mini ms-auto d-flex gap-2">
+                <div class="mini-stat-box text-end">
+                  <div class="text-white-30 text-xxxxs bold">WINPROB</div>
+                  <div class="text-success fw-bold text-xs">{{ (alert.winProbability || 0.5) | percent:'1.0-0' }}</div>
+                </div>
+                <div class="mini-stat-box text-end border-start border-white-05 ps-2">
+                  <div class="text-white-30 text-xxxxs bold">CONFIANZA</div>
+                  <div class="text-info fw-bold text-xs">{{ alert.confidence || 0 }}%</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="tactical-strip d-flex align-items-center justify-content-between bg-white-03 p-1 rounded mt-1">
+              <div class="price-tab d-flex align-items-baseline gap-1">
+                <span class="text-white-30 text-xxxxxs bold">ENTRY</span>
+                <span class="text-white text-xxs bold">${{ (alert.entryPrice || alert.price || 0) | number:'1.2-2' }}</span>
+              </div>
+              <div class="price-tab d-flex align-items-baseline gap-1 mx-2">
+                <span class="text-white-30 text-xxxxxs bold">SL</span>
+                <span class="text-danger-light text-xxs bold">${{ (alert.stopLoss || 0) | number:'1.2-2' }}</span>
+              </div>
+              <div class="price-tab d-flex align-items-baseline gap-1 me-2">
+                <span class="text-white-30 text-xxxxxs bold">TP</span>
+                <span class="text-success-light text-xxs bold">${{ (alert.takeProfit || 0) | number:'1.2-2' }}</span>
+              </div>
+              <div class="price-tab d-flex align-items-baseline gap-1">
+                <span class="text-white-30 text-xxxxxs bold">RR</span>
+                <span class="text-warning text-xxs bold">1:{{ alert.riskRewardRatio || '0.0' }}</span>
+              </div>
+              <app-glass-button class="btn-header-sober ms-auto" variant="solid" (click)="alertService.handleAlertClick(alert.id)" style="width: auto; min-width: 90px; height: 24px !important;">
+                EJECUTAR
+              </app-glass-button>
+            </div>
+          </div>
+
+          <!-- COLUMN 2: COMPRESSED MOTOR INFO -->
+          <div class="header-col motor-info-col border-end border-white-05 px-3">
+             <div class="d-flex align-items-center gap-2 mb-2">
+                <div class="status-dot pulsing"></div>
+                <span class="text-success fw-bold text-xs tracking-wider">MOTOR ACTIVO</span>
+                <span class="text-white-50 text-xs ms-auto">{{ analysisTime }}</span>
+             </div>
+             
+             <div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom border-white-03">
+               <div class="d-flex gap-3">
+                 <div class="text-xxs uppercase">
+                   <span class="text-white-50">SHIELD:</span>
+                   <span class="text-success ms-1 bold">QUIET PERIOD</span>
+                 </div>
+                 <div class="text-xxs uppercase border-start border-white-10 ps-3">
+                   <span class="text-white-50">SENTIMIENTO:</span>
+                   <span class="text-info ms-1 bold">BULLISH</span>
+                 </div>
+               </div>
+             </div>
+
+             <div class="d-flex align-items-center gap-2">
+                <span class="text-white-50 text-xxs bold">BALLENAS:</span>
+                <div class="d-flex gap-1">
+                   <span *ngFor="let w of headerWhales" class="badge bg-info-light text-dark-soft" style="font-size: 8px; padding: 2px 4px;">{{ w.symbol }} ({{ w.influence }}%)</span>
+                </div>
+                <span class="text-white-50 text-xxs ms-auto bold">SQUEEZES: <span class="text-white-30 fw-normal">Normal</span></span>
+             </div>
+          </div>
+
+          <!-- COLUMN 3: BUTTONS & HEATMAP -->
+          <div class="header-col actions-heatmap-col ps-3">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+               <app-glass-button class="btn-header-sober" variant="warning" (click)="alertService.markAllAsRead()">Borrar alertas</app-glass-button>
+               <app-glass-button class="btn-header-sober" variant="danger" (click)="finalizeHunt()">Finalizar</app-glass-button>
+            </div>
+
+            <div class="mini-heatmap-vision border-top border-white-05 pt-2">
+              <span class="text-white-50 text-xxxxs bold uppercase d-block mb-1">Live Heatmap</span>
+              <div class="d-flex justify-content-between gap-2">
+                <div *ngFor="let c of headerHeatmapCoins" class="heatmap-item-compact flex-grow-1">
+                  <div class="d-flex justify-content-between text-xxxxs mb-1">
+                    <span class="text-white-50">{{ c.symbol }}</span>
+                    <span class="text-success-light">{{ c.score }}%</span>
+                  </div>
+                  <div class="bar-bg" style="width: 100%; height: 3px; background: rgba(255,255,255,0.05); border-radius: 2px;">
+                    <div class="bar-fill" [style.width.%]="c.score" style="height: 100%; background: #10b981; box-shadow: 0 0 5px rgba(16, 185, 129, 0.4);"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </ng-template>
     </div>
 
     <!-- Main Content Row -->
@@ -178,7 +294,7 @@
             </div>
           </div>
           <div class="position-relative">
-            <app-alerts [alerts]="alertService.alerts()" [mode]="'overlay'"></app-alerts>
+            <app-alerts *ngIf="!activeHeaderAlert" [alerts]="alertService.alerts()" [mode]="'overlay'"></app-alerts>
             <div id="tradingview-chart" #chartContainer class="w-100" style="height: 480px;"></div>
           </div>
         </div>

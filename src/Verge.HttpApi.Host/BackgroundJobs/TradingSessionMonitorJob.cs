@@ -443,6 +443,7 @@ public class TradingSessionMonitorJob : BackgroundService
                     session.InitialVolumeMcapRatio = (decimal?)(context.CoinGeckoData?.MarketCap > 0 ? context.CoinGeckoData.TotalVolume / context.CoinGeckoData.MarketCap : 0);
                     session.EntryHour = DateTime.UtcNow.Hour;
                     session.EntryDayOfWeek = DateTime.UtcNow.DayOfWeek;
+                    session.InitialWeightedScoresJson = JsonSerializer.Serialize(result.WeightedScores);
 
                     // Sprint 5: Institutional persistence
                     session.WhaleInfluenceScore = result.WhaleInfluenceScore;
@@ -622,13 +623,16 @@ public class TradingSessionMonitorJob : BackgroundService
         }
 
         alertDto.RiskRewardRatio = result.RiskRewardRatio;
-        alertDto.WinProbability = result.WinProbability;
+        alertDto.WinProbability = result.WinProbability ?? result.Score; // 👈 Fallback to general AI Score
         alertDto.HistoricSampleSize = result.HistoricSampleSize;
         alertDto.PatternSignal = result.PatternSignal;
         alertDto.StopLoss = result.StopLossPrice;
         alertDto.TakeProfit = result.TakeProfitPrice;
+        alertDto.AgentOpinions = result.AgentOpinions ?? new Dictionary<string, string>();
 
-        _logger.LogInformation("🔔 [Analysis] Publicando alerta {Type} para sesión {Id}", alertDto.Type, session.Id);
+        _logger.LogInformation("🔔 [Analysis] Publicando alerta {Type} ({Crypto}) para sesión {Id}. [Opinions: {OpCount}, WinProb: {WinProb}%]", 
+            alertDto.Type, alertDto.Crypto, session.Id, alertDto.AgentOpinions.Count, alertDto.WinProbability);
+
         await eventBus.PublishAsync(new AlertStateChangedEto
         {
             UserId = identityUserId,

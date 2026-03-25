@@ -25,22 +25,21 @@ export class AlertsComponent {
     }
 
     get activeOverlayAlert(): VergeAlert | undefined {
-        // Mostramos la alerta más reciente que coincida con lo operativo o sistema y no esté leída
         const alert = this.alerts.find(a =>
             (a.type.startsWith('Stage') || a.type === 'Custom' || a.type === 'System') && !a.read
         );
         return alert;
     }
 
-    // --- Drag & Drop Logic ---
+    // --- UI State ---
     position = { x: 0, y: 0 };
+    expandedAlertIds = new Set<string>(); // 🧠 Track which alerts are expanded for AI reasoning
     private dragging = false;
     private initialMousePos = { x: 0, y: 0 };
 
     constructor(private cdr: ChangeDetectorRef) { }
 
     onMouseDown(event: MouseEvent) {
-        // Ignorar si se hace clic en botones
         if ((event.target as HTMLElement).closest('.close-btn') ||
             (event.target as HTMLElement).closest('button')) return;
 
@@ -55,7 +54,6 @@ export class AlertsComponent {
     @HostListener('document:mousemove', ['$event'])
     onMouseMove(event: MouseEvent) {
         if (!this.dragging) return;
-
         this.position.x = event.clientX - this.initialMousePos.x;
         this.position.y = event.clientY - this.initialMousePos.y;
         this.cdr.detectChanges();
@@ -73,25 +71,33 @@ export class AlertsComponent {
     onMarkAsReadClick(event: Event, alertId: string) {
         event.stopPropagation();
         this.markAsRead.emit(alertId);
-        // Reset position for the next alert if this one is closed
         this.position = { x: 0, y: 0 };
+        this.expandedAlertIds.delete(alertId);
         this.cdr.detectChanges();
+    }
+
+    toggleAIInsights(event: Event, alertId: string) {
+        event.stopPropagation();
+        if (this.expandedAlertIds.has(alertId)) {
+            this.expandedAlertIds.delete(alertId);
+        } else {
+            this.expandedAlertIds.add(alertId);
+        }
+        this.cdr.detectChanges();
+    }
+
+    isAIInsightsExpanded(alertId: string): boolean {
+        return this.expandedAlertIds.has(alertId);
     }
 
     getOverlayTitle(type: string): string {
         switch (type) {
-            case 'Stage1':
-                return 'CONTEXTO DE MERCADO';
-            case 'Stage2':
-                return 'PREPARACIÓN TÁCTICA';
-            case 'Stage3':
-                return 'ENTRADA CONFIRMADA';
-            case 'Stage4':
-                return 'OPERACIÓN FINALIZADA';
-            case 'System':
-                return 'INTELIGENCIA DE MERCADO';
-            default:
-                return 'ALERTA INSTITUCIONAL';
+            case 'Stage1': return 'CONTEXTO DE MERCADO';
+            case 'Stage2': return 'PREPARACIÓN TÁCTICA';
+            case 'Stage3': return 'ENTRADA CONFIRMADA';
+            case 'Stage4': return 'OPERACIÓN FINALIZADA';
+            case 'System': return 'INTELIGENCIA DE MERCADO';
+            default: return 'ALERTA INSTITUCIONAL';
         }
     }
 

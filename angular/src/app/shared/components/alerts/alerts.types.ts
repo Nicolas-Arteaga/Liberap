@@ -42,4 +42,5 @@ export interface VergeAlert {
     patternName?: string;
     entryMin?: number;
     entryMax?: number;
+    agentOpinions?: Record<string, string>;
 }

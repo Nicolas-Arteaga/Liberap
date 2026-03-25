@@ -29,6 +29,77 @@
       border-radius: 50%;
       box-shadow: 0 0 10px #10b981;
     }
+
+    /* Sober Button Refinement (Take 2) */
+    .btn-header-sober {
+      ::ng-deep .glass-btn {
+        height: 28px !important;
+        padding: 0 10px !important;
+        font-size: 10px !important;
+        border-radius: 6px !important;
+        font-weight: 700 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        backdrop-filter: none !important;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        
+        &.glass-btn { background: rgba(0, 196, 173, 0.1) !important; color: #00c4ad; }
+        &.solid-btn { background: #00ff8f !important; color: #000 !important; border: none; font-weight: 800 !important; } // Bright Green for EJECUTAR
+        &.warning-btn { background: #00c4ad !important; color: #000 !important; border: none; } // Vibrant Cyan for Borrar alertas
+        &.danger-btn { background: rgba(239, 68, 68, 0.2) !important; color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); } // Dark Red for Finalizar
+
+        &:hover {
+          transform: translateY(-1px);
+          filter: brightness(1.2);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        }
+      }
+
+      &.tiny-btn ::ng-deep .glass-btn {
+        height: 22px !important;
+        padding: 0 8px !important;
+        font-size: 9px !important;
+      }
+    }
+  }
+
+  /* Alert Driven Header (Image 1) */
+  .alert-driven-header-container {
+    grid-template-columns: 1.25fr 1fr 0.75fr;
+    min-height: 100px;
+    align-items: stretch;
+
+    .header-col {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .direction-text { font-family: 'Inter', sans-serif; letter-spacing: -1px; }
+    
+    .tactical-strip {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      white-space: nowrap;
+      overflow: hidden;
+
+      .price-tab {
+        flex-shrink: 0;
+      }
+    }
+
+    .bg-white-03 { background: rgba(255, 255, 255, 0.03); }
+    .border-white-03 { border-color: rgba(255, 255, 255, 0.03) !important; }
+
+    .text-xxxxs { font-size: 7px; }
+    .text-xxxxxs { font-size: 6px; }
+    .bold { font-weight: 800; }
+    .fw-black { font-weight: 900; }
+    .text-success-light { color: #34d399; }
+    .text-danger-light { color: #f87171; }
+    .text-info-light { color: #7dd3fc; }
+    .bg-info-light { background: #7dd3fc; }
+    .text-dark-soft { color: #1e2329; }
   }
 
   /* Positions Console Styles */
