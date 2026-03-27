@@ -117,5 +117,29 @@ public static class TradingModelBuilderExtensions
             b.HasIndex(x => x.Symbol);
             b.HasIndex(x => x.Status);
         });
+
+        builder.Entity<AlertHistory>(b =>
+        {
+            b.ToTable("AlertHistories");
+            b.ConfigureByConvention();
+            b.Property(x => x.Symbol).IsRequired().HasMaxLength(20);
+            b.Property(x => x.Style).IsRequired().HasMaxLength(50);
+            b.Property(x => x.Status).IsRequired().HasMaxLength(50);
+            b.Property(x => x.AlertTier).IsRequired().HasMaxLength(50);
+            b.HasIndex(x => x.Symbol);
+            b.HasIndex(x => x.Style);
+            b.HasIndex(x => x.Status);
+            b.HasIndex(x => x.AlertTier);
+            b.HasIndex(x => x.AlertType);
+            b.HasIndex(x => x.IsRead);
+            b.HasIndex(x => x.EmittedAt);
+            b.Property(x => x.AlertType).IsRequired().HasMaxLength(50);
+            b.Property(x => x.EntryPrice).HasColumnType("decimal(18,8)");
+            b.Property(x => x.TargetPrice).HasColumnType("decimal(18,8)");
+            b.Property(x => x.StopLossPrice).HasColumnType("decimal(18,8)");
+            b.Property(x => x.ExpectedDrawdownPct).HasColumnType("decimal(18,8)");
+            b.Property(x => x.ActualExitPrice).HasColumnType("decimal(18,8)");
+            b.Property(x => x.ActualPnlPct).HasColumnType("decimal(18,8)");
+        });
     }
 }

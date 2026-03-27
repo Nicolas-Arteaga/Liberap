@@ -45,7 +45,16 @@ export class TradingSignalrService {
 
     constructor() {
         console.warn('[SignalR] 🛠️ Instanciando TradingSignalrService e iniciando conexión...');
+        this.requestNotificationPermission();
         this.startConnection();
+    }
+
+    private requestNotificationPermission() {
+        if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+            Notification.requestPermission().then(permission => {
+                console.log(`[SignalR] 🔔 Notification permission: ${permission}`);
+            });
+        }
     }
 
     private startConnection() {
@@ -95,7 +104,7 @@ export class TradingSignalrService {
             const trade = this.normalizeTrade(rawTrade);
             console.log('[SignalR] 🚀 Operación Abierta:', trade);
             this.tradeOpenedSource.next(trade);
-            this.toaster.success(`Posición abierta: ${trade.side === 0 ? 'LONG' : 'SHORT'} ${trade.symbol}`, 'Trading Simulado');
+            this.toaster.success('::' + `Posición abierta: ${trade.side === 0 ? 'LONG' : 'SHORT'} ${trade.symbol}`, '::Trading Simulado');
         });
 
         this.connection.on('ReceiveTradeClosed', (rawTrade: any) => {
@@ -103,7 +112,7 @@ export class TradingSignalrService {
             console.log('[SignalR] 🏁 Operación Cerrada:', trade);
             this.tradeClosedSource.next(trade);
             const pnl = trade.realizedPnl ?? 0;
-            this.toaster.info(`Posición cerrada: ${trade.symbol}. PnL: ${pnl.toFixed(2)} USDT`, 'Trading Simulado');
+            this.toaster.info('::' + `Posición cerrada: ${trade.symbol}. PnL: ${pnl.toFixed(2)} USDT`, '::Trading Simulado');
         });
 
         this.connection.on('ReceiveTradeUpdate', (rawTrade: any) => {
@@ -118,6 +127,13 @@ export class TradingSignalrService {
             // Normalizar el objeto antes de procesarlo
             const normalized = this.normalizeAlert(alert);
 
+            // Phase 7: Block deprecated symbols
+            const deprecated = new Set(['MATICUSDT', 'LUNAUSDT', 'SRMUSDT', 'HNTUSDT', 'TOMOUSDT', 'BTTUSDT']);
+            if (deprecated.has(normalized.crypto)) {
+                console.warn(`[SignalR] 🚫 Bloqueada alerta de moneda deprecada: ${normalized.crypto}`);
+                return; // TRASH!
+            }
+
             // Siempre agregamos al servicio para que aparezca en la lista/campanita
             this.alertService.addAlert(normalized);
 
@@ -130,11 +146,41 @@ export class TradingSignalrService {
             } else {
                 console.log(`[SignalR] ⏩ Omitiendo Toast para ${symbol} (mismo estado: ${normalized.type})`);
             }
+
+            // --- Fase 6: Notificaciones Globales (OS) ---
+            if ((normalized.confidence || 0) >= 70) {
+                this.triggerOsNotification(normalized);
+            }
         });
 
         this.connection.start()
             .then(() => console.warn('[SignalR] 🟢🔥 CONECTADO EXITOSAMENTE AL HUB DE TRADING'))
             .catch(err => console.error('[SignalR] 🔴 Error de conexión:', err));
+    }
+
+    private triggerOsNotification(alert: VergeAlert) {
+        if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+        let tierTitle = 'Verge Alert';
+        const conf = alert.confidence || 0;
+        if (conf >= 100) tierTitle = '👑 LA VERDAD ABSOLUTA 👑';
+        else if (conf >= 90) tierTitle = '💀 APOCALIPSIS 💀';
+        else if (conf >= 80) tierTitle = '🔥 Fuego en el mercado 🔥';
+        else tierTitle = '🩸 Sangre en el agua 🩸';
+
+        const directionStr = alert.direction === 0 ? 'LONG' : (alert.direction === 1 ? 'SHORT' : 'INFO');
+        const symbol = alert.crypto || 'Global';
+        
+        try {
+            new Notification(`VERGE - ${tierTitle}`, {
+                body: `${symbol} ${directionStr} | Confianza: ${conf}% | Entry: $${alert.price?.toFixed(2) || 'N/A'}\n${alert.message}`,
+                icon: '/assets/images/logo/icon.png',
+                tag: `alert-${symbol}-${Date.now()}`,
+                requireInteraction: conf >= 90
+            });
+        } catch (e) {
+            console.error('[SignalR] ❌ Error triggering OS Notification', e);
+        }
     }
 
     private normalizeAlert(alert: any): VergeAlert {
@@ -261,9 +307,12 @@ export class TradingSignalrService {
         // ABP Toaster options
         const options = { life };
 
-        if (method === 'info') this.toaster.info(alert.message, alert.title, options);
-        else if (method === 'success') this.toaster.success(alert.message, alert.title, options);
-        else if (method === 'warn') this.toaster.warn(alert.message, alert.title, options);
-        else if (method === 'error') this.toaster.error(alert.message, alert.title, options);
+        const msg = '::' + (alert.message || '');
+        const title = '::' + (alert.title || '');
+
+        if (method === 'info') this.toaster.info(msg, title, options);
+        else if (method === 'success') this.toaster.success(msg, title, options);
+        else if (method === 'warn') this.toaster.warn(msg, title, options);
+        else if (method === 'error') this.toaster.error(msg, title, options);
     }
 }

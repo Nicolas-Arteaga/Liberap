@@ -75,6 +75,7 @@ public class VergeDbContext :
     public DbSet<WhaleMovement> WhaleMovements { get; set; }
     public DbSet<TemporalOptimizationResult> TemporalOptimizationResults { get; set; }
     public DbSet<SimulatedTrade> SimulatedTrades { get; set; }
+    public DbSet<AlertHistory> AlertHistories { get; set; }
 
     #endregion
 

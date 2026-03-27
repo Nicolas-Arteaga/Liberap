@@ -62,7 +62,27 @@ class SuperAnalysisRequest(BaseModel):
     sentiment_score: float
     timeframe: Optional[str] = "1h" # New parameter for style detection
     funding_rate: Optional[float] = 0.0
+    funding_rate: Optional[float] = 0.0
     oi_change: Optional[float] = 0.0
+
+class RegimeRequest(BaseModel):
+    symbol: str
+    timeframe: str
+    data: List[OHLCV]
+
+class RegimeResponse(BaseModel):
+    regime: str
+    trend_strength: float
+
+class TechRequest(BaseModel):
+    symbol: str
+    timeframe: str
+    data: List[OHLCV]
+
+class TechResponse(BaseModel):
+    rsi: float
+    macd_histogram: float
+    atr: float
 
 class SuperAnalysisResponse(BaseModel):
     signal_type: str
@@ -126,6 +146,10 @@ class MultiStylePredictor:
 
 predictor = MultiStylePredictor()
 
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
 @app.post("/analyze-super", response_model=SuperAnalysisResponse)
 async def analyze_super(request: SuperAnalysisRequest):
     try:
@@ -186,6 +210,41 @@ async def analyze_super(request: SuperAnalysisRequest):
     except Exception as e:
         logger.exception("Error")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/detect-regime", response_model=RegimeResponse)
+async def detect_regime(request: RegimeRequest):
+    try:
+        df = pd.DataFrame([d.model_dump() for d in request.data])
+        if len(df) < 20:
+            return RegimeResponse(regime="Ranging", trend_strength=0.5)
+        
+        sma20 = df['close'].rolling(20).mean().iloc[-1]
+        last_close = df['close'].iloc[-1]
+        
+        regime = "BullTrend" if last_close > sma20 else "BearTrend"
+        # Simplistic strength based on distance from SMA
+        strength = min(1.0, abs(last_close - sma20) / (sma20 * 0.05))
+        
+        return RegimeResponse(regime=regime, trend_strength=float(strength))
+    except Exception as e:
+        logger.error(f"Regime error: {e}")
+        return RegimeResponse(regime="Ranging", trend_strength=0.0)
+
+@app.post("/analyze-technicals", response_model=TechResponse)
+async def analyze_technicals(request: TechRequest):
+    try:
+        df = pd.DataFrame([d.model_dump() for d in request.data])
+        if len(df) < 14:
+            return TechResponse(rsi=50, macd_histogram=0, atr=0)
+        
+        rsi = ta.momentum.RSIIndicator(df["close"]).rsi().iloc[-1]
+        macd = ta.trend.MACD(df["close"]).macd_diff().iloc[-1]
+        atr = ta.volatility.AverageTrueRange(df["high"], df["low"], df["close"]).average_true_range().iloc[-1]
+        
+        return TechResponse(rsi=float(rsi), macd_histogram=float(macd), atr=float(atr))
+    except Exception as e:
+        logger.error(f"Tech error: {e}")
+        return TechResponse(rsi=50, macd_histogram=0, atr=0)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

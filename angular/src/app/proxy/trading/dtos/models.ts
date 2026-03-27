@@ -1,9 +1,34 @@
+import type { EntityDto, FullAuditedEntityDto } from '@abp/ng.core';
 import type { SignalDirection } from '../signal-direction.enum';
-import type { EntityDto } from '@abp/ng.core';
 import type { TradeStatus } from '../trade-status.enum';
 import type { SignalConfidence } from '../signal-confidence.enum';
 import type { MarketRegimeType } from '../market-regime-type.enum';
 import type { TradingStage } from '../trading-stage.enum';
+
+export interface AlertHistoryDto extends FullAuditedEntityDto<string> {
+  symbol?: string;
+  style?: string;
+  direction: number;
+  entryPrice: number;
+  targetPrice: number;
+  stopLossPrice: number;
+  confidence: number;
+  estimatedTimeMinutes: number;
+  expectedDrawdownPct: number;
+  reasoningJson?: string;
+  rawDataJson?: string;
+  emittedAt?: string;
+  expiresAt?: string;
+  status?: string;
+  actualExitPrice?: number;
+  actualPnlPct?: number;
+  timeToResolutionMinutes?: number;
+  alertTier?: string;
+  alertType?: string;
+  isRead: boolean;
+  directionName?: string;
+  tierDisplayName?: string;
+}
 
 export interface EnhancedAnalysisDto {
   rsi: number;

@@ -19,15 +19,24 @@ export class AlertsComponent {
     @Output() markAsRead = new EventEmitter<string>();
 
     get filteredAlerts(): VergeAlert[] {
-        return this.showOnlyUnread
+        const base = this.showOnlyUnread
             ? this.alerts.filter(a => !a.read)
             : this.alerts;
+            
+        // Fase 6: Solo mostrar alertas >= 70% en la campanita (60% para BTCUSDT)
+        return base.filter(a => {
+            const threshold = a.crypto === 'BTCUSDT' ? 60 : 70;
+            return (a.confidence || 0) >= threshold;
+        }).sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
     }
 
     get activeOverlayAlert(): VergeAlert | undefined {
-        const alert = this.alerts.find(a =>
-            (a.type.startsWith('Stage') || a.type === 'Custom' || a.type === 'System') && !a.read
-        );
+        const alert = this.alerts.find(a => {
+            const threshold = a.crypto === 'BTCUSDT' ? 60 : 70;
+            return (a.type.startsWith('Stage') || a.type === 'Custom' || a.type === 'System' || a.type === 'ScannerUpdate') 
+                && !a.read 
+                && (a.confidence || 0) >= threshold;
+        });
         return alert;
     }
 
@@ -90,7 +99,11 @@ export class AlertsComponent {
         return this.expandedAlertIds.has(alertId);
     }
 
-    getOverlayTitle(type: string): string {
+    getOverlayTitle(type: string, confidence: number = 0): string {
+        if (confidence >= 70) {
+            return this.getSpecialTierTitle(confidence);
+        }
+        
         switch (type) {
             case 'Stage1': return 'CONTEXTO DE MERCADO';
             case 'Stage2': return 'PREPARACIÓN TÁCTICA';
@@ -99,6 +112,14 @@ export class AlertsComponent {
             case 'System': return 'INTELIGENCIA DE MERCADO';
             default: return 'ALERTA INSTITUCIONAL';
         }
+    }
+
+    getSpecialTierTitle(confidence: number): string {
+        if (confidence >= 100) return '👑 LA VERDAD ABSOLUTA 👑';
+        if (confidence >= 90) return '💀 APOCALIPSIS 💀';
+        if (confidence >= 80) return '🔥 FUEGO EN EL MERCADO 🔥';
+        if (confidence >= 70) return '🩸 SANGRE EN EL AGUA 🩸';
+        return 'ALERTA BÁSICA';
     }
 
     getSeverityClass(severity: string): string {

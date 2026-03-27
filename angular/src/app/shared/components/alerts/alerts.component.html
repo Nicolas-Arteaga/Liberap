@@ -8,11 +8,23 @@
     </div>
 
     <div class="alert-content">
-      <div class="alert-header">
-        <h4 class="alert-title">{{ alert.title }}</h4>
-        <span class="alert-time">{{ alert.timestamp | date:'shortTime' }}</span>
+      <div class="alert-header d-flex justify-content-between align-items-center">
+        <h4 class="alert-title fw-bold m-0" [ngClass]="alert.confidence && alert.confidence >= 70 ? 'text-danger' : ''">
+          {{ getSpecialTierTitle(alert.confidence || 0) }} | {{ alert.title }}
+        </h4>
+        <span class="alert-time opacity-75">{{ alert.timestamp | date:'shortTime' }}</span>
       </div>
-      <p class="alert-message">{{ alert.message }}</p>
+      <p class="alert-message mb-1 mt-1">{{ alert.message }}</p>
+      
+      <!-- New Fase 5 fields -->
+      <div *ngIf="alert.confidence && alert.confidence >= 70" class="d-flex align-items-center gap-2 mt-1 mb-1">
+        <span class="badge bg-dark text-warning border border-warning" style="font-size: 0.65rem;">
+          <ion-icon name="time-outline" class="me-1"></ion-icon> Day Trading (1-4h)
+        </span>
+        <span class="badge bg-dark text-danger border border-danger opacity-75" style="font-size: 0.65rem;">
+          ⚠️ Drawdown ~1.2%
+        </span>
+      </div>
 
       <div *ngIf="alert.targetZone" class="alert-target">
         🎯 Zona: ${{ alert.targetZone.low | number:'1.2-2' }} - ${{ alert.targetZone.high | number:'1.2-2' }}
@@ -83,7 +95,7 @@
     <div class="message-area flex-grow-1">
       <div class="d-flex align-items-center gap-2 mb-1">
         <span class="text-xs text-uppercase fw-bold text-info-light opacity-75">{{
-          getOverlayTitle(activeOverlayAlert.type) }}</span>
+          getOverlayTitle(activeOverlayAlert.type, activeOverlayAlert.confidence || 0) }}</span>
         <span class="badge bg-white-10 text-white-50" *ngIf="activeOverlayAlert.patternName" style="font-size: 9px;">{{
           activeOverlayAlert.patternName }}</span>
       </div>

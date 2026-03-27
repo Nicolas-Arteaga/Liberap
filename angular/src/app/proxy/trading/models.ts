@@ -105,6 +105,13 @@ export interface ExecuteTradeDto {
   orderType?: OrderType;
 }
 
+export interface GetAlertHistoryInput extends PagedAndSortedResultRequestDto {
+  symbol?: string;
+  style?: string;
+  status?: string;
+  isRead?: boolean;
+}
+
 export interface GetHistoryInput extends PagedAndSortedResultRequestDto {
   symbol?: string;
   startDate?: string;

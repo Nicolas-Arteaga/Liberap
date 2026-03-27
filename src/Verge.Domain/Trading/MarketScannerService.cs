@@ -66,6 +66,7 @@ public class MarketScannerService : BackgroundService
         var sessionRepository = scope.ServiceProvider.GetRequiredService<IRepository<TradingSession, Guid>>();
         var profileRepository = scope.ServiceProvider.GetRequiredService<IRepository<TraderProfile, Guid>>();
         var analysisLogRepo = scope.ServiceProvider.GetRequiredService<IRepository<AnalysisLog, Guid>>();
+        var alertHistoryRepo = scope.ServiceProvider.GetRequiredService<IRepository<AlertHistory, Guid>>();
         var whaleTracker = scope.ServiceProvider.GetRequiredService<IWhaleTrackerService>();
         var institutionalService = scope.ServiceProvider.GetRequiredService<IInstitutionalDataService>();
         var multiAgentConsensus = scope.ServiceProvider.GetRequiredService<IMultiAgentConsensusService>();
@@ -146,11 +147,23 @@ public class MarketScannerService : BackgroundService
                 SignalDirection signal = SignalDirection.Auto;
 
                 if (rsi < 35) {
-                    confidence = (int)(35 - rsi) * 2 + 50;
-                    signal = SignalDirection.Long;
+                    // 🛡️ Falling Knife Protection: Don't call LONG if trend is strongly bearish
+                    if (trend == "bearish") {
+                        confidence = (int)(35 - rsi) * 1 + 40; // Reduced confidence
+                        signal = SignalDirection.Auto; // WAIT
+                    } else {
+                        confidence = (int)(35 - rsi) * 2 + 50;
+                        signal = SignalDirection.Long;
+                    }
                 } else if (rsi > 65) {
-                    confidence = (int)(rsi - 65) * 2 + 50; 
-                    signal = SignalDirection.Short;
+                    // 🛡️ Rocket Protection: Don't call SHORT if trend is strongly bullish
+                    if (trend == "bullish") {
+                        confidence = (int)(rsi - 65) * 1 + 40;
+                        signal = SignalDirection.Auto; // WAIT
+                    } else {
+                        confidence = (int)(rsi - 65) * 2 + 50; 
+                        signal = SignalDirection.Short;
+                    }
                 } else {
                     confidence = 30 + (trend == "bullish" ? 10 : 0);
                     signal = SignalDirection.Auto;
@@ -172,6 +185,7 @@ public class MarketScannerService : BackgroundService
                     trend = trend,
                     confidence = confidence,
                     signal = signal.ToString(),
+                    style = "DayTrading (15m)", // Fixed for now, can be dynamic later
                     sentiment = sentimentText,
                     whaleSentiment = whaleData.Summary,
                     institutionalSummary = instData.Summary,
@@ -222,6 +236,33 @@ public class MarketScannerService : BackgroundService
                         _logger.LogWarning("⚠️ [Scanner AI] Failed to fetch insights for {symbol}: {msg}", symbol, ex.Message);
                     }
                 }
+
+                // Fase 5 & 6: Save strictly every alert generated with all metrics
+                var (estMinutes, expectedDd) = AlertHistory.GetStyleEstimates("DayTrading"); // For Scanner is mostly day trading
+                var tier = AlertHistory.ComputeTier(confidence);
+                var alertReasoningJson = JsonSerializer.Serialize(agentOpinions);
+                
+                var alertHistory = new AlertHistory(
+                    Guid.NewGuid(),
+                    symbol,
+                    "DayTrading", // Default style for scanner
+                    signal == SignalDirection.Long ? 0 : (signal == SignalDirection.Short ? 1 : 2),
+                    prices.LastOrDefault(), // entry
+                    prices.LastOrDefault() + ( (prices.LastOrDefault() * 0.03m) * (signal == SignalDirection.Long ? 1.0m : -1.0m) ), // target
+                    prices.LastOrDefault() - ( (prices.LastOrDefault() * 0.015m) * (signal == SignalDirection.Long ? 1.0m : -1.0m) ), // sl
+                    confidence,
+                    estMinutes,
+                    expectedDd,
+                    alertReasoningJson,
+                    "{}", // raw representation can be added later if needed
+                    DateTime.UtcNow,
+                    DateTime.UtcNow.AddMinutes(estMinutes),
+                    tier,
+                    "Scanner",
+                    false
+                );
+                
+                await alertHistoryRepo.InsertAsync(alertHistory);
 
                 foreach (var profile in profiles)
                 {

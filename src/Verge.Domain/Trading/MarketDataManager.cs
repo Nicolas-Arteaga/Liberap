@@ -64,6 +64,18 @@ public class MarketDataManager : DomainService
         }
     }
 
+    // Símbolos deprecados/migrados que Binance sigue listando con volumen residual
+    private static readonly HashSet<string> _deprecatedSymbols = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "MATICUSDT",  // Migrated to POLUSDT
+        "LUNAUSDT",   // Collapsed, use LUNCUSDT
+        "SRMUSDT",    // Delisted (FTX related)
+        "RAYUSDT",    // Low liquidity
+        "HNTUSDT",    // Migrated away
+        "TOMOUSDT",   // Rebranded
+        "BTTUSDT",    // Split/rebrand
+    };
+
     public async Task<List<string>> GetTopSymbolsAsync(int limit = 30)
     {
         try
@@ -80,16 +92,18 @@ public class MarketDataManager : DomainService
 
             if (tickers == null) return new List<string> { "BTCUSDT", "ETHUSDT", "SOLUSDT" };
 
-            // Filtrar solo USDT y ordenar por quoteVolume (volumen en USDT)
+            // Filtrar solo USDT, excluir deprecados, y exigir volumen mínimo ($1M/24h)
             var topSymbols = tickers
                 .Where(x => x.GetProperty("symbol").GetString()!.EndsWith("USDT"))
                 .Select(x => new {
-                    Symbol = x.GetProperty("symbol").GetString(),
+                    Symbol = x.GetProperty("symbol").GetString()!,
                     Volume = decimal.Parse(x.GetProperty("quoteVolume").GetString()!, System.Globalization.CultureInfo.InvariantCulture)
                 })
+                .Where(x => !_deprecatedSymbols.Contains(x.Symbol))
+                .Where(x => x.Volume > 1_000_000m) // Mínimo $1M volumen 24h
                 .OrderByDescending(x => x.Volume)
                 .Take(limit)
-                .Select(x => x.Symbol!)
+                .Select(x => x.Symbol)
                 .ToList();
 
             return topSymbols;
@@ -186,9 +200,19 @@ public class MarketDataManager : DomainService
     {
         try
         {
-            var client = _httpClientFactory.CreateClient();
             symbol = symbol.ToUpper().Replace("/", "").Replace("-", "").Trim();
+
+            // 1. Try to get from WebSocket Cache first (Zero latency)
+            var wsDepth = _webSocketService.GetOrderBook(symbol);
+            if (wsDepth != null && wsDepth.Bids.Any())
+            {
+                return wsDepth;
+            }
+
+            // 2. Fallback to REST API if not in cache or symbol just added
+            Logger.LogInformation($"ℹ️ Depth cache miss for {symbol}. Falling back to REST API...");
             
+            var client = _httpClientFactory.CreateClient();
             var url = $"{FuturesBaseUrl}/fapi/v1/depth?symbol={symbol}&limit={limit}";
             var response = await client.GetAsync(url);
             

@@ -2,13 +2,15 @@ import { Injectable, signal } from '@angular/core';
 import { toObservable } from '@angular/core/rxjs-interop';
 import { VergeAlert } from '../shared/components/alerts/alerts.types';
 import { Router } from '@angular/router';
+import { Subject } from 'rxjs';
 
 @Injectable({
     providedIn: 'root'
 })
 export class AlertService {
     public alerts = signal<VergeAlert[]>([]);
-    public readonly alerts$ = toObservable(this.alerts);
+    public alerts$ = toObservable(this.alerts);
+    public onAlertExecute$ = new Subject<string>();
 
     constructor(private router: Router) {
         this.loadFromStorage();
@@ -51,13 +53,19 @@ export class AlertService {
     }
 
     getUnreadCount(): number {
-        return this.alerts().filter(a => !a.read).length;
+        // Fase 6: Solo contar notificaciones de alta confianza para la campanita
+        return this.alerts().filter(a => !a.read && (a.confidence || 0) >= 70).length;
     }
 
     handleAlertClick(id: string) {
         // Marcar como leída y navegar
         this.markAsRead(id);
-        this.router.navigate(['/dashboard']);
+        const alert = this.alerts().find(a => a.id === id);
+        if (alert && alert.crypto) {
+            this.onAlertExecute$.next(alert.crypto);
+        } else {
+            this.router.navigate(['/dashboard']);
+        }
     }
 
     private persistToStorage() {

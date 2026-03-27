@@ -12,7 +12,9 @@ import { TradingService } from '../proxy/trading/trading.service';
 import { TradingSessionDto, AnalysisLogDto, MarketAnalysisDto, OpportunityDto, SymbolTickerDto } from '../proxy/trading/models';
 import { SimulatedTradeDto } from '../proxy/trading/dtos/models';
 import { SimulatedTradeService } from '../proxy/trading/simulated-trade.service';
-import { SignalStatsDto } from '../proxy/trading/dtos/models';
+import { SignalStatsDto, AlertHistoryDto } from '../proxy/trading/dtos/models';
+import { AlertHistoryService } from '../proxy/trading/alert-history.service';
+import { PagedResultDto } from '@abp/ng.core';
 import { AnalysisLogType } from '../proxy/trading/analysis-log-type.enum';
 import { DialogComponent } from 'src/shared/components/dialog/dialog.component';
 import { CardContentComponent } from "src/shared/components/card-content/card-content.component";
@@ -60,13 +62,8 @@ interface StageInfo {
 })
 export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('chartContainer') set chartContainer(content: ElementRef) {
-    if (content) {
-      // Si ya hay un chart, destruirlo antes de crear uno nuevo
-      if (this.chart) {
-        this.chart.remove();
-        this.chart = null;
-      }
-      // Si el contenedor aparece (por el *ngIf), inicializamos el gráfico
+    if (content && content.nativeElement !== this.chartContainerElement) {
+      // Solo inicializamos si el elemento es nuevo o cambió
       this.initChart(content.nativeElement);
       this.loadData();
     }
@@ -78,6 +75,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private tradingService = inject(TradingService);
   private signalrService = inject(TradingSignalrService);
   public alertService = inject(AlertService);
+  private alertHistoryService = inject(AlertHistoryService);
   private destroy$ = new Subject<void>();
 
   // Estado del dashboard
@@ -96,10 +94,15 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   AnalysisLogType = AnalysisLogType; // Expose enum to template
 
   // Tabs & Categorized Data (Institutional Overhaul)
-  activeTab: 'events' | 'whales' | 'liquidations' | 'scanner' | 'performance' = 'events';
+  activeTab: 'events' | 'whales' | 'liquidations' | 'scanner' | 'performance' | 'history' = 'events';
   whaleLogs: any[] = [];
   liquidationLogs: any[] = [];
   scannerData: Map<string, any> = new Map(); // Real-time grid data
+  
+  // Historial paginado
+  alertHistoryPage: PagedResultDto<AlertHistoryDto> | null = null;
+  historyLoading = false;
+  historySkipCount = 0;
 
   // Header Institutional Metrics
   headerWhales: any[] = [];
@@ -129,6 +132,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   selectedTimeframe = '15';
   hmaPeriod = 50;
 
+  // Deprecated/migrated symbols that should be filtered out everywhere
+  private readonly deprecatedSymbols = new Set(['MATICUSDT', 'LUNAUSDT', 'SRMUSDT', 'HNTUSDT', 'TOMOUSDT', 'BTTUSDT']);
+
   symbols = [
     { value: 'BTCUSDT', label: 'BTC/USDT' },
     { value: 'ETHUSDT', label: 'ETH/USDT' },
@@ -137,7 +143,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     { value: 'XRPUSDT', label: 'XRP/USDT' },
     { value: 'ADAUSDT', label: 'ADA/USDT' },
     { value: 'DOGEUSDT', label: 'DOGE/USDT' },
-    { value: 'MATICUSDT', label: 'MATIC/USDT' },
+    { value: 'POLUSDT', label: 'POL/USDT' },
     { value: 'DOTUSDT', label: 'DOT/USDT' },
     { value: 'LTCUSDT', label: 'LTC/USDT' },
     { value: 'AVAXUSDT', label: 'AVAX/USDT' },
@@ -174,9 +180,12 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   activeSignals: TradingSignal[] = [];
 
   get activeHeaderAlert() {
-    return this.alertService.alerts().find(a => 
-      (a.type.startsWith('Stage') || a.type === 'Custom' || a.type === 'System') && !a.read
-    );
+    return this.alertService.alerts().find(a => {
+      const threshold = a.crypto === 'BTCUSDT' ? 60 : 70;
+      return (a.type.startsWith('Stage') || a.type === 'Custom' || a.type === 'System' || a.type === 'ScannerUpdate') 
+        && !a.read 
+        && (a.confidence || 0) >= threshold;
+    });
   }
 
   // Sistema de alertas 1-2-3-4
@@ -251,14 +260,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     this.subscribeToNotifications();
-
-    // Polling de datos
-    setInterval(() => {
-      this.loadData();
-      this.loadOrderBook();
-      this.loadRecentTrades();
-      this.loadTickers();
-    }, 5000);
   }
 
   private subscribeToNotifications() {
@@ -322,6 +323,18 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
       // All alerts feed the institutional scanner — no symbol filter here
       this.processInstitutionalAlert(latestAlert);
+
+      // Real-time update for History tab
+      if (this.activeTab === 'history') {
+        this.loadAlertHistory(this.historySkipCount);
+      }
+    });
+
+    // Execute Alert Button Click
+    this.alertService.onAlertExecute$.pipe(takeUntil(this.destroy$)).subscribe(symbol => {
+      this.searchTerm = symbol;
+      this.filterTickers();
+      this.selectSymbol(symbol);
     });
   }
 
@@ -337,6 +350,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       else if (alert.message?.toLowerCase().includes('liquidación')) symbol = '💥 LIQ';
       else symbol = 'VERGE';
     }
+
+    // Filter out deprecated/migrated symbols (e.g. MATIC → POL)
+    if (this.deprecatedSymbols.has(symbol)) return;
 
     const winProb = alert.winProbability !== undefined ? alert.winProbability : (alert.WinProbability !== undefined ? alert.WinProbability : 0.5);
     const score = alert.score !== undefined ? alert.score : (alert.Score !== undefined ? alert.Score : 0);
@@ -362,6 +378,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     let whaleScore = alert.whaleInfluenceScore || alert.whaleInfluence || alert.WhaleInfluence || 0;
     const factorBreakdown = alert.patternSignal || alert.PatternSignal || '';
     const timeWindow = alert.timeWindow || alert.TimeWindow || '2-4h';
+    const style = alert.style || alert.Style || 'DayTrading (15m)';
     const historicProb = winProb != null ? winProb * 100 : 0;
 
     // Keyword matching for generic logs without structured data
@@ -390,6 +407,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       historicProb: historicProb,
       rrRatio: alert.riskRewardRatio || 0,
       sampleSize: alert.historicSampleSize || 0,
+      style: style,
       // Tactical
       entryPrice: entryPrice,
       stopLoss: stopLoss,
@@ -472,12 +490,67 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  setTab(tab: 'events' | 'whales' | 'liquidations' | 'scanner' | 'performance') {
+  setTab(tab: 'events' | 'whales' | 'liquidations' | 'scanner' | 'performance' | 'history') {
     this.activeTab = tab;
+    if (tab === 'history' && !this.alertHistoryPage) {
+      this.loadAlertHistory();
+    }
+  }
+
+  loadAlertHistory(skipCount = 0) {
+    if (!this.currentSession || !this.isHunting) {
+      this.alertHistoryPage = { items: [], totalCount: 0 };
+      this.historyLoading = false;
+      return;
+    }
+
+    this.historyLoading = true;
+    
+    // Obtener las notificaciones LOCALES recibidas por SignalR
+    const sessionStartTime = new Date(this.currentSession.startTime!).getTime() - 60000; // 1 minuto de tolerancia
+    const localAlerts = this.alertService.alerts()
+      .filter(a => {
+         const alertTime = new Date(a.timestamp).getTime();
+         const isAfterSessionStart = alertTime >= sessionStartTime;
+         const isScannerOrSystem = a.type.startsWith('Stage') || a.type === 'Custom' || a.type === 'System' || a.type === 'ScannerUpdate';
+         return isAfterSessionStart && isScannerOrSystem;
+      })
+      .slice()
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .map(a => ({
+         emittedAt: new Date(a.timestamp).toISOString(),
+         symbol: a.crypto,
+         alertTierDisplay: a.type,
+         direction: a.direction || 0,
+         confidenceScore: a.confidence || 0,
+         entryPrice: a.price || (a as any).entryPrice || 0,
+         estimatedTimeMinutes: (a as any).historicSampleSize || 150,
+         targetPrice: (a as any).takeProfit || 0,
+         stopLossPrice: (a as any).stopLoss || 0,
+         confidence: a.confidence || 0,
+         expectedDrawdownPct: 0,
+         isRead: a.read
+      } as any));
+
+    this.alertHistoryPage = {
+      items: localAlerts.slice(skipCount, skipCount + 15),
+      totalCount: localAlerts.length
+    };
+    
+    this.historySkipCount = skipCount;
+    this.historyLoading = false;
+  }
+
+  changeHistoryPage(dir: number) {
+    const newSkip = Math.max(0, this.historySkipCount + (dir * 15));
+    if (this.alertHistoryPage && newSkip >= this.alertHistoryPage.totalCount) return;
+    this.loadAlertHistory(newSkip);
   }
 
   getScannerList() {
-    return Array.from(this.scannerData.values()).sort((a, b) => b.score - a.score);
+    return Array.from(this.scannerData.values())
+      .filter(s => !this.deprecatedSymbols.has(s.symbol))
+      .sort((a, b) => b.score - a.score);
   }
 
   private handleSessionUpdate(session: any) {
@@ -485,6 +558,14 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.currentStage = session.currentStage || 1;
     this.isHunting = true;
     this.isAnalyzing = true;
+
+    // Sincronizar símbolo si la sesión es de una moneda específica
+    if (session.symbol && session.symbol !== 'AUTO' && session.symbol !== this.selectedSymbol) {
+      console.log('[Dashboard] 🔄 Sincronizando símbolo con la sesión:', session.symbol);
+      this.selectedSymbol = session.symbol;
+      this.onSymbolChange();
+    }
+
     this.updateStagePrices(session);
     this.startAnalysisTimer();
     this.loadAnalysisLogs();
@@ -608,11 +689,18 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     }).subscribe({
       next: (data) => {
         if (this.candlestickSeries) {
+          const timeScale = this.chart!.timeScale();
+          const visibleRange = timeScale.getVisibleLogicalRange();
+
           // Sort data for lightweight-charts
           const sortedData = [...data].sort((a, b) => a.time - b.time);
           this.candlestickSeries.setData(sortedData as CandlestickData[]);
 
           this.updateHMA(sortedData);
+
+          if (visibleRange) {
+            timeScale.setVisibleLogicalRange(visibleRange);
+          }
 
           if (sortedData.length > 0) {
             const lastCandle = sortedData[sortedData.length - 1];
@@ -750,8 +838,19 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.marketAnalyses = [];
     if (!logs || logs.length === 0) return;
 
+    // Reject any log tied to or mentioning a deprecated symbol
+    const activeLogs = logs.filter(log => {
+      if (log.symbol && this.deprecatedSymbols.has(log.symbol)) return false;
+      if (log.message) {
+        for (const dep of this.deprecatedSymbols) {
+          if (log.message.includes(dep)) return false;
+        }
+      }
+      return true;
+    });
+
     // Deduplicate logs to reduce UI noise
-    const cleanLogs = this.deduplicateLogs(logs);
+    const cleanLogs = this.deduplicateLogs(activeLogs);
 
     // Process most recent logs first
     const sortedLogs = [...cleanLogs].sort((a, b) =>
@@ -768,14 +867,16 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       if (log.logType === AnalysisLogType.OpportunityRanking) {
         const rankings = data?.rankings || data?.top || data?.Rankings || data?.Top;
         if (rankings && Array.isArray(rankings)) {
-          this.topOpportunities = rankings;
+          // Filtrar monedas deprecadas
+          const validRankings = rankings.filter((r: any) => !this.deprecatedSymbols.has(r.symbol || r.Symbol));
+          this.topOpportunities = validRankings;
 
           // Enrich the log message with the actual coins (Top 3)
-          const top3 = rankings.slice(0, 3).map((r: any) => `${r.symbol || r.Symbol}(${r.score || r.Score})`).join(', ');
+          const top3 = validRankings.slice(0, 3).map((r: any) => `${r.symbol || r.Symbol}(${r.score || r.Score})`).join(', ');
           log.message = `📈 TOP 3: ${top3}`;
 
           // Populate Scanner with each ranked coin
-          rankings.forEach((rank: any) => {
+          validRankings.forEach((rank: any) => {
             this.processInstitutionalAlert({
               ...rank,
               symbol: rank.symbol || rank.Symbol,
@@ -1035,6 +1136,13 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loadData();
     this.loadOrderBook();
     this.loadRecentTrades();
+    
+    // Recargar historial si la tab está activa, o forzar recarga después
+    if (this.activeTab === 'history') {
+      this.loadAlertHistory();
+    } else {
+      this.alertHistoryPage = null;
+    }
   }
 
   // Métodos de control

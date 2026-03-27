@@ -416,7 +416,7 @@
         <!-- Institutional Console (Events, Whales, etc.) -->
         <div class="institutional-console bg-dark-deep border-top border-white-05 overflow-hidden">
           <div class="console-tabs d-flex border-bottom border-white-05 bg-dark-soft">
-            <div *ngFor="let tab of ['events', 'whales', 'liquidations', 'scanner', 'performance']" 
+            <div *ngFor="let tab of ['events', 'whales', 'liquidations', 'scanner', 'performance', 'history']" 
               class="tab-item py-2 px-4 pointer text-xs uppercase" [class.active]="activeTab === tab" (click)="setTab(tab)">
               {{ tab }}
             </div>
@@ -430,16 +430,73 @@
             </div>
             <div *ngIf="activeTab === 'scanner'">
                <table class="table table-dark table-sm text-xs">
-                  <thead><tr><th>MONEDA</th><th>SCORE</th><th>ESTADO</th><th>DYNAMIC</th></tr></thead>
+                  <thead><tr><th>MONEDA</th><th>STYLE</th><th>SCORE</th><th>DIRECTION</th><th>ESTADO</th><th>DYNAMIC</th></tr></thead>
                   <tbody>
-                    <tr *ngFor="let coin of getScannerList()">
+                    <tr *ngFor="let coin of getScannerList()" (click)="selectSymbol(coin.symbol)" class="pointer hover:bg-white-05">
                       <td class="text-info">{{ coin.symbol }}</td>
-                      <td [class.text-success]="coin.score > 70">{{ coin.score }}</td>
+                      <td class="text-white-50">{{ coin.style }}</td>
+                      <td [class.text-success]="coin.score > 70" class="fw-bold">{{ coin.score }}</td>
+                      <td>
+                        <span *ngIf="coin.direction === 0" class="text-success fw-black">LONG</span>
+                        <span *ngIf="coin.direction === 1" class="text-danger fw-black">SHORT</span>
+                        <span *ngIf="coin.direction !== 0 && coin.direction !== 1" class="text-white-30 italic">WAIT</span>
+                      </td>
                       <td>{{ coin.isSqueeze ? '🔥 SQUEEZE' : 'CONTEXT' }}</td>
                       <td>{{ coin.winProb | percent }}</td>
                     </tr>
                   </tbody>
                </table>
+            </div>
+
+            <!-- Tab de Historial Completo (Fase 5) -->
+            <div *ngIf="activeTab === 'history'" class="d-flex flex-column h-100">
+              <div *ngIf="historyLoading" class="text-center py-4 text-white-50">Cargando historial...</div>
+              
+              <div *ngIf="!historyLoading && alertHistoryPage?.items" class="flex-grow-1 overflow-auto">
+                <table class="table table-dark table-sm text-xs">
+                  <thead>
+                    <tr>
+                      <th>FECHA</th>
+                      <th>SÍMBOLO</th>
+                      <th>TIPO</th>
+                      <th>DIRECCIÓN</th>
+                      <th>CONFIANZA</th>
+                      <th>ENTRY</th>
+                      <th>ESTIMADO</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let alert of alertHistoryPage?.items" class="hover:bg-white-05">
+                      <td class="text-white-50">{{ alert.emittedAt | date:'MM/dd HH:mm' }}</td>
+                      <td class="fw-bold text-info">{{ alert.symbol }}</td>
+                      <td class="text-white-75">{{ alert.alertTierDisplay || alert.alertTier }}</td>
+                      <td>
+                        <span *ngIf="alert.direction === 0" class="text-success fw-bold">LONG</span>
+                        <span *ngIf="alert.direction === 1" class="text-danger fw-bold">SHORT</span>
+                        <span *ngIf="alert.direction === 2" class="text-white-50">WAIT</span>
+                      </td>
+                      <td [class.text-success]="alert.confidenceScore >= 70" [class.text-warning]="alert.confidenceScore < 70 && alert.confidenceScore >= 50">
+                        {{ alert.confidenceScore }}%
+                      </td>
+                      <td>${{ alert.entryPrice | number:'1.2-4' }}</td>
+                      <td class="text-white-50">{{ alert.estimatedTimeMinutes }}m</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Paginación Simple -->
+              <div *ngIf="!historyLoading && alertHistoryPage" class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top border-white-05">
+                <span class="text-xxs text-white-50">Mostrando {{ alertHistoryPage.items.length }} de {{ alertHistoryPage.totalCount }}</span>
+                <div class="d-flex gap-2">
+                  <button class="btn btn-sm btn-dark text-xxs border-white-10" [disabled]="historySkipCount === 0" (click)="changeHistoryPage(-1)">
+                    <ion-icon name="chevron-back-outline"></ion-icon> Anterior
+                  </button>
+                  <button class="btn btn-sm btn-dark text-xxs border-white-10" [disabled]="(historySkipCount + 15) >= alertHistoryPage.totalCount" (click)="changeHistoryPage(1)">
+                    Siguiente <ion-icon name="chevron-forward-outline"></ion-icon>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

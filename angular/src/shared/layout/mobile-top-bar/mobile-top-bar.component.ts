@@ -12,6 +12,7 @@ import { AlertsComponent } from '../../../app/shared/components/alerts/alerts.co
 import { AlertService } from '../../../app/services/alert.service';
 import { VergeAlert } from '../../../app/shared/components/alerts/alerts.types';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 @Component({
   selector: 'app-mobile-top-bar',
@@ -30,7 +31,10 @@ import { Observable } from 'rxjs';
 export class MobileTopBarComponent {
   private alertService = inject(AlertService);
 
-  notifications$: Observable<VergeAlert[]> = this.alertService.alerts$;
+  // Fase 6: Solo mostrar alertas >= 70% en el dropdown
+  notifications$: Observable<VergeAlert[]> = this.alertService.alerts$.pipe(
+    map(alerts => alerts.filter(a => (a.confidence || 0) >= 70))
+  );
   showNotifications = false;
 
   constructor() {
