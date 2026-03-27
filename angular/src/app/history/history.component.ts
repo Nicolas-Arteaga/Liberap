@@ -21,6 +21,7 @@ interface FilterOption {
 interface ChartData {
   month: string;
   amount: number;
+  isGain?: boolean;
 }
 
 // Interface removed as we use DTOs
@@ -86,21 +87,26 @@ export class HistoryComponent {
     });
   }
 
-  // Estadísticas basadas en backend si están disponibles, sino calculadas
+  // Estadísticas basadas en la lista REAL de trades presentes en el historial
   get totalProfit(): number {
-    return Number(this.performanceStats?.totalGain || 0);
+    return this.realTrades.reduce((acc, t) => acc + (t.realizedPnl || 0), 0);
   }
 
   get winRate(): number {
-    return Math.round(Number(this.performanceStats?.winRate || 0));
+    const closed = this.realTrades.filter(t => t.status === 1 || t.status === 2 || t.status === 6);
+    if (closed.length === 0) return 0;
+    const wins = closed.filter(t => t.status === 1).length;
+    return Math.round((wins / closed.length) * 100);
   }
 
   get totalTrades(): number {
-    return this.performanceStats?.totalTrades || 0;
+    return this.realTrades.length;
   }
 
   get averageProfit(): number {
-    return Number(this.performanceStats?.avgPerTrade || 0);
+    const closed = this.realTrades.filter(t => t.status === 1 || t.status === 2 || t.status === 6);
+    if (closed.length === 0) return 0;
+    return this.totalProfit / closed.length;
   }
 
   constructor(private router: Router) {}
@@ -126,16 +132,33 @@ export class HistoryComponent {
   }
 
   loadData() {
-    this.simulatedTradeService.getPerformanceStats().subscribe(stats => {
-      this.performanceStats = stats;
-      this.chartData = stats.equityCurve.map(p => ({
-        month: this.formatDateLabel(p.timestamp),
-        amount: Math.round(Number(p.balance))
-      }));
-    });
-
     this.simulatedTradeService.getRecentTrades(50).subscribe(trades => {
       this.realTrades = trades;
+      
+      // Calcular curva de equidad real basada en los trades del historial
+      const startBalance = 10000;
+      let currentBalance = startBalance;
+      
+      const closedTrades = [...trades]
+        .filter(t => t.status === 1 || t.status === 2 || t.status === 6)
+        .sort((a, b) => new Date(a.closedAt || a.openedAt || '').getTime() - new Date(b.closedAt || b.openedAt || '').getTime());
+
+      const curve: ChartData[] = [];
+
+      closedTrades.forEach(t => {
+        const pnl = t.realizedPnl || 0;
+        curve.push({
+          month: this.formatDateLabel(t.closedAt || t.openedAt || ''),
+          amount: pnl, // Usamos el PnL Real en lugar de la equidad acumulada
+          isGain: pnl >= 0
+        });
+      });
+
+      this.chartData = curve;
+    });
+
+    this.simulatedTradeService.getPerformanceStats().subscribe(stats => {
+      this.performanceStats = stats;
     });
   }
 

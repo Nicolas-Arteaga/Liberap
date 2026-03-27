@@ -4,6 +4,7 @@ import { CommonModule } from '@angular/common';
 export interface ChartData {
   month: string;
   amount: number;
+  isGain?: boolean; // New property for coloring
 }
 
 @Component({
@@ -16,20 +17,30 @@ export interface ChartData {
 export class PaymentChartComponent implements AfterViewInit {
   @Input() data: ChartData[] = [];
   
-  // Calcular el máximo para escalar
+  // Escalamiento basado en el PnL real (pueden ser negativos)
+  get minAmount(): number {
+    if (!this.data.length) return 0;
+    const min = Math.min(0, ...this.data.map(d => d.amount));
+    return min < 0 ? min * 1.1 : 0; // Agregamos margen si es negativo
+  }
+
   get maxAmount(): number {
     if (!this.data.length) return 1;
-    return Math.max(...this.data.map(d => d.amount));
+    const max = Math.max(0.01, ...this.data.map(d => d.amount));
+    return max * 1.1; // Agregamos margen
   }
   
-  // Altura en porcentaje
+  // Altura en porcentaje relativa al rango del movimiento
   getBarHeight(amount: number): number {
-    return (amount / this.maxAmount) * 100;
+    const range = this.maxAmount - this.minAmount;
+    if (range === 0) return 50;
+    const height = ((amount - this.minAmount) / range) * 100;
+    return Math.max(5, height); // Mínimo 5% para visibilidad
   }
   
   formatAmount(amount: number): string {
-    const value = amount / 1000;
-    return `$${value % 1 === 0 ? value.toFixed(0) : value.toFixed(1)}k`;
+    const sign = amount > 0 ? '+' : '';
+    return `${sign}$${amount.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 
   ngAfterViewInit() {

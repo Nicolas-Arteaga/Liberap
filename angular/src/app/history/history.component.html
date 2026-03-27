@@ -48,9 +48,8 @@
         </div>
       </div>
 
-      <!-- Gráfico de Evolución -->
       <div class="mt-4">
-        <p class="text-white-50 small mb-2">Evolución de Capital (simulada)</p>
+        <p class="text-white-50 small mb-2">Evolución de Capital</p>
         <app-payment-chart [data]="chartData"></app-payment-chart>
       </div>
     </app-card-content>
@@ -110,6 +109,10 @@
                   </span>
                   <span class="text-white-50 text-xs">•</span>
                   <span class="text-white-50 text-xs">{{ trade.leverage }}x</span>
+                  <span class="text-white-50 text-xs ms-2 opacity-50">
+                    (${{ trade.entryPrice | number:'1.2-2' }} → 
+                    {{ trade.closePrice ? '$' + (trade.closePrice | number:'1.2-2') : 'OPEN' }})
+                  </span>
                 </div>
               </div>
               

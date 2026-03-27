@@ -9,6 +9,7 @@
       <!-- Barras individuales -->
       <div *ngFor="let item of data; let i = index" 
            class="chart-column"
+           [class.last-bar]="i === data.length - 1"
            [style]="{
              'left': (i * (100 / data.length)) + '%',
              'width': (100 / data.length) + '%'
@@ -25,12 +26,15 @@
              [style]="{
                'height': getBarHeight(item.amount) + '%'
              }">
-          <div class="chart-bar-fill"></div>
+          <div class="chart-bar-fill" 
+               [class.gain]="item.isGain === true" 
+               [class.loss]="item.isGain === false">
+          </div>
         </div>
         
         <!-- Etiquetas -->
         <div class="chart-labels">
-          <div class="chart-month">{{ item.month }}</div>
+          <div class="chart-month" *ngIf="i === 0 || i === data.length - 1 || i % 5 === 0">{{ item.month }}</div>
           <div class="chart-amount">{{ formatAmount(item.amount) }}</div>
         </div>
         
