@@ -115,7 +115,7 @@ public class MarketDataManager : DomainService
         }
     }
 
-    public async Task<List<MarketCandleModel>> GetCandlesAsync(string symbol, string interval, int limit = 100)
+    public async Task<List<MarketCandleModel>> GetCandlesAsync(string symbol, string interval, int limit = 100, long? endTime = null)
     {
         try
         {
@@ -131,7 +131,9 @@ public class MarketDataManager : DomainService
                 _ => interval 
             };
 
-            var cacheKey = $"price:{cleanSymbol}:{binanceInterval}:{limit}";
+            var cacheKey = endTime.HasValue
+                ? $"price:{cleanSymbol}:{binanceInterval}:{limit}:{endTime.Value}"
+                : $"price:{cleanSymbol}:{binanceInterval}:{limit}";
 
             var cached = await _redis.StringGetAsync(cacheKey);
             if (cached.HasValue)
@@ -145,6 +147,11 @@ public class MarketDataManager : DomainService
             Logger.LogInformation($"🔄 Interval convertido: '{interval}' -> '{binanceInterval}'");
             
             var url = $"{FuturesBaseUrl}/fapi/v1/klines?symbol={cleanSymbol}&interval={binanceInterval}&limit={limit}";
+            if (endTime.HasValue)
+            {
+                url += $"&endTime={endTime.Value}";
+            }
+
             Logger.LogInformation($"📡 URL final: {url}");
 
             var response = await client.GetAsync(url);

@@ -17,6 +17,7 @@ public class GetMarketCandlesInput
     public string Symbol { get; set; } = "BTCUSDT";
     public string Interval { get; set; } = "1m";
     public int Limit { get; set; } = 100;
+    public long? EndTime { get; set; } // Unix timestamp in milliseconds
 }
 
 public class GetMarketDataInput

@@ -17,7 +17,7 @@ public class MarketDataAppService : ApplicationService, IMarketDataAppService
 
     public async Task<List<MarketCandleDto>> GetCandlesAsync(GetMarketCandlesInput input)
     {
-        var candles = await _marketDataManager.GetCandlesAsync(input.Symbol, input.Interval, input.Limit);
+        var candles = await _marketDataManager.GetCandlesAsync(input.Symbol, input.Interval, input.Limit, input.EndTime);
 
         return candles.Select(c => new MarketCandleDto
         {

@@ -131,6 +131,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private ma99Series: ISeriesApi<'Line'> | null = null;
   private chartContainerElement: HTMLElement | null = null;
 
+  chartData: CandlestickData[] = [];
+  isLoadingHistory: boolean = false;
+  loadedSymbol: string = '';
+  loadedTimeframe: string = '';
+
   // Configuración
   selectedSymbol = 'BTCUSDT';
   selectedTimeframe = '15';
@@ -705,6 +710,15 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     });
 
     window.addEventListener('resize', this.onResize);
+
+    // Paginación Histórica Infinita (Evita el paywall de TradingView)
+    this.chart.timeScale().subscribeVisibleLogicalRangeChange((logicalRange) => {
+      if (logicalRange !== null) {
+        if (logicalRange.from < 5 && !this.isLoadingHistory && this.chartData.length > 0) {
+          this.loadMoreHistory();
+        }
+      }
+    });
   }
 
   private onResize = () => {
@@ -713,8 +727,63 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   };
 
+  loadMoreHistory() {
+    if (this.isLoadingHistory || this.chartData.length === 0) return;
+    this.isLoadingHistory = true;
+    
+    const oldestTime = this.chartData[0].time as number;
+
+    this.marketDataService.getCandles({
+      symbol: this.selectedSymbol,
+      interval: this.selectedTimeframe,
+      limit: 1000,
+      endTime: oldestTime * 1000 // Convert to milliseconds for Binance
+    }).subscribe({
+      next: (data) => {
+        if (data && data.length > 0 && this.candlestickSeries && this.chart) {
+          const timeScale = this.chart.timeScale();
+          const oldLogicalRange = timeScale.getVisibleLogicalRange();
+
+          const newCandles = data as CandlestickData[];
+          const map = new Map<number, CandlestickData>();
+          
+          newCandles.forEach(c => map.set(c.time as number, c));
+          this.chartData.forEach(c => map.set(c.time as number, c));
+          
+          this.chartData = Array.from(map.values()).sort((a, b) => (a.time as number) - (b.time as number));
+          
+          this.candlestickSeries.setData(this.chartData);
+          this.updateHMA(this.chartData);
+          this.updateMA(this.chartData, 7, this.ma7Series);
+          this.updateMA(this.chartData, 25, this.ma25Series);
+          this.updateMA(this.chartData, 99, this.ma99Series);
+          
+          if (oldLogicalRange) {
+             // Shift visible range to maintain the user's scroll position seamlessly
+             const shift = newCandles.length;
+             timeScale.setVisibleLogicalRange({
+               from: oldLogicalRange.from + shift,
+               to: oldLogicalRange.to + shift
+             });
+          }
+        }
+        this.isLoadingHistory = false;
+      },
+      error: (err) => {
+        console.error('Error fetching historical data', err);
+        this.isLoadingHistory = false;
+      }
+    });
+  }
+
   loadData() {
     if (!this.chart || !this.candlestickSeries) return;
+
+    if (this.loadedSymbol !== this.selectedSymbol || this.loadedTimeframe !== this.selectedTimeframe) {
+      this.chartData = [];
+      this.loadedSymbol = this.selectedSymbol;
+      this.loadedTimeframe = this.selectedTimeframe;
+    }
 
     this.marketDataService.getCandles({
       symbol: this.selectedSymbol,
@@ -726,21 +795,37 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
           const timeScale = this.chart!.timeScale();
           const visibleRange = timeScale.getVisibleLogicalRange();
 
-          // Sort data for lightweight-charts
           const sortedData = [...data].sort((a, b) => a.time - b.time);
-          this.candlestickSeries.setData(sortedData as CandlestickData[]);
-
-          this.updateHMA(sortedData);
-          this.updateMA(sortedData, 7, this.ma7Series);
-          this.updateMA(sortedData, 25, this.ma25Series);
-          this.updateMA(sortedData, 99, this.ma99Series);
-
-          if (visibleRange) {
-            timeScale.setVisibleLogicalRange(visibleRange);
+          
+          if (this.chartData.length === 0) {
+            this.chartData = sortedData as CandlestickData[];
+          } else {
+            const map = new Map<number, CandlestickData>();
+            this.chartData.forEach(c => map.set(c.time as number, c));
+            sortedData.forEach(c => map.set(c.time, c as CandlestickData));
+            this.chartData = Array.from(map.values()).sort((a, b) => (a.time as number) - (b.time as number));
           }
 
-          if (sortedData.length > 0) {
-            const lastCandle = sortedData[sortedData.length - 1];
+          this.candlestickSeries.setData(this.chartData);
+
+          this.updateHMA(this.chartData);
+          this.updateMA(this.chartData, 7, this.ma7Series);
+          this.updateMA(this.chartData, 25, this.ma25Series);
+          this.updateMA(this.chartData, 99, this.ma99Series);
+
+          // Restore scroll only if we're not actively scrolling back
+          if (visibleRange && this.chartData.length > 0 && !this.isLoadingHistory) {
+             // Only auto-scroll to newest if we were already looking at the newest candles
+             const isAtEnd = visibleRange.to >= this.chartData.length - 10;
+             if (isAtEnd) {
+                 timeScale.scrollToRealTime();
+             } else {
+                 timeScale.setVisibleLogicalRange(visibleRange);
+             }
+          }
+
+          if (this.chartData.length > 0) {
+            const lastCandle = this.chartData[this.chartData.length - 1];
             this.chartPrices.current = Number(lastCandle.close);
           }
         }

@@ -130,6 +130,7 @@ export interface GetMarketCandlesInput {
   symbol?: string;
   interval?: string;
   limit: number;
+  endTime?: number;
 }
 
 export interface GetMarketDataInput {

@@ -14,7 +14,7 @@ export class MarketDataService {
     this.restService.request<any, MarketCandleDto[]>({
       method: 'GET',
       url: '/api/app/market-data/candles',
-      params: { symbol: input.symbol, interval: input.interval, limit: input.limit },
+      params: { symbol: input.symbol, interval: input.interval, limit: input.limit, endTime: input.endTime },
     },
     { apiName: this.apiName,...config });
   
