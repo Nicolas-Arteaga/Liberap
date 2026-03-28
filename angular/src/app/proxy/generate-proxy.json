@@ -1481,6 +1481,78 @@
             }
           }
         },
+        "Verge.Trading.FractalAnalysisAppService": {
+          "controllerName": "FractalAnalysis",
+          "controllerGroupName": "FractalAnalysis",
+          "isRemoteService": true,
+          "isIntegrationService": false,
+          "apiVersion": null,
+          "type": "Verge.Trading.FractalAnalysisAppService",
+          "interfaces": [
+            {
+              "type": "Verge.Trading.IFractalAnalysisAppService",
+              "name": "IFractalAnalysisAppService",
+              "methods": [
+                {
+                  "name": "GetStatusAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "symbol",
+                      "typeAsString": "System.String, System.Private.CoreLib",
+                      "type": "System.String",
+                      "typeSimple": "string",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "Verge.Trading.FractalStatusDto",
+                    "typeSimple": "Verge.Trading.FractalStatusDto"
+                  }
+                }
+              ]
+            }
+          ],
+          "actions": {
+            "GetStatusAsyncBySymbol": {
+              "uniqueName": "GetStatusAsyncBySymbol",
+              "name": "GetStatusAsync",
+              "httpMethod": "GET",
+              "url": "api/app/fractal-analysis/status",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "symbol",
+                  "typeAsString": "System.String, System.Private.CoreLib",
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "symbol",
+                  "name": "symbol",
+                  "jsonName": null,
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "Verge.Trading.FractalStatusDto",
+                "typeSimple": "Verge.Trading.FractalStatusDto"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.IFractalAnalysisAppService"
+            }
+          }
+        },
         "Verge.Trading.MarketDataAppService": {
           "controllerName": "MarketData",
           "controllerGroupName": "MarketData",
@@ -9686,6 +9758,75 @@
           "jsonName": null,
           "type": "Verge.Trading.OrderType",
           "typeSimple": "enum",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.FractalStatusDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Symbol",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "LastPrice",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "IsAccumulating",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "StabilityRange",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "PatternName",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
           "isRequired": false,
           "minLength": null,
           "maxLength": null,

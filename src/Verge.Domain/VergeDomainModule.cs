@@ -61,6 +61,8 @@ public class VergeDomainModule : AbpModule
         context.Services.AddScoped<IWhaleTrackerService, WhaleTrackerService>();
         context.Services.AddScoped<IInstitutionalDataService, InstitutionalDataService>();
         context.Services.AddSingleton<IMacroSentimentService, MacroSentimentService>();
+        context.Services.AddSingleton<IFractalPatternManager, FractalPatternManager>();
+        context.Services.AddSingleton<IAniquiladorPatternManager, AniquiladorPatternManager>();
         
         context.Services.AddSingleton<BinanceWebSocketService>();
         context.Services.AddHostedService(sp => sp.GetRequiredService<BinanceWebSocketService>());

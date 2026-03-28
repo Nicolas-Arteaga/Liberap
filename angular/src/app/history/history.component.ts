@@ -171,6 +171,14 @@ export class HistoryComponent {
     this.iconService.fixMissingIcons();
   }
 
+  viewInChart(symbol: string): void {
+    // Si el símbolo contiene '/', tomamos la primera parte (ej: BTC/USDT -> BTCUSDT si fuera necesario, 
+    // pero el sistema parece usar BTCUSDT internamente)
+    // El buscador del dashboard usa el símbolo completo como 'BTCUSDT'
+    const cleanSymbol = symbol.replace('/', '');
+    this.router.navigate(['/dashboard'], { queryParams: { symbol: cleanSymbol } });
+  }
+
   handleBack(): void {
     if (this.onBack) {
       this.onBack();

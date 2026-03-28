@@ -105,6 +105,14 @@ export interface ExecuteTradeDto {
   orderType?: OrderType;
 }
 
+export interface FractalStatusDto {
+  symbol?: string;
+  lastPrice: number;
+  isAccumulating: boolean;
+  stabilityRange: number;
+  patternName?: string;
+}
+
 export interface GetAlertHistoryInput extends PagedAndSortedResultRequestDto {
   symbol?: string;
   style?: string;

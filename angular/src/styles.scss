@@ -186,3 +186,15 @@ input[type="number"] {
 .pulse-animation {
   animation: pulse-animation 2s infinite;
 }
+
+/* Clickable symbols feedback */
+.cursor-pointer {
+  cursor: pointer !important;
+}
+
+.hover-text-primary:hover {
+  color: #f0b90b !important;
+  /* Yellow highlight */
+  text-decoration: underline !important;
+  opacity: 0.8;
+}

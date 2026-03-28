@@ -100,7 +100,45 @@
     .text-info-light { color: #7dd3fc; }
     .bg-info-light { background: #7dd3fc; }
     .text-dark-soft { color: #1e2329; }
-  }
+ 
+     /* Fractal Theme Highlights */
+     &.fractal-alert-theme {
+       .direction-text { 
+         color: #00f2ff !important; 
+         text-shadow: 0 0 15px rgba(0, 242, 255, 0.4);
+         font-size: 1.8rem !important;
+       }
+       .status-dot.pulsing {
+         box-shadow: 0 0 12px #00f2ff;
+       }
+     }
+ 
+     /* Aniquilador Theme Highlights */
+     &.aniquilador-alert-theme {
+       background: rgba(40, 25, 0, 0.4) !important;
+       .direction-text { 
+         color: #ffc107 !important; 
+         text-shadow: 0 0 20px rgba(255, 193, 7, 0.8), 0 0 40px rgba(255, 0, 100, 0.5);
+         font-size: 2rem !important;
+         animation: pulsateAniquilador 1s ease-in-out infinite alternate;
+       }
+       .status-dot.pulsing {
+         box-shadow: 0 0 15px #ffc107, 0 0 30px #ff0055;
+         animation: pulsateAniquiladorDot 0.5s ease-in-out infinite alternate;
+       }
+       @keyframes pulsateAniquilador {
+         0% { opacity: 0.8; transform: scale(0.98); }
+         100% { opacity: 1; transform: scale(1.02); }
+       }
+       @keyframes pulsateAniquiladorDot {
+         0% { box-shadow: 0 0 10px #ffc107; }
+         100% { box-shadow: 0 0 25px #ffc107, 0 0 40px #ff0055; }
+       }
+     }
+
+     .bg-info-10 { background: rgba(0, 242, 255, 0.08); }
+     .border-info-20 { border: 1px solid rgba(0, 242, 255, 0.15) !important; }
+   }
 
   /* Positions Console Styles */
   .positions-console {

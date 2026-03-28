@@ -2,7 +2,7 @@ import { Component, AfterViewInit, OnDestroy, inject, OnInit, ViewChild, Element
 import { Subject, takeUntil, timeout, filter } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { GlassButtonComponent } from 'src/shared/components/glass-button/glass-button.component';
 import { IonIcon } from '@ionic/angular/standalone';
 import { IconService } from 'src/shared/services/icon.service';
@@ -71,6 +71,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private iconService = inject(IconService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   private marketDataService = inject(MarketDataService);
   private tradingService = inject(TradingService);
   private signalrService = inject(TradingSignalrService);
@@ -125,6 +126,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private chart: IChartApi | null = null;
   private candlestickSeries: ISeriesApi<'Candlestick'> | null = null;
   private hmaSeries: ISeriesApi<'Line'> | null = null;
+  private ma7Series: ISeriesApi<'Line'> | null = null;
+  private ma25Series: ISeriesApi<'Line'> | null = null;
+  private ma99Series: ISeriesApi<'Line'> | null = null;
   private chartContainerElement: HTMLElement | null = null;
 
   // Configuración
@@ -182,7 +186,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   get activeHeaderAlert() {
     return this.alertService.alerts().find(a => {
       const threshold = a.crypto === 'BTCUSDT' ? 60 : 70;
-      return (a.type.startsWith('Stage') || a.type === 'Custom' || a.type === 'System' || a.type === 'ScannerUpdate') 
+      return (a.type.startsWith('Stage') || a.type === 'Custom' || a.type === 'System' || a.type === 'ScannerUpdate' || a.type === 'Fractal') 
         && !a.read 
         && (a.confidence || 0) >= threshold;
     });
@@ -251,6 +255,18 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loadTickers();
     this.loadActiveTrades();
     this.loadTradeHistory();
+
+    // Leer parámetro de símbolo desde URL (para navegación desde Historial)
+    this.route.queryParams.pipe(takeUntil(this.destroy$)).subscribe(params => {
+      const symbol = params['symbol'];
+      if (symbol) {
+        console.log('[Dashboard] 📍 Símbolo detectado en URL:', symbol);
+        this.selectedSymbol = symbol;
+        // Esperamos a que los tickers carguen para sincronizar el ticker seleccionado
+        // onSymbolChange() se llamará internamente cuando sea necesario o aquí directamente
+        setTimeout(() => this.onSymbolChange(), 500);
+      }
+    });
 
     // Verificar si hay sesión cacheada en SignalR (para el caso donde el evento ya llegó)
     const cachedSession = this.signalrService.getLastSession();
@@ -670,6 +686,24 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       title: 'HMA 50',
     });
 
+    this.ma7Series = this.chart.addSeries(LineSeries, {
+      color: '#fadb14', // Amarilla
+      lineWidth: 1,
+      title: 'MA(7)',
+    });
+
+    this.ma25Series = this.chart.addSeries(LineSeries, {
+      color: '#ba55d3', // Violeta/Fucsia
+      lineWidth: 1,
+      title: 'MA(25)',
+    });
+
+    this.ma99Series = this.chart.addSeries(LineSeries, {
+      color: '#722ed1', // Azul/Violeta Oscuro
+      lineWidth: 1,
+      title: 'MA(99)',
+    });
+
     window.addEventListener('resize', this.onResize);
   }
 
@@ -697,6 +731,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
           this.candlestickSeries.setData(sortedData as CandlestickData[]);
 
           this.updateHMA(sortedData);
+          this.updateMA(sortedData, 7, this.ma7Series);
+          this.updateMA(sortedData, 25, this.ma25Series);
+          this.updateMA(sortedData, 99, this.ma99Series);
 
           if (visibleRange) {
             timeScale.setVisibleLogicalRange(visibleRange);
@@ -1324,8 +1361,40 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       value: val
     }));
 
-    this.hmaSeries.setData(hmaData);
+    this.hmaSeries. setData(hmaData);
     this.hmaSeries.applyOptions({ title: `HMA ${this.hmaPeriod}` });
+  }
+
+  updateMA(data: any[], period: number, series: ISeriesApi<'Line'> | null) {
+    if (!series || data.length < period) {
+      if (series) series.setData([]);
+      return;
+    }
+
+    const prices = data.map(d => Number(d.close));
+    const maValues = this.calculateSMA(prices, period);
+
+    const maData = maValues.map((val, i) => ({
+      time: data[i + (data.length - maValues.length)].time,
+      value: val
+    }));
+
+    series.setData(maData);
+  }
+
+  private calculateSMA(data: number[], period: number): number[] {
+    const sma = [];
+    if (data.length < period) return [];
+
+    let sum = 0;
+    for (let i = 0; i < period; i++) sum += data[i];
+    sma.push(sum / period);
+
+    for (let i = period; i < data.length; i++) {
+      sum = sum - data[i - period] + data[i];
+      sma.push(sum / period);
+    }
+    return sma;
   }
 
   private calculateHMA(data: number[], period: number): number[] {

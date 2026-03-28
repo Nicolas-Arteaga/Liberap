@@ -72,6 +72,7 @@ public class MarketScannerService : BackgroundService
         var multiAgentConsensus = scope.ServiceProvider.GetRequiredService<IMultiAgentConsensusService>();
         var macroService = scope.ServiceProvider.GetRequiredService<IMacroSentimentService>();
         var unitOfWorkManager = scope.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
+        var aniquilador = scope.ServiceProvider.GetRequiredService<IAniquiladorPatternManager>();
 
         using var uow = unitOfWorkManager.Begin();
 
@@ -98,6 +99,15 @@ public class MarketScannerService : BackgroundService
                     _logger.LogWarning("⚠️ No hay suficientes velas para {symbol}", symbol);
                     continue;
                 }
+
+                // 🎯 [NICOLAS ANIQUILADOR] Obtener velas 1H y analizar el patrón extremo
+                try {
+                    var hourlyCandles = await marketDataManager.GetCandlesAsync(symbol, "1h", 120);
+                    if (hourlyCandles != null && hourlyCandles.Count >= 100)
+                    {
+                        await aniquilador.AnalyzeCandlesAsync(symbol, hourlyCandles);
+                    }
+                } catch { /* Ignorar fallos aislados en este branch analitico */ }
 
                 // 🚀 Phase 4 Pre-Filter: Zombie Data Check
                 if (analysisService.IsZombieData(candles))

@@ -4,6 +4,7 @@ export * from './alert-type.enum';
 export * from './analysis-log-type.enum';
 export * from './crypto-analysis.service';
 export * from './execution.service';
+export * from './fractal-analysis.service';
 export * from './market-data.service';
 export * from './market-regime-type.enum';
 export * from './models';

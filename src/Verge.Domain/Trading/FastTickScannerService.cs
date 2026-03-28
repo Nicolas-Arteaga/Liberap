@@ -20,6 +20,7 @@ public class FastTickScannerService : BackgroundService
     private readonly ILogger<FastTickScannerService> _logger;
     private readonly MarketDataManager _marketDataManager;
     private readonly ITickSpikeAlerter _spikeAlerter;
+    private readonly IFractalPatternManager _fractalManager;
     private readonly IDistributedEventBus _eventBus;
     
     // Configurable thresholds for the 1% Tier
@@ -31,12 +32,14 @@ public class FastTickScannerService : BackgroundService
         ILogger<FastTickScannerService> logger,
         MarketDataManager marketDataManager,
         ITickSpikeAlerter spikeAlerter,
+        IFractalPatternManager fractalManager,
         IDistributedEventBus eventBus)
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
         _marketDataManager = marketDataManager;
         _spikeAlerter = spikeAlerter;
+        _fractalManager = fractalManager;
         _eventBus = eventBus;
     }
 
@@ -96,8 +99,11 @@ public class FastTickScannerService : BackgroundService
                 var pricePrevious = lastPrices[symbol];
                 lastPrices[symbol] = currentPrice.Value;
 
-                var delta = (double)Math.Abs((currentPrice.Value - pricePrevious) / pricePrevious);
+                // 🎯 [NICOLAS FRACTAL] Update the buffer and check for patterns
+                await _fractalManager.ProcessPriceAsync(symbol, currentPrice.Value);
 
+                var delta = (double)Math.Abs((currentPrice.Value - pricePrevious) / pricePrevious);
+                
                 if (delta >= PriceDeltaThreshold)
                 {
                     _logger.LogWarning("⚡ [IMPULSE DETECTED] {Symbol} jumped {Delta:P2}! Alerting Engine...", symbol, delta);

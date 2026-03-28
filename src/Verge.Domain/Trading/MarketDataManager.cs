@@ -131,7 +131,7 @@ public class MarketDataManager : DomainService
                 _ => interval 
             };
 
-            var cacheKey = $"price:{cleanSymbol}:{binanceInterval}";
+            var cacheKey = $"price:{cleanSymbol}:{binanceInterval}:{limit}";
 
             var cached = await _redis.StringGetAsync(cacheKey);
             if (cached.HasValue)
