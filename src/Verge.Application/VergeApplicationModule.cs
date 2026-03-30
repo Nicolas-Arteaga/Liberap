@@ -7,6 +7,7 @@ using Volo.Abp.FeatureManagement;
 using Volo.Abp.Modularity;
 using Microsoft.Extensions.DependencyInjection;
 using Volo.Abp.TenantManagement;
+using Verge.Trading;
 
 namespace Verge;
 
@@ -29,5 +30,10 @@ public class VergeApplicationModule : AbpModule
         {
             options.AddMaps<VergeApplicationModule>();
         });
+
+        // ─── Bot de Scalping — Hosted Services ───
+        context.Services.AddHostedService<ScalpingBotService>();
+        context.Services.AddHostedService<BotPositionMonitorService>();
     }
 }
+

@@ -1,3 +1,4 @@
+import * as Bot from './bot';
 import * as Dtos from './dtos';
 export * from './alert-history.service';
 export * from './alert-type.enum';
@@ -11,6 +12,7 @@ export * from './models';
 export * from './order-type.enum';
 export * from './real-trade.service';
 export * from './risk-tolerance.enum';
+export * from './scalping-bot.service';
 export * from './signal-confidence.enum';
 export * from './signal-direction.enum';
 export * from './simulated-trade.service';
@@ -20,4 +22,4 @@ export * from './trading-stage.enum';
 export * from './trading-style.enum';
 export * from './trading.service';
 export * from './validation.service';
-export { Dtos };
+export { Bot, Dtos };

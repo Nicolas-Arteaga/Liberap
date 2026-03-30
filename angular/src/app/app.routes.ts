@@ -65,6 +65,11 @@ export const APP_ROUTES: Routes = [
           .then(c => c.BacktestingComponent),
       },
       {
+        path: 'scalping-bot',
+        loadComponent: () => import('./scalping-bot/scalping-bot.component')
+          .then(c => c.ScalpingBotComponent),
+      },
+      {
         path: 'admin/users/create',
         canActivate: [adminGuard],
         loadComponent: () => import('./identity/create-user/create-user.component').then(c => c.CreateUserComponent),

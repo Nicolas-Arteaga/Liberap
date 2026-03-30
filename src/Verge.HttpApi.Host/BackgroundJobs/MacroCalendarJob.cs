@@ -40,7 +40,14 @@ public class MacroCalendarJob : BackgroundService
             }
 
             // Sync calendar every 4 hours
-            await Task.Delay(TimeSpan.FromHours(4), stoppingToken);
+            try 
+            {
+                await Task.Delay(TimeSpan.FromHours(4), stoppingToken);
+            }
+            catch (TaskCanceledException)
+            {
+                break;
+            }
         }
     }
 }

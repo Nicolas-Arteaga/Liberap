@@ -39,7 +39,14 @@ public class AutoCalibrationJob : BackgroundService
                 _logger.LogError(ex, "❌ Error in Auto-Calibration cycle");
             }
 
-            await Task.Delay(TimeSpan.FromHours(6), stoppingToken);
+            try 
+            {
+                await Task.Delay(TimeSpan.FromHours(6), stoppingToken);
+            }
+            catch (TaskCanceledException)
+            {
+                break;
+            }
         }
     }
 

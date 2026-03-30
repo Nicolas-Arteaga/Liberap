@@ -22,15 +22,18 @@ public class MarketScannerService : BackgroundService
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<MarketScannerService> _logger;
     private readonly IDistributedEventBus _eventBus;
+    private readonly Verge.Trading.Bot.IBotStateService _botState; // Agregado
 
     public MarketScannerService(
         IServiceProvider serviceProvider, 
         ILogger<MarketScannerService> logger,
-        IDistributedEventBus eventBus)
+        IDistributedEventBus eventBus,
+        Verge.Trading.Bot.IBotStateService botState) // Agregado
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
         _eventBus = eventBus;
+        _botState = botState;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -74,7 +77,8 @@ public class MarketScannerService : BackgroundService
         var unitOfWorkManager = scope.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
         var aniquilador = scope.ServiceProvider.GetRequiredService<IAniquiladorPatternManager>();
 
-        using var uow = unitOfWorkManager.Begin();
+        // No transaction here, we'll open/close it per symbol for real-time visibility
+
 
         // 0. Macro Check (Sprint 5) - Affects entire scan cycle
         var macroData = await macroService.GetMacroSentimentAsync();
@@ -89,7 +93,9 @@ public class MarketScannerService : BackgroundService
         int analyzedCount = 0;
         foreach (var symbol in topSymbols)
         {
+            using var uow = unitOfWorkManager.Begin(); // Nueva transaccion por cada simbolo
             try
+
             {
                 _logger.LogInformation("🧪 Analizando {symbol}...", symbol);
                 
@@ -341,12 +347,20 @@ public class MarketScannerService : BackgroundService
                         }
                     }
                 }
-            } catch (Exception ex) {
-                _logger.LogWarning($"⚠️ Error analizando {symbol}: {ex.Message}");
+                await uow.CompleteAsync();
+                _logger.LogInformation("✅ [Scanner] Commit real-time guardado para {symbol}", symbol);
+
+                // 🚀 [THE FIX] Push a Redis para que el Bot lo vea AL INSTANTE sin depender de la DB
+                await _botState.SetSymbolScoreAsync(symbol, confidence, (int)signal);
+                _logger.LogInformation("🚀 [Scanner -> Redis] Score {Score} and Direction {Dir} pushed for {Symbol}", confidence, signal, symbol);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("⚠️ Error analizando {symbol}: {message}", symbol, ex.Message);
             }
         }
 
-        await uow.CompleteAsync();
         _logger.LogInformation("🏁 Ciclo completado. Se analizaron {count} símbolos", analyzedCount);
+
     }
 }
