@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Verge.Localization;
 using Verge.MultiTenancy;
 using Verge.Trading;
-using Verge.Trading.Bot;
 using Verge.Trading.DecisionEngine;
 using Verge.Trading.Integrations;
 using System;
@@ -67,10 +66,6 @@ public class VergeDomainModule : AbpModule
         
         context.Services.AddSingleton<BinanceWebSocketService>();
         context.Services.AddHostedService(sp => sp.GetRequiredService<BinanceWebSocketService>());
-
-        // ─── Bot de Scalping Agresivo ───
-        context.Services.AddTransient<ScalpingSignalEngine>();
-        context.Services.AddSingleton<IBotStateService, BotStateService>();
 #if DEBUG
         context.Services.Replace(ServiceDescriptor.Singleton<IEmailSender, NullEmailSender>());
 #endif

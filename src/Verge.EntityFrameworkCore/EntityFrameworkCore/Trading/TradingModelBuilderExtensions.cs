@@ -1,7 +1,6 @@
 using Verge.Trading;
 using Verge.Trading.DecisionEngine;
 using Verge.Trading.Optimization;
-using Verge.Trading.Bot;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Volo.Abp.EntityFrameworkCore.Modeling;
@@ -141,29 +140,6 @@ public static class TradingModelBuilderExtensions
             b.Property(x => x.ExpectedDrawdownPct).HasColumnType("decimal(18,8)");
             b.Property(x => x.ActualExitPrice).HasColumnType("decimal(18,8)");
             b.Property(x => x.ActualPnlPct).HasColumnType("decimal(18,8)");
-        });
-
-        builder.Entity<BotTrade>(b =>
-        {
-            b.ToTable("BotTrades");
-            b.ConfigureByConvention();
-            b.Property(x => x.Symbol).IsRequired().HasMaxLength(20);
-            b.Property(x => x.EntryConditionsJson).HasMaxLength(4000);
-            b.Property(x => x.CloseReason).HasMaxLength(64);
-            b.Property(x => x.Timeframe).HasMaxLength(5);
-            b.Property(x => x.EntryPrice).HasColumnType("decimal(18,8)");
-            b.Property(x => x.StopLoss).HasColumnType("decimal(18,8)");
-            b.Property(x => x.TakeProfit1).HasColumnType("decimal(18,8)");
-            b.Property(x => x.TakeProfit2).HasColumnType("decimal(18,8)");
-            b.Property(x => x.TrailingStopPrice).HasColumnType("decimal(18,8)");
-            b.Property(x => x.Margin).HasColumnType("decimal(18,8)");
-            b.Property(x => x.PartialPnl).HasColumnType("decimal(18,8)");
-            b.Property(x => x.FinalPnl).HasColumnType("decimal(18,8)");
-            b.Property(x => x.TotalPnl).HasColumnType("decimal(18,8)");
-            b.HasIndex(x => x.Symbol);
-            b.HasIndex(x => x.Status);
-            b.HasIndex(x => x.UserId);
-            b.HasIndex(x => x.OpenedAt);
         });
     }
 }

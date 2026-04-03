@@ -54,14 +54,7 @@ public class SimulationMarkPriceWorker : BackgroundService
                 _logger.LogError(ex, "❌ [SimulationWorker] Error in mark price update cycle.");
             }
 
-            try 
-            {
-                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
-            }
-            catch (TaskCanceledException)
-            {
-                break;
-            }
+            await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
         }
     }
 

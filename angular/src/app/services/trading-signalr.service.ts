@@ -35,12 +35,6 @@ export class TradingSignalrService {
     tradeClosed$ = this.tradeClosedSource.asObservable();
     tradeUpdate$ = this.tradeUpdateSource.asObservable();
 
-    private botActivityLogSource = new Subject<any>();
-    botActivityLog$ = this.botActivityLogSource.asObservable();
-
-    private botTradeOpenedSource = new Subject<any>();
-    botTradeOpened$ = this.botTradeOpenedSource.asObservable();
-
     private connection: signalR.HubConnection | null = null;
     private lastNotifiedState: Record<string, string> = {};
 
@@ -119,16 +113,6 @@ export class TradingSignalrService {
             this.tradeClosedSource.next(trade);
             const pnl = trade.realizedPnl ?? 0;
             this.toaster.info('::' + `Posición cerrada: ${trade.symbol}. PnL: ${pnl.toFixed(2)} USDT`, '::Trading Simulado');
-        });
-
-        this.connection.on('BotActivityLog', (log: any) => {
-            console.log('[SignalR] 🤖 Bot Activity:', log);
-            this.botActivityLogSource.next(log);
-        });
-
-        this.connection.on('BotTradeOpened', (trade: any) => {
-            console.log('[SignalR] 🤖 Bot Trade Opened:', trade);
-            this.botTradeOpenedSource.next(trade);
         });
 
         this.connection.on('ReceiveTradeUpdate', (rawTrade: any) => {

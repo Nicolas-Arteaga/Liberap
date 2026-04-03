@@ -39,14 +39,7 @@ public class LiveSignalCollectorJob : BackgroundService
                 _logger.LogError(ex, "❌ Error in Live Signal Collector cycle");
             }
 
-            try 
-            {
-                await Task.Delay(TimeSpan.FromMinutes(CheckIntervalMinutes), stoppingToken);
-            }
-            catch (TaskCanceledException)
-            {
-                break;
-            }
+            await Task.Delay(TimeSpan.FromMinutes(CheckIntervalMinutes), stoppingToken);
         }
     }
 

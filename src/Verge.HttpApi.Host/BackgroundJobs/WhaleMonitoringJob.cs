@@ -39,14 +39,7 @@ public class WhaleMonitoringJob : BackgroundService
             }
 
             // Check every 15 minutes (Refined Lead Time requirement)
-            try 
-            {
-                await Task.Delay(TimeSpan.FromMinutes(15), stoppingToken);
-            }
-            catch (TaskCanceledException)
-            {
-                break;
-            }
+            await Task.Delay(TimeSpan.FromMinutes(15), stoppingToken);
         }
     }
 }
