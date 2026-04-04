@@ -3,7 +3,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Memory;
 using Volo.Abp;
 using Volo.Abp.Application.Services;
-using Microsoft.Extensions.Caching.Memory;
 using System.Linq;
 
 namespace Verge.Trading

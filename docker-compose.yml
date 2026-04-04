@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   redis:
@@ -8,6 +7,19 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    restart: always
+
+  db:
+    image: postgres:16-alpine
+    container_name: verge-db
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=Verge
+    volumes:
+      - pg_data:/var/lib/postgresql/data
     restart: always
 
   python-ai:
@@ -30,18 +42,53 @@ services:
       dockerfile: src/Verge.HttpApi.Host/Dockerfile
     container_name: verge-dotnet-backend
     ports:
-      - "5000:80"
+      - "5000:8080"
       - "5001:443"
+    env_file:
+      - ./python-service/.env
     environment:
-      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
       - Redis:Configuration=redis:6379
+      - ConnectionStrings:Default=Host=db;Port=5432;Database=Verge;Username=postgres;Password=postgres;Pooling=true;TrustServerCertificate=true
       - RemoteServices:PythonAI:BaseUrl=http://python-ai:8000
       - BINANCE_API_KEY=${BINANCE_API_KEY}
       - BINANCE_API_SECRET=${BINANCE_API_SECRET}
     depends_on:
       - redis
+      - db
       - python-ai
+    restart: always
+
+  freqtrade:
+    build:
+      context: ./freqtrade
+      dockerfile: Dockerfile
+    container_name: verge-freqtrade
+    volumes:
+      - "./freqtrade/user_data:/freqtrade/user_data"
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    env_file:
+      - ./python-service/.env
+    environment:
+      - BINANCE_API_KEY=${BINANCE_API_KEY}
+      - BINANCE_API_SECRET=${BINANCE_API_SECRET}
+      - FREQTRADE__EXCHANGE__KEY=${BINANCE_API_KEY}
+      - FREQTRADE__EXCHANGE__SECRET=${BINANCE_API_SECRET}
+      - REDIS_URL=redis://redis:6379/0
+    command: >
+      trade
+      --logfile /freqtrade/user_data/logs/freqtrade.log
+      --db-url sqlite:////freqtrade/user_data/freqtrade.dry_run.sqlite
+      --config /freqtrade/user_data/config.json
+      --strategy VergeFreqAIStrategy
+      --freqaimodel XGBoostRegressor
+    depends_on:
+      - redis
     restart: always
 
 volumes:
   redis_data:
+  pg_data:

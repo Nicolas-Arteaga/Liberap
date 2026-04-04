@@ -21,7 +21,7 @@ export const APP_ROUTES: Routes = [
       },
       {
         path: 'signals',
-        loadComponent: () => import('./signals/signals.component').then(c => c.SignalsComponent),
+        loadComponent: () => import('./signals/bot.component').then(c => c.BotComponent),
       },
       {
         path: 'profile',
@@ -40,11 +40,6 @@ export const APP_ROUTES: Routes = [
         path: 'configure-strategy',
         loadComponent: () => import('./configure-strategy/configure-strategy.component')
           .then(c => c.ConfigureStrategyComponent),
-      },
-      {
-        path: 'negotiate-debt',
-        loadComponent: () => import('./negotiate-debt/negotiate-debt.component')
-          .then(c => c.NegotiateDebtComponent),
       },
       {
         path: 'history',

@@ -1,9 +1,9 @@
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 WORKDIR /app
-EXPOSE 80
+EXPOSE 8080
 EXPOSE 443
 
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY ["src/Verge.HttpApi.Host/Verge.HttpApi.Host.csproj", "src/Verge.HttpApi.Host/"]
 COPY ["src/Verge.HttpApi/Verge.HttpApi.csproj", "src/Verge.HttpApi/"]

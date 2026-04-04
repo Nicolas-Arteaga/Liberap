@@ -5,5 +5,7 @@
   [style.background]="variant === 'solid' ? color : null"
   [disabled]="disabled"
 >
+  <ion-icon *ngIf="icon" [name]="icon" class="me-2"></ion-icon>
+  <span *ngIf="label">{{ label }}</span>
   <ng-content></ng-content>
 </button>

@@ -1,0 +1,108 @@
+using System;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using StackExchange.Redis;
+using Verge.Freqtrade.Hubs;
+ 
+namespace Verge.BackgroundJobs;
+
+public class BotDataPublisherService : BackgroundService
+{
+    private readonly IConnectionMultiplexer _redis;
+    private readonly IHubContext<BotHub> _hubContext;
+    private readonly ILogger<BotDataPublisherService> _logger;
+
+    private readonly IDatabase _db;
+
+    public BotDataPublisherService(
+        IConnectionMultiplexer redis,
+        IHubContext<BotHub> hubContext,
+        ILogger<BotDataPublisherService> logger)
+    {
+        _redis = redis;
+        _hubContext = hubContext;
+        _logger = logger;
+        _db = _redis.GetDatabase();
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("🚀 BotDataPublisherService: Starting and subscribing to Redis channels...");
+
+        var subscriber = _redis.GetSubscriber();
+
+        // Suscripción al Super Score
+        await subscriber.SubscribeAsync(RedisChannel.Literal("verge:superscore"), async (channel, message) =>
+        {
+            try
+            {
+                var payload = message.ToString();
+                _logger.LogInformation("📢 Received 'verge:superscore' from Redis: {Payload}", payload);
+                
+                // Guardarlo en Redis Hash para el endpoint GET
+                using var doc = JsonDocument.Parse(payload);
+                if (doc.RootElement.TryGetProperty("symbol", out var symbolProp))
+                {
+                    var symbol = symbolProp.GetString();
+                    if (!string.IsNullOrEmpty(symbol))
+                    {
+                        await _db.HashSetAsync("verge:active_pairs", symbol, payload);
+                        _logger.LogDebug("✅ Saved signal for {Symbol} to Redis Hash", symbol);
+                    }
+                }
+
+                // Broadcast via SignalR
+                await _hubContext.Clients.All.SendAsync("ReceiveSuperScore", payload);
+                _logger.LogInformation("📡 Broadcasted SuperScore for {Channel} to SignalR clients", channel);
+
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError(ex, "❌ Error processing 'verge:superscore' Pub/Sub");
+            }
+        });
+
+        // Suscripción al Whale Signal
+        await subscriber.SubscribeAsync(RedisChannel.Literal("verge:whale_signal"), async (channel, message) =>
+        {
+            try
+            {
+                _logger.LogInformation("🐋 Received 'verge:whale_signal' from Redis");
+                await _hubContext.Clients.All.SendAsync("ReceiveWhaleSignal", message.ToString());
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError(ex, "❌ Error processing 'verge:whale_signal' Pub/Sub");
+            }
+        });
+
+        // Suscripción a Logs del bot
+        await subscriber.SubscribeAsync(RedisChannel.Literal("verge:bot_log"), async (channel, message) =>
+        {
+            try
+            {
+                var logMsg = message.ToString();
+                _logger.LogInformation("📄 Received 'verge:bot_log': {Msg}", logMsg.Length > 50 ? logMsg.Substring(0, 50) + "..." : logMsg);
+                await _hubContext.Clients.All.SendAsync("ReceiveBotLog", logMsg);
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError(ex, "❌ Error processing 'verge:bot_log' Pub/Sub");
+            }
+        });
+        
+        // Wait and keep alive
+        try 
+        {
+            await Task.Delay(Timeout.Infinite, stoppingToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // Normal shutdown
+        }
+    }
+}

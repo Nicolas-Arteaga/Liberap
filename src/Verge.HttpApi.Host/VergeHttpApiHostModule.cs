@@ -45,6 +45,7 @@ using Volo.Abp.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
 using Volo.Abp.AspNetCore.SignalR;
 using StackExchange.Redis;
+using Verge.BackgroundJobs;
 
 namespace Verge;
 
@@ -145,6 +146,7 @@ public class VergeHttpApiHostModule : AbpModule
         context.Services.AddHostedService<MarketScannerService>();
         context.Services.AddHostedService<LiveSignalCollectorJob>();
         context.Services.AddHostedService<SimulationMarkPriceWorker>();
+        context.Services.AddHostedService<BotDataPublisherService>();
 
         // Redis Configuration (Graceful startup)
         var redisConfig = configuration["Redis:Configuration"] ?? "localhost:6379";
@@ -157,6 +159,12 @@ public class VergeHttpApiHostModule : AbpModule
 
         // Execution Service
         context.Services.AddSingleton<BinanceFuturesExecutionService>();
+
+        context.Services.AddHttpClient("Freqtrade", client =>
+        {
+            var baseUrl = configuration["RemoteServices:Freqtrade:BaseUrl"] ?? "http://localhost:8080";
+            client.BaseAddress = new Uri(baseUrl);
+        });
 
         context.Services.ConfigureApplicationCookie(options =>
         {
@@ -371,6 +379,5 @@ public class VergeHttpApiHostModule : AbpModule
         app.UseAuditing();
         app.UseAbpSerilogEnrichers();
         app.UseConfiguredEndpoints();
-
     }
 }

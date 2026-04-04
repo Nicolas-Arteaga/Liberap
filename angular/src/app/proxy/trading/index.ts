@@ -2,6 +2,7 @@ import * as Dtos from './dtos';
 export * from './alert-history.service';
 export * from './alert-type.enum';
 export * from './analysis-log-type.enum';
+export * from './bot.service';
 export * from './crypto-analysis.service';
 export * from './execution.service';
 export * from './fractal-analysis.service';

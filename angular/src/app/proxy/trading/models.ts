@@ -43,6 +43,15 @@ export interface BacktestResultDto extends FullAuditedEntityDto<string> {
   tradeFrequencyPerDay: number;
 }
 
+export interface BotPairDto {
+  symbol?: string;
+  score: number;
+  prediction: number;
+  bias?: string;
+  atr: number;
+  recommendedAction?: string;
+}
+
 export interface ComparativeEvaluationReportDto {
   results: ComparativeEvaluationResultDto[];
   evaluationDate?: string;

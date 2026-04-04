@@ -7,6 +7,7 @@ using Verge.Trading.DTOs;
 namespace Verge.Trading;
 
 [Authorize]
+[HubRoute("/signalr-hubs/trading")]
 public class TradingHub : AbpHub
 {
     public async Task SendSessionUpdate(string message)

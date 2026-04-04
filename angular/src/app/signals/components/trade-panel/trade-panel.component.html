@@ -1,0 +1,99 @@
+<div class="trade-panel-container">
+  <!-- Pair Header -->
+  <div class="panel-header">
+    <h2>{{ pair.symbol }}</h2>
+    <div class="score-badge" [ngClass]="pair.score >= 70 ? 'high' : pair.score >= 40 ? 'med' : 'low'">
+      Score: {{ pair.score }}
+    </div>
+  </div>
+
+  <!-- Chart Area -->
+  <div class="chart-area glass-box">
+    <div #chartContainer class="full-chart"></div>
+  </div>
+
+  <!-- Data Insights -->
+  <div class="insights-grid">
+    <div class="insight-box">
+      <span class="label">FreqAI Pred</span>
+      <span class="value" [class.positive]="pair.prediction > 0" [class.negative]="pair.prediction < 0">
+        {{ pair.prediction > 0 ? '+' : '' }}{{ pair.prediction }}%
+      </span>
+    </div>
+    <div class="insight-box">
+      <span class="label">Bias Trend</span>
+      <span class="value" [ngClass]="pair.bias | lowercase">{{ pair.bias }}</span>
+    </div>
+    <div class="insight-box">
+      <span class="label">ATR</span>
+      <span class="value">{{ pair.atr | number:'1.1-2' }}%</span>
+    </div>
+  </div>
+
+  <!-- Simulation Logic -->
+  <div class="action-area" *ngIf="activeOrders().length === 0">
+    <h3>Simulate Trade</h3>
+    <div class="parameters glass-box">
+      <div class="param-row">
+        <span>Entry Signal:</span>
+        <strong [class.positive]="pair.recommendedAction === 'LONG'" [class.negative]="pair.recommendedAction === 'SHORT'">
+          {{ pair.recommendedAction }}
+        </strong>
+      </div>
+      <div class="param-row">
+        <span>Est. SL (ATR x1.5):</span>
+        <strong class="negative">-{{ pair.atr * 1.5 | number:'1.1-2' }}%</strong>
+      </div>
+      <div class="param-row">
+        <span>Est. TP (ATR x2):</span>
+        <strong class="positive">+{{ pair.atr * 2 | number:'1.1-2' }}%</strong>
+      </div>
+    </div>
+
+    <div class="action-buttons">
+      <button class="btn-trade btn-long" (click)="simulateLong()">
+        LONG
+      </button>
+      <button class="btn-trade btn-short" (click)="simulateShort()">
+        SHORT
+      </button>
+    </div>
+  </div>
+
+  <!-- Active Orders for this pair -->
+  <div class="active-orders-section" *ngIf="activeOrders().length > 0">
+    <h3>Active Simulated Orders</h3>
+    <div class="order-card" *ngFor="let order of activeOrders()">
+      <div class="order-header">
+        <span class="order-type" [ngClass]="order.direction | lowercase">
+          <ion-icon [name]="order.direction === 'LONG' ? 'trending-up-outline' : 'trending-down-outline'"></ion-icon>
+          {{ order.direction }}
+        </span>
+        <span class="order-time">
+          <ion-icon name="time-outline"></ion-icon>
+          {{ order.entryTime | date:'HH:mm:ss' }}
+        </span>
+      </div>
+      
+      <div class="order-details">
+        <div class="detail-item">
+          <span class="label">SL</span>
+          <span class="value negative">-{{ order.sl | number:'1.1-2' }}%</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">TP1</span>
+          <span class="value positive">+{{ order.tp1 | number:'1.1-2' }}%</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">TP2</span>
+          <span class="value positive">+{{ order.tp2 | number:'1.1-2' }}%</span>
+        </div>
+      </div>
+
+      <button class="btn-close-order" (click)="closeOrder(order.id)">
+        <ion-icon name="close-circle-outline"></ion-icon>
+        Cerrar Simulación
+      </button>
+    </div>
+  </div>
+</div>

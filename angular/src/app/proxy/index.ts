@@ -1,2 +1,3 @@
+import * as Freqtrade from './freqtrade';
 import * as Trading from './trading';
-export { Trading };
+export { Freqtrade, Trading };
