@@ -88,9 +88,9 @@ class VergeFreqAIStrategy(IStrategy):
 
     # ─── Hyperopt Parameters ──────────────────────────────────────────────────
     # Prediction threshold to enter long
-    long_threshold = DecimalParameter(0.01, 0.05, default=0.02, space="buy", optimize=True)
+    long_threshold = DecimalParameter(0.0001, 0.05, default=0.001, space="buy", optimize=True)
     # Prediction threshold to enter short
-    short_threshold = DecimalParameter(-0.05, -0.01, default=-0.02, space="sell", optimize=True)
+    short_threshold = DecimalParameter(-0.05, -0.0001, default=-0.001, space="sell", optimize=True)
     # RSI overbought/oversold
     rsi_buy = IntParameter(20, 45, default=35, space="buy", optimize=True)
     rsi_sell = IntParameter(55, 80, default=65, space="sell", optimize=True)

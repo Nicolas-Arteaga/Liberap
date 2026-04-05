@@ -21,9 +21,14 @@ import { ToasterService } from '@abp/ng.theme.shared';
         <label>Tipo:</label>
         <div class="type-selector">
           <label class="radio-label">
-            <input type="radio" value="Scalping" formControlName="type">
+            <input type="radio" value="VergeFreqAIStrategy" formControlName="type">
             <span class="custom-radio"></span>
             Scalping (FreqAI)
+          </label>
+          <label class="radio-label mt-2">
+            <input type="radio" value="VergeTestStrategy" formControlName="type">
+            <span class="custom-radio"></span>
+            Test Strategy (Cruce MA)
           </label>
         </div>
       </div>
@@ -230,7 +235,7 @@ export class CreateBotFormComponent {
   activePairs = this.botSignalRService.activePairs;
   
   botForm = new FormGroup({
-    type: new FormControl('Scalping'),
+    type: new FormControl('VergeFreqAIStrategy'),
     pair: new FormControl('', Validators.required),
     timeframe: new FormControl('15m'),
     stakeAmount: new FormControl(100),
@@ -288,7 +293,7 @@ export class CreateBotFormComponent {
         tpPercent: formVal.tp!,
         slPercent: formVal.sl!,
         leverage: this.leverage,
-        strategy: 'VergeFreqAIStrategy'
+        strategy: formVal.type!
       };
 
       this.freqtradeService.startBot(input).subscribe({

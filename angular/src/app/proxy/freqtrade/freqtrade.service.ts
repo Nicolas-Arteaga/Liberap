@@ -18,6 +18,15 @@ export class FreqtradeService {
     { apiName: this.apiName,...config });
   
 
+  forceEnter = (pair: string, side: string, stakeAmount: number, leverage: number, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'POST',
+      url: '/api/app/freqtrade/force-enter',
+      params: { pair, side, stakeAmount, leverage },
+    },
+    { apiName: this.apiName,...config });
+  
+
   getOpenTrades = (config?: Partial<Rest.Config>) =>
     this.restService.request<any, FreqtradeTradeDto[]>({
       method: 'GET',

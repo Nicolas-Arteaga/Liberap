@@ -9,6 +9,8 @@ import { LabelComponent } from 'src/shared/components/label/label.component';
 import { ToggleComponent } from 'src/shared/components/toggle/toggle.component';
 import { IonIcon } from '@ionic/angular/standalone';
 import { IconService } from 'src/shared/services/icon.service';
+import { FreqtradeService } from '../proxy/freqtrade/freqtrade.service';
+import { ToasterService } from '@abp/ng.theme.shared';
 
 interface MarketMetric {
   name: string;
@@ -44,6 +46,10 @@ interface ActiveAlert {
 export class DashboardAdvancedComponent implements AfterViewInit, OnDestroy {
   private iconService = inject(IconService);
   private router = inject(Router);
+
+  private freqtradeService = inject(FreqtradeService);
+  private toaster = inject(ToasterService);
+  isForcingTrade = false;
 
   // Datos de trading activo
   activeTrade = {
@@ -88,7 +94,7 @@ export class DashboardAdvancedComponent implements AfterViewInit, OnDestroy {
 
   // Gráficos disponibles
   availableCharts = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT', 'XRP/USDT'];
-  selectedChart = 'BTC/USDT';
+  selectedChart = '';
   
   // Timeframes
   timeframes = ['1m', '5m', '15m', '1h', '4h', '1d'];
@@ -106,11 +112,25 @@ export class DashboardAdvancedComponent implements AfterViewInit, OnDestroy {
     // Actualizar hora actual
     this.updateCurrentTime();
     
-    // Simular updates en tiempo real
+    // Simular updates en tiempo real y obtener par real
     this.updateInterval = setInterval(() => {
       this.simulateMarketUpdate();
       this.updateCurrentTime();
+      this.fetchRealStatus();
     }, 5000);
+    this.fetchRealStatus();
+  }
+
+  fetchRealStatus() {
+    this.freqtradeService.getStatus().subscribe({
+      next: (status) => {
+        if (status.currentPair && status.currentPair !== 'Offline' && status.currentPair !== 'No configurado') {
+          this.activeTrade.crypto = status.currentPair;
+          this.selectedChart = status.currentPair;
+        }
+      },
+      error: () => {}
+    });
   }
 
   ngOnDestroy() {
@@ -153,6 +173,26 @@ export class DashboardAdvancedComponent implements AfterViewInit, OnDestroy {
   onCloseTrade() {
     console.log('Cerrar trade manualmente');
     // Lógica para cerrar trade
+  }
+
+  onForceEnter(side: string) {
+    const pair = this.selectedChart || 'BTC/USDT';
+    const stake = this.activeTrade.invested || 100;
+    
+    this.isForcingTrade = true;
+    this.toaster.info(`Enviando orden Force ${side} para ${pair}...`);
+
+    this.freqtradeService.forceEnter(pair, side, stake, 10).subscribe({
+      next: () => {
+        this.toaster.success(`Trade ${side} abierto exitosamente en ${pair}`, 'Ejecución Correcta');
+        this.isForcingTrade = false;
+      },
+      error: (err: any) => {
+        this.toaster.error('Error al forzar orden.', 'Binance Reject');
+        this.isForcingTrade = false;
+        console.error(err);
+      }
+    });
   }
 
   onAddAlert() {

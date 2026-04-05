@@ -13,5 +13,6 @@ namespace Verge.Freqtrade
         Task<FreqtradeProfitDto> GetProfitAsync();
         Task CloseTradeAsync(string tradeId);
         Task UpdateWhitelistAsync(string pair);
+        Task ForceEnterAsync(string pair, string side, decimal stakeAmount, int leverage);
     }
 }

@@ -110,26 +110,44 @@ namespace Verge.Freqtrade
                     configDict["timeframe"] = input.Timeframe;
                     configDict["take_profit"] = Math.Round((double)input.TpPercent / 100.0, 4);
                     configDict["stoploss"] = -Math.Round((double)input.SlPercent / 100.0, 4);
+                    configDict["strategy"] = input.Strategy;
+                    configDict["force_entry_enable"] = true;
 
-                    // Sincronizar FreqAI include_timeframes con el timeframe base
-                    if (configDict.ContainsKey("freqai"))
+                    // Deshabilitar FreqAI si elegimos estrategia simple, o activarlo
+                    if (input.Strategy == "VergeFreqAIStrategy")
                     {
-                        var freqaiJson = JsonSerializer.Serialize(configDict["freqai"]);
-                        var freqaiDict = JsonSerializer.Deserialize<Dictionary<string, object>>(freqaiJson);
-                        if (freqaiDict != null)
+                        if (configDict.ContainsKey("freqai"))
                         {
-                            if (freqaiDict.TryGetValue("feature_parameters", out var fpObj))
+                            var freqaiJson = JsonSerializer.Serialize(configDict["freqai"]);
+                            var freqaiDict = JsonSerializer.Deserialize<Dictionary<string, object>>(freqaiJson);
+                            if (freqaiDict != null)
                             {
-                                var fpJson = JsonSerializer.Serialize(fpObj);
-                                var fpDict = JsonSerializer.Deserialize<Dictionary<string, object>>(fpJson);
-                                if (fpDict != null)
+                                freqaiDict["enabled"] = true;
+                                if (freqaiDict.TryGetValue("feature_parameters", out var fpObj))
                                 {
-                                    // Limpiar timeframes menores que el base para evitar crash en FreqAI
-                                    // Seteamos un set seguro para este modo
-                                    fpDict["include_timeframes"] = new List<string> { input.Timeframe, "1h", "4h" };
-                                    freqaiDict["feature_parameters"] = fpDict;
-                                    configDict["freqai"] = freqaiDict;
+                                    var fpJson = JsonSerializer.Serialize(fpObj);
+                                    var fpDict = JsonSerializer.Deserialize<Dictionary<string, object>>(fpJson);
+                                    if (fpDict != null)
+                                    {
+                                        fpDict["include_timeframes"] = new List<string> { input.Timeframe, "1h", "4h" };
+                                        freqaiDict["feature_parameters"] = fpDict;
+                                    }
                                 }
+                                configDict["freqai"] = freqaiDict;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Deshabilitar freqAI para la estrategia simple
+                        if (configDict.ContainsKey("freqai"))
+                        {
+                            var freqaiJson = JsonSerializer.Serialize(configDict["freqai"]);
+                            var freqaiDict = JsonSerializer.Deserialize<Dictionary<string, object>>(freqaiJson);
+                            if (freqaiDict != null)
+                            {
+                                freqaiDict["enabled"] = false;
+                                configDict["freqai"] = freqaiDict;
                             }
                         }
                     }
@@ -231,9 +249,16 @@ namespace Verge.Freqtrade
                     var configResult = JsonSerializer.Deserialize<JsonElement>(configContent);
                     var statusStr = configResult.TryGetProperty("state", out var state) ? state.GetString() : "unknown";
                     isRunning = statusStr == "running";
-                    
-                    // Extraer current pair config
-                    if (configResult.TryGetProperty("exchange", out var exchangeObj) && 
+                }
+
+                // Extraer current pair desde el archivo config.json directamente
+                var configPath = Path.Combine(Directory.GetCurrentDirectory(), "..", "Verge.HttpApi.Host", "freqtrade", "user_data", "config.json");
+                if (!File.Exists(configPath)) configPath = @"C:\Users\Nicolas\Desktop\Verge\Verge\freqtrade\user_data\config.json";
+                if (File.Exists(configPath))
+                {
+                    var json = await File.ReadAllTextAsync(configPath);
+                    using var doc = JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("exchange", out var exchangeObj) && 
                         exchangeObj.TryGetProperty("pair_whitelist", out var whitelist) &&
                         whitelist.ValueKind == JsonValueKind.Array &&
                         whitelist.GetArrayLength() > 0)
@@ -337,6 +362,37 @@ namespace Verge.Freqtrade
             // Implementación futura según la Freqtrade API.
             // Generalmente requiere actualizar config.json y recargar o /api/v1/sysinfo, etc.
             await Task.CompletedTask;
+        }
+
+        public async Task ForceEnterAsync(string pair, string side, decimal stakeAmount, int leverage)
+        {
+            var client = await GetClientAsync();
+            if (client == null) throw new UserFriendlyException("Freqtrade está offline.");
+
+            // Asegurar que siempre usamos el par configurado activo en lugar de depender del UI
+            var status = await GetStatusAsync();
+            if (!string.IsNullOrEmpty(status.CurrentPair) && status.CurrentPair != "Offline" && status.CurrentPair != "No configurado")
+            {
+                pair = status.CurrentPair;
+            }
+            
+            var payload = new Dictionary<string, object> 
+            { 
+                { "pair", pair }, 
+                { "side", side.ToLower() },
+                { "leverage", leverage },
+                { "stakeamount", stakeAmount }
+            };
+            
+            var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+            var response = await client.PostAsync("/api/v1/forceenter", content);
+            
+            if (!response.IsSuccessStatusCode) 
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"[Freqtrade ForceEnter] ERROR: {error}");
+                throw new UserFriendlyException($"Error de Binance al forzar {side} en {pair}: {error}");
+            }
         }
     }
 }

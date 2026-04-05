@@ -251,25 +251,24 @@
 
     <!-- Acciones -->
     <div class="space-y-3">
-      <app-glass-button
-        variant="success"
-        (click)="onExecuteTrade()"
-        class="w-full py-3">
-        <ion-icon name="flash-outline" class="me-2"></ion-icon>
-        Ejecutar Trade Avanzado
-      </app-glass-button>
-
-      <app-glass-button
-        variant="danger"
-        (click)="onCloseTrade()"
-        class="w-full py-3">
-        <ion-icon name="close-circle-outline" class="me-2"></ion-icon>
-        Cerrar Trade Manualmente
-      </app-glass-button>
+      <div class="row g-2">
+        <div class="col-6">
+          <app-glass-button variant="success" class="w-full py-3 h-100 fs-5" (click)="onForceEnter('long')" [disabled]="isForcingTrade">
+            <ion-icon name="trending-up-outline" class="me-2"></ion-icon>
+            Force Long
+          </app-glass-button>
+        </div>
+        <div class="col-6">
+          <app-glass-button variant="danger" class="w-full py-3 h-100 fs-5" (click)="onForceEnter('short')" [disabled]="isForcingTrade">
+            <ion-icon name="trending-down-outline" class="me-2"></ion-icon>
+            Force Short
+          </app-glass-button>
+        </div>
+      </div>
 
       <app-glass-button
         (click)="onSaveConfig()"
-        class="w-full py-3">
+        class="w-full py-3 mt-3">
         <ion-icon name="save-outline" class="me-2"></ion-icon>
         Guardar Configuración Avanzada
       </app-glass-button>

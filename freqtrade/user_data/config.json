@@ -46,7 +46,7 @@
     },
     "sandbox": true,
     "pair_whitelist": [
-      "BTC/USDT:USDT"
+      "XRP/USDT:USDT"
     ],
     "pair_blacklist": [
       "BNB/.*"
@@ -69,7 +69,7 @@
     }
   ],
   "freqai": {
-    "enabled": true,
+    "enabled": false,
     "purge_old_models": true,
     "train_period_days": 30,
     "backtest_period_days": 7,
@@ -133,7 +133,7 @@
   },
   "bot_name": "VergeFreqAI",
   "initial_state": "running",
-  "force_entry_enable": false,
+  "force_entry_enable": true,
   "internals": {
     "process_throttle_secs": 5,
     "heartbeat_interval": 60
@@ -144,5 +144,6 @@
     "chat_id": ""
   },
   "take_profit": 0.25,
-  "stoploss": -0.01
+  "stoploss": -0.01,
+  "strategy": "VergeFreqAIStrategy"
 }
