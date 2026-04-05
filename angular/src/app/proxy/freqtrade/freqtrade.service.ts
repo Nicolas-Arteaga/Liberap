@@ -18,6 +18,15 @@ export class FreqtradeService {
     { apiName: this.apiName,...config });
   
 
+  deleteBot = (pair: string, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'DELETE',
+      url: '/api/app/freqtrade/bot',
+      params: { pair },
+    },
+    { apiName: this.apiName,...config });
+  
+
   forceEnter = (pair: string, side: string, stakeAmount: number, leverage: number, config?: Partial<Rest.Config>) =>
     this.restService.request<any, void>({
       method: 'POST',
@@ -47,6 +56,14 @@ export class FreqtradeService {
     this.restService.request<any, FreqtradeStatusDto>({
       method: 'GET',
       url: '/api/app/freqtrade/status',
+    },
+    { apiName: this.apiName,...config });
+  
+
+  resumeBot = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'POST',
+      url: '/api/app/freqtrade/resume-bot',
     },
     { apiName: this.apiName,...config });
   

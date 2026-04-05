@@ -1,99 +1,129 @@
-<div class="trade-panel-container">
-  <!-- Pair Header -->
-  <div class="panel-header">
-    <h2>{{ pair.symbol }}</h2>
-    <div class="score-badge" [ngClass]="pair.score >= 70 ? 'high' : pair.score >= 40 ? 'med' : 'low'">
-      Score: {{ pair.score }}
-    </div>
-  </div>
-
-  <!-- Chart Area -->
-  <div class="chart-area glass-box">
-    <div #chartContainer class="full-chart"></div>
-  </div>
-
-  <!-- Data Insights -->
-  <div class="insights-grid">
-    <div class="insight-box">
-      <span class="label">FreqAI Pred</span>
-      <span class="value" [class.positive]="pair.prediction > 0" [class.negative]="pair.prediction < 0">
-        {{ pair.prediction > 0 ? '+' : '' }}{{ pair.prediction }}%
-      </span>
-    </div>
-    <div class="insight-box">
-      <span class="label">Bias Trend</span>
-      <span class="value" [ngClass]="pair.bias | lowercase">{{ pair.bias }}</span>
-    </div>
-    <div class="insight-box">
-      <span class="label">ATR</span>
-      <span class="value">{{ pair.atr | number:'1.1-2' }}%</span>
-    </div>
-  </div>
-
-  <!-- Simulation Logic -->
-  <div class="action-area" *ngIf="activeOrders().length === 0">
-    <h3>Simulate Trade</h3>
-    <div class="parameters glass-box">
-      <div class="param-row">
-        <span>Entry Signal:</span>
-        <strong [class.positive]="pair.recommendedAction === 'LONG'" [class.negative]="pair.recommendedAction === 'SHORT'">
-          {{ pair.recommendedAction }}
-        </strong>
-      </div>
-      <div class="param-row">
-        <span>Est. SL (ATR x1.5):</span>
-        <strong class="negative">-{{ pair.atr * 1.5 | number:'1.1-2' }}%</strong>
-      </div>
-      <div class="param-row">
-        <span>Est. TP (ATR x2):</span>
-        <strong class="positive">+{{ pair.atr * 2 | number:'1.1-2' }}%</strong>
-      </div>
-    </div>
-
-    <div class="action-buttons">
-      <button class="btn-trade btn-long" (click)="simulateLong()">
-        LONG
-      </button>
-      <button class="btn-trade btn-short" (click)="simulateShort()">
-        SHORT
-      </button>
-    </div>
-  </div>
-
-  <!-- Active Orders for this pair -->
-  <div class="active-orders-section" *ngIf="activeOrders().length > 0">
-    <h3>Active Simulated Orders</h3>
-    <div class="order-card" *ngFor="let order of activeOrders()">
-      <div class="order-header">
-        <span class="order-type" [ngClass]="order.direction | lowercase">
-          <ion-icon [name]="order.direction === 'LONG' ? 'trending-up-outline' : 'trending-down-outline'"></ion-icon>
-          {{ order.direction }}
-        </span>
-        <span class="order-time">
-          <ion-icon name="time-outline"></ion-icon>
-          {{ order.entryTime | date:'HH:mm:ss' }}
-        </span>
-      </div>
+<div class="institutional-chart-container animate-fade-in">
+  
+  <!-- Premium Chart Header (Institutional Look) -->
+  <div class="chart-toolbar d-flex align-items-center justify-content-between p-2">
+    <div class="d-flex align-items-center gap-3">
       
-      <div class="order-details">
-        <div class="detail-item">
-          <span class="label">SL</span>
-          <span class="value negative">-{{ order.sl | number:'1.1-2' }}%</span>
+      <!-- Symbol Selector -->
+      <div class="symbol-selector-root position-relative">
+        <div class="selected-symbol-container d-flex align-items-center gap-2 cursor-pointer" 
+             (click)="showSymbolSelector = !showSymbolSelector">
+          <div class="d-flex flex-column">
+            <span class="symbol-name fw-bold">{{ selectedSymbol }}</span>
+            <span class="text-xxs text-white-30 tracking-tighter uppercase">Binance Spot</span>
+          </div>
+          <div class="v-divider mx-1" style="height: 20px; width: 1px; background: rgba(255,255,255,0.1)"></div>
+          <div class="d-flex flex-column align-items-end" *ngIf="selectedTicker">
+            <span class="symbol-price text-xs fw-bold" [ngClass]="(selectedTicker.priceChangePercent || 0) >= 0 ? 'text-success' : 'text-danger'">
+              {{ selectedTicker.lastPrice | number:'1.2-8' }}
+            </span>
+            <span class="text-xxs fw-medium" [ngClass]="(selectedTicker.priceChangePercent || 0) >= 0 ? 'text-success' : 'text-danger'">
+              {{ (selectedTicker.priceChangePercent || 0) >= 0 ? '+' : '' }}{{ selectedTicker.priceChangePercent | number:'1.2-2' }}%
+            </span>
+          </div>
+          <ion-icon name="chevron-down-outline" class="ms-1 opacity-50"></ion-icon>
         </div>
-        <div class="detail-item">
-          <span class="label">TP1</span>
-          <span class="value positive">+{{ order.tp1 | number:'1.1-2' }}%</span>
-        </div>
-        <div class="detail-item">
-          <span class="label">TP2</span>
-          <span class="value positive">+{{ order.tp2 | number:'1.1-2' }}%</span>
+
+        <!-- Backdrop to close dropdown (Exactly as Dashboard) -->
+        <div *ngIf="showSymbolSelector" class="dropdown-backdrop position-fixed top-0 start-0 w-100 h-100" 
+             style="z-index: 999; background: transparent;"
+             (click)="showSymbolSelector = false"></div>
+
+        <!-- Dropdown Selector (Exactly as Dashboard) -->
+        <div class="symbol-dropdown-container animate-fade-in shadow-xl" *ngIf="showSymbolSelector" style="z-index: 1000;">
+          <div class="search-box p-3 border-bottom border-white-05">
+            <div class="input-group bg-dark-soft rounded-pill px-3 border border-white-10 d-flex align-items-center">
+              <ion-icon name="search-outline" class="text-white-30"></ion-icon>
+              <input type="text" 
+                     class="form-control bg-transparent border-0 text-white text-xs py-2 outline-none shadow-none" 
+                     placeholder="Buscar moneda..."
+                     [(ngModel)]="searchTerm"
+                     (input)="filterTickers()"
+                     autofocus>
+            </div>
+          </div>
+          <div class="tickers-list overflow-auto" style="max-height: 400px;">
+            <div class="ticker-item-header d-flex text-white-30 text-xs px-3 py-2">
+              <div class="flex-grow-1">Moneda</div>
+              <div class="text-end" style="width: 80px;">Precio</div>
+              <div class="text-end" style="width: 80px;">Cambio</div>
+            </div>
+            <div class="ticker-item d-flex align-items-center px-3 py-2 cursor-pointer hover:bg-white-05 border-bottom border-white-03"
+                 *ngFor="let t of filteredTickers"
+                 [class.active]="t.symbol === selectedSymbol"
+                 (click)="selectSymbol(t.symbol)">
+              <div class="flex-grow-1">
+                <div class="text-white fw-bold text-sm">{{ t.symbol }}</div>
+                <div class="text-white-30 text-xxs">Perpetuo</div>
+              </div>
+              <div class="text-end" style="width: 80px;">
+                <div class="text-white text-xs fw-medium">{{ t.lastPrice | number:'1.2-8' }}</div>
+              </div>
+              <div class="text-end" style="width: 80px;">
+                <div class="text-xs fw-medium" [ngClass]="t.priceChangePercent >= 0 ? 'text-success' : 'text-danger'">
+                  {{ t.priceChangePercent >= 0 ? '+' : '' }}{{ t.priceChangePercent | number:'1.2-2' }}%
+                </div>
+              </div>
+            </div>
+            <div *ngIf="filteredTickers.length === 0" class="p-4 text-center text-white-30 text-xs">
+              No se encontraron monedas
+            </div>
+          </div>
         </div>
       </div>
 
-      <button class="btn-close-order" (click)="closeOrder(order.id)">
-        <ion-icon name="close-circle-outline"></ion-icon>
-        Cerrar Simulación
-      </button>
+      <!-- Timeframe Selector -->
+      <div class="timeframe-selector d-flex gap-1 ms-2 overflow-auto">
+        <button *ngFor="let tf of timeframes" 
+                class="tf-btn px-2 py-1 rounded text-xs border-0" 
+                [class.active]="selectedTimeframe === tf.value"
+                (click)="onTimeframeChange(tf.value)">
+          {{ tf.label }}
+        </button>
+      </div>
+
+    </div>
+
+    <!-- Indicators & Settings -->
+    <div class="d-flex align-items-center gap-3 pe-2">
+      <div class="hma-settings d-flex align-items-center gap-2 px-2 py-1 rounded bg-dark-accent border border-white-05">
+        <span class="text-white-50 text-xs fw-bold">HMA</span>
+        <input type="number" 
+               class="bg-transparent border-0 text-info text-xs outline-none text-center" 
+               [(ngModel)]="hmaPeriod"
+               (change)="onHmaChange()"
+               style="width: 35px;">
+      </div>
+      <ion-icon name="options-outline" class="cursor-pointer opacity-50 hover:opacity-100"></ion-icon>
+      <ion-icon name="list-outline" class="cursor-pointer opacity-50 hover:opacity-100"></ion-icon>
+    </div>
+
+  </div>
+
+  <!-- Bot Signal Metadata Strip -->
+  <div class="bot-info-strip d-flex align-items-center justify-content-between px-3 py-2 mt-1 mx-2">
+    <div class="d-flex align-items-center gap-4">
+      <div class="info-item">
+        <span class="label">Signal:</span>
+        <span class="signal-value ms-2 text-uppercase fw-black" [ngClass]="pair?.recommendedAction | lowercase">
+          {{ pair?.recommendedAction || 'SCANNING...' }}
+        </span>
+      </div>
+      <div class="info-item">
+        <span class="label">Confidence:</span>
+        <span class="value success ms-2 fw-bold">{{ pair?.score || 0 }}%</span>
+      </div>
+    </div>
+    <div class="tags-row d-flex gap-3">
+      <span class="tag"><span class="dot green"></span> Whale accumulation</span>
+      <span class="tag"><span class="dot green"></span> RSI oversold</span>
+      <span class="tag"><span class="dot blue"></span> Breakout micro range</span>
     </div>
   </div>
+
+  <!-- Main Chart Container -->
+  <div class="chart-wrapper mt-2 bg-dark-deep">
+    <div #chartContainer class="full-chart w-100" style="height: 480px;"></div>
+  </div>
+
 </div>

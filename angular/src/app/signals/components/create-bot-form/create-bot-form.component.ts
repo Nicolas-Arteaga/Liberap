@@ -3,11 +3,13 @@ import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormControl, FormGroup, Validators } from '@angular/forms';
 import { IonIcon } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { chevronDownOutline, informationCircleOutline, syncOutline } from 'ionicons/icons';
+import { chevronDownOutline, informationCircleOutline, syncOutline, searchOutline } from 'ionicons/icons';
 import { BotSignalRService } from '../../services/bot-signalr.service';
 import { FreqtradeService } from '../../../proxy/freqtrade/freqtrade.service';
 import { FreqtradeCreateBotDto } from '../../../proxy/freqtrade/models';
 import { ToasterService } from '@abp/ng.theme.shared';
+import { MarketDataService } from '../../../proxy/trading/market-data.service';
+import { SymbolTickerDto } from '../../../proxy/trading/models';
 
 @Component({
   selector: 'app-create-bot-form',
@@ -18,7 +20,7 @@ import { ToasterService } from '@abp/ng.theme.shared';
       <h3>Crear Bot (Freqtrade)</h3>
 
       <div class="form-group" [formGroup]="botForm">
-        <label>Tipo:</label>
+        <label>Tipo de Estrategia:</label>
         <div class="type-selector">
           <label class="radio-label">
             <input type="radio" value="VergeFreqAIStrategy" formControlName="type">
@@ -28,21 +30,41 @@ import { ToasterService } from '@abp/ng.theme.shared';
           <label class="radio-label mt-2">
             <input type="radio" value="VergeTestStrategy" formControlName="type">
             <span class="custom-radio"></span>
-            Test Strategy (Cruce MA)
+            Test (Cruce MA)
           </label>
         </div>
       </div>
 
       <div class="form-group" [formGroup]="botForm">
-        <label>Par:</label>
-        <div class="select-wrapper">
-          <select formControlName="pair">
-            <option *ngIf="!botForm.get('pair')?.value" value="">-- SELECCIONA PAR --</option>
-            <option *ngFor="let p of activePairs(); trackBy: trackPair" [value]="p.symbol">
-              {{ p.symbol }} (Score: {{ p.score }})
-            </option>
-          </select>
-          <ion-icon name="chevron-down-outline"></ion-icon>
+        <label>Buscar Moneda (Binance Futures):</label>
+        
+        <div class="input-wrapper search-wrapper position-relative">
+          <input type="text" 
+                 formControlName="pair" 
+                 placeholder="Ej. PEPE, TIA, SOL..." 
+                 style="text-transform: uppercase;"
+                 (focus)="showAllTickers = true"
+                 (input)="filterTickers()">
+          <ion-icon name="search-outline"></ion-icon>
+
+          <!-- Custom Searchable Dropdown -->
+          <div class="custom-dropdown shadow-xl" *ngIf="showAllTickers">
+             <div class="dropdown-item d-flex justify-content-between align-items-center" 
+                  *ngFor="let t of filteredTickers.slice(0, 100)"
+                  (click)="selectSymbol(t.symbol)">
+               <span class="symbol-name fw-bold">{{ t.symbol }}</span>
+               <span class="text-xxs text-white-30 ms-2">Binance Perpetuo</span>
+               <span class="ms-auto text-xs" [ngClass]="t.priceChangePercent >= 0 ? 'text-success' : 'text-danger'">
+                 {{ t.priceChangePercent >=0 ? '+' : '' }}{{ t.priceChangePercent | number:'1.2-2' }}%
+               </span>
+             </div>
+             <div *ngIf="filteredTickers.length === 0" class="p-3 text-center text-white-30 text-xs">
+               Sin resultados...
+             </div>
+          </div>
+          
+          <!-- Close Backdrop -->
+          <div class="dropdown-backdrop" *ngIf="showAllTickers" (click)="showAllTickers = false"></div>
         </div>
       </div>
 
@@ -221,6 +243,45 @@ import { ToasterService } from '@abp/ng.theme.shared';
       &:disabled { opacity: 0.6; cursor: not-allowed; }
     }
 
+    .search-wrapper {
+      position: relative;
+      input { padding-left: 36px !important; }
+      ion-icon { left: 12px !important; right: auto !important; color: #3b82f6 !important; z-index: 2; }
+    }
+
+    .custom-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: #1c2128;
+      border: 1px solid #30363d;
+      border-top: none;
+      border-radius: 0 0 12px 12px;
+      max-height: 280px;
+      overflow-y: auto;
+      z-index: 2000;
+      margin-top: -2px;
+      
+      .dropdown-item {
+        padding: 10px 14px;
+        cursor: pointer;
+        transition: background 0.2s;
+        border-bottom: 1px solid rgba(255,255,255,0.03);
+        
+        &:last-child { border-bottom: none; }
+        &:hover { background: rgba(59, 130, 246, 0.1); }
+        
+        .symbol-name { color: #f0f6fc; }
+      }
+    }
+
+    .dropdown-backdrop {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      z-index: 1000;
+    }
+
     .animate-spin {
       animation: spin 1s linear infinite;
     }
@@ -230,10 +291,9 @@ import { ToasterService } from '@abp/ng.theme.shared';
 export class CreateBotFormComponent {
   private botSignalRService = inject(BotSignalRService);
   private freqtradeService = inject(FreqtradeService);
+  private marketDataService = inject(MarketDataService);
   private toaster = inject(ToasterService);
 
-  activePairs = this.botSignalRService.activePairs;
-  
   botForm = new FormGroup({
     type: new FormControl('VergeFreqAIStrategy'),
     pair: new FormControl('', Validators.required),
@@ -248,18 +308,43 @@ export class CreateBotFormComponent {
   private isInitialized = false;
 
   constructor() {
-    addIcons({ chevronDownOutline, informationCircleOutline, syncOutline });
+    addIcons({ chevronDownOutline, informationCircleOutline, syncOutline, searchOutline });
     
-    // Inicialización inteligente: solo la primera vez que vienen pares
+    // Sugerir SOLUSDT por defecto si está vacío
     effect(() => {
-      const pairs = this.activePairs();
       const currentPair = this.botForm.get('pair')?.value;
-      if (pairs.length > 0 && !this.isInitialized && !currentPair) {
-        console.log(`[CreateBot] 🚀 Inicialización de par por defecto: ${pairs[0].symbol}`);
-        this.botForm.patchValue({ pair: pairs[0].symbol });
+      if (!this.isInitialized && !currentPair) {
+        this.botForm.patchValue({ pair: 'SOLUSDT' });
         this.isInitialized = true;
       }
     }, { allowSignalWrites: true });
+
+    this.loadTickers();
+  }
+
+  tickers: SymbolTickerDto[] = [];
+  filteredTickers: SymbolTickerDto[] = [];
+  showAllTickers = false;
+
+  private loadTickers() {
+    this.marketDataService.getTickers().subscribe(data => {
+      this.tickers = data;
+      this.filterTickers();
+    });
+  }
+
+  filterTickers() {
+    const term = (this.botForm.get('pair')?.value || '').toUpperCase();
+    if (!term) {
+      this.filteredTickers = this.tickers.slice(0, 100);
+    } else {
+      this.filteredTickers = this.tickers.filter(t => t.symbol.includes(term));
+    }
+  }
+
+  selectSymbol(symbol: string) {
+    this.botForm.patchValue({ pair: symbol });
+    this.showAllTickers = false;
   }
 
   trackPair(index: number, item: any) {
@@ -283,11 +368,11 @@ export class CreateBotFormComponent {
     const formVal = this.botForm.value;
     const pair = formVal.pair!;
 
-    if (confirm(`¿Iniciar motor Freqtrade para ${pair}?`)) {
+    if (confirm(`¿Iniciar motor Freqtrade para ${pair.toUpperCase()}?`)) {
       this.isLoading = true;
       
       const input: FreqtradeCreateBotDto = {
-        pair: pair,
+        pair: pair.toUpperCase(),
         timeframe: formVal.timeframe!,
         stakeAmount: formVal.stakeAmount!,
         tpPercent: formVal.tp!,

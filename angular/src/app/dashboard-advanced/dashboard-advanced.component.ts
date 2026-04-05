@@ -124,9 +124,10 @@ export class DashboardAdvancedComponent implements AfterViewInit, OnDestroy {
   fetchRealStatus() {
     this.freqtradeService.getStatus().subscribe({
       next: (status) => {
-        if (status.currentPair && status.currentPair !== 'Offline' && status.currentPair !== 'No configurado') {
-          this.activeTrade.crypto = status.currentPair;
-          this.selectedChart = status.currentPair;
+        if (status.activePairs && status.activePairs.length > 0) {
+          const firstPair = status.activePairs[0];
+          this.activeTrade.crypto = firstPair;
+          this.selectedChart = firstPair;
         }
       },
       error: () => {}

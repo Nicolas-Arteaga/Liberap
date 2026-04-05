@@ -969,37 +969,21 @@
                   }
                 },
                 {
-                  "name": "ForceEnterAsync",
+                  "name": "ResumeBotAsync",
+                  "parametersOnMethod": [],
+                  "returnValue": {
+                    "type": "System.Void",
+                    "typeSimple": "System.Void"
+                  }
+                },
+                {
+                  "name": "DeleteBotAsync",
                   "parametersOnMethod": [
                     {
                       "name": "pair",
                       "typeAsString": "System.String, System.Private.CoreLib",
                       "type": "System.String",
                       "typeSimple": "string",
-                      "isOptional": false,
-                      "defaultValue": null
-                    },
-                    {
-                      "name": "side",
-                      "typeAsString": "System.String, System.Private.CoreLib",
-                      "type": "System.String",
-                      "typeSimple": "string",
-                      "isOptional": false,
-                      "defaultValue": null
-                    },
-                    {
-                      "name": "stakeAmount",
-                      "typeAsString": "System.Decimal, System.Private.CoreLib",
-                      "type": "System.Decimal",
-                      "typeSimple": "number",
-                      "isOptional": false,
-                      "defaultValue": null
-                    },
-                    {
-                      "name": "leverage",
-                      "typeAsString": "System.Int32, System.Private.CoreLib",
-                      "type": "System.Int32",
-                      "typeSimple": "number",
                       "isOptional": false,
                       "defaultValue": null
                     }
@@ -1267,6 +1251,58 @@
                   "jsonName": null,
                   "type": "System.Int32",
                   "typeSimple": "number",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "System.Void",
+                "typeSimple": "System.Void"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Freqtrade.FreqtradeAppService"
+            },
+            "ResumeBotAsync": {
+              "uniqueName": "ResumeBotAsync",
+              "name": "ResumeBotAsync",
+              "httpMethod": "POST",
+              "url": "api/app/freqtrade/resume-bot",
+              "supportedVersions": [],
+              "parametersOnMethod": [],
+              "parameters": [],
+              "returnValue": {
+                "type": "System.Void",
+                "typeSimple": "System.Void"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Freqtrade.IFreqtradeAppService"
+            },
+            "DeleteBotAsyncByPair": {
+              "uniqueName": "DeleteBotAsyncByPair",
+              "name": "DeleteBotAsync",
+              "httpMethod": "DELETE",
+              "url": "api/app/freqtrade/bot",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "pair",
+                  "typeAsString": "System.String, System.Private.CoreLib",
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "pair",
+                  "name": "pair",
+                  "jsonName": null,
+                  "type": "System.String",
+                  "typeSimple": "string",
                   "isOptional": false,
                   "defaultValue": null,
                   "constraintTypes": null,
@@ -7883,10 +7919,10 @@
           "regex": null
         },
         {
-          "name": "CurrentPair",
+          "name": "ActivePairs",
           "jsonName": null,
-          "type": "System.String",
-          "typeSimple": "string",
+          "type": "[System.String]",
+          "typeSimple": "[string]",
           "isRequired": false,
           "minLength": null,
           "maxLength": null,

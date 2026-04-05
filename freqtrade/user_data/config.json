@@ -46,7 +46,8 @@
     },
     "sandbox": true,
     "pair_whitelist": [
-      "XRP/USDT:USDT"
+      "SIREN/USDT:USDT",
+      "EDGE/USDT:USDT"
     ],
     "pair_blacklist": [
       "BNB/.*"
@@ -69,7 +70,7 @@
     }
   ],
   "freqai": {
-    "enabled": false,
+    "enabled": true,
     "purge_old_models": true,
     "train_period_days": 30,
     "backtest_period_days": 7,

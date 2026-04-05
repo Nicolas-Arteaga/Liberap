@@ -18,7 +18,7 @@ export interface FreqtradeProfitDto {
 
 export interface FreqtradeStatusDto {
   isRunning: boolean;
-  currentPair?: string;
+  activePairs: string[];
   openTradesCount: number;
   runtimeSeconds: number;
 }

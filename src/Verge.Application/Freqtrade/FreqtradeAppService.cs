@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Verge.Freqtrade.Hubs;
 using Volo.Abp;
@@ -96,6 +97,9 @@ namespace Verge.Freqtrade
 
             if (File.Exists(configPath))
             {
+                var flagPath = Path.Combine(Path.GetDirectoryName(configPath) ?? string.Empty, "bot_deleted.flag");
+                if (File.Exists(flagPath)) File.Delete(flagPath);
+
                 var json = await File.ReadAllTextAsync(configPath);
                 using var doc = JsonDocument.Parse(json);
                 var root = doc.RootElement.Clone();
@@ -168,7 +172,21 @@ namespace Verge.Freqtrade
                             }
                             
                             Console.WriteLine($"[Freqtrade] 🔄 Normalizando par: {input.Pair} -> {pair}");
-                            exchangeDict["pair_whitelist"] = new List<string> { pair };
+                            
+                            var currentPairs = new List<string>();
+                            if (exchangeDict.TryGetValue("pair_whitelist", out var currentObj))
+                            {
+                                try {
+                                    var arr = JsonSerializer.Deserialize<List<string>>(JsonSerializer.Serialize(currentObj));
+                                    if (arr != null) currentPairs = arr;
+                                } catch { /* Ignore parse error */ }
+                            }
+                            
+                            if (!currentPairs.Contains(pair)) {
+                                currentPairs.Add(pair);
+                            }
+                            
+                            exchangeDict["pair_whitelist"] = currentPairs;
                             configDict["exchange"] = exchangeDict;
                         }
                     }
@@ -236,10 +254,10 @@ namespace Verge.Freqtrade
         {
             var client = await GetClientAsync();
             if (client == null)
-                return new FreqtradeStatusDto { IsRunning = false, CurrentPair = "Offline", OpenTradesCount = 0, RuntimeSeconds = 0 };
+                return new FreqtradeStatusDto { IsRunning = false, ActivePairs = new List<string>(), OpenTradesCount = 0, RuntimeSeconds = 0 };
             
             bool isRunning = false;
-            string currentPair = "No configurado";
+            var activePairs = new List<string>();
             try
             {
                 var configResponse = await client.GetAsync("/api/v1/show_config");
@@ -251,19 +269,25 @@ namespace Verge.Freqtrade
                     isRunning = statusStr == "running";
                 }
 
-                // Extraer current pair desde el archivo config.json directamente
+                // Extraer current pairs desde el archivo config.json directamente
                 var configPath = Path.Combine(Directory.GetCurrentDirectory(), "..", "Verge.HttpApi.Host", "freqtrade", "user_data", "config.json");
                 if (!File.Exists(configPath)) configPath = @"C:\Users\Nicolas\Desktop\Verge\Verge\freqtrade\user_data\config.json";
-                if (File.Exists(configPath))
+                
+                var flagPath = Path.Combine(Path.GetDirectoryName(configPath) ?? string.Empty, "bot_deleted.flag");
+
+                if (!File.Exists(flagPath) && File.Exists(configPath))
                 {
                     var json = await File.ReadAllTextAsync(configPath);
                     using var doc = JsonDocument.Parse(json);
                     if (doc.RootElement.TryGetProperty("exchange", out var exchangeObj) && 
                         exchangeObj.TryGetProperty("pair_whitelist", out var whitelist) &&
-                        whitelist.ValueKind == JsonValueKind.Array &&
-                        whitelist.GetArrayLength() > 0)
+                        whitelist.ValueKind == JsonValueKind.Array)
                     {
-                        currentPair = whitelist[0].GetString() ?? "Multiple";
+                        foreach (var p in whitelist.EnumerateArray())
+                        {
+                            var s = p.GetString();
+                            if (!string.IsNullOrEmpty(s)) activePairs.Add(s);
+                        }
                     }
                 }
             }
@@ -286,7 +310,7 @@ namespace Verge.Freqtrade
             return new FreqtradeStatusDto
             {
                 IsRunning = isRunning,
-                CurrentPair = currentPair,
+                ActivePairs = activePairs,
                 OpenTradesCount = openTradesCount,
                 RuntimeSeconds = 0
             };
@@ -369,11 +393,13 @@ namespace Verge.Freqtrade
             var client = await GetClientAsync();
             if (client == null) throw new UserFriendlyException("Freqtrade está offline.");
 
-            // Asegurar que siempre usamos el par configurado activo en lugar de depender del UI
-            var status = await GetStatusAsync();
-            if (!string.IsNullOrEmpty(status.CurrentPair) && status.CurrentPair != "Offline" && status.CurrentPair != "No configurado")
+            // Enviar comando FORCEENTER para el par solicitado
+            // Freqtrade API espera { "pair": "ETH/USDT:USDT", "side": "long/short", "stakeamount": 100, "leverage": 10 }
+            
+            // Si el par no tiene formato Freqtrade, intentamos normalizarlo
+            if (!pair.Contains("/"))
             {
-                pair = status.CurrentPair;
+                if (pair.EndsWith("USDT")) pair = pair.Replace("USDT", "/USDT:USDT");
             }
             
             var payload = new Dictionary<string, object> 
@@ -392,6 +418,100 @@ namespace Verge.Freqtrade
                 var error = await response.Content.ReadAsStringAsync();
                 Console.WriteLine($"[Freqtrade ForceEnter] ERROR: {error}");
                 throw new UserFriendlyException($"Error de Binance al forzar {side} en {pair}: {error}");
+            }
+        }
+
+        public async Task ResumeBotAsync()
+        {
+            var client = await GetClientAsync();
+            if (client == null) throw new UserFriendlyException("Freqtrade está offline.");
+            
+            var response = await client.PostAsync("/api/v1/start", new StringContent("{}", Encoding.UTF8, "application/json"));
+            if (response.IsSuccessStatusCode)
+                await _botHubContext.Clients.All.SendAsync("BotStatusChanged", "running");
+            else 
+            {
+                var err = await response.Content.ReadAsStringAsync();
+                throw new UserFriendlyException($"Error al reanudar el motor de Freqtrade: {err}");
+            }
+        }
+
+        public async Task DeleteBotAsync(string pair)
+        {
+            var configPath = Path.Combine(Directory.GetCurrentDirectory(), "..", "Verge.HttpApi.Host", "freqtrade", "user_data", "config.json");
+            if (!File.Exists(configPath)) configPath = @"C:\Users\Nicolas\Desktop\Verge\Verge\freqtrade\user_data\config.json";
+            
+            var dbPath = Path.Combine(Directory.GetCurrentDirectory(), "..", "Verge.HttpApi.Host", "freqtrade", "user_data", "tradesv3.sqlite");
+            if (!File.Exists(dbPath)) dbPath = @"C:\Users\Nicolas\Desktop\Verge\Verge\freqtrade\user_data\tradesv3.sqlite";
+
+            var flagPath = Path.Combine(Path.GetDirectoryName(configPath) ?? string.Empty, "bot_deleted.flag");
+
+            var client = await GetClientAsync();
+            if (client != null) 
+            {
+                int remainingPairs = 0;
+                
+                // 1. Remover el par específico del Config
+                if (File.Exists(configPath))
+                {
+                    var json = await File.ReadAllTextAsync(configPath);
+                    var configDict = JsonSerializer.Deserialize<Dictionary<string, object>>(json);
+                    if (configDict != null && configDict.ContainsKey("exchange"))
+                    {
+                        var exchangeJson = JsonSerializer.Serialize(configDict["exchange"]);
+                        var exchangeDict = JsonSerializer.Deserialize<Dictionary<string, object>>(exchangeJson);
+                        if (exchangeDict != null)
+                        {
+                            var currentPairs = new List<string>();
+                            if (exchangeDict.TryGetValue("pair_whitelist", out var currentObj))
+                            {
+                                try {
+                                    var arr = JsonSerializer.Deserialize<List<string>>(JsonSerializer.Serialize(currentObj));
+                                    if (arr != null) currentPairs = arr;
+                                } catch { /* Ignore parse error */ }
+                            }
+                            
+                            if (currentPairs.Contains(pair)) {
+                                currentPairs.Remove(pair);
+                            }
+                            remainingPairs = currentPairs.Count;
+                            
+                            exchangeDict["pair_whitelist"] = currentPairs;
+                            configDict["exchange"] = exchangeDict;
+                            var updatedJson = JsonSerializer.Serialize(configDict, new JsonSerializerOptions { WriteIndented = true });
+                            await File.WriteAllTextAsync(configPath, updatedJson);
+                        }
+                    }
+                }
+
+                if (remainingPairs == 0)
+                {
+                    // No quedan pares: hard stop y limpieza total.
+                    Console.WriteLine("[Freqtrade] STOPPING Bot for Hard Deletion (No pairs left)...");
+                    await client.PostAsync("/api/v1/stop", new StringContent("{}", Encoding.UTF8, "application/json"));
+                    await Task.Delay(1500);
+
+                    await File.WriteAllTextAsync(flagPath, "true");
+                    Console.WriteLine("[Freqtrade] bot_deleted.flag creado.");
+
+                    try {
+                        if (File.Exists(dbPath)) {
+                            File.Delete(dbPath);
+                            Console.WriteLine("[Freqtrade] tradesv3.sqlite eliminado (Historial purgado).");
+                        }
+                    } catch(Exception e) {
+                        Console.WriteLine("[Freqtrade] Warning: No se pudo purgar tradesv3.sqlite: " + e.Message);
+                    }
+                }
+                else
+                {
+                    // Aún hay bots corriendo, solo recargamos
+                    Console.WriteLine($"[Freqtrade] Bot removido. Recargando Freqtrade con los restantes {remainingPairs} pares...");
+                    await client.PostAsync("/api/v1/reload_config", new StringContent("{}", Encoding.UTF8, "application/json"));
+                    await Task.Delay(1000);
+                }
+
+                await _botHubContext.Clients.All.SendAsync("BotStatusChanged", "deleted");
             }
         }
     }

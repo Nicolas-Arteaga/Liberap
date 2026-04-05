@@ -59,6 +59,21 @@ export class BotComponent implements OnInit, OnDestroy {
       console.log(`[BotComponent] SignalR status flip: ${status}. Refreshing poll...`);
       this.freqtradePollService.refresh();
     });
+
+    // Sincronizar selección de gráfico con el servicio de polling
+    this.freqtradePollService.selectedPair$.subscribe(pair => {
+      if (pair) {
+        const barePair = pair.replace('/USDT:USDT', 'USDT').replace('/', '');
+        const found = this.activePairs().find(p => p.symbol === barePair);
+        if (found) {
+          // Encontrar la orden simulada correspondiente si existe, o usar el ID del objeto
+          const order = this.botOrderService.orders().find(o => o.symbol === found.symbol);
+          if (order) {
+            this.botOrderService.selectBot(order.id);
+          }
+        }
+      }
+    });
   }
 
   ngOnInit(): void {

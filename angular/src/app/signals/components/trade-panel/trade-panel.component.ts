@@ -1,137 +1,24 @@
-import { Component, Input, inject, computed, ViewChild, ElementRef, AfterViewInit, OnDestroy, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, Input, inject, ViewChild, ElementRef, AfterViewInit, OnDestroy, OnChanges, SimpleChanges, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { IonIcon } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { statsChartOutline, trendingUpOutline, trendingDownOutline, optionsOutline, listOutline } from 'ionicons/icons';
+import { statsChartOutline, trendingUpOutline, trendingDownOutline, optionsOutline, listOutline, searchOutline, chevronDownOutline, chevronBackOutline, chevronForwardOutline, timeOutline, globeOutline, water, flame, settingsOutline, shieldCheckmark, closeOutline } from 'ionicons/icons';
 import { createChart, IChartApi, ISeriesApi, CandlestickData, CandlestickSeries, LineSeries } from 'lightweight-charts';
-import { PairBotInfo, SimulatedOrder } from '../../models/bot.models';
+import { PairBotInfo } from '../../models/bot.models';
 import { BotOrderService } from '../../services/bot-order.service';
 import { MarketDataService } from '../../../proxy/trading/market-data.service';
-import { Subject, takeUntil } from 'rxjs';
+import { SymbolTickerDto } from '../../../proxy/trading/models';
+import { Subject, takeUntil, interval, Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-trade-panel',
   standalone: true,
-  imports: [CommonModule, IonIcon],
-  template: `
-    <div class="institutional-chart-container">
-      <div class="chart-header">
-        <div class="left">
-          <span class="label">Bot Signal:</span>
-          <span class="signal-value" [ngClass]="pair?.recommendedAction | lowercase">
-            {{ pair?.recommendedAction }}
-          </span>
-        </div>
-        <div class="right">
-          <span class="score-badge">+8</span>
-          <ion-icon name="options-outline"></ion-icon>
-          <ion-icon name="list-outline"></ion-icon>
-        </div>
-      </div>
-
-      <div class="confidence-info">
-        <span class="label">Confianza:</span>
-        <span class="value success">{{ pair?.score }}%</span>
-      </div>
-
-      <div class="tags-row">
-        <span class="tag"><span class="dot green"></span> Whale accumulation</span>
-        <span class="tag"><span class="dot green"></span> RSI oversold</span>
-        <span class="tag"><span class="dot blue"></span> Breakout micro range</span>
-      </div>
-
-      <div class="chart-wrapper">
-        <div #chartContainer class="full-chart"></div>
-      </div>
-    </div>
-  `,
-  styles: [`
-    .institutional-chart-container {
-      background: rgba(21, 26, 38, 0.6);
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      border-radius: 12px;
-      padding: 20px;
-      color: white;
-    }
-
-    .chart-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-
-      .left {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-        .label { font-size: 14px; color: #8b949e; font-weight: 600; }
-        .signal-value {
-          font-size: 14px;
-          font-weight: 800;
-          &.long { color: #22c55e; }
-          &.short { color: #ef4444; }
-          &.wait { color: #f59e0b; }
-        }
-      }
-
-      .right {
-        display: flex;
-        gap: 12px;
-        align-items: center;
-        color: #8b949e;
-        
-        .score-badge {
-          background: rgba(38, 166, 154, 0.2);
-          color: #26a69a;
-          padding: 2px 8px;
-          border-radius: 4px;
-          font-size: 12px;
-          font-weight: 700;
-        }
-      }
-    }
-
-    .confidence-info {
-      margin-bottom: 12px;
-      font-size: 14px;
-      .label { color: #8b949e; }
-      .value.success { color: #22c55e; font-weight: 700; margin-left: 8px; }
-    }
-
-    .tags-row {
-      display: flex;
-      gap: 16px;
-      margin-bottom: 20px;
-      
-      .tag {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 12px;
-        color: #f0f6fc;
-        
-        .dot {
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          &.green { background: #22c55e; box-shadow: 0 0 6px rgba(34, 197, 94, 0.5); }
-          &.blue { background: #3b82f6; box-shadow: 0 0 6px rgba(59, 130, 246, 0.5); }
-        }
-      }
-    }
-
-    .chart-wrapper {
-      height: 380px;
-      width: 100%;
-      background: #0d1117;
-      border-radius: 8px;
-      overflow: hidden;
-      
-      .full-chart { width: 100%; height: 100%; }
-    }
-  `]
+  imports: [CommonModule, IonIcon, FormsModule],
+  templateUrl: './trade-panel.component.html',
+  styleUrls: ['./trade-panel.component.scss']
 })
-export class TradePanelComponent implements AfterViewInit, OnDestroy, OnChanges {
+export class TradePanelComponent implements OnInit, AfterViewInit, OnDestroy, OnChanges {
   @Input() pair: PairBotInfo | null = null;
   @ViewChild('chartContainer') chartContainer!: ElementRef;
   
@@ -141,19 +28,64 @@ export class TradePanelComponent implements AfterViewInit, OnDestroy, OnChanges 
   private chart: IChartApi | null = null;
   private candlestickSeries: ISeriesApi<'Candlestick'> | null = null;
   private hmaSeries: ISeriesApi<'Line'> | null = null;
+  private ma7Series: ISeriesApi<'Line'> | null = null;
+  private ma25Series: ISeriesApi<'Line'> | null = null;
+  private ma99Series: ISeriesApi<'Line'> | null = null;
+
+  // Searcher State
+  selectedSymbol = 'BTCUSDT';
+  selectedTimeframe = '15m'; 
+  hmaPeriod = 50;
+  searchTerm = '';
+  showSymbolSelector = false;
+  tickers: SymbolTickerDto[] = [];
+  filteredTickers: SymbolTickerDto[] = [];
+  selectedTicker?: SymbolTickerDto;
+  tickerSubscription?: Subscription;
+
+  timeframes = [
+    { value: '1m', label: '1m' },
+    { value: '3m', label: '3m' },
+    { value: '5m', label: '5m' },
+    { value: '15m', label: '15m' },
+    { value: '30m', label: '30m' },
+    { value: '1h', label: '1h' },
+    { value: '2h', label: '2h' },
+    { value: '4h', label: '4h' },
+    { value: '1d', label: '1d' },
+    { value: '1w', label: '1w' },
+    { value: '1M', label: '1M' }
+  ];
 
   constructor() {
-    addIcons({ statsChartOutline, trendingUpOutline, trendingDownOutline, optionsOutline, listOutline });
+    addIcons({ 
+      statsChartOutline, trendingUpOutline, trendingDownOutline, 
+      optionsOutline, listOutline, searchOutline, chevronDownOutline,
+      chevronBackOutline, chevronForwardOutline, timeOutline, 
+      globeOutline, water, flame, settingsOutline, shieldCheckmark, closeOutline 
+    });
+  }
+
+  ngOnInit() {
+    this.loadTickers();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['pair'] && !changes['pair'].firstChange) {
-      this.loadData();
+    if (changes['pair'] && changes['pair'].currentValue) {
+      const newPair = changes['pair'].currentValue as PairBotInfo;
+      // Normalizar par: XRP/USDT:USDT -> XRPUSDT
+      const clean = newPair.symbol.split(':')[0].replace('/', '');
+      if (clean !== this.selectedSymbol) {
+        this.selectedSymbol = clean;
+        this.updateSelectedTicker();
+        this.loadData();
+      }
     }
   }
 
   ngAfterViewInit(): void {
-    this.initChart();
+    // Timeout para asegurar que el container tenga dimensiones
+    setTimeout(() => this.initChart(), 0);
   }
 
   ngOnDestroy(): void {
@@ -170,33 +102,41 @@ export class TradePanelComponent implements AfterViewInit, OnDestroy, OnChanges 
 
     this.chart = createChart(this.chartContainer.nativeElement, {
       width: this.chartContainer.nativeElement.clientWidth,
-      height: 380,
+      height: 480,
       layout: {
         background: { color: '#0d1117' },
-        textColor: '#8b949e',
+        textColor: '#d1d4dc',
       },
       grid: {
-        vertLines: { color: 'rgba(42, 46, 57, 0.1)' },
-        horzLines: { color: 'rgba(42, 46, 57, 0.1)' },
+        vertLines: { color: 'rgba(42, 46, 57, 0.2)' },
+        horzLines: { color: 'rgba(42, 46, 57, 0.2)' },
+      },
+      rightPriceScale: {
+        borderColor: 'rgba(197, 203, 206, 0.8)',
       },
       timeScale: {
-        borderColor: 'rgba(197, 203, 206, 0.2)',
+        borderColor: 'rgba(197, 203, 206, 0.8)',
         timeVisible: true,
       },
     });
 
     this.candlestickSeries = this.chart.addSeries(CandlestickSeries, {
-      upColor: '#22c55e',
-      downColor: '#ef4444',
+      upColor: '#26a69a',
+      downColor: '#ef5350',
       borderVisible: false,
-      wickUpColor: '#22c55e',
-      wickDownColor: '#ef4444',
+      wickUpColor: '#26a69a',
+      wickDownColor: '#ef5350',
     });
 
     this.hmaSeries = this.chart.addSeries(LineSeries, {
       color: '#3b82f6',
       lineWidth: 2,
+      lastValueVisible: true,
     });
+
+    this.ma7Series = this.chart.addSeries(LineSeries, { color: '#fadb14', lineWidth: 1 });
+    this.ma25Series = this.chart.addSeries(LineSeries, { color: '#ba55d3', lineWidth: 1 });
+    this.ma99Series = this.chart.addSeries(LineSeries, { color: '#722ed1', lineWidth: 1 });
 
     this.loadData();
 
@@ -208,39 +148,97 @@ export class TradePanelComponent implements AfterViewInit, OnDestroy, OnChanges 
     resizeObserver.observe(this.chartContainer.nativeElement);
   }
 
+  loadTickers() {
+    this.marketDataService.getTickers().subscribe({
+      next: (data) => {
+        this.tickers = data;
+        this.filterTickers();
+        this.updateSelectedTicker();
+      },
+      error: (err) => console.error('[TradePanel] Error loading tickers', err)
+    });
+  }
+
+  filterTickers() {
+    const term = (this.searchTerm || '').toUpperCase();
+    if (!term) {
+      // Priorizar monedas con mayor volumen o simplemente las top 50 de Binance
+      this.filteredTickers = this.tickers.slice(0, 50);
+    } else {
+      this.filteredTickers = this.tickers
+        .filter(t => t.symbol.includes(term))
+        .sort((a, b) => {
+          // Si empieza con el término, va primero
+          if (a.symbol.startsWith(term) && !b.symbol.startsWith(term)) return -1;
+          if (!a.symbol.startsWith(term) && b.symbol.startsWith(term)) return 1;
+          return a.symbol.localeCompare(b.symbol);
+        })
+        .slice(0, 50);
+    }
+  }
+
+  updateSelectedTicker() {
+    this.selectedTicker = this.tickers.find(t => t.symbol === this.selectedSymbol);
+  }
+
+  selectSymbol(symbol: string) {
+    this.selectedSymbol = symbol;
+    this.showSymbolSelector = false;
+    this.updateSelectedTicker();
+    this.loadData();
+  }
+
+  onTimeframeChange(tf: string) {
+    this.selectedTimeframe = tf;
+    this.loadData();
+  }
+
+  onHmaChange() {
+    this.loadData();
+  }
+
   private loadData() {
-    if (!this.pair || !this.candlestickSeries) return;
+    if (!this.candlestickSeries) return;
     
-    const cleanSymbol = this.pair.symbol.split(':')[0].replace('/', '');
-    
+    // El Dashboard usa el timeframe sin el 'm' para la API
+    const intervalArg = this.selectedTimeframe.replace('m', '');
+
     this.marketDataService.getCandles({
-      symbol: cleanSymbol,
-      interval: '1m', // As seen in image
-      limit: 100
+      symbol: this.selectedSymbol,
+      interval: intervalArg, 
+      limit: 1000
     }).pipe(takeUntil(this.destroy$)).subscribe(data => {
-      if (this.candlestickSeries && data.length > 0) {
+      if (this.candlestickSeries && data && data.length > 0) {
         const sortedData = data.map(d => ({
-          time: d.time,
+          time: d.time as any,
           open: d.open,
           high: d.high,
           low: d.low,
           close: d.close
-        } as CandlestickData)).sort((a, b) => (a.time as number) - (b.time as number));
+        })).sort((a, b) => a.time - b.time);
         
         this.candlestickSeries.setData(sortedData);
         
-        if (this.hmaSeries) {
-          const maData = sortedData.map((d, i) => {
-            if (i < 20) return null;
-            const slice = sortedData.slice(i - 20, i);
-            const sum = slice.reduce((acc, val) => acc + val.close, 0);
-            return { time: d.time, value: sum / 20 };
-          }).filter(d => d !== null) as any[];
-          this.hmaSeries.setData(maData);
-        }
+        this.updateMA(sortedData, this.hmaPeriod, this.hmaSeries!);
+        this.updateMA(sortedData, 7, this.ma7Series!);
+        this.updateMA(sortedData, 25, this.ma25Series!);
+        this.updateMA(sortedData, 99, this.ma99Series!);
 
         this.chart?.timeScale().fitContent();
       }
     });
+  }
+
+  private updateMA(data: any[], period: number, series: ISeriesApi<'Line'>) {
+    if (!series) return;
+    const maData = data.map((d, i) => {
+      if (i < period) return null;
+      let sum = 0;
+      for (let j = 0; j < period; j++) {
+        sum += data[i - j].close;
+      }
+      return { time: d.time, value: sum / period };
+    }).filter(d => d !== null);
+    series.setData(maData as any[]);
   }
 }
