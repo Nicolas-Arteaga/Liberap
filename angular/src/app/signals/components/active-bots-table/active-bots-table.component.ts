@@ -27,15 +27,19 @@ import { ToasterService } from '@abp/ng.theme.shared';
           <tbody>
             <!-- Real Open Trades List -->
             <tr *ngFor="let trade of pollService.openTrades$ | async; let i = index" 
-                [class.selected]="(pollService.selectedTradeId$ | async) === trade.id || (pollService.selectedPair$ | async) === trade.pair">
-              <td class="name-cell">Trade Abierto #{{ trade.id }}</td>
+                [class.selected]="(pollService.selectedTradeId$ | async) === trade.id">
+              <td class="name-cell">Trade #{{ trade.id }}</td>
               <td>{{ trade.pair.replace('/USDT:USDT', 'USDT') }}</td>
-              <td>Posición Activa</td>
               <td>
-                <span class="status-text running">Open</span>
+                <span class="type-badge" [class.long]="!trade.isShort" [class.short]="trade.isShort">
+                  {{ trade.isShort ? 'SHORT' : 'LONG' }}
+                </span>
+              </td>
+              <td>
+                <span class="status-badge open">OPEN</span>
               </td>
               <td class="pnl-cell" [class.positive]="trade.pnl >= 0" [class.negative]="trade.pnl < 0">
-                {{ trade.pnl >= 0 ? '+' : '' }}{{ trade.pnl | number:'1.2-2' }}$
+                {{ trade.pnl >= 0 ? '+' : '' }}{{ trade.pnl | number:'1.2-2' }} USDT
               </td>
               <td class="actions-cell">
                 <button class="btn-ver" (click)="viewTrade(trade.id, trade.pair)">Ver</button>
@@ -43,27 +47,14 @@ import { ToasterService } from '@abp/ng.theme.shared';
               </td>
             </tr>
 
-            <!-- Standby Motor Rows for each active pair -->
-            <ng-container *ngIf="pollService.status$ | async as status">
-              <tr *ngFor="let pair of status.activePairs" 
-                  [class.selected]="(pollService.selectedPair$ | async) === pair && !(pollService.selectedTradeId$ | async)">
-                <td class="name-cell">Motor Scanner</td>
-                <td>{{ pair.replace('/USDT:USDT', 'USDT') }}</td>
-                <td>FreqAI Scanner</td>
-                <td>
-                  <span class="status-text" [class.running]="status.isRunning" [class.paused]="!status.isRunning">
-                    {{ status.isRunning ? 'Analizando...' : 'Detenido' }}
-                  </span>
-                </td>
-                <td class="pnl-cell text-muted">0.00$</td>
-                <td class="actions-cell">
-                   <button class="btn-ver" (click)="viewPair(pair)">Ver</button>
-                </td>
-              </tr>
-              <tr *ngIf="status.activePairs.length === 0 && (pollService.openTrades$ | async)?.length === 0">
-                <td colspan="6" class="text-center text-muted" style="padding: 20px;">No hay bots configurados.</td>
-              </tr>
-            </ng-container>
+            <tr *ngIf="(pollService.openTrades$ | async)?.length === 0">
+              <td colspan="6" class="text-center text-muted" style="padding: 40px;">
+                <div class="empty-trades">
+                  <span class="d-block mb-1">Sin posiciones abiertas.</span>
+                  <span class="text-xxs">El bot está analizando el mercado en busca de oportunidades.</span>
+                </div>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -100,11 +91,21 @@ import { ToasterService } from '@abp/ng.theme.shared';
 
     .name-cell { font-weight: 600; color: #f0f6fc; }
 
-    .status-text {
-      font-weight: 600;
-      &.running { color: #22c55e; }
-      &.paused { color: #ef4444; }
-      &.stopped { color: #8b949e; }
+    .type-badge {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      &.long { background: rgba(34, 197, 94, 0.1); color: #22c55e; }
+      &.short { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+    }
+
+    .status-badge {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 800;
+      &.open { background: #3b82f6; color: white; }
     }
 
     .pnl-cell {
@@ -112,6 +113,11 @@ import { ToasterService } from '@abp/ng.theme.shared';
       font-size: 14px;
       &.positive { color: #22c55e; }
       &.negative { color: #ef4444; }
+    }
+    
+    .empty-trades {
+      opacity: 0.6;
+      .text-xxs { font-size: 10px; color: #8b949e; }
     }
     
     .text-muted { color: #8b949e !important; }
@@ -136,11 +142,8 @@ import { ToasterService } from '@abp/ng.theme.shared';
         &.btn-ver { background: #1c2230; color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3); }
         &.btn-ver:hover { background: rgba(59, 130, 246, 0.1); }
         
-        &.btn-stop { background: #eab308; color: #000; } /* yellow stop */
+        &.btn-stop { background: #ef4444; color: #fff; }
         &.btn-stop:hover { filter: brightness(1.1); }
-        
-        &.btn-resume { background: #1c2230; border: 1px solid rgba(255,255,255,0.1); color: #22c55e; }
-        &.btn-resume:hover { background: rgba(34, 197, 94, 0.1); border-color: rgba(34, 197, 94, 0.3); }
       }
     }
   `]

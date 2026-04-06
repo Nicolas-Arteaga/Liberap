@@ -202,6 +202,7 @@ public class CryptoAnalysisService : DomainService
         var recent = candles.Skip(Math.Max(0, candles.Count - 10)).ToList();
         var first = recent.First().Close;
         // If all 10 recent candles have the exact same price, it's a zombie/stagnant symbol
-        return recent.All(c => c.Close == first);
+        // Relaxed for now: Return false to ensure all symbols are analyzed as requested
+        return false; 
     }
 }

@@ -1,0 +1,115 @@
+.forzar-acciones-panel {
+  background: #11141d;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+  color: white;
+
+  h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: #e2e8f0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+  }
+
+  .signals-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+
+    th {
+      text-align: left;
+      color: #8b949e;
+      font-weight: 500;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 11px;
+    }
+
+    td {
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+      vertical-align: middle;
+    }
+
+    .pair-cell {
+      .pair-name {
+        display: block;
+        font-weight: 700;
+        color: #f8fafc;
+      }
+      .bot-label {
+        display: block;
+        font-size: 10px;
+        color: #8b949e;
+      }
+    }
+
+    .score-badge {
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.05);
+      font-weight: 700;
+      color: #facc15; // Yellow default
+
+      &.high {
+        color: #22c55e; // Green
+        background: rgba(34, 197, 94, 0.1);
+      }
+      &.low {
+        color: #ef4444; // Red
+        background: rgba(239, 68, 68, 0.1);
+      }
+    }
+
+    .actions-cell {
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+
+      button {
+        padding: 5px 12px;
+        border-radius: 6px;
+        border: none;
+        font-size: 11px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+        color: white;
+
+        &.btn-force-long {
+          background: #22c55e;
+          &:hover:not([disabled]) {
+            background: #16a34a;
+            transform: translateY(-1px);
+          }
+        }
+
+        &.btn-force-short {
+          background: #ef4444;
+          &:hover:not([disabled]) {
+            background: #dc2626;
+            transform: translateY(-1px);
+          }
+        }
+
+        &:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+        }
+      }
+    }
+  }
+
+  &.empty {
+    opacity: 0.7;
+  }
+}
+
+.text-muted {
+  color: #8b949e;
+}

@@ -10,6 +10,9 @@ namespace Verge.Freqtrade
         public decimal OpenRate { get; set; }
         public decimal CurrentRate { get; set; }
         public decimal Pnl { get; set; }
+        public decimal ProfitPercentage { get; set; }
+        public decimal ProfitAbs { get; set; }
         public DateTime OpenDate { get; set; }
+        public bool IsShort { get; set; }
     }
 }

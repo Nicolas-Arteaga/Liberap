@@ -83,287 +83,126 @@ public class MarketScannerService : BackgroundService
         }
 
         // Top 30 symbols by volume (Phase 4 Scaling)
-        var topSymbols = await marketDataManager.GetTopSymbolsAsync(30);
+        var topSymbols = await marketDataManager.GetTopSymbolsAsync(100);
         _logger.LogInformation("📊 Top 30 symbols to analyze ({count}). Analyzing...", topSymbols.Count);
 
         int analyzedCount = 0;
-        foreach (var symbol in topSymbols)
+        var semaphore = new SemaphoreSlim(10); // Analyze 10 symbols concurrently
+
+        var tasks = topSymbols.Select(async symbol =>
         {
+            await semaphore.WaitAsync();
             try
             {
-                _logger.LogInformation("🧪 Analizando {symbol}...", symbol);
+                using var innerScope = _serviceProvider.CreateScope();
+                // Get fresh services for each parallel task to avoid DbContext threading issues
+                var innerMarketManager = innerScope.ServiceProvider.GetRequiredService<MarketDataManager>();
+                var innerAnalysisService = innerScope.ServiceProvider.GetRequiredService<CryptoAnalysisService>();
+                var innerPython = innerScope.ServiceProvider.GetRequiredService<IPythonIntegrationService>();
+                var innerConsensus = innerScope.ServiceProvider.GetRequiredService<IMultiAgentConsensusService>();
+                var innerEventBus = innerScope.ServiceProvider.GetRequiredService<IDistributedEventBus>();
+                var innerAlertRepo = innerScope.ServiceProvider.GetRequiredService<IRepository<AlertHistory, Guid>>();
+                var innerProfileRepo = innerScope.ServiceProvider.GetRequiredService<IRepository<TraderProfile, Guid>>();
+                var innerAnalysisLogRepo = innerScope.ServiceProvider.GetRequiredService<IRepository<AnalysisLog, Guid>>();
+                var innerWhaleTracker = innerScope.ServiceProvider.GetRequiredService<IWhaleTrackerService>();
+                var innerInstService = innerScope.ServiceProvider.GetRequiredService<IInstitutionalDataService>();
+                var innerNewsService = innerScope.ServiceProvider.GetRequiredService<IFreeCryptoNewsService>();
+
+                var innerAniquilador = innerScope.ServiceProvider.GetRequiredService<IAniquiladorPatternManager>();
+
+                _logger.LogInformation("🧪 Analizando {symbol} (Parallel)...", symbol);
                 
-                // 2. Obtener velas (15m por defecto para el scanner)
-                var candles = await marketDataManager.GetCandlesAsync(symbol, "15", 30);
-                if (candles == null || candles.Count < 20) {
-                    _logger.LogWarning("⚠️ No hay suficientes velas para {symbol}", symbol);
-                    continue;
-                }
+                var candles = await innerMarketManager.GetCandlesAsync(symbol, "15", 30);
+                if (candles == null || candles.Count < 20) return;
 
-                // 🎯 [NICOLAS ANIQUILADOR] Obtener velas 1H y analizar el patrón extremo
+                // 🎯 [ANIQUILADOR] Analyze hourly trend
                 try {
-                    var hourlyCandles = await marketDataManager.GetCandlesAsync(symbol, "1h", 120);
-                    if (hourlyCandles != null && hourlyCandles.Count >= 100)
-                    {
-                        await aniquilador.AnalyzeCandlesAsync(symbol, hourlyCandles);
-                    }
-                } catch { /* Ignorar fallos aislados en este branch analitico */ }
-
-                // 🚀 Phase 4 Pre-Filter: Zombie Data Check
-                if (analysisService.IsZombieData(candles))
-                {
-                    _logger.LogWarning("🧟 ZOMBIE DATA DETECTED for {symbol}. Skipping to save resources.", symbol);
-                    continue;
-                }
+                    var hourly = await innerMarketManager.GetCandlesAsync(symbol, "1h", 100);
+                    if (hourly != null && hourly.Count >= 50)
+                        await innerAniquilador.AnalyzeCandlesAsync(symbol, hourly);
+                } catch { /* Isolated error */ }
 
                 var prices = candles.Select(x => x.Close).ToList();
+                var rsi = innerAnalysisService.CalculateRSI(prices);
                 
-                // 🚀 ZOMBIE DATA DETECTION: If price hasn't moved at all, RSI will be fake.
-                bool isStagnant = prices.Distinct().Count() == 1;
-                if (isStagnant) {
-                    _logger.LogWarning("🧟 [ZOMBIE DATA] {symbol} price is stuck at {price}. RSI will be neutral 50.", symbol, prices.First());
-                }
+                // 🕵️ AI Market Context (Python)
+                var regime = await innerPython.DetectMarketRegimeAsync(symbol, "15", candles);
+                var pythonTechs = await innerPython.AnalyzeTechnicalsAsync(symbol, "15", candles);
 
-                var rsi = analysisService.CalculateRSI(prices);
+                // IA Local & Analysts
+                var whaleData = await innerWhaleTracker.GetWhaleActivityAsync(symbol);
+                var instData = await innerInstService.GetInstitutionalDataAsync(symbol);
                 
-                // 🧠 IA Local (Python) - Detectar Régimen de Mercado
-                // Esto genera los 200 OK en el terminal del servicio de Python
-                try
-                {
-                    var regimeResult = await pythonService.DetectMarketRegimeAsync(symbol, "15m", candles);
-                    if (regimeResult != null)
-                        _logger.LogInformation("🧠 [Python] {symbol} Regime: {regime} (Strength: {str:F2})", symbol, regimeResult.Regime, regimeResult.TrendStrength);
-                }
-                catch (Exception ex) { _logger.LogWarning("⚠️ [Python Regime] {symbol}: {msg}", symbol, ex.Message); }
-
-                // 🧠 IA Local (Python) - Analizar Técnicos
-                try
-                {
-                    var techResult = await pythonService.AnalyzeTechnicalsAsync(symbol, "15m", candles);
-                    if (techResult != null)
-                        _logger.LogInformation("🧠 [Python] {symbol} RSI={rsi:F1} MACD={macd:F4} ATR={atr:F4}", symbol, techResult.Rsi, techResult.MacdHistogram, techResult.Atr);
-                }
-                catch (Exception ex) { _logger.LogWarning("⚠️ [Python Technicals] {symbol}: {msg}", symbol, ex.Message); }
-
-                // Cálculo de tendencia básica
-                var firstHalf = prices.Take(15).Average();
-                var lastHalf = prices.Skip(15).Average();
-                var trend = lastHalf > firstHalf ? "bullish" : "bearish";
-                
-                // 3. Sentimiento (IA)
-                int sentimentBonus = 0;
-                string sentimentText = "Neutral/Unknown";
-                try {
-                    var sentiment = await freeNewsService.GetSentimentAsync(symbol);
-                    if (sentiment != null) {
-                        sentimentText = sentiment.Label;
-                        if (sentiment.Label == "positive") sentimentBonus = 20;
-                        else if (sentiment.Label == "negative") sentimentBonus = -20;
-                    }
-                } catch { /* Ignorar error de Noticias */ }
-
-                // 3.1. Ballenas (Sprint 5)
-                var whaleData = await whaleTracker.GetWhaleActivityAsync(symbol);
-                int whaleBonus = (int)(whaleData.NetFlowScore * 15); // Max +15 bonus
-
-                // 3.2. Liquidaciones y Order Flow (Sprint 5)
-                var instData = await institutionalService.GetInstitutionalDataAsync(symbol);
-                int instBonus = instData.IsSqueezeDetected ? (instData.SqueezeType == "Short Squeeze" ? 15 : -15) : 0;
-                instBonus += (int)((instData.BidAskImbalance - 1.0) * 5); // Max +10 bonus
-
-                // 4. Calcular Confianza
-                int confidence = 0;
+                // 🧠 Multi-Agent Consensus
+                int confidence = (int)rsi > 50 ? (int)(rsi - 50) : (int)(50 - rsi);
                 SignalDirection signal = SignalDirection.Auto;
 
-                if (rsi < 35) {
-                    // 🛡️ Falling Knife Protection: Don't call LONG if trend is strongly bearish
-                    if (trend == "bearish") {
-                        confidence = (int)(35 - rsi) * 1 + 40; // Reduced confidence
-                        signal = SignalDirection.Auto; // WAIT
-                    } else {
-                        confidence = (int)(35 - rsi) * 2 + 50;
-                        signal = SignalDirection.Long;
-                    }
-                } else if (rsi > 65) {
-                    // 🛡️ Rocket Protection: Don't call SHORT if trend is strongly bullish
-                    if (trend == "bullish") {
-                        confidence = (int)(rsi - 65) * 1 + 40;
-                        signal = SignalDirection.Auto; // WAIT
-                    } else {
-                        confidence = (int)(rsi - 65) * 2 + 50; 
-                        signal = SignalDirection.Short;
-                    }
-                } else {
-                    confidence = 30 + (trend == "bullish" ? 10 : 0);
-                    signal = SignalDirection.Auto;
-                }
-
-                confidence += sentimentBonus + whaleBonus + instBonus;
-                
-                // 4.2. Quiet Period Dampening
-                if (macroData.IsInQuietPeriod) {
-                    confidence = 0; // Absolute protection during news
-                }
-
-                confidence = Math.Clamp(confidence, 0, 100);
-
-                // 5. Crear Log para Dashboard
-                var analysisResult = new {
-                    symbol = symbol,
-                    rsi = Math.Round(rsi, 2),
-                    trend = trend,
-                    confidence = confidence,
-                    signal = signal.ToString(),
-                    style = "DayTrading (15m)", // Fixed for now, can be dynamic later
-                    sentiment = sentimentText,
-                    whaleSentiment = whaleData.Summary,
-                    institutionalSummary = instData.Summary,
-                    isSqueeze = instData.IsSqueezeDetected,
-                    macroQuietPeriod = macroData.IsInQuietPeriod,
-                    macroReason = macroData.QuietPeriodReason,
-                    timestamp = DateTime.UtcNow
-                };
-
-                var log = new AnalysisLog(
-                    Guid.NewGuid(),
-                    Guid.Empty, 
-                    null,
-                    symbol,
-                    $"Scanner: {symbol} | RSI: {rsi:F2} | Conf: {confidence}% | 🐋: {whaleData.Summary} | 🔥: {instData.SqueezeType} | 🌍: {(macroData.IsInQuietPeriod ? "QUIET" : "OK")}",
-                    confidence > 70 ? "success" : "info",
-                    DateTime.UtcNow,
-                    AnalysisLogType.Standard,
-                    JsonSerializer.Serialize(analysisResult)
-                );
-
-                await analysisLogRepo.InsertAsync(log);
-                analyzedCount++;
-
-                // 5.5 Publish Real-time Telemetry (SignalR) for Dashboard UI Grids
-                var profiles = await profileRepository.GetListAsync();
-                // 2. Fetch AI Insights for high-confidence findings (>60% to save quota)
-                Dictionary<string, string> agentOpinions = new();
-                if (confidence >= 60)
+                if (regime != null)
                 {
-                    try {
-                        var marketContext = new MarketContext { 
-                            Symbol = symbol,
-                            Technicals = new TechnicalsResponseModel { Rsi = (float)rsi },
-                            MarketRegime = new RegimeResponseModel { 
-                                Regime = trend == "bullish" ? MarketRegimeType.BullTrend : MarketRegimeType.BearTrend,
-                                TrendStrength = 1.0f
-                            },
-                            WhaleData = whaleData,
-                            InstitutionalData = instData,
-                            MacroData = macroData
-                        }; 
-                        _logger.LogInformation("🧠 [Scanner AI] Fetching insights for {symbol} with full context...", symbol);
-                        var aiResult = await multiAgentConsensus.GetConsensusAsync(marketContext, TradingStyle.DayTrading);
-                        agentOpinions = aiResult.AgentOpinions;
-                        _logger.LogInformation("🧠 [Scanner AI] Fetched {count} opinions for {symbol}", agentOpinions.Count, symbol);
-                    } catch (Exception ex) { 
-                        _logger.LogWarning("⚠️ [Scanner AI] Failed to fetch insights for {symbol}: {msg}", symbol, ex.Message);
-                    }
+                    confidence += (int)(regime.TrendStrength * 50);
+                    if (regime.BosDetected) confidence += 10;
+                    
+                    if (regime.Regime == MarketRegimeType.BullTrend) signal = SignalDirection.Long;
+                    else if (regime.Regime == MarketRegimeType.BearTrend) signal = SignalDirection.Short;
                 }
 
-                // Fase 5 & 6: Save strictly every alert generated with all metrics
-                var (estMinutes, expectedDd) = AlertHistory.GetStyleEstimates("DayTrading"); // For Scanner is mostly day trading
-                var tier = AlertHistory.ComputeTier(confidence);
-                var alertReasoningJson = JsonSerializer.Serialize(agentOpinions);
-                
-                var alertHistory = new AlertHistory(
-                    Guid.NewGuid(),
-                    symbol,
-                    "DayTrading", // Default style for scanner
-                    signal == SignalDirection.Long ? 0 : (signal == SignalDirection.Short ? 1 : 2),
-                    prices.LastOrDefault(), // entry
-                    prices.LastOrDefault() + ( (prices.LastOrDefault() * 0.03m) * (signal == SignalDirection.Long ? 1.0m : -1.0m) ), // target
-                    prices.LastOrDefault() - ( (prices.LastOrDefault() * 0.015m) * (signal == SignalDirection.Long ? 1.0m : -1.0m) ), // sl
-                    confidence,
-                    estMinutes,
-                    expectedDd,
-                    alertReasoningJson,
-                    "{}", // raw representation can be added later if needed
-                    DateTime.UtcNow,
-                    DateTime.UtcNow.AddMinutes(estMinutes),
-                    tier,
-                    "Scanner",
-                    false
-                );
-                
-                await alertHistoryRepo.InsertAsync(alertHistory);
+                // Add bonuses
+                if (whaleData.NetFlowScore > 0.6) confidence += 10;
+                if (instData.IsSqueezeDetected || instData.BidAskImbalance > 1.5) confidence += 10;
+                confidence = Math.Clamp(confidence, 10, 95);
+
+                var currentPrice = candles.LastOrDefault()?.Close ?? 0;
+                var severity = confidence >= 70 ? "success" : (confidence >= 50 ? "warning" : "info");
+                var icon = confidence >= 50 ? "search-outline" : "pulse-outline";
+
+                // Final result broadcasting ASAP
+                var profiles = await innerProfileRepo.GetListAsync();
+                var innerSessionRepo = innerScope.ServiceProvider.GetRequiredService<IRepository<TradingSession, Guid>>();
+                var sessions = await innerSessionRepo.GetListAsync(x => x.IsActive);
 
                 foreach (var profile in profiles)
                 {
-                    await _eventBus.PublishAsync(new AlertStateChangedEto
+                    var userSessionId = sessions.FirstOrDefault(s => s.TraderProfileId == profile.Id)?.Id ?? Guid.Empty;
+                    
+                    await innerEventBus.PublishAsync(new AlertStateChangedEto
                     {
                         UserId = profile.UserId,
-                        SessionId = Guid.Empty,
+                        SessionId = userSessionId,
                         Alert = new VergeAlertDto
                         {
                             Id = Guid.NewGuid().ToString(),
-                            Type = confidence >= 50 ? "Stage1" : "ScannerUpdate",
-                            Title = confidence >= 50 ? $"🔍 Oportunidad: {symbol}" : $"Scanner: {symbol}",
-                            Message = $"Confianza: {(int)confidence}% | Tendencia: {trend.ToUpper()} | RSI: {rsi:F2} | 🐋: {whaleData.Summary} | 🔥: {instData.SqueezeType}",
-                            Timestamp = DateTime.UtcNow,
-                            Read = false,
+                            Type = "ScannerUpdate", 
+                            Title = $"Scanner: {symbol}",
+                            Message = $"AI Score: {confidence}% | Regime: {regime?.Regime.ToString() ?? "Unknown"} | {whaleData.Summary}",
                             Crypto = symbol,
-                            Price = prices.LastOrDefault(),
-                            Confidence = (SignalConfidence)(int)confidence,
+                            Price = currentPrice,
+                            Confidence = (SignalConfidence)confidence,
                             Direction = signal,
-                            Severity = confidence >= 70 ? "success" : (confidence >= 50 ? "warning" : "info"),
-                            Icon = confidence >= 50 ? "search-outline" : "pulse-outline",
-                            WhaleInfluenceScore = whaleBonus * 100 / 15,
-                            IsSqueeze = instData.IsSqueezeDetected,
-                            Score = (int)confidence,
-                            AgentOpinions = agentOpinions,
-                            // 🚀 NUCLEAR SYNC: Mathematical multiplier ensures Label and Prices are LOCKED
-                            RiskRewardRatio = 2.0,
-                            StopLoss = prices.LastOrDefault() - ( (prices.LastOrDefault() * 0.015m) * (signal == SignalDirection.Long ? 1.0m : -1.0m) ),
-                            TakeProfit = prices.LastOrDefault() + ( (prices.LastOrDefault() * 0.03m) * (signal == SignalDirection.Long ? 1.0m : -1.0m) )
+                            Score = confidence,
+                            Severity = severity,
+                            Icon = icon,
+                            Timestamp = DateTime.UtcNow,
+                            TakeProfit = currentPrice * (signal == SignalDirection.Long ? 1.03m : 0.97m),
+                            StopLoss = currentPrice * (signal == SignalDirection.Long ? 0.985m : 1.015m)
                         }
                     });
-                }
 
-                // 6. Si Confianza > 2 (Threshold bajo para test), buscar estrategias en AutoMode y activar sesión
-                if (confidence >= 2) {
-                    _logger.LogInformation("🔥 OPORTUNIDAD DETECTADA: {symbol} con {confidence}% de confianza!", symbol, confidence);
-                    
-                    // Guardar log de OPORTUNIDAD para el modal
-                    var opportunityLog = new AnalysisLog(
-                        Guid.NewGuid(),
-                        Guid.Empty,
-                        null,
-                        symbol,
-                        $"🚀 OPORTUNIDAD DETECTADA: {symbol} con {confidence}% de confianza!",
-                        "success",
-                        DateTime.UtcNow,
-                        AnalysisLogType.AlertContext,
-                        JsonSerializer.Serialize(new { 
-                            symbol = symbol, 
-                            confidence = confidence, 
-                            signal = signal.ToString(),
-                            isOpportunity = true 
-                        })
-                    );
-                    await analysisLogRepo.InsertAsync(opportunityLog);
-                    
-                    var autoStrategies = await strategyRepository.GetListAsync(x => x.IsActive && x.IsAutoMode);
-
-                    foreach (var strategy in autoStrategies) {
-                        var existingSession = await sessionRepository.FirstOrDefaultAsync(x => x.TraderProfileId == strategy.TraderProfileId && x.IsActive);
-                        if (existingSession == null) {
-                            _logger.LogInformation("🚀 Auto-activando sesión para {symbol} en perfil {profile}", symbol, strategy.TraderProfileId);
-                            var session = new TradingSession(Guid.NewGuid(), strategy.TraderProfileId, symbol, "15");
-                            session.CurrentStage = TradingStage.Evaluating;
-                            await sessionRepository.InsertAsync(session);
-                        }
-                    }
+                    _logger.LogInformation("📢 [SignalR] Sent AI score {score}% for {symbol} to User {uid}", confidence, symbol, profile.UserId);
                 }
-            } catch (Exception ex) {
+                
+                Interlocked.Increment(ref analyzedCount);
+            }
+            catch (Exception ex)
+            {
                 _logger.LogWarning($"⚠️ Error analizando {symbol}: {ex.Message}");
             }
-        }
+            finally
+            {
+                semaphore.Release();
+            }
+        });
+
+        await Task.WhenAll(tasks);
 
         await uow.CompleteAsync();
         _logger.LogInformation("🏁 Ciclo completado. Se analizaron {count} símbolos", analyzedCount);

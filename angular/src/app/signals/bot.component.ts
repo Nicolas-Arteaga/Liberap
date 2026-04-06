@@ -15,6 +15,7 @@ import { BotStatsBarComponent } from './components/bot-stats-bar/bot-stats-bar.c
 import { CreateBotFormComponent } from './components/create-bot-form/create-bot-form.component';
 import { ActiveBotsTableComponent } from './components/active-bots-table/active-bots-table.component';
 import { BotControlPanelComponent } from './components/bot-control-panel/bot-control-panel.component';
+import { ForzarAccionesPanelComponent } from './components/forzar-acciones-panel/forzar-acciones-panel.component';
 import { TradePanelComponent } from './components/trade-panel/trade-panel.component';
 
 @Component({
@@ -26,6 +27,7 @@ import { TradePanelComponent } from './components/trade-panel/trade-panel.compon
     CreateBotFormComponent, 
     ActiveBotsTableComponent, 
     BotControlPanelComponent,
+    ForzarAccionesPanelComponent,
     TradePanelComponent
   ],
   templateUrl: './bot.component.html',

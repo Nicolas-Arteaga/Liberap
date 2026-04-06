@@ -997,6 +997,51 @@
             }
           ],
           "actions": {
+            "GetOpenTradesAsync": {
+              "uniqueName": "GetOpenTradesAsync",
+              "name": "GetOpenTradesAsync",
+              "httpMethod": "GET",
+              "url": "api/app/freqtrade/open-trades",
+              "supportedVersions": [],
+              "parametersOnMethod": [],
+              "parameters": [],
+              "returnValue": {
+                "type": "System.Collections.Generic.List<Verge.Freqtrade.FreqtradeTradeDto>",
+                "typeSimple": "[Verge.Freqtrade.FreqtradeTradeDto]"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Freqtrade.IFreqtradeAppService"
+            },
+            "GetStatusAsync": {
+              "uniqueName": "GetStatusAsync",
+              "name": "GetStatusAsync",
+              "httpMethod": "GET",
+              "url": "api/app/freqtrade/status",
+              "supportedVersions": [],
+              "parametersOnMethod": [],
+              "parameters": [],
+              "returnValue": {
+                "type": "Verge.Freqtrade.FreqtradeStatusDto",
+                "typeSimple": "Verge.Freqtrade.FreqtradeStatusDto"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Freqtrade.IFreqtradeAppService"
+            },
+            "GetProfitAsync": {
+              "uniqueName": "GetProfitAsync",
+              "name": "GetProfitAsync",
+              "httpMethod": "GET",
+              "url": "api/app/freqtrade/profit",
+              "supportedVersions": [],
+              "parametersOnMethod": [],
+              "parameters": [],
+              "returnValue": {
+                "type": "Verge.Freqtrade.FreqtradeProfitDto",
+                "typeSimple": "Verge.Freqtrade.FreqtradeProfitDto"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Freqtrade.IFreqtradeAppService"
+            },
             "StartBotAsyncByInput": {
               "uniqueName": "StartBotAsyncByInput",
               "name": "StartBotAsync",
@@ -1049,51 +1094,6 @@
               "allowAnonymous": false,
               "implementFrom": "Verge.Freqtrade.IFreqtradeAppService"
             },
-            "GetStatusAsync": {
-              "uniqueName": "GetStatusAsync",
-              "name": "GetStatusAsync",
-              "httpMethod": "GET",
-              "url": "api/app/freqtrade/status",
-              "supportedVersions": [],
-              "parametersOnMethod": [],
-              "parameters": [],
-              "returnValue": {
-                "type": "Verge.Freqtrade.FreqtradeStatusDto",
-                "typeSimple": "Verge.Freqtrade.FreqtradeStatusDto"
-              },
-              "allowAnonymous": false,
-              "implementFrom": "Verge.Freqtrade.IFreqtradeAppService"
-            },
-            "GetOpenTradesAsync": {
-              "uniqueName": "GetOpenTradesAsync",
-              "name": "GetOpenTradesAsync",
-              "httpMethod": "GET",
-              "url": "api/app/freqtrade/open-trades",
-              "supportedVersions": [],
-              "parametersOnMethod": [],
-              "parameters": [],
-              "returnValue": {
-                "type": "System.Collections.Generic.List<Verge.Freqtrade.FreqtradeTradeDto>",
-                "typeSimple": "[Verge.Freqtrade.FreqtradeTradeDto]"
-              },
-              "allowAnonymous": false,
-              "implementFrom": "Verge.Freqtrade.IFreqtradeAppService"
-            },
-            "GetProfitAsync": {
-              "uniqueName": "GetProfitAsync",
-              "name": "GetProfitAsync",
-              "httpMethod": "GET",
-              "url": "api/app/freqtrade/profit",
-              "supportedVersions": [],
-              "parametersOnMethod": [],
-              "parameters": [],
-              "returnValue": {
-                "type": "Verge.Freqtrade.FreqtradeProfitDto",
-                "typeSimple": "Verge.Freqtrade.FreqtradeProfitDto"
-              },
-              "allowAnonymous": false,
-              "implementFrom": "Verge.Freqtrade.IFreqtradeAppService"
-            },
             "CloseTradeAsyncByTradeId": {
               "uniqueName": "CloseTradeAsyncByTradeId",
               "name": "CloseTradeAsync",
@@ -1121,43 +1121,6 @@
                   "defaultValue": null,
                   "constraintTypes": [],
                   "bindingSourceId": "Path",
-                  "descriptorName": ""
-                }
-              ],
-              "returnValue": {
-                "type": "System.Void",
-                "typeSimple": "System.Void"
-              },
-              "allowAnonymous": false,
-              "implementFrom": "Verge.Freqtrade.IFreqtradeAppService"
-            },
-            "UpdateWhitelistAsyncByPair": {
-              "uniqueName": "UpdateWhitelistAsyncByPair",
-              "name": "UpdateWhitelistAsync",
-              "httpMethod": "PUT",
-              "url": "api/app/freqtrade/whitelist",
-              "supportedVersions": [],
-              "parametersOnMethod": [
-                {
-                  "name": "pair",
-                  "typeAsString": "System.String, System.Private.CoreLib",
-                  "type": "System.String",
-                  "typeSimple": "string",
-                  "isOptional": false,
-                  "defaultValue": null
-                }
-              ],
-              "parameters": [
-                {
-                  "nameOnMethod": "pair",
-                  "name": "pair",
-                  "jsonName": null,
-                  "type": "System.String",
-                  "typeSimple": "string",
-                  "isOptional": false,
-                  "defaultValue": null,
-                  "constraintTypes": null,
-                  "bindingSourceId": "ModelBinding",
                   "descriptorName": ""
                 }
               ],
@@ -1285,6 +1248,43 @@
               "name": "DeleteBotAsync",
               "httpMethod": "DELETE",
               "url": "api/app/freqtrade/bot",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "pair",
+                  "typeAsString": "System.String, System.Private.CoreLib",
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "pair",
+                  "name": "pair",
+                  "jsonName": null,
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "System.Void",
+                "typeSimple": "System.Void"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Freqtrade.IFreqtradeAppService"
+            },
+            "UpdateWhitelistAsyncByPair": {
+              "uniqueName": "UpdateWhitelistAsyncByPair",
+              "name": "UpdateWhitelistAsync",
+              "httpMethod": "PUT",
+              "url": "api/app/freqtrade/whitelist",
               "supportedVersions": [],
               "parametersOnMethod": [
                 {
@@ -8036,10 +8036,46 @@
           "regex": null
         },
         {
+          "name": "ProfitPercentage",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "ProfitAbs",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
           "name": "OpenDate",
           "jsonName": null,
           "type": "System.DateTime",
           "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "IsShort",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
           "isRequired": false,
           "minLength": null,
           "maxLength": null,

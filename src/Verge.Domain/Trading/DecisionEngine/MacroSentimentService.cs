@@ -85,12 +85,7 @@ public class MacroSentimentService : IMacroSentimentService
             // 2. ECONOMIC CALENDAR (Simulation/Mock for now, as free APIs are limited)
             // In a full implementation, we'd scrape or use a paid/freemium API like Finnhub
             var today = DateTime.UtcNow.Date;
-            _cachedEvents = new List<MacroEvent>
-            {
-                new MacroEvent { Name = "FED Interest Rate Decision", Impact = "High", Currency = "USD", EventTime = today.AddHours(14).AddMinutes(30).ToUniversalTime() },
-                new MacroEvent { Name = "CPI Data Release", Impact = "High", Currency = "USD", EventTime = today.AddHours(10).AddMinutes(30).ToUniversalTime() },
-                new MacroEvent { Name = "EU Central Bank Speech", Impact = "Medium", Currency = "EUR", EventTime = today.AddHours(11).ToUniversalTime() }
-            };
+            _cachedEvents = new List<MacroEvent>(); // DISABLED HARDCODED MOCKS TO UNBLOCK SCANNER
 
             _lastSync = DateTime.UtcNow;
         }

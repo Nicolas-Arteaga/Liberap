@@ -59,7 +59,16 @@ export class FreqtradePollService implements OnDestroy {
         ))
       ).subscribe({
         next: data => {
-          if (data) this.status$.next(data);
+          if (data) {
+            this.status$.next(data);
+            
+            // Auto-select first pair if none is selected and we have active pairs
+            if (data.activePairs && data.activePairs.length > 0 && !this.selectedPair$.value) {
+              const firstPair = data.activePairs[0].replace('/', '').split(':')[0];
+              console.log('[FreqtradePollService] Auto-selecting first pair:', firstPair);
+              this.selectedPair$.next(firstPair);
+            }
+          }
         },
         error: () => {} // Managed by catchError
       })

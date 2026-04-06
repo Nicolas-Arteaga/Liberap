@@ -26,6 +26,7 @@ export class TradingSignalrService {
     private tradeOpenedSource = new Subject<any>();
     private tradeClosedSource = new Subject<any>();
     private tradeUpdateSource = new Subject<any>();
+    private superScoreSource = new BehaviorSubject<any>(null); // 👈 Nuevo para Scores de IA
 
     sessionStarted$ = this.sessionStartedSource.asObservable();
     sessionEnded$ = this.sessionEndedSource.asObservable();
@@ -34,6 +35,7 @@ export class TradingSignalrService {
     tradeOpened$ = this.tradeOpenedSource.asObservable();
     tradeClosed$ = this.tradeClosedSource.asObservable();
     tradeUpdate$ = this.tradeUpdateSource.asObservable();
+    superScore$ = this.superScoreSource.asObservable(); // 👈 Observable para componentes
 
     private connection: signalR.HubConnection | null = null;
     private lastNotifiedState: Record<string, string> = {};
@@ -121,35 +123,36 @@ export class TradingSignalrService {
             this.tradeUpdateSource.next(trade);
         });
 
-        this.connection.on('ReceiveAlert', (alert: any) => {
-            console.log('[SignalR] 🔔 Alerta RECIBIDA en frontend:', alert);
+        this.connection.on('ReceiveAlert', (rawAlert: any) => {
+            try {
+                console.log('[SignalR] 🔔 Alerta RECIBIDA en frontend (RAW):', rawAlert);
+                
+                const alert = this.normalizeAlert(rawAlert);
+                console.log('[SignalR] ✅ Alerta NORMALIZADA y procesando:', alert.crypto, '| Score:', alert.confidence);
 
-            // Normalizar el objeto antes de procesarlo
-            const normalized = this.normalizeAlert(alert);
+                // 1. Push al AlertService → dashboard.component.ts la recibe vía alerts$
+                this.alertService.addAlert(alert);
 
-            // Phase 7: Block deprecated symbols
-            const deprecated = new Set(['MATICUSDT', 'LUNAUSDT', 'SRMUSDT', 'HNTUSDT', 'TOMOUSDT', 'BTTUSDT']);
-            if (deprecated.has(normalized.crypto)) {
-                console.warn(`[SignalR] 🚫 Bloqueada alerta de moneda deprecada: ${normalized.crypto}`);
-                return; // TRASH!
+                // 2. Toast visual para el usuario
+                this.showToastForAlert(alert);
+
+                // 3. OS Push Notification para alertas de alta confianza (≥70%)
+                if ((alert.confidence || 0) >= 70) {
+                    this.triggerOsNotification(alert);
+                }
+            } catch (e) {
+                console.error('[SignalR] ❌ Error procesando ReceiveAlert:', e, rawAlert);
             }
+        });
 
-            // Siempre agregamos al servicio para que aparezca en la lista/campanita
-            this.alertService.addAlert(normalized);
-
-            // Evitar spam de Toasts: solo lo mostramos si el estado ha cambiado para este par
-            const symbol = normalized.crypto || 'Global';
-            if (this.lastNotifiedState[symbol] !== normalized.type) {
-                console.log(`[SignalR] ✨ Cambio de estado detectado para ${symbol}: ${this.lastNotifiedState[symbol]} -> ${normalized.type}. Disparando Toast.`);
-                this.lastNotifiedState[symbol] = normalized.type;
-                this.showToastForAlert(normalized);
-            } else {
-                console.log(`[SignalR] ⏩ Omitiendo Toast para ${symbol} (mismo estado: ${normalized.type})`);
-            }
-
-            // --- Fase 6: Notificaciones Globales (OS) ---
-            if ((normalized.confidence || 0) >= 70) {
-                this.triggerOsNotification(normalized);
+        // --- AI Scores Handler ---
+        this.connection.on('ReceiveSuperScore', (payload: any) => {
+            try {
+                const data = typeof payload === 'string' ? JSON.parse(payload) : payload;
+                console.log('[SignalR] 🧠 SuperScore Recibido:', data);
+                this.superScoreSource.next(data);
+            } catch (e) {
+                console.error('[SignalR] ❌ Error parsing SuperScore:', e);
             }
         });
 
