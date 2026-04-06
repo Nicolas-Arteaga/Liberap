@@ -48,8 +48,8 @@ public class MarketScannerService : BackgroundService
                 _logger.LogError(ex, "❌ Error in market scanner cycle");
             }
 
-            _logger.LogInformation("😴 Scanner sleeping for 3 minutes...");
-            await Task.Delay(TimeSpan.FromMinutes(3), stoppingToken);
+            _logger.LogInformation("😴 Scanner sleeping for 30 seconds...");
+            await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
         }
     }
 
@@ -126,6 +126,25 @@ public class MarketScannerService : BackgroundService
 
                 var rsi = analysisService.CalculateRSI(prices);
                 
+                // 🧠 IA Local (Python) - Detectar Régimen de Mercado
+                // Esto genera los 200 OK en el terminal del servicio de Python
+                try
+                {
+                    var regimeResult = await pythonService.DetectMarketRegimeAsync(symbol, "15m", candles);
+                    if (regimeResult != null)
+                        _logger.LogInformation("🧠 [Python] {symbol} Regime: {regime} (Strength: {str:F2})", symbol, regimeResult.Regime, regimeResult.TrendStrength);
+                }
+                catch (Exception ex) { _logger.LogWarning("⚠️ [Python Regime] {symbol}: {msg}", symbol, ex.Message); }
+
+                // 🧠 IA Local (Python) - Analizar Técnicos
+                try
+                {
+                    var techResult = await pythonService.AnalyzeTechnicalsAsync(symbol, "15m", candles);
+                    if (techResult != null)
+                        _logger.LogInformation("🧠 [Python] {symbol} RSI={rsi:F1} MACD={macd:F4} ATR={atr:F4}", symbol, techResult.Rsi, techResult.MacdHistogram, techResult.Atr);
+                }
+                catch (Exception ex) { _logger.LogWarning("⚠️ [Python Technicals] {symbol}: {msg}", symbol, ex.Message); }
+
                 // Cálculo de tendencia básica
                 var firstHalf = prices.Take(15).Average();
                 var lastHalf = prices.Skip(15).Average();

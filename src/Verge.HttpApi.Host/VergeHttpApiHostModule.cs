@@ -166,6 +166,14 @@ public class VergeHttpApiHostModule : AbpModule
             client.BaseAddress = new Uri(baseUrl);
         });
 
+        // Python AI Service HTTP Client
+        context.Services.AddHttpClient<PythonIntegrationService>(client =>
+        {
+            var pythonUrl = configuration["PythonService:Url"] ?? "http://localhost:8000";
+            client.BaseAddress = new Uri(pythonUrl);
+            client.Timeout = TimeSpan.FromSeconds(10);
+        });
+
         context.Services.ConfigureApplicationCookie(options =>
         {
             options.ExpireTimeSpan = TimeSpan.FromDays(30);
