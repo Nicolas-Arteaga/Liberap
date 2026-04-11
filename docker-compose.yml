@@ -27,7 +27,7 @@ services:
       context: ./python-service
     container_name: verge-python-ai
     ports:
-      - "8000:8000"
+      - "8005:8000"
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379

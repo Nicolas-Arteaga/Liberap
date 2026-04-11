@@ -47,7 +47,8 @@
     "sandbox": true,
     "pair_whitelist": [
       "SOL/USDT:USDT",
-      "SIREN/USDT:USDT"
+      "SIREN/USDT:USDT",
+      "TRU/USDT:USDT"
     ],
     "pair_blacklist": [
       "BNB/.*"
