@@ -15,6 +15,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Verge.Freqtrade.Hubs;
 using Volo.Abp;
+using Volo.Abp.Domain.Repositories;
+using Verge.Trading;
 
 namespace Verge.Freqtrade
 {
@@ -30,17 +32,20 @@ namespace Verge.Freqtrade
         private readonly IHubContext<BotHub> _botHubContext;
         private readonly IConfiguration _configuration;
         private readonly ILogger<FreqtradeAppService> _logger;
+        private readonly IRepository<TradingBot, Guid> _botRepository;
 
         public FreqtradeAppService(
             IHttpClientFactory httpClientFactory,
             IHubContext<BotHub> botHubContext,
             IConfiguration configuration,
-            ILogger<FreqtradeAppService> logger)
+            ILogger<FreqtradeAppService> logger,
+            IRepository<TradingBot, Guid> botRepository)
         {
             _httpClientFactory = httpClientFactory;
             _botHubContext = botHubContext;
             _configuration = configuration;
             _logger = logger;
+            _botRepository = botRepository;
         }
 
         private async Task EnsureLoginAsync()
@@ -239,13 +244,18 @@ namespace Verge.Freqtrade
                     using var doc = JsonDocument.Parse(content);
                     var root = doc.RootElement;
 
-                    // El bot podría devolver la config directamente o dentro de un objeto "config"
                     var result = root.TryGetProperty("config", out var configObj) ? configObj : root;
+                    var stateValue = result.TryGetProperty("state", out var stateProp) ? stateProp.GetString()?.ToLower() : "stopped";
+                    
+                    if (stateValue == "stopped")
+                    {
+                        var pingResp = await client.GetAsync("/api/v1/ping");
+                        if (pingResp.IsSuccessStatusCode) {
+                             stateValue = "running";
+                        }
+                    }
 
-                    var stateValue = result.TryGetProperty("state", out var state) ? state.GetString()?.ToLower() : "stopped";
                     var pairs = new List<string>();
-
-                    // Local helper for extraction
                     void ExtractFromElement(JsonElement el)
                     {
                         if (el.TryGetProperty("pair_whitelist", out var wl) && wl.ValueKind == JsonValueKind.Array)
@@ -257,14 +267,11 @@ namespace Verge.Freqtrade
                         }
                     }
 
-                    // Multi-Path Extraction Strategy
-                    ExtractFromElement(result); // Root
-                    // Guard: only try to extract from 'exchange' if it is an object, not a string
+                    ExtractFromElement(result);
                     if (result.TryGetProperty("exchange", out var exch) && exch.ValueKind == JsonValueKind.Object)
-                        ExtractFromElement(exch); // Exchange level
+                        ExtractFromElement(exch);
                     
-                    // Fallback Dinámico: Si la config no tiene la lista (común en versiones modernas o durante entrenamiento)
-                    if (pairs.Count == 0 || stateValue == "running")
+                    if (pairs.Count == 0)
                     {
                         try 
                         {
@@ -283,11 +290,10 @@ namespace Verge.Freqtrade
                     }
 
                     var distinctPairs = pairs.Distinct().Where(p => !string.IsNullOrEmpty(p)).ToList();
-                    _logger.LogInformation("[Freqtrade] Sync: State={state}, Pairs={count}", stateValue, distinctPairs.Count);
-
+                    
                     return new FreqtradeStatusDto
                     {
-                        IsRunning = stateValue == "running" || stateValue == "starting",
+                        IsRunning = stateValue == "running" || stateValue == "starting" || stateValue == "healthy",
                         ActivePairs = distinctPairs,
                         OpenTradesCount = 0 
                     };
@@ -295,7 +301,7 @@ namespace Verge.Freqtrade
             }
             catch (Exception ex)
             { 
-                _logger.LogError(ex, "[Freqtrade] Error fatal en GetStatusAsync");
+                _logger.LogError(ex, "[Freqtrade] Exception in GetStatusAsync");
             }
             return new FreqtradeStatusDto { IsRunning = false, ActivePairs = new List<string>() };
         }
@@ -329,8 +335,8 @@ namespace Verge.Freqtrade
 
         public async Task StartBotAsync(FreqtradeCreateBotDto input)
         {
-            var configPath = @"C:\Users\Nicolas\Desktop\Verge\Verge\freqtrade\user_data\config.json";
-            if (!File.Exists(configPath)) throw new UserFriendlyException("Config file not found");
+            var configPath = _configuration["Freqtrade:ConfigPath"] ?? @"C:\Users\Nicolas\Desktop\Verge\Verge\freqtrade\user_data\config.json";
+            if (!File.Exists(configPath)) throw new UserFriendlyException("Config file not found: " + configPath);
 
             var json = await File.ReadAllTextAsync(configPath);
             var rootNode = JsonNode.Parse(json);
@@ -341,7 +347,33 @@ namespace Verge.Freqtrade
             if (string.IsNullOrEmpty(pair)) return;
             if (!pair.Contains("/")) pair = $"{pair.Replace("USDT", "")}/USDT:USDT";
 
-            // Update basic config
+            // 1. Persistencia en Base de Datos (Source of Truth)
+            var existing = await _botRepository.FirstOrDefaultAsync(x => x.Symbol == input.Pair.ToUpper());
+            if (existing == null)
+            {
+                await _botRepository.InsertAsync(new TradingBot(
+                    GuidGenerator.Create(),
+                    input.Pair,
+                    input.Strategy ?? "VergeFreqAIStrategy",
+                    input.Timeframe ?? "15m",
+                    input.StakeAmount,
+                    input.Leverage,
+                    input.TpPercent,
+                    input.SlPercent,
+                    CurrentUser.Id
+                ));
+            }
+            else 
+            {
+                existing.IsActive = true;
+                existing.Strategy = input.Strategy ?? existing.Strategy;
+                existing.Timeframe = input.Timeframe ?? existing.Timeframe;
+                existing.StakeAmount = input.StakeAmount;
+                existing.Leverage = input.Leverage;
+                await _botRepository.UpdateAsync(existing);
+            }
+
+            // Update basic config in file
             rootNode["stake_amount"] = input.StakeAmount > 0 ? input.StakeAmount : 100;
             rootNode["timeframe"] = !string.IsNullOrEmpty(input.Timeframe) ? input.Timeframe : "15m";
             rootNode["strategy"] = !string.IsNullOrEmpty(input.Strategy) ? input.Strategy : "VergeFreqAIStrategy";
@@ -376,13 +408,18 @@ namespace Verge.Freqtrade
             }
 
             await File.WriteAllTextAsync(configPath, rootNode.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+            _logger.LogInformation("✅ Config file updated SUCCESSFULLY with {pair}", pair);
 
             var client = await GetClientAsync();
             if (client != null)
             {
-                await client.PostAsync("/api/v1/reload_config", new StringContent("{}", Encoding.UTF8, "application/json"));
-                await Task.Delay(1500);
-                await client.PostAsync("/api/v1/start", new StringContent("{}", Encoding.UTF8, "application/json"));
+                var reloadResp = await client.PostAsync("/api/v1/reload_config", new StringContent("{}", Encoding.UTF8, "application/json"));
+                _logger.LogInformation("🔄 Freqtrade Reload Config Sent: {Status}", reloadResp.StatusCode);
+                
+                await Task.Delay(2500); 
+                
+                var startResp = await client.PostAsync("/api/v1/start", new StringContent("{}", Encoding.UTF8, "application/json"));
+                _logger.LogInformation("▶️ Freqtrade Start Sent: {Status}", startResp.StatusCode);
             }
             
             await _botHubContext.Clients.All.SendAsync("BotStatusChanged", "running");
@@ -444,9 +481,16 @@ namespace Verge.Freqtrade
         }
         public async Task DeleteBotAsync(string pair)
         {
-            var configPath = @"C:\Users\Nicolas\Desktop\Verge\Verge\freqtrade\user_data\config.json";
-            if (!File.Exists(configPath)) return;
+            // 1. Actualizar DB
+            var existing = await _botRepository.FirstOrDefaultAsync(x => x.Symbol == pair.ToUpper());
+            if (existing != null)
+            {
+                await _botRepository.DeleteAsync(existing);
+                _logger.LogInformation("🗑️ Bot {pair} REMOVED from Database.", pair);
+            }
 
+            var configPath = _configuration["Freqtrade:ConfigPath"] ?? @"C:\Users\Nicolas\Desktop\Verge\Verge\freqtrade\user_data\config.json";
+            if (!File.Exists(configPath)) return;
             var json = await File.ReadAllTextAsync(configPath);
             var rootNode = JsonNode.Parse(json);
             if (rootNode == null) return;

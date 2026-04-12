@@ -147,6 +147,7 @@ public class VergeHttpApiHostModule : AbpModule
         context.Services.AddHostedService<LiveSignalCollectorJob>();
         context.Services.AddHostedService<SimulationMarkPriceWorker>();
         context.Services.AddHostedService<BotDataPublisherService>();
+        context.Services.AddHostedService<BotSyncJob>();
 
         // Redis Configuration (Graceful startup)
         var redisConfig = configuration["Redis:Configuration"] ?? "localhost:6379";

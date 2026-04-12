@@ -229,7 +229,7 @@ public class MarketScannerService : BackgroundService
                         regime = regime?.Regime.ToString() ?? "Unknown",
                         style = "DayTrading (15m)",
                         estado = confidence >= 60 ? "GO" : "WAIT",
-                        dynamic_score = 50,
+                        dynamic_score = confidence,
                         timestamp = DateTime.UtcNow
                     });
                     await publisher.PublishAsync(RedisChannel.Literal("verge:superscore"), superScorePayload);

@@ -47,7 +47,9 @@
     "sandbox": true,
     "pair_whitelist": [
       "SIREN/USDT:USDT",
-      "ADA/USDT:USDT"
+      "ADA/USDT:USDT",
+      "BTC/USDT:USDT",
+      "LINK/USDT:USDT"
     ],
     "pair_blacklist": [
       "BNB/.*"
