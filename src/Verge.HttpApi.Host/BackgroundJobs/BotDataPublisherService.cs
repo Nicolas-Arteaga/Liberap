@@ -7,13 +7,15 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 using Verge.Freqtrade.Hubs;
- 
+using Verge.Trading;
+
 namespace Verge.BackgroundJobs;
 
 public class BotDataPublisherService : BackgroundService
 {
     private readonly IConnectionMultiplexer _redis;
     private readonly IHubContext<BotHub> _hubContext;
+    private readonly IHubContext<TradingHub> _tradingHubContext;
     private readonly ILogger<BotDataPublisherService> _logger;
 
     private readonly IDatabase _db;
@@ -21,10 +23,12 @@ public class BotDataPublisherService : BackgroundService
     public BotDataPublisherService(
         IConnectionMultiplexer redis,
         IHubContext<BotHub> hubContext,
+        IHubContext<TradingHub> tradingHubContext,
         ILogger<BotDataPublisherService> logger)
     {
         _redis = redis;
         _hubContext = hubContext;
+        _tradingHubContext = tradingHubContext;
         _logger = logger;
         _db = _redis.GetDatabase();
     }
@@ -55,9 +59,10 @@ public class BotDataPublisherService : BackgroundService
                     }
                 }
 
-                // Broadcast via SignalR
+                // Broadcast via SignalR to both Hubs
                 await _hubContext.Clients.All.SendAsync("ReceiveSuperScore", payload);
-                _logger.LogInformation("📡 Broadcasted SuperScore for {Channel} to SignalR clients", channel);
+                await _tradingHubContext.Clients.All.SendAsync("ReceiveSuperScore", payload);
+                _logger.LogInformation("📡 Broadcasted SuperScore for {Channel} to SignalR clients (Both Hubs)", channel);
 
             }
             catch (System.Exception ex)
@@ -72,7 +77,9 @@ public class BotDataPublisherService : BackgroundService
             try
             {
                 _logger.LogInformation("🐋 Received 'verge:whale_signal' from Redis");
-                await _hubContext.Clients.All.SendAsync("ReceiveWhaleSignal", message.ToString());
+                var payload = message.ToString();
+                await _hubContext.Clients.All.SendAsync("ReceiveWhaleSignal", payload);
+                await _tradingHubContext.Clients.All.SendAsync("ReceiveWhaleSignal", payload);
             }
             catch (System.Exception ex)
             {

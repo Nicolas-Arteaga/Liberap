@@ -187,7 +187,7 @@ public class MarketScannerService : BackgroundService
                         }
                     });
 
-                    _logger.LogInformation("📢 [SignalR] Sent AI score {score}% for {symbol} to User {uid}", confidence, symbol, profile.UserId);
+                    _logger.LogInformation("📢 [SignalR] Published AI alert {score}% for {symbol} to EventBus for User {uid}", confidence, symbol, profile.UserId);
                 }
                 
                 Interlocked.Increment(ref analyzedCount);

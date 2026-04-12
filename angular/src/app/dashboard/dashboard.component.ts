@@ -357,6 +357,22 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       this.filterTickers();
       this.selectSymbol(symbol);
     });
+    
+    // AI SuperScore Subscription - Feed the scanner from the Python AI service
+    this.signalrService.superScore$.pipe(takeUntil(this.destroy$)).subscribe(score => {
+      if (score) {
+        console.log('[Dashboard] 🧠 Procesando SuperScore IA para el Scanner:', score.symbol);
+        this.processInstitutionalAlert({
+          ...score,
+          type: 'ScannerUpdate',
+          title: `AI Score: ${score.symbol}`,
+          // Normalize confidence/score
+          confidence: (score.confidence * 100) || score.score || 0,
+          score: (score.confidence * 100) || score.score || 0,
+          timestamp: new Date()
+        });
+      }
+    });
   }
 
   private processInstitutionalAlert(alert: any) {

@@ -150,6 +150,15 @@ export class TradingSignalrService {
             try {
                 const data = typeof payload === 'string' ? JSON.parse(payload) : payload;
                 console.log('[SignalR] 🧠 SuperScore Recibido:', data);
+                
+                // REGLA: Toast para SuperScore si es >= 55%
+                // Los SuperScores suelen venir desde el bot/python y tienen 'confidence' o 'prob'
+                const confidence = (data.confidence * 100) || data.score || 0;
+                if (confidence >= 55) {
+                    const symbol = data.symbol || 'Global';
+                    this.toaster.success(`::Nueva señal IA para ${symbol} - Confianza: ${confidence.toFixed(1)}%`, '::AI Intelligence', { life: 5000 });
+                }
+
                 this.superScoreSource.next(data);
             } catch (e) {
                 console.error('[SignalR] ❌ Error parsing SuperScore:', e);
@@ -277,7 +286,13 @@ export class TradingSignalrService {
     }
 
     private showToastForAlert(alert: VergeAlert) {
-        console.log('[SignalR] 🍞 Ejecutando showToastForAlert() para:', alert.title);
+        console.log('[SignalR] 🍞 Evaluando toast para:', alert.crypto, '| Confianza:', alert.confidence);
+
+        // REGLA: Solo mostrar Toasts si el score/confianza es >= 55%
+        if ((alert.confidence || 0) < 55) {
+            console.log(`[SignalR] 🔇 Alerta filtrada por baja confianza (${alert.confidence}% < 55%). No se muestra toast.`);
+            return;
+        }
 
         let life = 8000;
         let method: 'info' | 'success' | 'warn' | 'error' = 'info';
@@ -305,13 +320,11 @@ export class TradingSignalrService {
                 break;
         }
 
-        console.log(`[SignalR] 🍞 Disparando Toast ABP [${method}] con duración ${life}ms`);
+        console.log(`[SignalR] 🍞 DISPARANDO TOAST ABP [${method}] con duración ${life}ms`);
 
-        // ABP Toaster options
         const options = { life };
-
         const msg = '::' + (alert.message || '');
-        const title = '::' + (alert.title || '');
+        const title = '::' + (alert.title || alert.crypto || 'Alerta Verge');
 
         if (method === 'info') this.toaster.info(msg, title, options);
         else if (method === 'success') this.toaster.success(msg, title, options);

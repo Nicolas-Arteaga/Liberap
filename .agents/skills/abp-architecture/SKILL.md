@@ -43,3 +43,17 @@ docker ps --filter "publish=8000"
 3. **Si necesitas actualizar el código del servicio**, debes hacer `docker build` y `docker restart verge-python-ai`, NO simplemente editar el archivo local y asumir que se actualiza solo.
 4. **El `.NET backend** (`MarketScannerService`) llama al contenedor Docker via `http://localhost:8000` (o una URL configurada en `appsettings.json`). Ese target nunca debe cambiar sin actualizar también la config del backend.
 5. **Si hay múltiples procesos en el puerto 8000** (verificar con `netstat -ano | findstr ":8000"`), es NORMAL que Docker (`com.docker.backend`, `wslrelay`) aparezca — es la plomería interna de Windows/WSL. Solo preocuparse si el contenedor `verge-python-ai` NO aparece en `docker ps`.
+
+## ⚠️ REGLA CRÍTICA: Freqtrade Bot Integration (puerto 8080)
+
+**NO modifiques la lógica de FreqtradeAppService ni el `config.json` del bot sin entender el flujo granular.**
+
+1. **Multi-Bot Virtual:** El sistema simula control individual de pares (Play/Pause/Delete) manipulando dinámicamente la `pair_whitelist` y `pair_blacklist` del `config.json` y disparando `/api/v1/reload_config`.
+2. **Persistence:** Los cambios se escriben directamente en el archivo JSON físico en `freqtrade/user_data/config.json`. Cualquier agente que quiera agregar lógica debe usar `JsonNode` para no romper el esquema.
+3. **Control del Motor:** 
+   - El botón **Play** llama a `/api/v1/start`.
+   - El botón **Stop** llama a `/api/v1/stop`.
+   - El botón **Delete** remueve el par de AMBAS listas (blanca y negra) para evitar efectos "zombie".
+4. **Sincronización:** El backend detecta qué pares están abiertos consultando `/api/v1/status`. Nunca cambies esto a `/api/v1/trades` para estados en vivo (el historial es solo para visualización).
+5. **Chart Markers:** El Super Gráfico inyecta marcadores de compra/venta usando la propiedad `setMarkers` de Lightweight Charts tras obtener el historial del backend. No borres esta lógica al actualizar el componente de gráficos.
+
