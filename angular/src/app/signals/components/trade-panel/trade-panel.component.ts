@@ -9,6 +9,9 @@ import { PairBotInfo } from '../../models/bot.models';
 import { BotOrderService } from '../../services/bot-order.service';
 import { MarketDataService } from '../../../proxy/trading/market-data.service';
 import { SymbolTickerDto } from '../../../proxy/trading/models';
+import { FreqtradePollService } from '../../../services/freqtrade-poll.service';
+import { FreqtradeService } from '../../../proxy/freqtrade/freqtrade.service';
+import { FreqtradeTradeDto } from '../../../proxy/freqtrade/models';
 import { Subject, takeUntil, interval, Subscription } from 'rxjs';
 
 @Component({
@@ -23,6 +26,8 @@ export class TradePanelComponent implements OnInit, AfterViewInit, OnDestroy, On
   @ViewChild('chartContainer') chartContainer!: ElementRef;
   
   private marketDataService = inject(MarketDataService);
+  private freqtradeService = inject(FreqtradeService);
+  public pollService = inject(FreqtradePollService);
   private destroy$ = new Subject<void>();
 
   private chart: IChartApi | null = null;
@@ -33,7 +38,7 @@ export class TradePanelComponent implements OnInit, AfterViewInit, OnDestroy, On
   private ma99Series: ISeriesApi<'Line'> | null = null;
 
   // Searcher State
-  selectedSymbol = 'BTCUSDT';
+  selectedSymbol = 'SIRENUSDT';
   selectedTimeframe = '15m'; 
   hmaPeriod = 50;
   searchTerm = '';
@@ -42,6 +47,10 @@ export class TradePanelComponent implements OnInit, AfterViewInit, OnDestroy, On
   filteredTickers: SymbolTickerDto[] = [];
   selectedTicker?: SymbolTickerDto;
   tickerSubscription?: Subscription;
+  
+  // Trades History
+  tradeMarkers: any[] = [];
+  tradeHistory: FreqtradeTradeDto[] = [];
 
   timeframes = [
     { value: '1m', label: '1m' },
@@ -67,6 +76,15 @@ export class TradePanelComponent implements OnInit, AfterViewInit, OnDestroy, On
   }
 
   ngOnInit() {
+    this.pollService.selectedPair$.pipe(takeUntil(this.destroy$)).subscribe(pair => {
+      if (pair) {
+        const clean = pair.replace('/', '').split(':')[0];
+        if (clean !== this.selectedSymbol) {
+          this.selectedSymbol = clean;
+          this.loadData();
+        }
+      }
+    });
     this.loadTickers();
   }
 
@@ -224,9 +242,52 @@ export class TradePanelComponent implements OnInit, AfterViewInit, OnDestroy, On
         this.updateMA(sortedData, 25, this.ma25Series!);
         this.updateMA(sortedData, 99, this.ma99Series!);
 
+        this.updateTradeMarkers();
         this.chart?.timeScale().fitContent();
       }
     });
+
+    this.updateSelectedTicker();
+    this.loadTradeHistory();
+  }
+
+  private loadTradeHistory() {
+    this.freqtradeService.getTradeHistory(this.selectedSymbol).subscribe(history => {
+      this.tradeHistory = history || [];
+      this.updateTradeMarkers();
+    });
+  }
+
+  private updateTradeMarkers() {
+    if (!this.candlestickSeries || !this.tradeHistory.length) return;
+
+    const markers: any[] = [];
+    
+    this.tradeHistory.forEach(trade => {
+      if (trade.openDate) {
+        const openTime = new Date(trade.openDate).getTime() / 1000;
+        markers.push({
+          time: openTime,
+          position: trade.isShort ? 'aboveBar' : 'belowBar',
+          color: trade.isShort ? '#ef5350' : '#26a69a',
+          shape: trade.isShort ? 'arrowDown' : 'arrowUp',
+          text: trade.isShort ? 'Short entry' : 'Long entry'
+        });
+      }
+
+      if (trade.closeDate) {
+        const closeTime = new Date(trade.closeDate).getTime() / 1000;
+        markers.push({
+          time: closeTime,
+          position: trade.isShort ? 'belowBar' : 'aboveBar',
+          color: '#fadb14',
+          shape: 'diamond',
+          text: 'Exit'
+        });
+      }
+    });
+
+    (this.candlestickSeries as any).setMarkers(markers.sort((a, b) => a.time - b.time));
   }
 
   private updateMA(data: any[], period: number, series: ISeriesApi<'Line'>) {

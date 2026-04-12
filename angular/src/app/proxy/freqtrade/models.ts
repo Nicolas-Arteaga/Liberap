@@ -33,5 +33,6 @@ export interface FreqtradeTradeDto {
   profitPercentage: number;
   profitAbs: number;
   openDate?: string;
+  closeDate?: string;
   isShort: boolean;
 }

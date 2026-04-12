@@ -9,8 +9,8 @@
         <div class="selected-symbol-container d-flex align-items-center gap-2 cursor-pointer" 
              (click)="showSymbolSelector = !showSymbolSelector">
           <div class="d-flex flex-column">
-            <span class="symbol-name fw-bold">{{ selectedSymbol }}</span>
-            <span class="text-xxs text-white-30 tracking-tighter uppercase">Binance Spot</span>
+            <span class="symbol-name fw-bold">{{ selectedSymbol.replace('USDT', '') }}</span>
+            <span class="text-xxs text-white-30 tracking-tighter uppercase">BOT PAIR</span>
           </div>
           <div class="v-divider mx-1" style="height: 20px; width: 1px; background: rgba(255,255,255,0.1)"></div>
           <div class="d-flex flex-column align-items-end" *ngIf="selectedTicker">
@@ -29,44 +29,27 @@
              style="z-index: 999; background: transparent;"
              (click)="showSymbolSelector = false"></div>
 
-        <!-- Dropdown Selector (Exactly as Dashboard) -->
+        <!-- Restricted Pair Dropdown -->
         <div class="symbol-dropdown-container animate-fade-in shadow-xl" *ngIf="showSymbolSelector" style="z-index: 1000;">
-          <div class="search-box p-3 border-bottom border-white-05">
-            <div class="input-group bg-dark-soft rounded-pill px-3 border border-white-10 d-flex align-items-center">
-              <ion-icon name="search-outline" class="text-white-30"></ion-icon>
-              <input type="text" 
-                     class="form-control bg-transparent border-0 text-white text-xs py-2 outline-none shadow-none" 
-                     placeholder="Buscar moneda..."
-                     [(ngModel)]="searchTerm"
-                     (input)="filterTickers()"
-                     autofocus>
-            </div>
-          </div>
-          <div class="tickers-list overflow-auto" style="max-height: 400px;">
+          <div class="tickers-list overflow-auto" style="max-height: 400px; padding-top: 10px;">
             <div class="ticker-item-header d-flex text-white-30 text-xs px-3 py-2">
-              <div class="flex-grow-1">Moneda</div>
-              <div class="text-end" style="width: 80px;">Precio</div>
-              <div class="text-end" style="width: 80px;">Cambio</div>
+              <div class="flex-grow-1">Bots Activos</div>
+              <div class="text-end" style="width: 80px;">Status</div>
             </div>
             <div class="ticker-item d-flex align-items-center px-3 py-2 cursor-pointer hover:bg-white-05 border-bottom border-white-03"
-                 *ngFor="let t of filteredTickers"
-                 [class.active]="t.symbol === selectedSymbol"
-                 (click)="selectSymbol(t.symbol)">
+                 *ngFor="let p of (pollService.status$ | async)?.activePairs"
+                 [class.active]="p.replace('/', '').split(':')[0] === selectedSymbol"
+                 (click)="selectSymbol(p.replace('/', '').split(':')[0])">
               <div class="flex-grow-1">
-                <div class="text-white fw-bold text-sm">{{ t.symbol }}</div>
-                <div class="text-white-30 text-xxs">Perpetuo</div>
+                <div class="text-white fw-bold text-sm">{{ p.replace('/', '').split(':')[0] }}</div>
+                <div class="text-white-30 text-xxs">Freqtrade Engine</div>
               </div>
               <div class="text-end" style="width: 80px;">
-                <div class="text-white text-xs fw-medium">{{ t.lastPrice | number:'1.2-8' }}</div>
-              </div>
-              <div class="text-end" style="width: 80px;">
-                <div class="text-xs fw-medium" [ngClass]="t.priceChangePercent >= 0 ? 'text-success' : 'text-danger'">
-                  {{ t.priceChangePercent >= 0 ? '+' : '' }}{{ t.priceChangePercent | number:'1.2-2' }}%
-                </div>
+                <div class="text-xs fw-medium text-success">ONLINE</div>
               </div>
             </div>
-            <div *ngIf="filteredTickers.length === 0" class="p-4 text-center text-white-30 text-xs">
-              No se encontraron monedas
+            <div *ngIf="!(pollService.status$ | async)?.activePairs?.length" class="p-4 text-center text-white-30 text-xs">
+              No hay bots configurados
             </div>
           </div>
         </div>

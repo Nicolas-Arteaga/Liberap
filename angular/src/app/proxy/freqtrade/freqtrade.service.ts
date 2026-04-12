@@ -36,10 +36,27 @@ export class FreqtradeService {
     { apiName: this.apiName,...config });
   
 
+  forceExit = (tradeId: string, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'POST',
+      url: `/api/app/freqtrade/force-exit/${tradeId}`,
+    },
+    { apiName: this.apiName,...config });
+  
+
   getOpenTrades = (config?: Partial<Rest.Config>) =>
     this.restService.request<any, FreqtradeTradeDto[]>({
       method: 'GET',
       url: '/api/app/freqtrade/open-trades',
+    },
+    { apiName: this.apiName,...config });
+  
+
+  getTradeHistory = (pair?: string, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, FreqtradeTradeDto[]>({
+      method: 'GET',
+      url: '/api/app/freqtrade/trade-history',
+      params: { pair },
     },
     { apiName: this.apiName,...config });
   
@@ -56,6 +73,22 @@ export class FreqtradeService {
     this.restService.request<any, FreqtradeStatusDto>({
       method: 'GET',
       url: '/api/app/freqtrade/status',
+    },
+    { apiName: this.apiName,...config });
+  
+
+  pauseBot = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'POST',
+      url: '/api/app/freqtrade/pause-bot',
+    },
+    { apiName: this.apiName,...config });
+  
+
+  reloadConfig = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'POST',
+      url: '/api/app/freqtrade/reload-config',
     },
     { apiName: this.apiName,...config });
   

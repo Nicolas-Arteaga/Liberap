@@ -13,6 +13,7 @@ namespace Verge.Freqtrade
         public decimal ProfitPercentage { get; set; }
         public decimal ProfitAbs { get; set; }
         public DateTime OpenDate { get; set; }
+        public DateTime? CloseDate { get; set; }
         public bool IsShort { get; set; }
     }
 }

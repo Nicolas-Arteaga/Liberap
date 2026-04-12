@@ -25,33 +25,44 @@ import { ToasterService } from '@abp/ng.theme.shared';
             </tr>
           </thead>
           <tbody>
-            <!-- Real Open Trades List -->
-            <tr *ngFor="let trade of pollService.openTrades$ | async; let i = index" 
-                [class.selected]="(pollService.selectedTradeId$ | async) === trade.id">
-              <td class="name-cell">Trade #{{ trade.id }}</td>
-              <td>{{ trade.pair.replace('/USDT:USDT', 'USDT') }}</td>
+            <!-- Iteramos sobre pares configurados en el bot -->
+            <tr *ngFor="let pair of (pollService.status$ | async)?.activePairs; let i = index" 
+                [class.selected]="(pollService.selectedPair$ | async) === pair">
+              <td class="name-cell">Bot #{{ i + 1 }}</td>
+              <td>{{ pair.replace('/USDT:USDT', 'USDT').replace('/', '') }}</td>
               <td>
-                <span class="type-badge" [class.long]="!trade.isShort" [class.short]="trade.isShort">
-                  {{ trade.isShort ? 'SHORT' : 'LONG' }}
-                </span>
+                <ng-container *ngIf="getTradeForPair(pair) as trade; else scanning">
+                  <span class="type-badge" [class.long]="!trade.isShort" [class.short]="trade.isShort">
+                    {{ trade.isShort ? 'SHORT' : 'LONG' }}
+                  </span>
+                </ng-container>
+                <ng-template #scanning>-</ng-template>
               </td>
               <td>
-                <span class="status-badge open">OPEN</span>
+                <ng-container *ngIf="getTradeForPair(pair) as trade; else scanningStatus">
+                  <span class="status-badge open">IN TRADE</span>
+                </ng-container>
+                <ng-template #scanningStatus>
+                  <span class="status-badge scanning">SCANNING</span>
+                </ng-template>
               </td>
-              <td class="pnl-cell" [class.positive]="trade.pnl >= 0" [class.negative]="trade.pnl < 0">
-                {{ trade.pnl >= 0 ? '+' : '' }}{{ trade.pnl | number:'1.2-2' }} USDT
+              <td class="pnl-cell" [class.positive]="getTradeForPair(pair)?.pnl >= 0" [class.negative]="getTradeForPair(pair)?.pnl < 0">
+                <ng-container *ngIf="getTradeForPair(pair) as trade; else scanningPnl">
+                  {{ trade.pnl >= 0 ? '+' : '' }}{{ trade.pnl | number:'1.2-2' }} USDT
+                </ng-container>
+                <ng-template #scanningPnl>0.00 USDT</ng-template>
               </td>
               <td class="actions-cell">
-                <button class="btn-ver" (click)="viewTrade(trade.id, trade.pair)">Ver</button>
-                <button class="btn-action btn-stop" (click)="closeTrade(trade.id)">Cerrar</button>
+                <button class="btn-ver" (click)="viewPair(pair)">Analizar</button>
+                <button *ngIf="getTradeForPair(pair) as trade" class="btn-action btn-stop" (click)="closeTrade(trade.id)">Cerrar</button>
               </td>
             </tr>
 
-            <tr *ngIf="(pollService.openTrades$ | async)?.length === 0">
+            <tr *ngIf="!(pollService.status$ | async)?.activePairs?.length">
               <td colspan="6" class="text-center text-muted" style="padding: 40px;">
                 <div class="empty-trades">
-                  <span class="d-block mb-1">Sin posiciones abiertas.</span>
-                  <span class="text-xxs">El bot está analizando el mercado en busca de oportunidades.</span>
+                  <span class="d-block mb-1">Cero bots configurados.</span>
+                  <span class="text-xxs">Agregue una moneda para comenzar.</span>
                 </div>
               </td>
             </tr>
@@ -106,6 +117,7 @@ import { ToasterService } from '@abp/ng.theme.shared';
       font-size: 10px;
       font-weight: 800;
       &.open { background: #3b82f6; color: white; }
+      &.scanning { background: rgba(255, 255, 255, 0.05); color: #8b949e; border: 1px solid rgba(255, 255, 255, 0.1); }
     }
 
     .pnl-cell {
@@ -152,6 +164,17 @@ export class ActiveBotsTableComponent {
   public pollService = inject(FreqtradePollService);
   private freqtradeService = inject(FreqtradeService);
   private toaster = inject(ToasterService);
+
+  private openTrades: any[] = [];
+
+  constructor() {
+    this.pollService.openTrades$.subscribe(t => this.openTrades = t || []);
+  }
+
+  getTradeForPair(pair: string) {
+    const base = pair.replace('/', '').split(':')[0];
+    return this.openTrades.find(t => t.pair === base);
+  }
 
   viewTrade(id: number, pair: string) {
     this.pollService.selectTrade(id);

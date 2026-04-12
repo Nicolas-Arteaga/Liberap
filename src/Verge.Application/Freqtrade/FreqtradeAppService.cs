@@ -112,51 +112,113 @@ namespace Verge.Freqtrade
 
             try
             {
-                var response = await client.GetAsync("/api/v1/trades");
+                // /api/v1/status returns the currently active trades
+                var response = await client.GetAsync("/api/v1/status");
                 if (!response.IsSuccessStatusCode) return new List<FreqtradeTradeDto>();
 
                 var content = await response.Content.ReadAsStringAsync();
                 using var doc = JsonDocument.Parse(content);
                 var list = new List<FreqtradeTradeDto>();
 
-                // Freqtrade returns { "trades": [...], "trades_count": X }
-                if (doc.RootElement.TryGetProperty("trades", out var tradesArray))
-                {
-                    foreach (var element in tradesArray.EnumerateArray())
-                    {
-                        var isOpen = element.TryGetProperty("is_open", out var openProp) && openProp.GetBoolean();
-                        if (isOpen)
-                        {
-                            var rawPair = element.TryGetProperty("pair", out var pProp) ? pProp.GetString() ?? "" : "";
-                            // Normalizar: "SIREN/USDT:USDT" -> "SIRENUSDT"
-                            var normalizedPair = rawPair.Replace("/", "").Split(':')[0];
-
-                            list.Add(new FreqtradeTradeDto
-                            {
-                                Id = element.TryGetProperty("trade_id", out var idProp) ? idProp.GetInt32() : 0,
-                                Pair = normalizedPair,
-                                Amount = element.TryGetProperty("amount", out var amtProp) ? amtProp.GetDecimal() : 0,
-                                OpenRate = element.TryGetProperty("open_rate", out var orProp) ? orProp.GetDecimal() : 0,
-                                CurrentRate = element.TryGetProperty("current_rate", out var crProp) ? crProp.GetDecimal() : 
-                                              (element.TryGetProperty("close_rate", out var clrProp) ? clrProp.GetDecimal() : 0),
-                                ProfitPercentage = element.TryGetProperty("profit_pct", out var ppProp) ? ppProp.GetDecimal() : 
-                                                  (element.TryGetProperty("profit_ratio", out var prProp) ? prProp.GetDecimal() * 100 : 0),
-                                ProfitAbs = element.TryGetProperty("profit_abs", out var paProp) ? paProp.GetDecimal() : 0,
-                                Pnl = element.TryGetProperty("profit_abs", out var pnlProp) ? pnlProp.GetDecimal() : 0,
-                                OpenDate = element.TryGetProperty("open_date", out var odProp) && odProp.GetString() != null 
-                                          ? (DateTime.TryParse(odProp.GetString(), out var date) ? date : DateTime.UtcNow) 
-                                          : DateTime.UtcNow,
-                                IsShort = element.TryGetProperty("is_short", out var shortProp) && shortProp.GetBoolean()
-                            });
-                        }
-                    }
+                // Freqtrade /status returns a JSON array directly or in a "trades" property
+                var root = doc.RootElement;
+                JsonElement tradesArray;
+                
+                if (root.ValueKind == JsonValueKind.Array) {
+                    tradesArray = root;
+                } else if (root.TryGetProperty("trades", out var tArr)) {
+                    tradesArray = tArr;
+                } else {
+                    return list;
                 }
-                _logger.LogDebug("[Freqtrade] Sync: {Count} trades abiertos encontrados.", list.Count);
+
+                foreach (var element in tradesArray.EnumerateArray())
+                {
+                    var rawPair = element.TryGetProperty("pair", out var pProp) ? pProp.GetString() ?? "" : "";
+                    var normalizedPair = rawPair.Replace("/", "").Split(':')[0];
+
+                    list.Add(new FreqtradeTradeDto
+                    {
+                        Id = element.TryGetProperty("trade_id", out var idProp) ? idProp.GetInt32() : 0,
+                        Pair = normalizedPair,
+                        Amount = element.TryGetProperty("amount", out var amtProp) ? amtProp.GetDecimal() : 0,
+                        OpenRate = element.TryGetProperty("open_rate", out var orProp) ? orProp.GetDecimal() : 0,
+                        CurrentRate = element.TryGetProperty("current_rate", out var crProp) ? crProp.GetDecimal() : 
+                                      (element.TryGetProperty("close_rate", out var clrProp) ? clrProp.GetDecimal() : 0),
+                        ProfitPercentage = element.TryGetProperty("profit_pct", out var ppProp) ? ppProp.GetDecimal() : 
+                                          (element.TryGetProperty("profit_ratio", out var prProp) ? prProp.GetDecimal() * 100 : 0),
+                        ProfitAbs = element.TryGetProperty("profit_abs", out var paProp) ? paProp.GetDecimal() : 0,
+                        Pnl = element.TryGetProperty("profit_abs", out var pnlProp) ? pnlProp.GetDecimal() : 0,
+                        OpenDate = element.TryGetProperty("open_date", out var odProp) && odProp.GetString() != null 
+                                  ? (DateTime.TryParse(odProp.GetString(), out var date) ? date : DateTime.UtcNow) 
+                                  : DateTime.UtcNow,
+                        IsShort = element.TryGetProperty("is_short", out var shortProp) && shortProp.GetBoolean()
+                    });
+                }
+                
+                _logger.LogDebug("[Freqtrade] Status Sync: {Count} trades abiertos encontrados.", list.Count);
                 return list;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "[Freqtrade] Error en GetOpenTradesAsync");
+                return new List<FreqtradeTradeDto>();
+            }
+        }
+
+        public async Task<List<FreqtradeTradeDto>> GetTradeHistoryAsync(string? pair = null)
+        {
+            var client = await GetClientAsync();
+            if (client == null) return new List<FreqtradeTradeDto>();
+
+            try
+            {
+                // /api/v1/trades?limit=500
+                var url = "/api/v1/trades?limit=500";
+                var response = await client.GetAsync(url);
+                if (!response.IsSuccessStatusCode) return new List<FreqtradeTradeDto>();
+
+                var content = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(content);
+                var list = new List<FreqtradeTradeDto>();
+
+                if (doc.RootElement.TryGetProperty("trades", out var tradesArray))
+                {
+                    foreach (var element in tradesArray.EnumerateArray())
+                    {
+                        var rawPair = element.TryGetProperty("pair", out var pProp) ? pProp.GetString() ?? "" : "";
+                        var normalizedPair = rawPair.Replace("/", "").Split(':')[0];
+
+                        // Filter by pair if requested
+                        if (!string.IsNullOrEmpty(pair)) {
+                            var cleanInputPair = pair.Replace("/", "").Split(':')[0];
+                            if (!normalizedPair.Equals(cleanInputPair, StringComparison.OrdinalIgnoreCase)) continue;
+                        }
+
+                        list.Add(new FreqtradeTradeDto
+                        {
+                            Id = element.TryGetProperty("trade_id", out var idProp) ? idProp.GetInt32() : 0,
+                            Pair = normalizedPair,
+                            Amount = element.TryGetProperty("amount", out var amtProp) ? amtProp.GetDecimal() : 0,
+                            OpenRate = element.TryGetProperty("open_rate", out var orProp) ? orProp.GetDecimal() : 0,
+                            CurrentRate = element.TryGetProperty("close_rate", out var crProp) ? crProp.GetDecimal() : 0,
+                            ProfitPercentage = element.TryGetProperty("profit_pct", out var ppProp) ? ppProp.GetDecimal() : 0,
+                            ProfitAbs = element.TryGetProperty("profit_abs", out var paProp) ? paProp.GetDecimal() : 0,
+                            OpenDate = element.TryGetProperty("open_date", out var odProp) && odProp.GetString() != null 
+                                      ? (DateTime.TryParse(odProp.GetString(), out var date) ? date : DateTime.UtcNow) 
+                                      : DateTime.UtcNow,
+                            CloseDate = element.TryGetProperty("close_date", out var cdProp) && cdProp.GetString() != null 
+                                       ? (DateTime.TryParse(cdProp.GetString(), out var cDate) ? cDate : (DateTime?)null) 
+                                       : null,
+                            IsShort = element.TryGetProperty("is_short", out var shortProp) && shortProp.GetBoolean()
+                        });
+                    }
+                }
+                return list;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[Freqtrade] Error en GetTradeHistoryAsync");
                 return new List<FreqtradeTradeDto>();
             }
         }
@@ -347,7 +409,13 @@ namespace Verge.Freqtrade
             await _botHubContext.Clients.All.SendAsync("BotStatusChanged", "stopped");
         }
 
-        public async Task ResumeBotAsync() => await StartBotAsync(new FreqtradeCreateBotDto());
+        public async Task ResumeBotAsync()
+        {
+            var client = await GetClientAsync();
+            if (client == null) return;
+            await client.PostAsync("/api/v1/start", new StringContent("{}", Encoding.UTF8, "application/json"));
+            await client.PostAsync("/api/v1/reload_config", new StringContent("{}", Encoding.UTF8, "application/json"));
+        }
 
         public async Task CloseTradeAsync(string tradeId)
         {
@@ -366,6 +434,27 @@ namespace Verge.Freqtrade
             await client.PostAsync("/api/v1/forceenter", new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json"));
         }
 
+        public async Task ForceExitAsync(string tradeId)
+        {
+            var client = await GetClientAsync();
+            if (client == null) return;
+            var payload = new { tradeid = tradeId };
+            await client.PostAsync("/api/v1/forceexit", new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json"));
+        }
+
+        public async Task PauseBotAsync()
+        {
+            var client = await GetClientAsync();
+            if (client == null) return;
+            await client.PostAsync("/api/v1/stopbuy", new StringContent("{}", Encoding.UTF8, "application/json"));
+        }
+
+        public async Task ReloadConfigAsync()
+        {
+            var client = await GetClientAsync();
+            if (client == null) return;
+            await client.PostAsync("/api/v1/reload_config", new StringContent("{}", Encoding.UTF8, "application/json"));
+        }
         public async Task DeleteBotAsync(string pair)
         {
             var configPath = @"C:\Users\Nicolas\Desktop\Verge\Verge\freqtrade\user_data\config.json";
@@ -382,31 +471,31 @@ namespace Verge.Freqtrade
             if (exchange != null)
             {
                 var whitelist = exchange["pair_whitelist"]?.AsArray();
+                var blacklist = exchange["pair_blacklist"]?.AsArray();
+                
                 if (whitelist != null)
                 {
                     for (int i = 0; i < whitelist.Count; i++)
                     {
-                        if (whitelist[i]?.ToString().Equals(pairToMatch, StringComparison.OrdinalIgnoreCase) == true)
-                        {
-                            whitelist.RemoveAt(i);
-                            _logger.LogInformation("❌ Pair {pair} REMOVED from whitelist surgically.", pairToMatch);
-                            break;
-                        }
+                        if (whitelist[i]?.ToString().Equals(pairToMatch, StringComparison.OrdinalIgnoreCase) == true){ whitelist.RemoveAt(i); break; }
                     }
-                    
-                    await File.WriteAllTextAsync(configPath, rootNode.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
                 }
+                if (blacklist != null)
+                {
+                    for (int i = 0; i < blacklist.Count; i++)
+                    {
+                        if (blacklist[i]?.ToString().Equals(pairToMatch, StringComparison.OrdinalIgnoreCase) == true){ blacklist.RemoveAt(i); break; }
+                    }
+                }
+                
+                await File.WriteAllTextAsync(configPath, rootNode.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
             }
 
             var client = await GetClientAsync();
             if (client != null)
             {
                 await client.PostAsync("/api/v1/reload_config", new StringContent("{}", Encoding.UTF8, "application/json"));
-                await Task.Delay(1000);
-                await client.PostAsync("/api/v1/start", new StringContent("{}", Encoding.UTF8, "application/json"));
             }
-            
-            await _botHubContext.Clients.All.SendAsync("BotStatusChanged", "running");
         }
 
         public async Task UpdateWhitelistAsync(string pair) => await Task.CompletedTask;

@@ -969,6 +969,39 @@
                   }
                 },
                 {
+                  "name": "PauseBotAsync",
+                  "parametersOnMethod": [],
+                  "returnValue": {
+                    "type": "System.Void",
+                    "typeSimple": "System.Void"
+                  }
+                },
+                {
+                  "name": "ReloadConfigAsync",
+                  "parametersOnMethod": [],
+                  "returnValue": {
+                    "type": "System.Void",
+                    "typeSimple": "System.Void"
+                  }
+                },
+                {
+                  "name": "ForceExitAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "tradeId",
+                      "typeAsString": "System.String, System.Private.CoreLib",
+                      "type": "System.String",
+                      "typeSimple": "string",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "System.Void",
+                    "typeSimple": "System.Void"
+                  }
+                },
+                {
                   "name": "ResumeBotAsync",
                   "parametersOnMethod": [],
                   "returnValue": {
@@ -1084,6 +1117,21 @@
               "name": "StopBotAsync",
               "httpMethod": "POST",
               "url": "api/app/freqtrade/stop-bot",
+              "supportedVersions": [],
+              "parametersOnMethod": [],
+              "parameters": [],
+              "returnValue": {
+                "type": "System.Void",
+                "typeSimple": "System.Void"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Freqtrade.IFreqtradeAppService"
+            },
+            "ResumeBotAsync": {
+              "uniqueName": "ResumeBotAsync",
+              "name": "ResumeBotAsync",
+              "httpMethod": "POST",
+              "url": "api/app/freqtrade/resume-bot",
               "supportedVersions": [],
               "parametersOnMethod": [],
               "parameters": [],
@@ -1228,11 +1276,63 @@
               "allowAnonymous": false,
               "implementFrom": "Verge.Freqtrade.FreqtradeAppService"
             },
-            "ResumeBotAsync": {
-              "uniqueName": "ResumeBotAsync",
-              "name": "ResumeBotAsync",
+            "ForceExitAsyncByTradeId": {
+              "uniqueName": "ForceExitAsyncByTradeId",
+              "name": "ForceExitAsync",
               "httpMethod": "POST",
-              "url": "api/app/freqtrade/resume-bot",
+              "url": "api/app/freqtrade/force-exit/{tradeId}",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "tradeId",
+                  "typeAsString": "System.String, System.Private.CoreLib",
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "tradeId",
+                  "name": "tradeId",
+                  "jsonName": null,
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": [],
+                  "bindingSourceId": "Path",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "System.Void",
+                "typeSimple": "System.Void"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Freqtrade.IFreqtradeAppService"
+            },
+            "PauseBotAsync": {
+              "uniqueName": "PauseBotAsync",
+              "name": "PauseBotAsync",
+              "httpMethod": "POST",
+              "url": "api/app/freqtrade/pause-bot",
+              "supportedVersions": [],
+              "parametersOnMethod": [],
+              "parameters": [],
+              "returnValue": {
+                "type": "System.Void",
+                "typeSimple": "System.Void"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Freqtrade.IFreqtradeAppService"
+            },
+            "ReloadConfigAsync": {
+              "uniqueName": "ReloadConfigAsync",
+              "name": "ReloadConfigAsync",
+              "httpMethod": "POST",
+              "url": "api/app/freqtrade/reload-config",
               "supportedVersions": [],
               "parametersOnMethod": [],
               "parameters": [],
@@ -2417,132 +2517,6 @@
                   "constraintTypes": null,
                   "bindingSourceId": "ModelBinding",
                   "descriptorName": "input"
-                }
-              ],
-              "returnValue": {
-                "type": "Verge.Trading.TradePreviewDto",
-                "typeSimple": "Verge.Trading.TradePreviewDto"
-              },
-              "allowAnonymous": null,
-              "implementFrom": "Verge.Trading.IRealTradeAppService"
-            },
-            "ConfirmAsyncByInput": {
-              "uniqueName": "ConfirmAsyncByInput",
-              "name": "ConfirmAsync",
-              "httpMethod": "POST",
-              "url": "api/app/real-trade/confirm",
-              "supportedVersions": [],
-              "parametersOnMethod": [
-                {
-                  "name": "input",
-                  "typeAsString": "Verge.Trading.TradeConfirmationDto, Verge.Application.Contracts",
-                  "type": "Verge.Trading.TradeConfirmationDto",
-                  "typeSimple": "Verge.Trading.TradeConfirmationDto",
-                  "isOptional": false,
-                  "defaultValue": null
-                }
-              ],
-              "parameters": [
-                {
-                  "nameOnMethod": "input",
-                  "name": "input",
-                  "jsonName": null,
-                  "type": "Verge.Trading.TradeConfirmationDto",
-                  "typeSimple": "Verge.Trading.TradeConfirmationDto",
-                  "isOptional": false,
-                  "defaultValue": null,
-                  "constraintTypes": null,
-                  "bindingSourceId": "Body",
-                  "descriptorName": ""
-                }
-              ],
-              "returnValue": {
-                "type": "System.Boolean",
-                "typeSimple": "boolean"
-              },
-              "allowAnonymous": null,
-              "implementFrom": "Verge.Trading.IRealTradeAppService"
-            }
-          }
-        },
-        "Verge.Trading.RealTradeController": {
-          "controllerName": "RealTrade",
-          "controllerGroupName": "RealTrade",
-          "isRemoteService": true,
-          "isIntegrationService": false,
-          "apiVersion": null,
-          "type": "Verge.Trading.RealTradeController",
-          "interfaces": [
-            {
-              "type": "Verge.Trading.IRealTradeAppService",
-              "name": "IRealTradeAppService",
-              "methods": [
-                {
-                  "name": "GetPreviewAsync",
-                  "parametersOnMethod": [
-                    {
-                      "name": "input",
-                      "typeAsString": "Verge.Trading.TradeRequestDto, Verge.Application.Contracts",
-                      "type": "Verge.Trading.TradeRequestDto",
-                      "typeSimple": "Verge.Trading.TradeRequestDto",
-                      "isOptional": false,
-                      "defaultValue": null
-                    }
-                  ],
-                  "returnValue": {
-                    "type": "Verge.Trading.TradePreviewDto",
-                    "typeSimple": "Verge.Trading.TradePreviewDto"
-                  }
-                },
-                {
-                  "name": "ConfirmAsync",
-                  "parametersOnMethod": [
-                    {
-                      "name": "input",
-                      "typeAsString": "Verge.Trading.TradeConfirmationDto, Verge.Application.Contracts",
-                      "type": "Verge.Trading.TradeConfirmationDto",
-                      "typeSimple": "Verge.Trading.TradeConfirmationDto",
-                      "isOptional": false,
-                      "defaultValue": null
-                    }
-                  ],
-                  "returnValue": {
-                    "type": "System.Boolean",
-                    "typeSimple": "boolean"
-                  }
-                }
-              ]
-            }
-          ],
-          "actions": {
-            "GetPreviewAsyncByInput": {
-              "uniqueName": "GetPreviewAsyncByInput",
-              "name": "GetPreviewAsync",
-              "httpMethod": "POST",
-              "url": "api/app/real-trade/preview",
-              "supportedVersions": [],
-              "parametersOnMethod": [
-                {
-                  "name": "input",
-                  "typeAsString": "Verge.Trading.TradeRequestDto, Verge.Application.Contracts",
-                  "type": "Verge.Trading.TradeRequestDto",
-                  "typeSimple": "Verge.Trading.TradeRequestDto",
-                  "isOptional": false,
-                  "defaultValue": null
-                }
-              ],
-              "parameters": [
-                {
-                  "nameOnMethod": "input",
-                  "name": "input",
-                  "jsonName": null,
-                  "type": "Verge.Trading.TradeRequestDto",
-                  "typeSimple": "Verge.Trading.TradeRequestDto",
-                  "isOptional": false,
-                  "defaultValue": null,
-                  "constraintTypes": null,
-                  "bindingSourceId": "Body",
-                  "descriptorName": ""
                 }
               ],
               "returnValue": {
