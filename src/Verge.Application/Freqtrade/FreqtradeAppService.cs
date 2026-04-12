@@ -231,6 +231,7 @@ namespace Verge.Freqtrade
             
             try
             {
+                // Aumentamos el timeout para esta llamada específica ya que el bot puede estar ocupado (entrenando)
                 var response = await client.GetAsync("/api/v1/show_config");
                 if (response.IsSuccessStatusCode)
                 {
@@ -241,76 +242,62 @@ namespace Verge.Freqtrade
                     // El bot podría devolver la config directamente o dentro de un objeto "config"
                     var result = root.TryGetProperty("config", out var configObj) ? configObj : root;
 
-                    var statusStr = result.TryGetProperty("state", out var state) ? state.GetString()?.ToLower() : "stopped";
+                    var stateValue = result.TryGetProperty("state", out var state) ? state.GetString()?.ToLower() : "stopped";
                     var pairs = new List<string>();
 
-                    // Función local para extraer de un elemento
+                    // Local helper for extraction
                     void ExtractFromElement(JsonElement el)
                     {
-                        if (el.TryGetProperty("pair_whitelist", out var wl))
+                        if (el.TryGetProperty("pair_whitelist", out var wl) && wl.ValueKind == JsonValueKind.Array)
                         {
-                            foreach (var p in wl.EnumerateArray()) pairs.Add(p.GetString() ?? "");
+                            foreach (var p in wl.EnumerateArray()) {
+                                var s = p.GetString();
+                                if (!string.IsNullOrEmpty(s)) pairs.Add(s);
+                            }
                         }
                     }
 
-                    // 1. Root / Config level
-                    ExtractFromElement(result);
-
-                    // 2. Exchange level
+                    // Multi-Path Extraction Strategy
+                    ExtractFromElement(result); // Root
+                    // Guard: only try to extract from 'exchange' if it is an object, not a string
                     if (result.TryGetProperty("exchange", out var exch) && exch.ValueKind == JsonValueKind.Object)
+                        ExtractFromElement(exch); // Exchange level
+                    
+                    // Fallback Dinámico: Si la config no tiene la lista (común en versiones modernas o durante entrenamiento)
+                    if (pairs.Count == 0 || stateValue == "running")
                     {
-                        ExtractFromElement(exch);
-                    }
-
-                    // 3. Pairlists level (formato moderno)
-                    if (result.TryGetProperty("pairlists", out var plists))
-                    {
-                        if (plists.ValueKind == JsonValueKind.Array)
-                        {
-                            foreach (var pl in plists.EnumerateArray()) ExtractFromElement(pl);
-                        }
-                        else if (plists.ValueKind == JsonValueKind.Object)
-                        {
-                            ExtractFromElement(plists);
-                        }
-                    }
-
-                    // Fallback Crítico: Si el bot está corriendo pero no encontramos parejas en config,
-                    // intentamos sacarlas de los trades actuales o de /api/v1/whitelist
-                    if (pairs.Count == 0 && statusStr == "running")
-                    {
-                        _logger.LogWarning("[Freqtrade] Whitelist no encontrada en show_config. Intentando fallback...");
                         try 
                         {
-                             var wlResp = await client.GetAsync("/api/v1/whitelist");
-                             if (wlResp.IsSuccessStatusCode)
-                             {
-                                 var wlCont = await wlResp.Content.ReadAsStringAsync();
-                                 using var wlDoc = JsonDocument.Parse(wlCont);
-                                 if (wlDoc.RootElement.TryGetProperty("whitelist", out var wlArray))
-                                 {
-                                     foreach(var p in wlArray.EnumerateArray()) pairs.Add(p.GetString() ?? "");
-                                 }
-                             }
-                        } catch { /* ignore fallback error */ }
+                            var wlResp = await client.GetAsync("/api/v1/whitelist");
+                            if (wlResp.IsSuccessStatusCode)
+                            {
+                                var wlContent = await wlResp.Content.ReadAsStringAsync();
+                                using var wlDoc = JsonDocument.Parse(wlContent);
+                                if (wlDoc.RootElement.TryGetProperty("whitelist", out var wlArray))
+                                {
+                                    foreach (var p in wlArray.EnumerateArray()) pairs.Add(p.GetString() ?? "");
+                                }
+                            }
+                        }
+                        catch (Exception ex) { _logger.LogWarning("[Freqtrade] Whitelist fallback failed: {msg}", ex.Message); }
                     }
 
-                    if (pairs.Count == 0) _logger.LogWarning("[Freqtrade] ❌ No se pudo encontrar pair_whitelist en ninguna ruta.");
-                    else _logger.LogInformation("[Freqtrade] ✅ Sincronizados {Count} pares activos.", pairs.Distinct().Count());
+                    var distinctPairs = pairs.Distinct().Where(p => !string.IsNullOrEmpty(p)).ToList();
+                    _logger.LogInformation("[Freqtrade] Sync: State={state}, Pairs={count}", stateValue, distinctPairs.Count);
 
                     return new FreqtradeStatusDto
                     {
-                        IsRunning = statusStr == "running",
-                        ActivePairs = pairs.Distinct().ToList(),
+                        IsRunning = stateValue == "running" || stateValue == "starting",
+                        ActivePairs = distinctPairs,
                         OpenTradesCount = 0 
                     };
                 }
             }
             catch (Exception ex)
             { 
-                _logger.LogError(ex, "[Freqtrade] Error en GetStatusAsync");
+                _logger.LogError(ex, "[Freqtrade] Error fatal en GetStatusAsync");
             }
-            return new FreqtradeStatusDto { IsRunning = false };
+            return new FreqtradeStatusDto { IsRunning = false, ActivePairs = new List<string>() };
         }
 
         public async Task<FreqtradeProfitDto> GetProfitAsync()

@@ -9,6 +9,7 @@ using Microsoft.Extensions.Http;
 using StackExchange.Redis;
 using Volo.Abp.Domain.Services;
 using Verge.Trading.Integrations;
+using System.Threading;
 
 namespace Verge.Trading;
 
@@ -20,6 +21,7 @@ public class MarketDataManager : DomainService
     private const string FuturesBaseUrl = "https://fapi.binance.com";
 
     private readonly IDatabase _redis;
+    private static readonly SemaphoreSlim _binanceGate = new(5, 5); // Max 5 parallel REST calls globally
 
     public MarketDataManager(IHttpClientFactory httpClientFactory, BinanceWebSocketService webSocketService, IConnectionMultiplexer redis)
     {
@@ -141,26 +143,27 @@ public class MarketDataManager : DomainService
                 return JsonSerializer.Deserialize<List<MarketCandleModel>>((string)cached!)!;
             }
 
-            var client = _httpClientFactory.CreateClient();
-            
-            // LOG: a qué se convirtió
-            Logger.LogInformation($"🔄 Interval convertido: '{interval}' -> '{binanceInterval}'");
-            
-            var url = $"{FuturesBaseUrl}/fapi/v1/klines?symbol={cleanSymbol}&interval={binanceInterval}&limit={limit}";
-            if (endTime.HasValue)
+            await _binanceGate.WaitAsync();
+            HttpResponseMessage response;
+            try
             {
-                url += $"&endTime={endTime.Value}";
+                var client = _httpClientFactory.CreateClient();
+                var url = $"{FuturesBaseUrl}/fapi/v1/klines?symbol={cleanSymbol}&interval={binanceInterval}&limit={limit}";
+                if (endTime.HasValue) url += $"&endTime={endTime.Value}";
+
+                Logger.LogInformation($"📡 Fetching Candles (Gate Open): {url}");
+                response = await client.GetAsync(url);
             }
-
-            Logger.LogInformation($"📡 URL final: {url}");
-
-            var response = await client.GetAsync(url);
+            finally
+            {
+                _binanceGate.Release();
+            }
             
             if (!response.IsSuccessStatusCode)
             {
                 var error = await response.Content.ReadAsStringAsync();
                 Logger.LogError($"❌ Error de Binance: {response.StatusCode} - {error}");
-                return new List<MarketCandleModel>(); // Devuelvo vacío en lugar de explotar
+                return new List<MarketCandleModel>(); 
             }
 
             var content = await response.Content.ReadAsStringAsync();
@@ -299,6 +302,7 @@ public class MarketDataManager : DomainService
 
     public async Task<List<SymbolTickerModel>> GetTickersAsync()
     {
+        await _binanceGate.WaitAsync();
         try
         {
             var client = _httpClientFactory.CreateClient();
@@ -330,6 +334,10 @@ public class MarketDataManager : DomainService
         {
             Logger.LogError($"💥 Error al obtener tickers: {ex.Message}");
             return new List<SymbolTickerModel>();
+        }
+        finally
+        {
+            _binanceGate.Release();
         }
     }
     

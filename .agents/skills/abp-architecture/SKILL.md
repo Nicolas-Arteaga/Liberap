@@ -57,3 +57,65 @@ docker ps --filter "publish=8000"
 4. **Sincronización:** El backend detecta qué pares están abiertos consultando `/api/v1/status`. Nunca cambies esto a `/api/v1/trades` para estados en vivo (el historial es solo para visualización).
 5. **Chart Markers:** El Super Gráfico inyecta marcadores de compra/venta usando la propiedad `setMarkers` de Lightweight Charts tras obtener el historial del backend. No borres esta lógica al actualizar el componente de gráficos.
 
+---
+
+## 🚨 ADVERTENCIA CRÍTICA #1: Freqtrade `GetStatusAsync` — El campo `exchange` puede ser STRING
+
+**Antes de modificar `FreqtradeAppService.GetStatusAsync()`, lee esto.**
+
+La respuesta de Freqtrade `/api/v1/show_config` devuelve a veces `"exchange"` como un **string** (nombre del exchange), no como un objeto JSON con propiedades.
+
+```csharp
+// ❌ NUNCA hagas esto — explota con InvalidOperationException en runtime
+if (result.TryGetProperty("exchange", out var exch)) ExtractFromElement(exch);
+
+// ✅ SIEMPRE guardá el ValueKind antes de procesarlo como objeto
+if (result.TryGetProperty("exchange", out var exch) && exch.ValueKind == JsonValueKind.Object)
+    ExtractFromElement(exch);
+```
+
+**Síntoma si se rompe:** El bot siempre aparece como "stopped" en la UI aunque Freqtrade esté corriendo. Los logs muestran `[Freqtrade] Error fatal en GetStatusAsync` con `InvalidOperationException: The requested operation requires an element of type 'Object', but the target element has type 'String'`.
+
+---
+
+## 🚨 ADVERTENCIA CRÍTICA #2: La Tabla del Scanner y el Bot usan pipelines de datos SEPARADOS
+
+**El Scanner del Dashboard y las alertas SignalR NO son el mismo flujo. NO son intercambiables.**
+
+```
+[MarketScannerService]
+    │
+    ├─► Redis PUBLISH "verge:superscore"          ← ALIMENTA LA TABLA DEL DASHBOARD
+    │       └─► BotDataPublisherService (subscribe)
+    │               └─► Redis HSET "verge:active_pairs"
+    │                       └─► BotAppService.GetActivePairsAsync()
+    │                               └─► Tabla Scanner del Dashboard
+    │
+    └─► EventBus (AlertStateChangedEto)            ← ALIMENTA LOS TOASTS/ALERTAS
+            └─► AlertStateChangedEventHandler
+                    └─► SignalR TradingHub "ReceiveAlert"
+                            └─► Notificaciones / toasts en el frontend
+```
+
+**Reglas:**
+1. **Si la tabla del Scanner muestra pocas monedas o ninguna** → el `MarketScannerService` NO está publicando en Redis `verge:superscore`.
+2. **Si las alertas/toasts no llegan** → el `EventBus` o `SignalR` está roto, NO el scanner.
+3. **NUNCA elimines el `Redis PUBLISH "verge:superscore"`** del scanner para "simplificar" — vaciaría la tabla del dashboard.
+4. **El threshold de confianza (>= 40) aplica solo al EventBus.** El publish a Redis `verge:superscore` debe ocurrir para TODOS los símbolos analizados (sujeto a revisión futura de performance).
+
+**Por qué parece que "arreglar uno rompe el otro":** Los dos bugs son siempre independientes y preexistentes. La percepción de causalidad es falsa — es coincidencia de timing al verificar el estado del sistema.
+
+---
+
+## 🚨 ADVERTENCIA CRÍTICA #3: Semáforo Global de Binance API en MarketDataManager
+
+El `MarketDataManager` tiene un semáforo `static` que limita los REST calls concurrentes a Binance:
+
+```csharp
+private static readonly SemaphoreSlim _binanceGate = new(5, 5); // Max 5 concurrent
+```
+
+- Es `static` → compartido entre TODOS los scoped instances del proceso.
+- Protege la cuenta Binance de errores **429 Too Many Requests** que crashean el Bot.
+- **No lo elimines, no lo aumentes a más de 10.** Si el Scanner necesita más velocidad, reducí el `Take(50)` de símbolos, no el semáforo.
+- Si ves que el Bot empieza a fallar después de tocar el scanner, verificá primero si hay 429s en los logs de Freqtrade antes de asumir un bug en el código.

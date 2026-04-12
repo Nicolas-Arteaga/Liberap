@@ -9,6 +9,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Uow;
+using StackExchange.Redis;
 
 using Verge.Trading.Integrations;
 using Verge.Trading.DecisionEngine;
@@ -22,15 +23,18 @@ public class MarketScannerService : BackgroundService
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<MarketScannerService> _logger;
     private readonly IDistributedEventBus _eventBus;
+    private readonly IConnectionMultiplexer _redis;
 
     public MarketScannerService(
         IServiceProvider serviceProvider, 
         ILogger<MarketScannerService> logger,
-        IDistributedEventBus eventBus)
+        IDistributedEventBus eventBus,
+        IConnectionMultiplexer redis)
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
         _eventBus = eventBus;
+        _redis = redis;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -48,8 +52,8 @@ public class MarketScannerService : BackgroundService
                 _logger.LogError(ex, "❌ Error in market scanner cycle");
             }
 
-            _logger.LogInformation("😴 Scanner sleeping for 30 seconds...");
-            await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+            _logger.LogInformation("😴 Scanner sleeping for 60 seconds (Bot Stability Buffer)...");
+            await Task.Delay(TimeSpan.FromSeconds(60), stoppingToken);
         }
     }
 
@@ -82,9 +86,21 @@ public class MarketScannerService : BackgroundService
             _logger.LogWarning("🌍 QUIET PERIOD ACTIVE: {reason}. Skipping scanners or dampening entries...", macroData.QuietPeriodReason);
         }
 
-        // Top 30 symbols by volume (Phase 4 Scaling)
-        var topSymbols = await marketDataManager.GetTopSymbolsAsync(100);
-        _logger.LogInformation("📊 Top 30 symbols to analyze ({count}). Analyzing...", topSymbols.Count);
+        // Optimization: Use Tickers to select active movers instead of static top volume.
+        // This reduces the REST call count and focuses AI analysis on symbols with volatility.
+        var tickers = await marketDataManager.GetTickersAsync();
+        var topSymbols = tickers
+            .Where(t => t.Volume > 1_500_000m) // Reasonable volume threshold
+            .OrderByDescending(t => Math.Abs(t.PriceChangePercent)) 
+            .Take(50) 
+            .Select(t => t.Symbol)
+            .ToList();
+
+        if (topSymbols.Count == 0) {
+            topSymbols = await marketDataManager.GetTopSymbolsAsync(30); // Fallback
+        }
+
+        _logger.LogInformation("📊 Analyzing top {count} symbols (Mover Prioritization).", topSymbols.Count);
 
         int analyzedCount = 0;
         var semaphore = new SemaphoreSlim(10); // Analyze 10 symbols concurrently
@@ -164,33 +180,64 @@ public class MarketScannerService : BackgroundService
                 {
                     var userSessionId = sessions.FirstOrDefault(s => s.TraderProfileId == profile.Id)?.Id ?? Guid.Empty;
                     
-                    await innerEventBus.PublishAsync(new AlertStateChangedEto
+                    // CRITICAL OPTIMIZATION: Only publish to the event bus if score is significant (>= 40)
+                    // Lowered from 55 to allow the 20-30 coins the user expects.
+                    if (confidence >= 40)
                     {
-                        UserId = profile.UserId,
-                        SessionId = userSessionId,
-                        Alert = new VergeAlertDto
+                        await innerEventBus.PublishAsync(new AlertStateChangedEto
                         {
-                            Id = Guid.NewGuid().ToString(),
-                            Type = "ScannerUpdate", 
-                            Title = $"Scanner: {symbol}",
-                            Message = $"AI Score: {confidence}% | Regime: {regime?.Regime.ToString() ?? "Unknown"} | {whaleData.Summary}",
-                            Crypto = symbol,
-                            Price = currentPrice,
-                            Confidence = (SignalConfidence)confidence,
-                            Direction = signal,
-                            Score = confidence,
-                            Severity = severity,
-                            Icon = icon,
-                            Timestamp = DateTime.UtcNow,
-                            TakeProfit = currentPrice * (signal == SignalDirection.Long ? 1.03m : 0.97m),
-                            StopLoss = currentPrice * (signal == SignalDirection.Long ? 0.985m : 1.015m)
-                        }
-                    });
+                            UserId = profile.UserId,
+                            SessionId = userSessionId,
+                            Alert = new VergeAlertDto
+                            {
+                                Id = Guid.NewGuid().ToString(),
+                                Type = "ScannerUpdate", 
+                                Title = $"Scanner: {symbol}",
+                                Message = $"AI Score: {confidence}% | Regime: {regime?.Regime.ToString() ?? "Unknown"} | {whaleData.Summary}",
+                                Crypto = symbol,
+                                Price = currentPrice,
+                                Confidence = (SignalConfidence)confidence,
+                                Direction = signal,
+                                Score = confidence,
+                                Severity = severity,
+                                Icon = icon,
+                                Timestamp = DateTime.UtcNow,
+                                TakeProfit = currentPrice * (signal == SignalDirection.Long ? 1.03m : 0.97m),
+                                StopLoss = currentPrice * (signal == SignalDirection.Long ? 0.985m : 1.015m)
+                            }
+                        });
 
-                    _logger.LogInformation("📢 [SignalR] Published AI alert {score}% for {symbol} to EventBus for User {uid}", confidence, symbol, profile.UserId);
+                        _logger.LogInformation("📢 [SignalR] Published AI alert {score}% for {symbol} to EventBus for User {uid}", confidence, symbol, profile.UserId);
+                    }
+                    else 
+                    {
+                        _logger.LogDebug("⏭️ Skipping event bus for low-confidence signal ({score}%) for {symbol}", confidence, symbol);
+                    }
                 }
-                
                 Interlocked.Increment(ref analyzedCount);
+
+                // ✅ PUNTO CLAVE: Publicar en Redis 'verge:superscore' para que el Dashboard lo lea.
+                // BotDataPublisherService escucha este canal y escribe en verge:active_pairs (el hash que usa la tabla del Scanner).
+                try
+                {
+                    var publisher = _redis.GetSubscriber();
+                    var superScorePayload = JsonSerializer.Serialize(new
+                    {
+                        symbol = symbol,
+                        score = confidence,
+                        direction = signal.ToString(),
+                        regime = regime?.Regime.ToString() ?? "Unknown",
+                        style = "DayTrading (15m)",
+                        estado = confidence >= 60 ? "GO" : "WAIT",
+                        dynamic_score = 50,
+                        timestamp = DateTime.UtcNow
+                    });
+                    await publisher.PublishAsync(RedisChannel.Literal("verge:superscore"), superScorePayload);
+                }
+                catch (Exception redisEx)
+                {
+                    _logger.LogWarning("⚠️ Redis SuperScore publish failed for {symbol}: {msg}", symbol, redisEx.Message);
+                }
             }
             catch (Exception ex)
             {

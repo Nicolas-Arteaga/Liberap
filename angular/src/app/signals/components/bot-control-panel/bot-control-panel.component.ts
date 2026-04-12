@@ -30,16 +30,17 @@ import { map } from 'rxjs/operators';
         </div>
         
         <div class="global-controls d-flex justify-content-center gap-2">
-          <button class="btn-icon play" title="Start Engine" (click)="startEngine()" [disabled]="status.isRunning">
-            <ion-icon name="play-outline"></ion-icon>
+          <button class="btn-icon play" title="Start Engine" (click)="startEngine()" [disabled]="status.isRunning || isLoading">
+            <ion-icon name="play-outline" *ngIf="!isLoading"></ion-icon>
+            <span class="spinner-border spinner-border-sm" *ngIf="isLoading"></span>
           </button>
-          <button class="btn-icon pause" title="Pause (StopBuy)" (click)="pauseEngine()" [disabled]="!status.isRunning">
+          <button class="btn-icon pause" title="Pause (StopBuy)" (click)="pauseEngine()" [disabled]="!status.isRunning || isLoading">
             <ion-icon name="pause-outline"></ion-icon>
           </button>
-          <button class="btn-icon stop" title="Stop Engine" (click)="stopEngine()" [disabled]="!status.isRunning">
+          <button class="btn-icon stop" title="Stop Engine" (click)="stopEngine()" [disabled]="!status.isRunning || isLoading">
             <ion-icon name="stop-outline"></ion-icon>
           </button>
-          <button class="btn-icon reload" title="Reload Config" (click)="reloadConfig()">
+          <button class="btn-icon reload" title="Reload Config" (click)="reloadConfig()" [disabled]="isLoading">
             <ion-icon name="refresh-outline"></ion-icon>
           </button>
         </div>
@@ -179,6 +180,7 @@ export class BotControlPanelComponent implements OnInit, OnDestroy {
   allOpenTrades: FreqtradeTradeDto[] = [];
   selectedPairForControl: string = '';
   showPairSelector = false;
+  isLoading = false;
 
   private scoresSub: Subscription | null = null;
   private scoresMap: Record<string, number> = {};
@@ -234,32 +236,57 @@ export class BotControlPanelComponent implements OnInit, OnDestroy {
   // --- MOTOR GLOBAL ACTIONS ---
 
   startEngine() {
-    this.freqtradeService.resumeBot().subscribe(() => {
-      this.toaster.success('Motor Iniciado.');
-      this.pollService.refresh();
+    this.isLoading = true;
+    this.freqtradeService.resumeBot().subscribe({
+      next: () => {
+        this.toaster.success('Motor Iniciado / Reanudado correctamente.');
+        setTimeout(() => {
+          this.pollService.refresh();
+          this.isLoading = false;
+        }, 2000);
+      },
+      error: () => {
+        this.toaster.error('Error al iniciar el motor. Revisa los logs de Freqtrade.');
+        this.isLoading = false;
+      }
     });
   }
 
   pauseEngine() {
-    this.freqtradeService.pauseBot().subscribe(() => {
-      this.toaster.success('Motor en pausa (No abrirá nuevos trades).');
-      this.pollService.refresh();
+    this.isLoading = true;
+    this.freqtradeService.pauseBot().subscribe({
+      next: () => {
+        this.toaster.success('Motor en pausa (No abrirá nuevos trades).');
+        this.pollService.refresh();
+        this.isLoading = false;
+      },
+      error: () => { this.isLoading = false; }
     });
   }
 
   stopEngine() {
     if (confirm('¿Detener completamente el motor Freqtrade? Esto apagará todos los bots activos.')) {
-      this.freqtradeService.stopBot().subscribe(() => {
-        this.toaster.success('Motor Detenido.');
-        this.pollService.refresh();
+      this.isLoading = true;
+      this.freqtradeService.stopBot().subscribe({
+        next: () => {
+          this.toaster.success('Motor Detenido.');
+          this.pollService.refresh();
+          this.isLoading = false;
+        },
+        error: () => { this.isLoading = false; }
       });
     }
   }
 
   reloadConfig() {
-    this.freqtradeService.reloadConfig().subscribe(() => {
-      this.toaster.info('Recargando configuración de Freqtrade...');
-      this.pollService.refresh();
+    this.isLoading = true;
+    this.freqtradeService.reloadConfig().subscribe({
+      next: () => {
+        this.toaster.info('Recargando configuración de Freqtrade...');
+        this.pollService.refresh();
+        this.isLoading = false;
+      },
+      error: () => { this.isLoading = false; }
     });
   }
 
