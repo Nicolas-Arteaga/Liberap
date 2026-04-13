@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -72,7 +73,7 @@ public class Nexus15AppService : ApplicationService, INexus15AppService
                 Next20CandlesProb = result.Next20CandlesProb,
                 EstimatedRangePercent = result.EstimatedRangePercent,
                 Regime = result.Regime,
-                GroupScores = new Nexus15GroupScoresDto
+                GroupScores = result.GroupScores == null ? new Nexus15GroupScoresDto() : new Nexus15GroupScoresDto
                 {
                     G1PriceAction = result.GroupScores.G1PriceAction,
                     G2SmcIct = result.GroupScores.G2SmcIct,
@@ -81,7 +82,7 @@ public class Nexus15AppService : ApplicationService, INexus15AppService
                     G5Volume = result.GroupScores.G5Volume,
                     G6Ml = result.GroupScores.G6Ml
                 },
-                Features = new Nexus15FeaturesDto
+                Features = result.Features == null ? new Nexus15FeaturesDto() : new Nexus15FeaturesDto
                 {
                     CandleBodyRatio = result.Features.CandleBodyRatio,
                     UpperWickRatio = result.Features.UpperWickRatio,
@@ -104,7 +105,7 @@ public class Nexus15AppService : ApplicationService, INexus15AppService
                     MacdHistogram = result.Features.MacdHistogram,
                     AtrPercent = result.Features.AtrPercent
                 },
-                Detectivity = result.Detectivity
+                Detectivity = result.Detectivity ?? new Dictionary<string, string>()
             };
         }
 

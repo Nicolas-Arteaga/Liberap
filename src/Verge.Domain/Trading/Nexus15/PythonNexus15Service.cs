@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 namespace Verge.Trading.Nexus15;
 
 /// <summary>
-/// Llama al endpoint /nexus15/analyze-nexus15 del contenedor verge-python-ai.
+/// Llama al endpoint /nexus15/analyze del contenedor verge-python-ai.
 /// Totalmente aislado del PythonIntegrationService existente.
 /// </summary>
 public class PythonNexus15Service : IPythonNexus15Service
