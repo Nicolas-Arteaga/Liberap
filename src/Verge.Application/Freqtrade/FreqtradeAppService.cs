@@ -119,6 +119,11 @@ namespace Verge.Freqtrade
             {
                 // /api/v1/status returns the currently active trades
                 var response = await client.GetAsync("/api/v1/status");
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                {
+                    _jwtToken = null;
+                    return new List<FreqtradeTradeDto>();
+                }
                 if (!response.IsSuccessStatusCode) return new List<FreqtradeTradeDto>();
 
                 var content = await response.Content.ReadAsStringAsync();
@@ -238,6 +243,13 @@ namespace Verge.Freqtrade
             {
                 // Aumentamos el timeout para esta llamada específica ya que el bot puede estar ocupado (entrenando)
                 var response = await client.GetAsync("/api/v1/show_config");
+
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                {
+                    _jwtToken = null;
+                    return new FreqtradeStatusDto { IsRunning = false, ActivePairs = new List<string>() };
+                }
+
                 if (response.IsSuccessStatusCode)
                 {
                     var content = await response.Content.ReadAsStringAsync();

@@ -87,6 +87,30 @@ public class BotDataPublisherService : BackgroundService
             }
         });
 
+        // ─── NEXUS-15 subscription (nuevas señales predictivas 15m) ───────────────
+        await subscriber.SubscribeAsync(RedisChannel.Pattern("verge:nexus15:*"), async (channel, message) =>
+        {
+            try
+            {
+                var payload = message.ToString();
+                var symbol = channel.ToString().Replace("verge:nexus15:", "");
+
+                _logger.LogInformation("🔭 [Nexus15] Received signal for {Symbol}", symbol);
+
+                // Caché en Redis (TTL 20 min = 1 vela 15m + buffer)
+                await _db.StringSetAsync($"verge:nexus15_cache:{symbol}", payload, TimeSpan.FromMinutes(20));
+
+                // Broadcast via SignalR → método Nexus15Update
+                await _tradingHubContext.Clients.All.SendAsync("Nexus15Update", payload);
+
+                _logger.LogInformation("📡 [Nexus15] Broadcasted Nexus15Update for {Symbol}", symbol);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ [Nexus15] Error processing verge:nexus15:* Pub/Sub");
+            }
+        });
+
         // Suscripción a Logs del bot
         await subscriber.SubscribeAsync(RedisChannel.Literal("verge:bot_log"), async (channel, message) =>
         {

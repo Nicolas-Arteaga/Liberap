@@ -51,13 +51,17 @@ services:
       - ASPNETCORE_HTTP_PORTS=8080
       - Redis:Configuration=redis:6379
       - ConnectionStrings:Default=Host=db;Port=5432;Database=Verge;Username=postgres;Password=postgres;Pooling=true;TrustServerCertificate=true
-      - RemoteServices:PythonAI:BaseUrl=http://python-ai:8000
+      - RemoteServices__Freqtrade__BaseUrl=http://freqtrade:8080
+      - PythonService__Url=http://python-ai:8000
       - BINANCE_API_KEY=${BINANCE_API_KEY}
       - BINANCE_API_SECRET=${BINANCE_API_SECRET}
+      - Freqtrade__ConfigPath=/app/freqtrade/user_data/config.json
     depends_on:
       - redis
       - db
       - python-ai
+    volumes:
+      - ./freqtrade/user_data:/app/freqtrade/user_data
     restart: always
 
   freqtrade:

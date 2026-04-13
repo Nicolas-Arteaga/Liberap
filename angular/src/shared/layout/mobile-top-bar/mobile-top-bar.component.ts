@@ -1,7 +1,8 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { addIcons } from 'ionicons';
-import { personOutline, notificationsOutline, checkmarkDoneOutline, notificationsOffOutline, pulseOutline, trendingUpOutline, layersOutline, rocketOutline, analyticsOutline, cashOutline, warningOutline } from 'ionicons/icons';
+import { personOutline, notificationsOutline, checkmarkDoneOutline, notificationsOffOutline, pulseOutline, trendingUpOutline, layersOutline, rocketOutline, analyticsOutline, cashOutline, warningOutline, hardwareChipOutline } from 'ionicons/icons';
+import { RouterLink } from '@angular/router';
 import {
   IonHeader,
   IonToolbar,
@@ -19,6 +20,7 @@ import { map } from 'rxjs/operators';
   standalone: true,
   imports: [
     CommonModule,
+    RouterLink,
     IonHeader,
     IonToolbar,
     IonButton,
@@ -38,7 +40,7 @@ export class MobileTopBarComponent {
   showNotifications = false;
 
   constructor() {
-    addIcons({ personOutline, notificationsOutline, checkmarkDoneOutline, notificationsOffOutline, pulseOutline, trendingUpOutline, layersOutline, rocketOutline, analyticsOutline, cashOutline, warningOutline });
+    addIcons({ personOutline, notificationsOutline, checkmarkDoneOutline, notificationsOffOutline, pulseOutline, trendingUpOutline, layersOutline, rocketOutline, analyticsOutline, cashOutline, warningOutline, hardwareChipOutline });
   }
 
   get unreadCount(): number {

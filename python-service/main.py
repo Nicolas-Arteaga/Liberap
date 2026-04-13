@@ -13,6 +13,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from sentiment_service import SentimentService
 from dotenv import load_dotenv
+from nexus15 import router as nexus15_router
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', handlers=[logging.StreamHandler(sys.stdout)])
@@ -38,6 +39,7 @@ except ImportError:
 load_dotenv()
 
 app = FastAPI(title="VERGE AI - Phase 2.0 Multi-Style", version="2.0.0")
+app.include_router(nexus15_router)
 
 # --- Helper Models & Schema ---
 

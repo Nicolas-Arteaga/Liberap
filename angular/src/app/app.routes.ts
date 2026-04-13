@@ -60,6 +60,10 @@ export const APP_ROUTES: Routes = [
           .then(c => c.BacktestingComponent),
       },
       {
+        path: 'nexus-15',
+        loadComponent: () => import('./nexus15/nexus15.component').then(c => c.Nexus15Component),
+      },
+      {
         path: 'admin/users/create',
         canActivate: [adminGuard],
         loadComponent: () => import('./identity/create-user/create-user.component').then(c => c.CreateUserComponent),

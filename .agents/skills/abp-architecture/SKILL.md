@@ -118,4 +118,34 @@ private static readonly SemaphoreSlim _binanceGate = new(5, 5); // Max 5 concurr
 - Es `static` → compartido entre TODOS los scoped instances del proceso.
 - Protege la cuenta Binance de errores **429 Too Many Requests** que crashean el Bot.
 - **No lo elimines, no lo aumentes a más de 10.** Si el Scanner necesita más velocidad, reducí el `Take(50)` de símbolos, no el semáforo.
-- Si ves que el Bot empieza a fallar después de tocar el scanner, verificá primero si hay 429s en los logs de Freqtrade antes de asumir un bug en el código.
+
+## 🚨 ADVERTENCIA CRÍTICA #4: Persistencia y Sincronización de DB (Puerto 5433)
+
+**NUNCA modifiques la base de datos sin considerar el `BotSyncJob` y el puerto configurado.**
+
+1. **Fuente de Verdad Dual:**
+   - Para el motor (Freqtrade), la verdad es el `config.json`.
+   - Para la UI de Verge, la verdad es la tabla `TradingBots` en PostgreSQL.
+2. **Sincronización Bidireccional (`BotSyncJob`):**
+   - El job corre cada 2 minutos. 
+   - **Discovery:** Si hay un par en Freqtrade que no está en la DB, lo importa automáticamente.
+   - **Re-injection:** Si hay un bot `IsActive` en la DB que falta en Freqtrade, lo vuelve a inyectar llamando a `StartBotAsync`.
+3. **Puerto de Postgres:** 
+   - El puerto estándar configurado y estable es el **5433**. No intentes "corregirlo" a 5432 sin verificar primero con `netstat` si el servicio está escuchando allí, o romperás la conexión del backend.
+4. **Modificación de Bots:** 
+   - Cualquier cambio en la estrategia o parámetros de un bot debe hacerse a través de `IRepository<TradingBot, Guid>` para que el sincronizador lo propague al motor.
+
+---
+
+## 5. El Gran Mapa de Datos (Data Flow)
+
+```mermaid
+graph TD
+    A[python-service:8000] -- "Analysis" --> B[Redis: verge:superscore]
+    B -- "Pub/Sub" --> C[BotDataPublisherService]
+    C -- "SignalR" --> D[Angular Dashboard]
+    C -- "HSET" --> E[Redis: verge:active_pairs]
+    F[Freqtrade:8080] -- "/api/v1/reload_config" --> G[config.json]
+    H[BotSyncJob] -- "Reconcile" --> I[Postgres: TradingBots]
+    I -- "Sync" --> F
+```

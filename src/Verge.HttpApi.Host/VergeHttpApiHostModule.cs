@@ -148,6 +148,9 @@ public class VergeHttpApiHostModule : AbpModule
         context.Services.AddHostedService<SimulationMarkPriceWorker>();
         context.Services.AddHostedService<BotDataPublisherService>();
         context.Services.AddHostedService<BotSyncJob>();
+        context.Services.AddHostedService<Verge.Trading.Nexus15.Nexus15ScannerJob>();
+        context.Services.AddScoped<Verge.Trading.Nexus15.IPythonNexus15Service, Verge.Trading.Nexus15.PythonNexus15Service>();
+
 
         // Redis Configuration (Graceful startup)
         var redisConfig = configuration["Redis:Configuration"] ?? "localhost:6379";
@@ -174,6 +177,15 @@ public class VergeHttpApiHostModule : AbpModule
             client.BaseAddress = new Uri(pythonUrl);
             client.Timeout = TimeSpan.FromSeconds(10);
         });
+
+        // Python Nexus 15 HTTP Client
+        context.Services.AddHttpClient("PythonNexus15", client =>
+        {
+            var url = configuration["PythonService:Url"] ?? "http://localhost:8000";
+            client.BaseAddress = new Uri(url);
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
+
 
         context.Services.ConfigureApplicationCookie(options =>
         {
@@ -260,10 +272,29 @@ public class VergeHttpApiHostModule : AbpModule
         {
             Configure<AbpVirtualFileSystemOptions>(options =>
             {
-                options.FileSets.ReplaceEmbeddedByPhysical<VergeDomainSharedModule>(Path.Combine(hostingEnvironment.ContentRootPath, $"..{Path.DirectorySeparatorChar}Verge.Domain.Shared"));
-                options.FileSets.ReplaceEmbeddedByPhysical<VergeDomainModule>(Path.Combine(hostingEnvironment.ContentRootPath, $"..{Path.DirectorySeparatorChar}Verge.Domain"));
-                options.FileSets.ReplaceEmbeddedByPhysical<VergeApplicationContractsModule>(Path.Combine(hostingEnvironment.ContentRootPath, $"..{Path.DirectorySeparatorChar}Verge.Application.Contracts"));
-                options.FileSets.ReplaceEmbeddedByPhysical<VergeApplicationModule>(Path.Combine(hostingEnvironment.ContentRootPath, $"..{Path.DirectorySeparatorChar}Verge.Application"));
+                var sharedPath = Path.Combine(hostingEnvironment.ContentRootPath, $"..{Path.DirectorySeparatorChar}Verge.Domain.Shared");
+                if (Directory.Exists(sharedPath))
+                {
+                    options.FileSets.ReplaceEmbeddedByPhysical<VergeDomainSharedModule>(sharedPath);
+                }
+
+                var domainPath = Path.Combine(hostingEnvironment.ContentRootPath, $"..{Path.DirectorySeparatorChar}Verge.Domain");
+                if (Directory.Exists(domainPath))
+                {
+                    options.FileSets.ReplaceEmbeddedByPhysical<VergeDomainModule>(domainPath);
+                }
+
+                var contractsPath = Path.Combine(hostingEnvironment.ContentRootPath, $"..{Path.DirectorySeparatorChar}Verge.Application.Contracts");
+                if (Directory.Exists(contractsPath))
+                {
+                    options.FileSets.ReplaceEmbeddedByPhysical<VergeApplicationContractsModule>(contractsPath);
+                }
+
+                var appPath = Path.Combine(hostingEnvironment.ContentRootPath, $"..{Path.DirectorySeparatorChar}Verge.Application");
+                if (Directory.Exists(appPath))
+                {
+                    options.FileSets.ReplaceEmbeddedByPhysical<VergeApplicationModule>(appPath);
+                }
             });
         }
     }

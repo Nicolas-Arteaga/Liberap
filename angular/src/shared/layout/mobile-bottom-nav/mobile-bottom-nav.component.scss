@@ -52,3 +52,23 @@
     color: #00c47d;
   }
 }
+
+// ── NEXUS-15 nav item ──────────────────────────────────────────
+.nexus-nav-item {
+  color: rgba(0, 240, 255, 0.6);
+  font-size: 9px;
+  letter-spacing: 0.5px;
+
+  .nexus-icon-wrapper {
+    ion-icon { color: rgba(0, 240, 255, 0.6); }
+  }
+
+  &.active {
+    color: #00f0ff;
+    .nexus-icon-wrapper {
+      background: rgba(0, 240, 255, 0.12);
+      box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+      ion-icon { color: #00f0ff; }
+    }
+  }
+}

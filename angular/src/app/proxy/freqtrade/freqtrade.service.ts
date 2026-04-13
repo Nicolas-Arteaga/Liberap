@@ -52,15 +52,6 @@ export class FreqtradeService {
     { apiName: this.apiName,...config });
   
 
-  getTradeHistory = (pair?: string, config?: Partial<Rest.Config>) =>
-    this.restService.request<any, FreqtradeTradeDto[]>({
-      method: 'GET',
-      url: '/api/app/freqtrade/trade-history',
-      params: { pair },
-    },
-    { apiName: this.apiName,...config });
-  
-
   getProfit = (config?: Partial<Rest.Config>) =>
     this.restService.request<any, FreqtradeProfitDto>({
       method: 'GET',
@@ -73,6 +64,15 @@ export class FreqtradeService {
     this.restService.request<any, FreqtradeStatusDto>({
       method: 'GET',
       url: '/api/app/freqtrade/status',
+    },
+    { apiName: this.apiName,...config });
+  
+
+  getTradeHistory = (pair?: string, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, FreqtradeTradeDto[]>({
+      method: 'GET',
+      url: '/api/app/freqtrade/trade-history',
+      params: { pair },
     },
     { apiName: this.apiName,...config });
   

@@ -19,4 +19,9 @@ public class TradingHub : AbpHub
     {
         await Clients.User(userId).SendAsync("ReceiveAlert", alert);
     }
+
+    public async Task SendNexus15Update(string payload)
+    {
+        await Clients.All.SendAsync("Nexus15Update", payload);
+    }
 }
