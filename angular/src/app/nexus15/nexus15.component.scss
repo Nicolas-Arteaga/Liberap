@@ -316,6 +316,69 @@ $border:  rgba(0, 240, 255, 0.15);
 .tb-time { font-size: 9px; color: rgba($cyan,0.35); margin-left: auto; }
 .tb-error { font-size: 10px; color: #ff4466; }
 
+// ── LIVE PRICE WIDGET ──
+.tb-live-price {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 12px;
+  border: 1px solid rgba($cyan, 0.35);
+  border-radius: 6px;
+  background: rgba($cyan, 0.05);
+  animation: fade-in 0.3s ease;
+  box-shadow: 0 0 10px rgba($cyan, 0.08), inset 0 0 12px rgba($cyan, 0.03);
+
+  &.lp-loading {
+    border-color: rgba(255,255,255,0.1);
+    background: rgba(0,0,0,0.2);
+  }
+
+  .lp-label {
+    font-size: 8px;
+    letter-spacing: 2px;
+    color: rgba($cyan, 0.5);
+    text-transform: uppercase;
+  }
+
+  .lp-value {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 15px;
+    font-weight: 900;
+    color: $cyan;
+    text-shadow: 0 0 14px rgba($cyan, 0.8);
+    letter-spacing: 1px;
+
+    &.lp-wait {
+      color: rgba(255,255,255,0.2);
+      font-size: 11px;
+      text-shadow: none;
+      letter-spacing: 4px;
+    }
+  }
+
+  .lp-change {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: color 0.4s;
+
+    &.lp-pos {
+      color: $green;
+      background: rgba($green, 0.1);
+      border: 1px solid rgba($green, 0.3);
+      text-shadow: 0 0 8px $green;
+    }
+    &.lp-neg {
+      color: #ff4466;
+      background: rgba(#ff4466, 0.1);
+      border: 1px solid rgba(#ff4466, 0.3);
+      text-shadow: 0 0 8px #ff4466;
+    }
+  }
+}
+
 // ── 3-COL GRID ──
 .nx15-grid {
   display: grid;

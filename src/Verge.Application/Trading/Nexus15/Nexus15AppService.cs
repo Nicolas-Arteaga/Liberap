@@ -50,17 +50,23 @@ public class Nexus15AppService : ApplicationService, INexus15AppService
     {
         try
         {
-            var candles = await _marketData.GetCandlesAsync(symbol, "15", 50);
+            // Normalize symbol for Binance: "SIREN/USDT:USDT" → "SIRENUSDT"
+            var normalized = symbol.Contains(':') ? symbol.Split(':')[0] : symbol;
+            var cleanSymbol = normalized.ToUpper().Replace("/", "").Replace("-", "").Trim();
+
+            var candles = await _marketData.GetCandlesAsync(cleanSymbol, "15", 50);
             if (candles == null || candles.Count < 25)
             {
-                _logger.LogWarning("⚠️ [Nexus15] Insufficient candles for {Symbol}", symbol);
+                _logger.LogWarning("⚠️ [Nexus15] Insufficient candles for {Symbol} (got {Count})", cleanSymbol, candles?.Count ?? 0);
                 return null;
             }
 
-            var result = await _pythonService.AnalyzeNexus15Async(symbol, candles);
+            _logger.LogInformation("🔍 [Nexus15] OnDemand: {Symbol} — {Count} candles loaded", cleanSymbol, candles.Count);
+
+            var result = await _pythonService.AnalyzeNexus15Async(cleanSymbol, candles);
             if (result == null) return null;
 
-            return new Nexus15ResultDto
+            var dto = new Nexus15ResultDto
             {
                 Symbol = result.Symbol,
                 Timeframe = result.Timeframe,
@@ -107,8 +113,22 @@ public class Nexus15AppService : ApplicationService, INexus15AppService
                 },
                 Detectivity = result.Detectivity ?? new Dictionary<string, string>()
             };
-        }
 
+            // Cache the result in Redis so GetLatest also works for non-top symbols (e.g. SIREN)
+            try
+            {
+                var cacheKey = $"verge:nexus15_cache:{cleanSymbol}";
+                var json = System.Text.Json.JsonSerializer.Serialize(dto);
+                await _db.StringSetAsync(cacheKey, json, TimeSpan.FromMinutes(20));
+                _logger.LogInformation("✅ [Nexus15] Cached result for {Symbol}", cleanSymbol);
+            }
+            catch (Exception cacheEx)
+            {
+                _logger.LogWarning(cacheEx, "⚠️ [Nexus15] Failed to cache result for {Symbol}", cleanSymbol);
+            }
+
+            return dto;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "❌ [Nexus15] OnDemand analysis failed for {Symbol}", symbol);

@@ -81,6 +81,8 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
   data           = signal<Nexus15ResultDto | null>(null);
   errorMsg       = signal<string | null>(null);
   terminalLines  = signal<string[]>([]);
+  livePrice      = signal<number | null>(null);
+  livePriceChange = signal<number>(0); // % change vs previous close
   scanCount      = signal(0);
 
   // ── Dynamic Pair Selector ──────────────────────────────────────────────────
@@ -179,7 +181,13 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
   onSymbolChange(sym: string) {
     this.selectedSymbol.set(sym);
     this.symbolSearch.set('');
-    this.loadLatest();
+    this.data.set(null);               // clear old AI data
+    this.errorMsg.set(null);
+    this.livePrice.set(null);          // reset price display
+    this.coneData = null;              // clear old cone
+    this.ghostCandleSeries?.setData([]);
+    this.loadBinanceCandles(sym);      // real OHLCV from Binance (symbol normalized internally)
+    this.loadLatest();                 // AI prediction from backend
   }
 
   onSymbolSearch(q: string) {
@@ -192,16 +200,25 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
     this.pushTerminal(`> MANUAL SCAN: ${this.selectedSymbol()}`);
     this.nexus15Svc.analyzeOnDemand(this.selectedSymbol()).subscribe({
       next: r => {
-        this.data.set(r);
         this.isLoading.set(false);
+        if (!r) {
+          this.errorMsg.set(`AI model sin datos para ${this.selectedSymbol()} — chart activo igual.`);
+          this.pushTerminal(`⚠ AI model sin datos para ${this.selectedSymbol()} — chart activo igual.`);
+          this.pushTerminal(`  → Seleccioná un par mayor (BTC, ETH, SOL...) para IA.`);
+          return;
+        }
+        this.data.set(r);
         this.scanCount.update(n => n + 1);
         this.pushTerminal(`✓ CONF:${(r.aiConfidence ?? 0).toFixed(1)}% DIR:${r.direction}`);
         this.renderProjection(r);
       },
       error: err => {
         this.isLoading.set(false);
-        this.errorMsg.set('Python Service offline or no cached data.');
-        this.pushTerminal(`✗ ERROR: ${err?.error?.error || 'check service'}`);
+        const msg = err?.error?.error || err?.message || 'check service';
+        this.errorMsg.set(`AI model sin datos para ${this.selectedSymbol()} — chart activo igual.`);
+        this.pushTerminal(`⚠ NEXUS-15: sin modelo para ${this.selectedSymbol()} (${msg})`);
+        this.pushTerminal(`  → Chart Binance disponible. Seleccioná un par mayor para IA.`);
+        // Chart already has real Binance data, no need to reload candles
       }
     });
   }
@@ -288,7 +305,7 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
       lastValueVisible: false,
     });
 
-    this.loadDemoCandles();
+    this.loadBinanceCandles(this.selectedSymbol()); // normalized inside
 
     // ── Re-draw canvas cone whenever the user scrolls / zooms ───────────────
     this.chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
@@ -296,25 +313,108 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  private loadDemoCandles() {
-    const now = Math.floor(Date.now() / 1000);
+  /**
+   * Fetches 200 real OHLCV candles from Binance public REST API.
+   * Tries Futures (fapi.binance.com) first, then Spot, then demo fallback.
+   * No auth required — completely public.
+   */
+  /** Converts any symbol format to clean Binance format.
+   *  "SIREN/USDT:USDT" → "SIRENUSDT" | "BTCUSDT" → "BTCUSDT" */
+  private toBinanceSymbol(sym: string): string {
+    const withoutSettle = sym.includes(':') ? sym.split(':')[0] : sym;
+    return withoutSettle.replace(/[/\-]/g, '').toUpperCase().trim();
+  }
+
+  private loadBinanceCandles(symbol: string, interval = '15m', limit = 200) {
+    const binanceSym = this.toBinanceSymbol(symbol);
+    this.pushTerminal(`> BINANCE KLINES: ${binanceSym} [${interval}] x${limit}...`);
+
+    const parseKlines = (raw: any[]) => {
+      const candles: CandlestickData[] = [];
+      const volumes: any[]             = [];
+      for (const k of raw) {
+        const t   = Math.floor(k[0] / 1000) as any;
+        const o   = parseFloat(k[1]);
+        const h   = parseFloat(k[2]);
+        const l   = parseFloat(k[3]);
+        const c   = parseFloat(k[4]);
+        const vol = parseFloat(k[5]);
+        candles.push({ time: t, open: o, high: h, low: l, close: c });
+        volumes.push({ time: t, value: vol,
+          color: c >= o ? 'rgba(0,255,136,0.45)' : 'rgba(255,68,102,0.45)' });
+      }
+      return { candles, volumes };
+    };
+
+    const apply = (candles: CandlestickData[], volumes: any[]) => {
+      this.realCandles = candles;
+      this.candleSeries?.setData(candles);
+      this.volumeSeries?.setData(volumes);
+      this.ghostCandleSeries?.setData([]);
+      this.coneData = null;
+      this.chart?.timeScale().fitContent();
+      // ── Live price from last candle ──────────────────────────────────────
+      if (candles.length >= 2) {
+        const last = candles[candles.length - 1];
+        const prev = candles[candles.length - 2];
+        this.livePrice.set(last.close);
+        const pct = ((last.close - prev.close) / prev.close) * 100;
+        this.livePriceChange.set(Math.round(pct * 100) / 100);
+      }
+      this.pushTerminal(`✓ ${candles.length} CANDLES [${binanceSym}] @ ${this.livePrice()?.toFixed(4) ?? '?'}`);
+    };
+
+    // Try Futures API first
+    const futuresUrl = `https://fapi.binance.com/fapi/v1/klines?symbol=${binanceSym}&interval=${interval}&limit=${limit}`;
+    fetch(futuresUrl)
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((raw: any[]) => {
+        if (!Array.isArray(raw) || raw.length === 0) throw new Error('no data');
+        const { candles, volumes } = parseKlines(raw);
+        apply(candles, volumes);
+      })
+      .catch(() => {
+        // Fallback: Spot API
+        const spotUrl = `https://api.binance.com/api/v3/klines?symbol=${binanceSym}&interval=${interval}&limit=${limit}`;
+        this.pushTerminal(`  → Futures n/d para ${binanceSym}, probando SPOT...`);
+        fetch(spotUrl)
+          .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json();
+          })
+          .then((raw: any[]) => {
+            if (!Array.isArray(raw) || raw.length === 0) throw new Error('no data');
+            const { candles, volumes } = parseKlines(raw);
+            apply(candles, volumes);
+          })
+          .catch(() => {
+            this.pushTerminal(`⚠ ${binanceSym} no encontrado en Binance — DEMO MODE`);
+            this.errorMsg.set(`${binanceSym} no disponible en Binance. Mostrando datos demo.`);
+            this.loadFallbackDemo();
+          });
+      });
+  }
+
+  /** Pure random demo candles (last resort fallback) — 200 candles at price ~1.00 for unknowns */
+  private loadFallbackDemo(basePrice = 1.0) {
+    const now      = Math.floor(Date.now() / 1000);
     const interval = 15 * 60;
     const candles: CandlestickData[] = [];
-    const volumes: any[] = [];
-    let price = 66500;
-    for (let i = 40; i >= 0; i--) {
-      const t = (now - (i * interval) - (now % interval)) as any;
-      const o = price;
-      const change = (Math.random() - 0.48) * 300;
-      const c = o + change;
-      const h = Math.max(o, c) + Math.random() * 150;
-      const l = Math.min(o, c) - Math.random() * 150;
+    const volumes: any[]             = [];
+    let price = basePrice;
+    for (let i = 200; i >= 0; i--) {
+      const t       = (now - i * interval - (now % interval)) as any;
+      const o       = price;
+      const pct     = (Math.random() - 0.48) * 0.018;
+      const c       = o * (1 + pct);
+      const h       = Math.max(o, c) * (1 + Math.random() * 0.005);
+      const l       = Math.min(o, c) * (1 - Math.random() * 0.005);
       candles.push({ time: t, open: o, high: h, low: l, close: c });
-      volumes.push({
-        time: t,
-        value: Math.random() * 1000 + 200,
-        color: c > o ? 'rgba(0, 255, 136, 0.4)' : 'rgba(255, 68, 102, 0.4)'
-      });
+      volumes.push({ time: t, value: Math.random() * 500000 + 100000,
+        color: c > o ? 'rgba(0,255,136,0.4)' : 'rgba(255,68,102,0.4)' });
       price = c;
     }
     this.realCandles = candles;
@@ -323,8 +423,18 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
     this.chart?.timeScale().fitContent();
   }
 
+  /** @deprecated use loadBinanceCandles — kept only for internal fallback */
+  private loadDemoCandles() {
+    this.loadFallbackDemo(66500);
+  }
+
   private renderProjection(d: Nexus15ResultDto) {
     if (!this.candleSeries || !this.ghostCandleSeries || !this.volumeSeries) return;
+    if (this.realCandles.length === 0) {
+      // candles still loading from Binance — retry in 500ms
+      setTimeout(() => this.renderProjection(d), 500);
+      return;
+    }
 
     const interval = 15 * 60;
     const bullish  = (d.direction ?? '') === 'BULLISH';

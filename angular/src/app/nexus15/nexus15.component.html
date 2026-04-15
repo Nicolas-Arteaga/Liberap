@@ -73,6 +73,21 @@
         </select>
       </div>
 
+      <!-- ── Live Price Display ── -->
+      <div class="tb-live-price" *ngIf="livePrice() !== null">
+        <span class="lp-label">PRECIO</span>
+        <span class="lp-value">{{ livePrice() | number:'1.2-6' }}</span>
+        <span class="lp-change"
+          [class.lp-pos]="livePriceChange() >= 0"
+          [class.lp-neg]="livePriceChange() < 0">
+          {{ livePriceChange() >= 0 ? '▲' : '▼' }}{{ livePriceChange() | number:'1.2-2' }}%
+        </span>
+      </div>
+      <div class="tb-live-price lp-loading" *ngIf="livePrice() === null">
+        <span class="lp-label">PRECIO</span>
+        <span class="lp-value lp-wait">— — —</span>
+      </div>
+
       <div class="tb-regime" *ngIf="data()">
         <span class="regime-label">{{ data()?.regime }}</span>
         <span class="regime-sep">|</span>

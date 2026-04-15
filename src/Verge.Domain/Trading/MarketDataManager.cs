@@ -121,7 +121,11 @@ public class MarketDataManager : DomainService
     {
         try
         {
-            var cleanSymbol = symbol.ToUpper().Replace("/", "").Replace("-", "").Trim();
+            // Normalize symbol: handle Freqtrade format (e.g. "SIREN/USDT:USDT" → "SIRENUSDT")
+            // Strip the ":USDT" settle suffix first, then remove / and -
+            var normalized = symbol.Contains(':') ? symbol.Split(':')[0] : symbol;
+            var cleanSymbol = normalized.ToUpper().Replace("/", "").Replace("-", "").Trim();
+
             var binanceInterval = interval.ToLower() switch
             {
                 "1" => "1m",
@@ -130,7 +134,7 @@ public class MarketDataManager : DomainService
                 "30" => "30m",
                 "60" => "1h",
                 "240" => "4h",
-                _ => interval 
+                _ => interval
             };
 
             var cacheKey = endTime.HasValue
@@ -143,32 +147,59 @@ public class MarketDataManager : DomainService
                 return JsonSerializer.Deserialize<List<MarketCandleModel>>((string)cached!)!;
             }
 
-            await _binanceGate.WaitAsync();
-            HttpResponseMessage response;
-            try
-            {
-                var client = _httpClientFactory.CreateClient();
-                var url = $"{FuturesBaseUrl}/fapi/v1/klines?symbol={cleanSymbol}&interval={binanceInterval}&limit={limit}";
-                if (endTime.HasValue) url += $"&endTime={endTime.Value}";
+            var result = await FetchKlinesAsync(cleanSymbol, binanceInterval, limit, endTime, futures: true);
 
-                Logger.LogInformation($"📡 Fetching Candles (Gate Open): {url}");
-                response = await client.GetAsync(url);
-            }
-            finally
+            // ── Fallback to Spot API for small-caps not listed on Futures ────────
+            if (result.Count < 5)
             {
-                _binanceGate.Release();
+                Logger.LogWarning($"⚠️ Futures sin datos para {cleanSymbol}, probando Spot API...");
+                result = await FetchKlinesAsync(cleanSymbol, binanceInterval, limit, endTime, futures: false);
             }
-            
+
+            if (result.Count > 0)
+            {
+                var ttlSeconds = binanceInterval switch {
+                    "1m" => 30,
+                    "5m" => 120,
+                    _ => 300
+                };
+                await _redis.StringSetAsync(cacheKey, JsonSerializer.Serialize(result), TimeSpan.FromSeconds(ttlSeconds));
+            }
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"💥 EXCEPCIÓN en MarketDataManager: {ex.Message}");
+            return new List<MarketCandleModel>();
+        }
+    }
+
+    private async Task<List<MarketCandleModel>> FetchKlinesAsync(string cleanSymbol, string binanceInterval, int limit, long? endTime, bool futures)
+    {
+        await _binanceGate.WaitAsync();
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            var baseEndpoint = futures
+                ? $"{FuturesBaseUrl}/fapi/v1/klines"
+                : $"{BinanceBaseUrl}/api/v3/klines";
+
+            var url = $"{baseEndpoint}?symbol={cleanSymbol}&interval={binanceInterval}&limit={limit}";
+            if (endTime.HasValue) url += $"&endTime={endTime.Value}";
+
+            Logger.LogInformation($"📡 Fetching Klines ({(futures ? "Futures" : "Spot")}): {url}");
+            var response = await client.GetAsync(url);
+
             if (!response.IsSuccessStatusCode)
             {
-                var error = await response.Content.ReadAsStringAsync();
-                Logger.LogError($"❌ Error de Binance: {response.StatusCode} - {error}");
-                return new List<MarketCandleModel>(); 
+                var err = await response.Content.ReadAsStringAsync();
+                Logger.LogWarning($"⚠️ Klines {(futures ? "Futures" : "Spot")} {response.StatusCode} for {cleanSymbol}: {err}");
+                return new List<MarketCandleModel>();
             }
 
             var content = await response.Content.ReadAsStringAsync();
             var rawCandles = JsonSerializer.Deserialize<List<List<JsonElement>>>(content);
-
             var result = new List<MarketCandleModel>();
 
             if (rawCandles != null)
@@ -187,22 +218,11 @@ public class MarketDataManager : DomainService
                 }
             }
 
-
-            // Redis Cache with TTL
-            var ttlSeconds = binanceInterval switch {
-                "1m" => 30,
-                "5m" => 120,
-                _ => 300
-            };
-
-            await _redis.StringSetAsync(cacheKey, JsonSerializer.Serialize(result), TimeSpan.FromSeconds(ttlSeconds));
-
             return result;
         }
-        catch (Exception ex)
+        finally
         {
-            Logger.LogError($"💥 EXCEPCIÓN en MarketDataManager: {ex.Message}");
-            return new List<MarketCandleModel>();
+            _binanceGate.Release();
         }
     }
 
