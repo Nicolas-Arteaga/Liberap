@@ -40,6 +40,7 @@ public class Nexus15FeaturesDto
     public bool OrderBlockDetected { get; set; }
     public bool FairValueGap { get; set; }
     public bool BosDetected { get; set; }
+    public bool LiquiditySweep { get; set; }
     public string WyckoffPhase { get; set; }
     public bool SpringDetected { get; set; }
     public bool UpthrustDetected { get; set; }

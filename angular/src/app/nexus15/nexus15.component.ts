@@ -6,7 +6,11 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { Nexus15Service } from '../proxy/trading/nexus15/nexus15.service';
-import { Nexus15ResultDto, Nexus15FeaturesDto } from '../proxy/trading/nexus15/models';
+import { Nexus15ResultDto, Nexus15FeaturesDto as BaseNexus15FeaturesDto } from '../proxy/trading/nexus15/models';
+
+export interface Nexus15FeaturesDto extends BaseNexus15FeaturesDto {
+  liquiditySweep?: boolean;
+}
 import { BotService } from '../proxy/trading/bot.service';
 import { TradingSignalrService } from '../services/trading-signalr.service';
 import {
@@ -84,6 +88,8 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
   livePrice      = signal<number | null>(null);
   livePriceChange = signal<number>(0); // % change vs previous close
   scanCount      = signal(0);
+  topResults     = signal<Nexus15ResultDto[]>([]);
+  isTopLoading   = signal(false);
 
   // ── Dynamic Pair Selector ──────────────────────────────────────────────────
   availableSymbols = signal<string[]>(BINANCE_FUTURES_PAIRS);
@@ -219,6 +225,23 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
         this.pushTerminal(`⚠ NEXUS-15: sin modelo para ${this.selectedSymbol()} (${msg})`);
         this.pushTerminal(`  → Chart Binance disponible. Seleccioná un par mayor para IA.`);
         // Chart already has real Binance data, no need to reload candles
+      }
+    });
+  }
+
+  runTopScan() {
+    this.isTopLoading.set(true);
+    this.topResults.set([]);
+    this.pushTerminal('> MASSIVE MARKET SCAN INIT: TOP 20 VOL OVERRIDE...');
+    this.nexus15Svc.analyzeTopAvailable(5).subscribe({
+      next: res => {
+        this.topResults.set(res || []);
+        this.isTopLoading.set(false);
+        this.pushTerminal(`✓ SCAN COMPLETE: ${res?.length ?? 0} OPPORTUNITIES FOUND`);
+      },
+      error: err => {
+        this.isTopLoading.set(false);
+        this.pushTerminal('⚠ TOP SCAN ERROR');
       }
     });
   }
@@ -719,8 +742,9 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
       ];
       case 'g2SmcIct': return [
         { label: 'Order Block',    value: f.orderBlockDetected ? '✓' : '✗',            status: f.orderBlockDetected ? 'ok' : 'warn' },
-        { label: 'Fair Value Gap', value: f.fairValueGap ? '✓' : '✗',                 status: f.fairValueGap ? 'ok' : 'warn' },
+        { label: 'Fair Val Gap',   value: f.fairValueGap ? '✓' : '✗',                 status: f.fairValueGap ? 'ok' : 'warn' },
         { label: 'BOS',            value: f.bosDetected ? '✓' : '✗',                   status: f.bosDetected ? 'ok' : 'neutral' },
+        { label: 'Liq Sweep',      value: f.liquiditySweep ? '✓' : '✗',               status: f.liquiditySweep ? 'ok' : 'neutral' },
       ];
       case 'g3Wyckoff': return [
         { label: 'Phase',    value: f.wyckoffPhase ?? '--',        status: (f.wyckoffPhase === 'Markup' || f.wyckoffPhase === 'Accumulation') ? 'ok' : 'warn' },

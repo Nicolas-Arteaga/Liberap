@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
@@ -134,5 +137,47 @@ public class Nexus15AppService : ApplicationService, INexus15AppService
             _logger.LogError(ex, "❌ [Nexus15] OnDemand analysis failed for {Symbol}", symbol);
             return null;
         }
+    }
+
+    /// <summary>Analiza el mercado top y recopila las mejores opciones.</summary>
+    public async Task<List<Nexus15ResultDto>> AnalyzeTopAvailableAsync(int topN = 5)
+    {
+        _logger.LogInformation("🚀 [Nexus15] Initiating Top 20 Market Massive Scan... targeting top {Top}", topN);
+        
+        var tickers = await _marketData.GetTickersAsync();
+        var topSymbols = tickers
+            .Where(t => t.Volume > 1_000_000m)
+            .OrderByDescending(t => Math.Abs(t.PriceChangePercent))
+            .Take(40)
+            .Select(t => t.Symbol)
+            .ToList();
+
+
+        var results = new ConcurrentBag<Nexus15ResultDto>();
+        using var semaphore = new SemaphoreSlim(10); // analyze 10 concurrently max
+
+        var tasks = topSymbols.Select(async symbol =>
+        {
+            await semaphore.WaitAsync();
+            try
+            {
+                var res = await AnalyzeOnDemandAsync(symbol);
+                if (res != null) results.Add(res);
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        });
+
+        await Task.WhenAll(tasks);
+
+        _logger.LogInformation("✅ [Nexus15] Top scan finished successfully.");
+
+        return results
+            .Where(r => r.Direction == "BULLISH" || r.Direction == "BEARISH")
+            .OrderByDescending(r => r.AiConfidence)
+            .Take(topN)
+            .ToList();
     }
 }

@@ -75,10 +75,6 @@ public class MarketScannerService : BackgroundService
         var institutionalService = scope.ServiceProvider.GetRequiredService<IInstitutionalDataService>();
         var multiAgentConsensus = scope.ServiceProvider.GetRequiredService<IMultiAgentConsensusService>();
         var macroService = scope.ServiceProvider.GetRequiredService<IMacroSentimentService>();
-        var unitOfWorkManager = scope.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
-        var aniquilador = scope.ServiceProvider.GetRequiredService<IAniquiladorPatternManager>();
-
-        using var uow = unitOfWorkManager.Begin();
 
         // 0. Macro Check (Sprint 5) - Affects entire scan cycle
         var macroData = await macroService.GetMacroSentimentAsync();
@@ -111,6 +107,9 @@ public class MarketScannerService : BackgroundService
             try
             {
                 using var innerScope = _serviceProvider.CreateScope();
+                var innerUowManager = innerScope.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
+                using var innerUow = innerUowManager.Begin(requiresNew: true); // Force strict isolation
+
                 // Get fresh services for each parallel task to avoid DbContext threading issues
                 var innerMarketManager = innerScope.ServiceProvider.GetRequiredService<MarketDataManager>();
                 var innerAnalysisService = innerScope.ServiceProvider.GetRequiredService<CryptoAnalysisService>();
@@ -238,6 +237,8 @@ public class MarketScannerService : BackgroundService
                 {
                     _logger.LogWarning("⚠️ Redis SuperScore publish failed for {symbol}: {msg}", symbol, redisEx.Message);
                 }
+
+                await innerUow.CompleteAsync();
             }
             catch (Exception ex)
             {
@@ -251,7 +252,6 @@ public class MarketScannerService : BackgroundService
 
         await Task.WhenAll(tasks);
 
-        await uow.CompleteAsync();
         _logger.LogInformation("🏁 Ciclo completado. Se analizaron {count} símbolos", analyzedCount);
     }
 }

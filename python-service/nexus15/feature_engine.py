@@ -46,35 +46,65 @@ class Nexus15FeatureEngine:
 
     # ── Grupo 2: SMC/ICT ──────────────────────────────────────────────────
     def _group2_smc_ict(self, df: pd.DataFrame) -> dict:
-        # Order Block: vela bajista fuerte seguida de impulso alcista
         ob_detected = False
-        if len(df) >= 3:
-            prev2 = df.iloc[-3]
-            prev1 = df.iloc[-2]
-            last  = df.iloc[-1]
-            if (prev2['close'] < prev2['open'] and
-                abs(prev2['close'] - prev2['open']) / (prev2['high'] - prev2['low'] + EPSILON) > 0.6 and
-                last['close'] > prev2['high']):
-                ob_detected = True
-
-        # Fair Value Gap: gap entre high[i-2] y low[i]
         fvg = False
-        if len(df) >= 3:
-            if df.iloc[-3]['high'] < df.iloc[-1]['low']:
-                gap_pct = (df.iloc[-1]['low'] - df.iloc[-3]['high']) / df.iloc[-1]['close']
-                fvg = gap_pct > 0.001  # > 0.1%
-
-        # BOS: nuevo HH (Higher High) sobre últimos 10 pivots
         bos = False
-        if len(df) >= 10:
-            recent_highs = df['high'].iloc[-10:-1]
-            if df['high'].iloc[-1] > recent_highs.max():
-                bos = True
+        liq_sweep = False
+
+        if len(df) >= 15:
+            last = df.iloc[-1]
+            
+            # 1. Order Block Mitigation (Últimas 10 velas)
+            # Buscamos de atrás para adelante si el precio actual está en la zona de una vela contraria fuerte.
+            for i in range(len(df) - 10, len(df) - 1):
+                candle = df.iloc[i]
+                body = abs(candle['close'] - candle['open'])
+                hl = candle['high'] - candle['low'] + EPSILON
+                
+                if body / hl > 0.6:  # Vela con cuerpo sólido
+                    if candle['close'] < candle['open']:  # OB Alcista (vela bajista previa al alza)
+                        if last['low'] <= candle['high'] and last['close'] > candle['low']:
+                            ob_detected = True
+                            break
+                    else:  # OB Bajista (vela alcista previa a la baja)
+                        if last['high'] >= candle['low'] and last['close'] < candle['high']:
+                            ob_detected = True
+                            break
+
+            # 2. Fair Value Gap (Bullish & Bearish) con Memoria (Últimas 5 velas)
+            for i in range(len(df) - 5, len(df)):
+                if i < 2: continue
+                # Bullish FVG
+                fvg_bull = df.iloc[i-2]['high'] < df.iloc[i]['low']
+                # Bearish FVG
+                fvg_bear = df.iloc[i-2]['low'] > df.iloc[i]['high']
+                
+                if fvg_bull or fvg_bear:
+                    gap = min(
+                        abs(df.iloc[i]['low'] - df.iloc[i-2]['high']),
+                        abs(df.iloc[i-2]['low'] - df.iloc[i]['high'])
+                    )
+                    if (gap / df.iloc[i]['close']) > 0.001:
+                        fvg = True
+                        break
+
+            # 3. BOS (Break of Structure real basado en cierres)
+            recent_high = df['high'].iloc[-15:-2].max()
+            recent_low = df['low'].iloc[-15:-2].min()
+            
+            bos = (last['close'] > recent_high) or (last['close'] < recent_low)
+
+            # 4. Liquidity Sweep (Fakeout de mecha)
+            if last['high'] > recent_high and last['close'] < recent_high:
+                liq_sweep = True  # Barrió highs pero cerró abajo
+            if last['low'] < recent_low and last['close'] > recent_low:
+                liq_sweep = True  # Barrió lows pero cerró arriba
 
         return {
             "order_block_detected": ob_detected,
             "fair_value_gap": fvg,
             "bos_detected": bos,
+            "liquidity_sweep": liq_sweep
         }
 
     # ── Grupo 3: Wyckoff ──────────────────────────────────────────────────

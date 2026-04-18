@@ -797,14 +797,99 @@ $border:  rgba(0, 240, 255, 0.15);
   &:disabled { opacity: 0.4; cursor: not-allowed; animation: none; }
 
   .act-icon { font-size: 16px; filter: drop-shadow(0 0 6px #ff8800); }
-  .act-text {
-    font-family: 'Orbitron', sans-serif;
-    font-size: 12px;
-    font-weight: 900;
-    color: #ff8800;
-    letter-spacing: 2px;
+  .act-text { font-family: 'Orbitron', sans-serif; font-size: 11px; font-weight: 900; letter-spacing: 2px; color: #fff; }
+  .act-spin { margin-left: 6px; font-size: 12px; display: inline-block; animation: spinAnim 1s linear infinite; }
+}
+
+// ── TOP LIST PANEL ──
+.nx15-top-list {
+  border: 1px solid rgba($cyan,0.15);
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: auto;
+  animation: fade-in 0.4s ease;
+
+  .tl-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba($cyan, 0.2);
+    padding-bottom: 4px;
+    margin-bottom: 4px;
+
+    .tl-title { font-family: 'Orbitron', sans-serif; font-size: 11px; color: $cyan; font-weight: 700; }
+    .tl-clear { font-size: 14px; color: rgba(255,255,255,0.4); cursor: pointer; line-height: 1; margin-top: -2px; }
+    .tl-clear:hover { color: #ff4466; text-shadow: 0 0 8px #ff4466; }
   }
-  .act-spin { color: #ff8800; animation: spin 0.8s linear infinite; display: inline-block; }
+
+  .tl-row {
+    display: grid;
+    grid-template-columns: 2fr 1.5fr 1.7fr;
+    font-size: 10px;
+    align-items: center;
+    padding: 3px 0;
+  }
+
+  .tl-th {
+    color: rgba(255,255,255,0.3);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    padding-bottom: 4px;
+  }
+
+  .tl-item {
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.2s;
+    padding: 4px 2px;
+    &:hover { background: rgba($cyan, 0.15); }
+  }
+
+  .tl-sym {
+    color: #fff;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+  }
+
+  .tl-conf {
+    font-family: 'Share Tech Mono', monospace;
+    font-weight: bold;
+    font-size: 11px;
+    text-shadow: 0 0 6px currentColor;
+  }
+
+  .tl-dir {
+    text-align: right; 
+    font-weight: bold;
+    font-size: 9px;
+    &.bullish { color: $green; }
+    &.bearish { color: #ff4466; }
+  }
+}
+
+.nx15-actions-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.btn-top5 {
+  border-color: rgba($cyan, 0.7);
+  background: linear-gradient(135deg, rgba($cyan,0.20), rgba($cyan,0.05));
+  animation: pulse-glow 3s ease infinite;
+  
+  .act-icon { filter: drop-shadow(0 0 6px $cyan); }
+  
+  &:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgba($cyan,0.35), rgba($cyan,0.15));
+    border-color: $cyan;
+    box-shadow: 0 0 24px rgba($cyan,0.4), 0 0 48px rgba($cyan,0.15);
+  }
 }
 
 // ── RESPONSIVE ──

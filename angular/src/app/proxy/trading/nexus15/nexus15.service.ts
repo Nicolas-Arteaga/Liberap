@@ -26,4 +26,12 @@ export class Nexus15Service {
       params: { symbol },
     },
     { apiName: this.apiName,...config });
+
+  analyzeTopAvailable = (topN: number = 5, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, Nexus15ResultDto[]>({
+      method: 'POST',
+      url: '/api/app/nexus15/analyze-top-available',
+      params: { topN },
+    },
+    { apiName: this.apiName,...config });
 }

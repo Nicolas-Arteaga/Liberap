@@ -33,6 +33,7 @@ class Nexus15Features(BaseModel):
     order_block_detected: bool
     fair_value_gap: bool
     bos_detected: bool
+    liquidity_sweep: bool
     # G3
     wyckoff_phase: str
     spring_detected: bool

@@ -209,8 +209,8 @@
         </div>
       </div>
 
-      <!-- FreqTrade info -->
-      <div class="nx15-freqtrade">
+      <!-- FreqTrade info (Fallback) -->
+      <div class="nx15-freqtrade" *ngIf="topResults().length === 0">
         <div class="ft-title">
           <span class="ft-logo">FreqTrade</span>
           <span class="ft-live" [style.color]="data() ? '#00ff88' : '#555'">● {{ data() ? 'LIVE' : 'IDLE' }}</span>
@@ -227,12 +227,42 @@
         </div>
       </div>
 
-      <!-- ⚡ ACTIVATE BUTTON — below G6 -->
-      <button class="nx15-activate" (click)="runOnDemand()" [disabled]="isLoading()">
-        <span class="act-icon">⚡</span>
-        <span class="act-text">ACTIVAR NEXUS-15</span>
-        <span class="act-spin" *ngIf="isLoading()"> ⟳</span>
-      </button>
+      <!-- Top 5 List (Replaces FreqTrade) -->
+      <div class="nx15-top-list" *ngIf="topResults().length > 0">
+        <div class="tl-header">
+          <span class="tl-title">🏆 TOP 5 NEXUS</span>
+          <span class="tl-clear" (click)="topResults.set([])">⨯</span>
+        </div>
+        <div class="tl-row tl-th">
+          <div class="tl-col">ASSET</div>
+          <div class="tl-col">CONF%</div>
+          <div class="tl-col">DIR</div>
+        </div>
+        <div class="tl-row tl-item" *ngFor="let tr of topResults()" (click)="onSymbolChange(tr.symbol!)">
+          <div class="tl-col tl-sym">{{ tr.symbol?.replace('USDT','') }}</div>
+          <div class="tl-col tl-conf" [style.color]="(tr.aiConfidence ?? 0) >= 75 ? '#00ff88' : '#ffdd00'">
+             {{ tr.aiConfidence | number:'1.1-1' }}%
+          </div>
+          <div class="tl-col tl-dir" [class]="tr.direction === 'BULLISH' ? 'bullish' : 'bearish'">
+             {{ tr.direction === 'BULLISH' ? '▲ LONG' : '▼ SHORT' }}
+          </div>
+        </div>
+      </div>
+
+      <!-- ⚡ ACTIVATE BUTTONS — below G6 -->
+      <div class="nx15-actions-panel">
+        <button class="nx15-activate" (click)="runOnDemand()" [disabled]="isLoading() || isTopLoading()">
+          <span class="act-icon">⚡</span>
+          <span class="act-text">ACTIVAR NEXUS-15</span>
+          <span class="act-spin" *ngIf="isLoading()"> ⟳</span>
+        </button>
+
+        <button class="nx15-activate btn-top5" (click)="runTopScan()" [disabled]="isLoading() || isTopLoading()">
+          <span class="act-icon">🏆</span>
+          <span class="act-text">TOP DE NEXUS-15</span>
+          <span class="act-spin" *ngIf="isTopLoading()"> ⟳</span>
+        </button>
+      </div>
 
     </aside>
   </div>

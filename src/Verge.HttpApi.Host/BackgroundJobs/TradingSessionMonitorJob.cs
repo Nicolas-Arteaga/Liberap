@@ -89,8 +89,6 @@ public class TradingSessionMonitorJob : BackgroundService
         var unitOfWorkManager = scope.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
         var eventBus = scope.ServiceProvider.GetRequiredService<IDistributedEventBus>();
 
-        using var uow = unitOfWorkManager.Begin();
-
         var activeSessions = await sessionRepository.GetListAsync(x => x.IsActive && x.CurrentStage < TradingStage.SellActive);
         if (!activeSessions.Any())
         {
@@ -221,6 +219,7 @@ public class TradingSessionMonitorJob : BackgroundService
 
             try
             {
+                using var sessionUow = unitOfWorkManager.Begin(requiresNew: true, isTransactional: true);
                 // 4.0 Check for TP/SL Exits (Sprint 1)
                 var currentTraderProfile = profileMap[session.TraderProfileId];
                 if (session.CurrentStage == TradingStage.BuyActive)
@@ -370,6 +369,8 @@ public class TradingSessionMonitorJob : BackgroundService
                     // Always run stagnancy check for AUTO mode even if no winner or bestOpportunity is null
                     await CheckSessionStagnancyAsync(session, strategy, eventBus, currentTraderProfile.UserId, analysisLogRepo);
                 }
+
+                await sessionUow.CompleteAsync();
             }
             catch (Exception ex)
             {
@@ -377,7 +378,6 @@ public class TradingSessionMonitorJob : BackgroundService
             }
         }
 
-        await uow.CompleteAsync();
         _logger.LogInformation("🏁 Monitoring cycle completed.");
     }
 

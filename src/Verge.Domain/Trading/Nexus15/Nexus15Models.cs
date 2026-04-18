@@ -69,6 +69,8 @@ public class Nexus15FeaturesModel
     public bool FairValueGap { get; set; }
     [JsonPropertyName("bos_detected")]
     public bool BosDetected { get; set; }
+    [JsonPropertyName("liquidity_sweep")]
+    public bool LiquiditySweep { get; set; }
     [JsonPropertyName("wyckoff_phase")]
     public string WyckoffPhase { get; set; }
     [JsonPropertyName("spring_detected")]

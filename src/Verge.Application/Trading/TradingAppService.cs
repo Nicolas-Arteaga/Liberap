@@ -350,7 +350,6 @@ public class TradingAppService : ApplicationService, ITradingAppService
 
         session.IsActive = false;
         session.EndTime = DateTime.UtcNow;
-        await _sessionRepository.UpdateAsync(session, autoSave: true);
         await _sessionRepository.DeleteAsync(session, autoSave: true); 
 
         // Borrar la estrategia activa asociada
@@ -358,18 +357,13 @@ public class TradingAppService : ApplicationService, ITradingAppService
         if (strategy != null)
         {
             strategy.IsActive = false;
-            await _strategyRepository.UpdateAsync(strategy, autoSave: true);
             await _strategyRepository.DeleteAsync(strategy.Id, autoSave: true); 
             _logger.LogInformation("🗑️ Estrategia {StrategyId} eliminada físicamente", strategy.Id);
         }
 
-        // Limpiar registros de análisis asociados a ESTA sesión
-        var logs = await _analysisLogRepository.GetListAsync(x => x.TradingSessionId == sessionId);
-        foreach (var log in logs)
-        {
-            await _analysisLogRepository.DeleteAsync(log.Id);
-        }
-        _logger.LogInformation("🧹 {Count} registros de análisis eliminados para la sesión {SessionId}", logs.Count, sessionId);
+        // Limpiar registros de análisis asociados a ESTA sesión usando eliminación explícita sin cargar en memoria
+        await _analysisLogRepository.DeleteAsync(x => x.TradingSessionId == sessionId, autoSave: true);
+        _logger.LogInformation("🧹 Registros de análisis eliminados para la sesión {SessionId}", sessionId);
 
         // Notificar fin de sesión
         await _hubContext.Clients.All.SendAsync("SessionEnded", sessionId);

@@ -58,22 +58,32 @@ class Nexus15Analyzer:
         xgb_prob = self.model_loader.predict(feature_vector)
         g6 = xgb_prob if xgb_prob is not None else 0.5
 
-        # 4. AI Confidence
-        technical_score = (
+        # 4. Raw Score (0 = Max Bearish, 1 = Max Bullish)
+        technical_score_raw = (
             g1 * GROUP_WEIGHTS["g1"] +
             g2 * GROUP_WEIGHTS["g2"] +
             g3 * GROUP_WEIGHTS["g3"] +
             g4 * GROUP_WEIGHTS["g4"] +
             g5 * GROUP_WEIGHTS["g5"]
         )
-        ai_confidence = round(
-            (technical_score * 0.85 + g6 * 0.15) * 100, 2
-        )
+        combined_raw = technical_score_raw * 0.85 + g6 * 0.15
 
-        # 5. Direction
-        direction = self._determine_direction(feats, xgb_prob)
+        # 5. Direction First
+        direction = self._determine_direction(feats, g6)
 
-        # 6. Recommendation
+        # 6. AI Conviction (Absolute Strength)
+        # Si combined = 0.1 (muy bajista), la distancia a 0.5 es 0.4 -> 80% Conviction
+        # Si combined = 0.9 (muy alcista), la distancia a 0.5 es 0.4 -> 80% Conviction
+        # El grupo SMC (g2) es de magnitud/volatilidad neutra, así que suma al conviction base
+        conviction_base = abs(combined_raw - 0.5) * 2.0
+        
+        # Ajuste de convicción: SMC aumenta la convicción de la tendencia si se detectan barridos/bos.
+        if direction != "NEUTRAL":
+            conviction_base += (g2 * 0.20)  # Bonificación de evento institucional
+
+        ai_confidence = round(min(1.0, conviction_base) * 100, 2)
+
+        # 7. Recommendation
         recommendation = "Wait"
         if ai_confidence >= STRONG_SIGNAL_THRESHOLD:
             if direction == "BULLISH":
@@ -81,7 +91,7 @@ class Nexus15Analyzer:
             elif direction == "BEARISH":
                 recommendation = "Short"
 
-        # 7. Forward probabilities (decaying con XGBoost + ATR)
+        # 8. Forward probabilities (decaying con XGBoost + ATR)
         base_prob = min(0.95, max(0.35, g6 if g6 else 0.5))
         atr_decay = max(0, 1 - feats["atr_percent"] / 5.0)
 
@@ -128,9 +138,10 @@ class Nexus15Analyzer:
 
     def _score_g2(self, f) -> float:
         return round(
-            int(f["order_block_detected"]) * 0.4 +
-            int(f["fair_value_gap"]) * 0.3 +
-            int(f["bos_detected"]) * 0.3, 4
+            int(f["order_block_detected"]) * 0.3 +
+            int(f["fair_value_gap"]) * 0.2 +
+            int(f["bos_detected"]) * 0.3 +
+            int(f.get("liquidity_sweep", False)) * 0.2, 4
         )
 
     def _score_g3(self, f) -> float:
@@ -180,7 +191,7 @@ class Nexus15Analyzer:
     def _build_detectivity(self, f, g1, g2, g3, g4, g5, g6) -> dict:
         return {
             "g1_price_action": f"Body ratio {f['candle_body_ratio']:.0%} | {f['consecutive_bull_bars']} velas alcistas consecutivas",
-            "g2_smc_ict": f"OB: {'✅' if f['order_block_detected'] else '❌'} | FVG: {'✅' if f['fair_value_gap'] else '❌'} | BOS: {'✅' if f['bos_detected'] else '❌'}",
+            "g2_smc_ict": f"OB: {'✅' if f['order_block_detected'] else '❌'} | FVG: {'✅' if f['fair_value_gap'] else '❌'} | BOS: {'✅' if f['bos_detected'] else '❌'} | Sweep: {'✅' if f.get('liquidity_sweep', False) else '❌'}",
             "g3_wyckoff": f"Fase: {f['wyckoff_phase']} | Spring: {'✅' if f['spring_detected'] else '❌'} | Upthrust: {'✅' if f['upthrust_detected'] else '❌'}",
             "g4_fractals": f"Estructura: {'HH/HL ↑' if f['trend_structure'] == 1 else 'LH/LL ↓' if f['trend_structure'] == -1 else 'Lateral'} | Fractal Alto: {'✅' if f['fractal_high_5'] else '❌'}",
             "g5_volume": f"Vol ratio {f['volume_ratio_20']:.2f}x | CVD {'📈' if f['cvd_delta'] > 0 else '📉'} {f['cvd_delta']:,.0f} | Surge: {'✅' if f['volume_surge_bullish'] else '❌'}",
