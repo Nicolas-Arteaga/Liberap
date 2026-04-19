@@ -46,6 +46,8 @@ public class PythonNexus15Service : IPythonNexus15Service
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
+            _logger.LogInformation("DEBUG NEXUS: Raw JSON from Python for {Symbol}: {Json}", symbol, json);
+            
             return JsonSerializer.Deserialize<Nexus15ResponseModel>(json, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true

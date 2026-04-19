@@ -240,11 +240,14 @@
         </div>
         <div class="tl-row tl-item" *ngFor="let tr of topResults()" (click)="onSymbolChange(tr.symbol!)">
           <div class="tl-col tl-sym">{{ tr.symbol?.replace('USDT','') }}</div>
-          <div class="tl-col tl-conf" [style.color]="(tr.aiConfidence ?? 0) >= 75 ? '#00ff88' : '#ffdd00'">
+          <div class="tl-col tl-conf" [style.color]="(tr.aiConfidence ?? 0) >= 75 ? '#00ff88' : (tr.aiConfidence ?? 0) >= 45 ? '#ffdd00' : '#ff8888'">
              {{ tr.aiConfidence | number:'1.1-1' }}%
           </div>
-          <div class="tl-col tl-dir" [class]="tr.direction === 'BULLISH' ? 'bullish' : 'bearish'">
-             {{ tr.direction === 'BULLISH' ? '▲ LONG' : '▼ SHORT' }}
+          <div class="tl-col tl-dir"
+               [class.bullish]="tr.direction === 'BULLISH'"
+               [class.bearish]="tr.direction === 'BEARISH'"
+               [class.neutral]="tr.direction === 'NEUTRAL'">
+             {{ tr.direction === 'BULLISH' ? '▲ LONG' : tr.direction === 'BEARISH' ? '▼ SHORT' : '⬡ RANGING' }}
           </div>
         </div>
       </div>

@@ -174,10 +174,22 @@ public class Nexus15AppService : ApplicationService, INexus15AppService
 
         _logger.LogInformation("✅ [Nexus15] Top scan finished successfully.");
 
-        return results
+        // Prefer directional signals (BULLISH/BEARISH) but fallback to best neutrals
+        // so the button never appears broken during ranging/neutral markets.
+        var directional = results
             .Where(r => r.Direction == "BULLISH" || r.Direction == "BEARISH")
             .OrderByDescending(r => r.AiConfidence)
-            .Take(topN)
             .ToList();
+
+        if (directional.Count >= topN)
+            return directional.Take(topN).ToList();
+
+        // Fill remaining slots with highest-confidence neutral results
+        var neutralFill = results
+            .Where(r => r.Direction == "NEUTRAL")
+            .OrderByDescending(r => r.AiConfidence)
+            .Take(topN - directional.Count);
+
+        return directional.Concat(neutralFill).Take(topN).ToList();
     }
 }

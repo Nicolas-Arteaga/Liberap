@@ -58,30 +58,38 @@ class Nexus15Analyzer:
         xgb_prob = self.model_loader.predict(feature_vector)
         g6 = xgb_prob if xgb_prob is not None else 0.5
 
-        # 4. Raw Score (0 = Max Bearish, 1 = Max Bullish)
-        technical_score_raw = (
+        # [DEBUG]
+        print(f"DEBUG NEXUS {req.symbol}: g1={g1:.3f} g2={g2:.3f} g3={g3:.3f} g4={g4:.3f} g5={g5:.3f} g6={g6:.3f}")
+
+        # 4. Total Combined Score (0 = Max Bearish, 1 = Max Bullish)
+        # Normalizado 0.0 a 1.0 aprovechando que la suma de pesos en GROUP_WEIGHTS es 1.0
+        combined_raw = (
             g1 * GROUP_WEIGHTS["g1"] +
             g2 * GROUP_WEIGHTS["g2"] +
             g3 * GROUP_WEIGHTS["g3"] +
             g4 * GROUP_WEIGHTS["g4"] +
-            g5 * GROUP_WEIGHTS["g5"]
+            g5 * GROUP_WEIGHTS["g5"] +
+            g6 * GROUP_WEIGHTS["g6"]
         )
-        combined_raw = technical_score_raw * 0.85 + g6 * 0.15
 
         # 5. Direction First
         direction = self._determine_direction(feats, g6)
 
         # 6. AI Conviction (Absolute Strength)
-        # Si combined = 0.1 (muy bajista), la distancia a 0.5 es 0.4 -> 80% Conviction
-        # Si combined = 0.9 (muy alcista), la distancia a 0.5 es 0.4 -> 80% Conviction
-        # El grupo SMC (g2) es de magnitud/volatilidad neutra, así que suma al conviction base
+        # La convicción base es la distancia al punto neutral (0.5), escalada a 0-100.
         conviction_base = abs(combined_raw - 0.5) * 2.0
         
-        # Ajuste de convicción: SMC aumenta la convicción de la tendencia si se detectan barridos/bos.
+        # Ajuste de convicción: 
+        # Si hay señales fuertes en grupos clave (SMC o Volumen), subimos la confianza mínima
+        # incluso si el neto es algo neutral, para indicar que "hay mucha actividad".
+        activity_bonus = 0.0
         if direction != "NEUTRAL":
-            conviction_base += (g2 * 0.20)  # Bonificación de evento institucional
+            activity_bonus += 0.15  # Recompensa por tener una dirección clara
+            if g2 > 0.7 or g2 < 0.3: activity_bonus += 0.10 # Evento SMC fuerte
+            if g5 > 0.8: activity_bonus += 0.10             # Volumen inusual
 
-        ai_confidence = round(min(1.0, conviction_base) * 100, 2)
+        # AI Confidence final: conviction (0-1) + bonus → escalado a 0-100, piso mínimo de 10
+        ai_confidence = round(min(100.0, max(10.0, (conviction_base + activity_bonus) * 100.0)), 1)
 
         # 7. Recommendation
         recommendation = "Wait"
@@ -172,16 +180,36 @@ class Nexus15Analyzer:
     def _determine_direction(self, f, xgb_prob) -> str:
         bullish_votes = 0
         bearish_votes = 0
+        
+        # G4: Estructura de Tendencia (Voto fuerte)
         if f["trend_structure"] == 1: bullish_votes += 2
         if f["trend_structure"] == -1: bearish_votes += 2
+        
+        # G5: Volumen y CVD (Voto medio)
         if f["cvd_delta"] > 0: bullish_votes += 1
         if f["cvd_delta"] < 0: bearish_votes += 1
-        if xgb_prob and xgb_prob > 0.55: bullish_votes += 2
-        if xgb_prob and xgb_prob < 0.45: bearish_votes += 2
+        if f["volume_surge_bullish"]: bullish_votes += 1
+        
+        # G6: ML Prediction (Voto fuerte)
+        if xgb_prob and xgb_prob > 0.60: bullish_votes += 2
+        if xgb_prob and xgb_prob < 0.40: bearish_votes += 2
+        
+        # G2: SMC Events (Voto medio)
         if f["bos_detected"]: bullish_votes += 1
         if f["upthrust_detected"]: bearish_votes += 1
+        if f["spring_detected"]: bullish_votes += 1
+        
+        # G3: Wyckoff Phase (Voto medio)
+        if f["wyckoff_phase"] in ["Markup", "Accumulation"]: bullish_votes += 1
+        if f["wyckoff_phase"] in ["Markdown", "Distribution"]: bearish_votes += 1
+
+        # G1: Candle Action
+        if f["consecutive_bull_bars"] >= 3: bullish_votes += 1
+        if f["candle_body_ratio"] > 0.7: bullish_votes += 1
+
         if bullish_votes > bearish_votes + 1: return "BULLISH"
         if bearish_votes > bullish_votes + 1: return "BEARISH"
+        
         return "NEUTRAL"
 
     def _wyckoff_to_num(self, phase: str) -> float:
