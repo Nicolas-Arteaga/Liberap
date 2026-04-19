@@ -262,7 +262,7 @@ $border:  rgba(0, 240, 255, 0.15);
 
 .tb-sym {
   font-family: 'Orbitron', sans-serif;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
   color: $cyan;
   text-shadow: 0 0 10px $cyan;
@@ -273,7 +273,7 @@ $border:  rgba(0, 240, 255, 0.15);
   border: 1px solid rgba($cyan,0.3);
   color: $cyan;
   font-family: 'Share Tech Mono', monospace;
-  font-size: 10px;
+  font-size: 13px;
   padding: 3px 6px;
   border-radius: 4px;
   cursor: pointer;
@@ -293,7 +293,7 @@ $border:  rgba(0, 240, 255, 0.15);
   border: 1px solid rgba($cyan, 0.25);
   color: $cyan;
   font-family: 'Share Tech Mono', monospace;
-  font-size: 10px;
+  font-size: 13px;
   padding: 3px 7px;
   border-radius: 4px;
   outline: none;
@@ -305,7 +305,7 @@ $border:  rgba(0, 240, 255, 0.15);
 }
 
 .tb-regime {
-  font-size: 10px;
+  font-size: 13px;
   color: rgba($cyan,0.5);
   display: flex; gap: 6px;
   .regime-label { color: #ff8800; }
@@ -313,8 +313,8 @@ $border:  rgba(0, 240, 255, 0.15);
   .regime-range { color: $cyan; }
 }
 
-.tb-time { font-size: 9px; color: rgba($cyan,0.35); margin-left: auto; }
-.tb-error { font-size: 10px; color: #ff4466; }
+.tb-time { font-size: 12px; color: rgba($cyan,0.35); margin-left: auto; }
+.tb-error { font-size: 13px; color: #ff4466; }
 
 // ── LIVE PRICE WIDGET ──
 .tb-live-price {
@@ -334,7 +334,7 @@ $border:  rgba(0, 240, 255, 0.15);
   }
 
   .lp-label {
-    font-size: 8px;
+    font-size: 11px;
     letter-spacing: 2px;
     color: rgba($cyan, 0.5);
     text-transform: uppercase;
@@ -342,7 +342,7 @@ $border:  rgba(0, 240, 255, 0.15);
 
   .lp-value {
     font-family: 'Orbitron', sans-serif;
-    font-size: 15px;
+    font-size: 20px;
     font-weight: 900;
     color: $cyan;
     text-shadow: 0 0 14px rgba($cyan, 0.8);
@@ -358,7 +358,7 @@ $border:  rgba(0, 240, 255, 0.15);
 
   .lp-change {
     font-family: 'Share Tech Mono', monospace;
-    font-size: 11px;
+    font-size: 14px;
     font-weight: 700;
     padding: 2px 6px;
     border-radius: 4px;
@@ -430,7 +430,7 @@ $border:  rgba(0, 240, 255, 0.15);
   align-items: center;
   justify-content: center;
   font-family: 'Orbitron', sans-serif;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 900;
   color: #000;
   flex-shrink: 0;
@@ -439,7 +439,7 @@ $border:  rgba(0, 240, 255, 0.15);
 .gcard-label {
   flex: 1;
   font-family: 'Orbitron', sans-serif;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.3px;
   text-shadow: 0 0 8px currentColor;
@@ -447,7 +447,7 @@ $border:  rgba(0, 240, 255, 0.15);
 
 .gcard-pct {
   font-family: 'Orbitron', sans-serif;
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 900;
   text-shadow: 0 0 12px currentColor;
 }
@@ -484,7 +484,7 @@ $border:  rgba(0, 240, 255, 0.15);
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 9.5px;
+  font-size: 12.5px;
   color: rgba(255,255,255,0.45);
   padding: 2px 0;
   border-bottom: 1px solid rgba(255,255,255,0.04);
@@ -492,12 +492,12 @@ $border:  rgba(0, 240, 255, 0.15);
 
 .ck-idx   { color: rgba(255,255,255,0.2); min-width: 12px; }
 .ck-label { flex: 1; }
-.ck-val   { color: rgba(255,255,255,0.5); min-width: 36px; text-align: right; font-size: 9px; }
+.ck-val   { color: rgba(255,255,255,0.5); min-width: 36px; text-align: right; font-size: 12px; }
 
 .ck-icon {
-  .ico-ok      { color: #00ff88; font-size: 12px; }
-  .ico-warn    { color: #ff8800; font-size: 11px; }
-  .ico-neutral { color: #aaa; font-size: 11px; }
+  .ico-ok      { color: #00ff88; font-size: 14px; }
+  .ico-warn    { color: #ff8800; font-size: 13px; }
+  .ico-neutral { color: #aaa; font-size: 13px; }
 }
 
 // ── DIRECTION BANNER ──
@@ -557,6 +557,51 @@ $border:  rgba(0, 240, 255, 0.15);
     inset 0 0 60px rgba(0, 240, 255, 0.03);
 }
 
+.nx15-chart-box {
+  flex: 1;
+  position: relative;
+  background: rgba(0,0,0,0.6);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: inset 0 0 40px rgba(0,0,0,0.5);
+}
+
+.nx15-sync-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  color: $cyan;
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 2px;
+  animation: fade-in 0.3s ease;
+
+  .sync-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba($cyan, 0.1);
+    border-top-color: $cyan;
+    border-radius: 50%;
+    animation: rotate 1s linear infinite;
+    box-shadow: 0 0 15px rgba($cyan, 0.3);
+  }
+}
+
+@keyframes rotate { to { transform: rotate(360deg); } }
+
+.nx15-chart-container {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
 .chart-inner {
   width: 100%;
   height: 100%;
@@ -577,24 +622,64 @@ $border:  rgba(0, 240, 255, 0.15);
   z-index: 1;
 }
 
-.chart-label {
+.chart-header-row {
   position: absolute;
   top: 8px;
   left: 10px;
-  font-size: 10px;
-  color: rgba($cyan,0.6);
+  right: 54px; // keep clear of the price scale on the right
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
   z-index: 10;
-  font-family: 'Share Tech Mono', monospace;
+  pointer-events: none; // let clicks pass through the row itself
 }
 
-.chart-label-right {
-  position: absolute;
-  top: 8px;
-  right: 54px;
-  font-size: 10px;
-  color: rgba($cyan,0.4);
-  z-index: 10;
+.chart-label {
+  font-size: 14px;
+  font-weight: bold;
+  color: rgba($cyan, 0.9);
+  font-family: 'Share Tech Mono', monospace;
+  pointer-events: auto;
+  text-shadow: 0 0 5px rgba(0,0,0,0.8);
 }
+
+.chart-timeframes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  pointer-events: auto;
+  background: rgba(0,0,0,0.4);
+  padding: 3px;
+  border-radius: 6px;
+  border: 1px solid rgba($cyan, 0.2);
+  backdrop-filter: blur(4px);
+
+  .tf-btn {
+    background: transparent;
+    border: none;
+    color: rgba($cyan, 0.5);
+    font-size: 11px;
+    font-family: 'Orbitron', sans-serif;
+    padding: 2px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      color: $cyan;
+      background: rgba($cyan, 0.1);
+    }
+    
+    &.active {
+      color: #000;
+      background: $cyan;
+      font-weight: bold;
+      box-shadow: 0 0 8px rgba($cyan, 0.5);
+    }
+  }
+}
+
 
 .chart-funnel-badge {
   position: absolute;
@@ -605,7 +690,7 @@ $border:  rgba(0, 240, 255, 0.15);
   align-items: center;
   gap: 5px;
   font-family: 'Orbitron', sans-serif;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 700;
   padding: 3px 12px;
   border-radius: 20px;
@@ -615,7 +700,7 @@ $border:  rgba(0, 240, 255, 0.15);
   border: 1px solid transparent;
   transition: all 0.4s;
 
-  .funnel-icon { font-size: 11px; }
+  .funnel-icon { font-size: 14px; }
 
   &.bullish {
     color: $green;
@@ -647,7 +732,7 @@ $border:  rgba(0, 240, 255, 0.15);
   gap: 8px;
   background: rgba($bg, 0.7);
   color: $cyan;
-  font-size: 11px;
+  font-size: 14px;
   z-index: 20;
   .spin { animation: spin 0.8s linear infinite; display: inline-block; }
 }
@@ -681,7 +766,7 @@ $border:  rgba(0, 240, 255, 0.15);
 
 .bcard-title {
   font-family: 'Orbitron', sans-serif;
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -710,7 +795,7 @@ $border:  rgba(0, 240, 255, 0.15);
   }
   .rd-dir {
     font-family: 'Orbitron', sans-serif;
-    font-size: 11px;
+    font-size: 14px;
     font-weight: 900;
     letter-spacing: 3px;
     margin: 2px 0;
@@ -719,7 +804,7 @@ $border:  rgba(0, 240, 255, 0.15);
     display: flex;
     justify-content: center;
     gap: 10px;
-    font-size: 9px;
+    font-size: 12px;
     color: rgba(255,255,255,0.4);
     margin-top: 6px;
     b { color: $cyan; }
@@ -796,79 +881,75 @@ $border:  rgba(0, 240, 255, 0.15);
 
   &:disabled { opacity: 0.4; cursor: not-allowed; animation: none; }
 
-  .act-icon { font-size: 16px; filter: drop-shadow(0 0 6px #ff8800); }
-  .act-text { font-family: 'Orbitron', sans-serif; font-size: 11px; font-weight: 900; letter-spacing: 2px; color: #fff; }
-  .act-spin { margin-left: 6px; font-size: 12px; display: inline-block; animation: spinAnim 1s linear infinite; }
+  .act-icon { font-size: 19px; filter: drop-shadow(0 0 6px #ff8800); }
+  .act-text { font-family: 'Orbitron', sans-serif; font-size: 13px; font-weight: 900; letter-spacing: 2px; color: #fff; }
+  .act-spin { margin-left: 6px; font-size: 15px; display: inline-block; animation: spinAnim 1s linear infinite; }
 }
 
-// ── TOP LIST PANEL ──
-.nx15-top-list {
-  border: 1px solid rgba($cyan,0.15);
-  border-radius: 8px;
-  padding: 10px;
-  background: rgba(0,0,0,0.45);
+// ── TOP 5 LIST (HORIZONTAL BANNER) ──
+.nx15-top-banner {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: auto;
-  animation: fade-in 0.4s ease;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba($cyan, 0.3);
+  background: rgba(0, 5, 10, 0.4);
+  animation: fade-in 0.3s ease;
+  flex-shrink: 0;
 
-  .tl-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid rgba($cyan, 0.2);
-    padding-bottom: 4px;
-    margin-bottom: 4px;
-
-    .tl-title { font-family: 'Orbitron', sans-serif; font-size: 11px; color: $cyan; font-weight: 700; }
-    .tl-clear { font-size: 14px; color: rgba(255,255,255,0.4); cursor: pointer; line-height: 1; margin-top: -2px; }
-    .tl-clear:hover { color: #ff4466; text-shadow: 0 0 8px #ff4466; }
-  }
-
-  .tl-row {
-    display: grid;
-    grid-template-columns: 2fr 1.5fr 1.7fr;
-    font-size: 10px;
-    align-items: center;
-    padding: 3px 0;
-  }
-
-  .tl-th {
-    color: rgba(255,255,255,0.3);
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    padding-bottom: 4px;
-  }
-
-  .tl-item {
-    cursor: pointer;
-    border-radius: 4px;
-    transition: background 0.2s;
-    padding: 4px 2px;
-    &:hover { background: rgba($cyan, 0.15); }
-  }
-
-  .tl-sym {
-    color: #fff;
+  .tb-title {
     font-family: 'Orbitron', sans-serif;
-    font-size: 9px;
+    font-size: 13px;
     font-weight: 700;
+    color: $cyan;
+    text-shadow: 0 0 10px $cyan;
+    white-space: nowrap;
   }
 
-  .tl-conf {
-    font-family: 'Share Tech Mono', monospace;
-    font-weight: bold;
-    font-size: 11px;
-    text-shadow: 0 0 6px currentColor;
+  .tb-items {
+    display: flex;
+    flex: 1;
+    gap: 10px;
+    overflow-x: auto;
+    
+    &::-webkit-scrollbar { height: 2px; }
+    &::-webkit-scrollbar-thumb { background: rgba($cyan, 0.2); }
   }
 
-  .tl-dir {
-    text-align: right; 
-    font-weight: bold;
-    font-size: 9px;
-    &.bullish { color: $green; }
-    &.bearish { color: #ff4466; }
-    &.neutral { color: #888; opacity: 0.8; }
+  .tb-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    background: rgba(255,255,255, 0.05);
+    border: 1px solid rgba(255,255,255, 0.1);
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+
+    &:hover { background: rgba($cyan, 0.15); border-color: rgba($cyan, 0.4); box-shadow: 0 0 10px rgba($cyan, 0.1); }
+
+    .tb-sym { font-family: 'Orbitron', sans-serif; font-size: 12px; font-weight: 700; color: #fff; }
+    .tb-conf { font-family: 'Share Tech Mono', monospace; font-size: 13px; font-weight: bold; }
+    .tb-dir {
+      font-size: 13px; font-weight: 900;
+      &.bullish { color: $green; text-shadow: 0 0 6px currentColor; }
+      &.bearish { color: #ff4466; text-shadow: 0 0 6px currentColor; }
+      &.neutral { color: #888; }
+    }
+  }
+
+  .tb-clear {
+    font-size: 18px;
+    color: rgba(255,255,255,0.4);
+    cursor: pointer;
+    padding: 0 4px;
+    transition: color 0.2s;
+    line-height: 1;
+    
+    &:hover { color: #ff4466; text-shadow: 0 0 10px #ff4466; }
   }
 }
 

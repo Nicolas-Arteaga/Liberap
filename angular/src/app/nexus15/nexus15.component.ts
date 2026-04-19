@@ -16,8 +16,8 @@ import { TradingSignalrService } from '../services/trading-signalr.service';
 import {
   createChart, IChartApi, ISeriesApi,
   CandlestickData, CandlestickSeries,
-  HistogramSeries,
-  ColorType, CrosshairMode,
+  HistogramSeries, LineSeries, LineData,
+  ColorType, CrosshairMode, IPriceLine, LineStyle
 } from 'lightweight-charts';
 
 // ── Default Binance Futures pairs (full list) ────────────────────────────────
@@ -73,7 +73,6 @@ export interface CheckItem {
 })
 export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('chartContainer') chartContainerRef!: ElementRef<HTMLDivElement>;
-  @ViewChild('coneCanvas')     coneCanvasRef!: ElementRef<HTMLCanvasElement>;
 
   private nexus15Svc = inject(Nexus15Service);
   private botSvc     = inject(BotService);
@@ -101,6 +100,23 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
     return q ? all.filter(s => s.includes(q)) : all;
   });
 
+  // ── Timeframes ─────────────────────────────────────────────────────────────
+  availableTimeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '1d', '1w', '1M'];
+  selectedTimeframe = signal('15m');
+
+  onTimeframeChange(tf: string) {
+    if (this.selectedTimeframe() === tf) return;
+    this.selectedTimeframe.set(tf);
+    
+    // Wipe all series data but preserve the latest AI result data
+    const currentData = this.data();
+    this.wipeAllState();
+    
+    // Load new timeframe
+    this.loadBinanceCandles(this.selectedSymbol());
+  }
+
+  // ── Terminal ───────────────────────────────────────────────────────────────
   private sub?: Subscription;
   private terminalTimer?: any;
   private msgIdx = 0;
@@ -116,24 +132,20 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
     'NEXUS-15 PREDICTIVE CORE READY ✓',
   ];
 
-  // ── Chart ──────────────────────────────────────────────────────────────────
+  // ── Chart series ─────────────────────────────────────────────────────────
   private chart?: IChartApi;
   private candleSeries?: ISeriesApi<'Candlestick'>;
   private volumeSeries?: ISeriesApi<'Histogram'>;
-  private ghostCandleSeries?: ISeriesApi<'Candlestick'>;
+  private hmaSeries?: ISeriesApi<'Line'>;       // HMA 50 Overlay
+  // Projection lines - ALL native Lightweight Charts series (no canvas!)
+  private midLineSeries?: ISeriesApi<'Line'>;   // center trajectory
+  private upperBandSeries?: ISeriesApi<'Line'>; // upper probability band
+  private lowerBandSeries?: ISeriesApi<'Line'>; // lower probability band
+  private entryLine?: IPriceLine;               // horizontal entry marker
+  private targetLine?: IPriceLine;              // horizontal target marker
 
   // All real candles stored so we can read the last one's price at projection time
-  private realCandles: CandlestickData[] = [];
-
-  // Canvas-overlay holographic cone
-  private coneData: {
-    anchorTime: number;
-    anchorPrice: number;
-    points: Array<{ t: number; upper: number; mid: number; lower: number }>;
-    bullish: boolean;
-  } | null = null;
-
-  private coneAnimFrame?: number;
+  realCandles: CandlestickData[] = []; // public for template *ngIf
 
   // ── Computed ───────────────────────────────────────────────────────────────
   confidenceColor = computed(() => {
@@ -179,21 +191,51 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
   ngOnDestroy() {
     this.sub?.unsubscribe();
     if (this.terminalTimer) clearInterval(this.terminalTimer);
-    if (this.coneAnimFrame) cancelAnimationFrame(this.coneAnimFrame);
     this.chart?.remove();
   }
 
   // ── Public actions ─────────────────────────────────────────────────────────
-  onSymbolChange(sym: string) {
-    this.selectedSymbol.set(sym);
+  onSymbolChange(sym: string, existingData?: Nexus15ResultDto) {
+    const binanceSym = this.toBinanceSymbol(sym);
+    if (binanceSym === this.selectedSymbol()) return; // No change needed
+
+    this.selectedSymbol.set(binanceSym);
     this.symbolSearch.set('');
-    this.data.set(null);               // clear old AI data
+    this.wipeAllState();
+
+    if (existingData) {
+      this.data.set(existingData);
+    } else {
+      this.data.set(null);
+      this.loadLatest();
+    }
+
+    this.loadBinanceCandles(binanceSym);
+  }
+
+  /** Atomic reset of ALL visual state for the current chart. No canvas, no loops. */
+  private wipeAllState() {
     this.errorMsg.set(null);
-    this.livePrice.set(null);          // reset price display
-    this.coneData = null;              // clear old cone
-    this.ghostCandleSeries?.setData([]);
-    this.loadBinanceCandles(sym);      // real OHLCV from Binance (symbol normalized internally)
-    this.loadLatest();                 // AI prediction from backend
+    this.livePrice.set(null);
+    this.realCandles = [];
+
+    // Clear native chart series
+    this.candleSeries?.setData([]);
+    this.volumeSeries?.setData([]);
+    this.hmaSeries?.setData([]);
+    this.midLineSeries?.setData([]);
+    this.upperBandSeries?.setData([]);
+    this.lowerBandSeries?.setData([]);
+
+    // Remove horizontal price lines
+    if (this.entryLine && this.candleSeries) {
+      this.candleSeries.removePriceLine(this.entryLine);
+      this.entryLine = undefined;
+    }
+    if (this.targetLine && this.candleSeries) {
+      this.candleSeries.removePriceLine(this.targetLine);
+      this.targetLine = undefined;
+    }
   }
 
   onSymbolSearch(q: string) {
@@ -265,7 +307,7 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  // ── Chart ──────────────────────────────────────────────────────────────────
+  // ── Chart initialization ──────────────────────────────────────────────────
   private initChart() {
     if (!this.chartContainerRef) return;
     const el = this.chartContainerRef.nativeElement;
@@ -273,9 +315,9 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
     this.chart = createChart(el, {
       layout: {
         background: { type: ColorType.Solid, color: 'transparent' },
-        textColor: 'rgba(0,240,255,0.5)',
+        textColor: 'rgba(0,240,255,0.7)',
         fontFamily: "'Share Tech Mono', monospace",
-        fontSize: 10,
+        fontSize: 13,
       },
       grid: {
         vertLines: { color: 'rgba(0,240,255,0.03)' },
@@ -294,7 +336,7 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
       height: el.clientHeight || 300,
     });
 
-    // ── Real candles ──
+    // ── Real candles ──────────────────────────────────────────────────────────
     this.candleSeries = this.chart.addSeries(CandlestickSeries, {
       upColor: '#00ff88',
       downColor: '#ff4466',
@@ -304,36 +346,61 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
       wickDownColor: '#ff4466',
     });
 
-    // ── Volume histogram (bottom 20%) ──
+    // ── Volume histogram ─────────────────────────────────────────────────────
     this.volumeSeries = this.chart.addSeries(HistogramSeries, {
       color: '#00f0ff',
       priceFormat: { type: 'volume' },
       priceScaleId: 'volume',
     });
-
     this.chart.priceScale('volume').applyOptions({
       scaleMargins: { top: 0.82, bottom: 0 },
     });
 
-    // ── Ghost / Predictive candles (turquoise) ──
-    const cyan = '#00f0ff';
-    this.ghostCandleSeries = this.chart.addSeries(CandlestickSeries, {
-      upColor: cyan,
-      downColor: cyan,
-      borderUpColor: cyan,
-      borderDownColor: cyan,
-      wickUpColor: cyan,
-      wickDownColor: cyan,
-      priceLineVisible: false,
+    // ── HMA 50 (Hull Moving Average) ─────────────────────────────────────────
+    this.hmaSeries = this.chart.addSeries(LineSeries, {
+      color: 'rgba(255, 0, 170, 0.8)',
+      lineWidth: 2,
+      crosshairMarkerVisible: false,
       lastValueVisible: false,
+      priceLineVisible: false,
+      autoscaleInfoProvider: () => null, // Exclude from autoscale calculation
     });
 
-    this.loadBinanceCandles(this.selectedSymbol()); // normalized inside
-
-    // ── Re-draw canvas cone whenever the user scrolls / zooms ───────────────
-    this.chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
-      if (this.coneData) requestAnimationFrame(() => this.drawConeOnCanvas());
+    // ── Projection lines (ALL native - zero canvas) ───────────────────────────
+    // Upper probability band
+    this.upperBandSeries = this.chart.addSeries(LineSeries, {
+      color: 'rgba(0,255,136,0.15)',
+      lineWidth: 1,
+      lineStyle: LineStyle.Dashed,
+      crosshairMarkerVisible: false,
+      lastValueVisible: false,
+      priceLineVisible: false,
+      autoscaleInfoProvider: () => null, // Don't squash the chart if prediction goes wild
     });
+
+    // Lower probability band
+    this.lowerBandSeries = this.chart.addSeries(LineSeries, {
+      color: 'rgba(0,255,136,0.15)',
+      lineWidth: 1,
+      lineStyle: LineStyle.Dashed,
+      crosshairMarkerVisible: false,
+      lastValueVisible: false,
+      priceLineVisible: false,
+      autoscaleInfoProvider: () => null,
+    });
+
+    // Center trajectory (the main forecast line)
+    this.midLineSeries = this.chart.addSeries(LineSeries, {
+      color: '#00f0ff',
+      lineWidth: 2,
+      lineStyle: LineStyle.Dashed,
+      crosshairMarkerVisible: true,
+      lastValueVisible: true,
+      priceLineVisible: false,
+      autoscaleInfoProvider: () => null,
+    });
+
+    this.loadBinanceCandles(this.selectedSymbol());
   }
 
   /**
@@ -348,7 +415,7 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
     return withoutSettle.replace(/[/\-]/g, '').toUpperCase().trim();
   }
 
-  private loadBinanceCandles(symbol: string, interval = '15m', limit = 200) {
+  private loadBinanceCandles(symbol: string, interval = this.selectedTimeframe(), limit = 1000) {
     const binanceSym = this.toBinanceSymbol(symbol);
     this.pushTerminal(`> BINANCE KLINES: ${binanceSym} [${interval}] x${limit}...`);
 
@@ -356,7 +423,9 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
       const candles: CandlestickData[] = [];
       const volumes: any[]             = [];
       for (const k of raw) {
-        const t   = Math.floor(k[0] / 1000) as any;
+        let t = Math.floor(k[0] / 1000) as any;
+        // Format fix for 1M timeframe which provides months instead of timestamps sometimes
+        // But k[0] is typically valid open timestamp in MS.
         const o   = parseFloat(k[1]);
         const h   = parseFloat(k[2]);
         const l   = parseFloat(k[3]);
@@ -370,12 +439,49 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
     };
 
     const apply = (candles: CandlestickData[], volumes: any[]) => {
+      // Final check: did the user change symbol WHILE we were downloading?
+      if (this.selectedSymbol() !== binanceSym) return;
+
       this.realCandles = candles;
+
+      // Ensure proper decimal precision for alt-coins (prevents flatline charts)
+      let prec = 2;
+      let minMove = 0.01;
+      if (candles.length > 0) {
+         const p = candles[candles.length - 1].close;
+         if (p < 0.001) { prec = 6; minMove = 0.000001; }
+         else if (p < 0.1) { prec = 5; minMove = 0.00001; }
+         else if (p < 1)   { prec = 4; minMove = 0.0001; }
+         else if (p < 10)  { prec = 3; minMove = 0.001; }
+      }
+
+      const format = { type: 'price' as const, precision: prec, minMove };
+      this.candleSeries?.applyOptions({ priceFormat: format });
+      this.hmaSeries?.applyOptions({ priceFormat: format });
+      this.midLineSeries?.applyOptions({ priceFormat: format });
+      this.upperBandSeries?.applyOptions({ priceFormat: format });
+      this.lowerBandSeries?.applyOptions({ priceFormat: format });
+
       this.candleSeries?.setData(candles);
       this.volumeSeries?.setData(volumes);
-      this.ghostCandleSeries?.setData([]);
-      this.coneData = null;
+      
+      // Calculate and apply HMA 50
+      if (candles.length >= 50) {
+        const hmaData = this.calculateHMA(candles, 50);
+        this.hmaSeries?.setData(hmaData);
+      } else {
+        this.hmaSeries?.setData([]);
+      }
+
       this.chart?.timeScale().fitContent();
+
+      // IMMEDIATE REDRAW: If we have the AI data (from Top 5 click), 
+      // render the projection the exact millisecond the candles are in memory.
+      const currentData = this.data();
+      if (currentData && this.toBinanceSymbol(currentData.symbol ?? '') === binanceSym) {
+         this.renderProjection(currentData);
+      }
+
       // ── Live price from last candle ──────────────────────────────────────
       if (candles.length >= 2) {
         const last = candles[candles.length - 1];
@@ -446,250 +552,106 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
     this.chart?.timeScale().fitContent();
   }
 
-  /** @deprecated use loadBinanceCandles — kept only for internal fallback */
-  private loadDemoCandles() {
-    this.loadFallbackDemo(66500);
-  }
+  /** @deprecated — use loadBinanceCandles */
+  private loadDemoCandles() { this.loadFallbackDemo(66500); }
 
   private renderProjection(d: Nexus15ResultDto) {
-    if (!this.candleSeries || !this.ghostCandleSeries || !this.volumeSeries) return;
+    if (!this.candleSeries || !this.midLineSeries || !this.upperBandSeries || !this.lowerBandSeries) return;
+
+    const targetSym = this.toBinanceSymbol(d.symbol ?? '');
+    if (targetSym !== this.selectedSymbol()) return; // GUARD: prevent stale data
+
     if (this.realCandles.length === 0) {
-      // candles still loading from Binance — retry in 500ms
-      setTimeout(() => this.renderProjection(d), 500);
+      setTimeout(() => this.renderProjection(d), 200);
       return;
     }
 
-    const interval = 15 * 60;
-    const bullish  = (d.direction ?? '') === 'BULLISH';
-    const prob15   = d.next15CandlesProb  ?? 0.5;
-    const rangePct = (d.estimatedRangePercent ?? 1.8) / 100;
-
-    // ── Anchor EXACTLY at the last real candle ───────────────────────────────
-    if (this.realCandles.length === 0) this.loadDemoCandles();
-    const lastCandle   = this.realCandles[this.realCandles.length - 1];
-    const anchorTime   = lastCandle.time as number;   // unix seconds
-    const anchorPrice  = lastCandle.close;
-
-    // ── Build projection data ───────────────────────────────────────────────
-    const ghosts:     CandlestickData[] = [];
-    const futureVols: any[]             = [];
-    const conePoints: Array<{ t: number; upper: number; mid: number; lower: number }> = [];
-
-    let currentPrice  = anchorPrice;
-    const dirMul      = bullish ? 1 : -1;
+    const interval   = 15 * 60; // 15 min in seconds
+    const bullish    = (d.direction ?? '') === 'BULLISH';
+    const neutral    = (d.direction ?? '') === 'NEUTRAL';
+    const prob15     = d.next15CandlesProb ?? 0.5;
+    const rangePct   = (d.estimatedRangePercent ?? 1.8) / 100;
+    const dirMul     = bullish ? 1 : neutral ? 0 : -1;
     const candleCount = 20;
 
+    const lastCandle  = this.realCandles[this.realCandles.length - 1];
+    const anchorTime  = lastCandle.time as number;
+    const anchorPrice = lastCandle.close;
+
+    // ── Colors ───────────────────────────────────────────────────────────────
+    const midColor   = neutral  ? '#00f0ff' : bullish ? '#00ff88' : '#ff4466';
+    const bandColor  = neutral  ? 'rgba(0,240,255,0.12)' : bullish ? 'rgba(0,255,136,0.12)' : 'rgba(255,68,102,0.12)';
+    const bandColor2 = neutral  ? 'rgba(0,240,255,0.06)' : bullish ? 'rgba(0,255,136,0.06)' : 'rgba(255,68,102,0.06)';
+
+    this.midLineSeries.applyOptions({ color: midColor, lineWidth: 2, lineStyle: LineStyle.Dashed });
+    this.upperBandSeries.applyOptions({ color: bandColor, lineWidth: 1, lineStyle: LineStyle.Dotted });
+    this.lowerBandSeries.applyOptions({ color: bandColor2, lineWidth: 1, lineStyle: LineStyle.Dotted });
+
+    // ── Build data arrays starting AT the last real candle ───────────────────
+    const midData:   LineData[] = [{ time: anchorTime as any, value: anchorPrice }];
+    const upperData: LineData[] = [{ time: anchorTime as any, value: anchorPrice }];
+    const lowerData: LineData[] = [{ time: anchorTime as any, value: anchorPrice }];
+
     for (let i = 1; i <= candleCount; i++) {
-      const t        = (anchorTime + i * interval) as any;
-      const progress = i / candleCount;
+      const t          = (anchorTime + i * interval) as any;
+      const progress   = i / candleCount;
+      const mid        = anchorPrice * (1 + dirMul * rangePct * progress);
+      // Confidence factor: lower confidence = wider band
+      const spread     = anchorPrice * rangePct * 1.5 * progress * (1 + (1 - prob15) * 0.6);
 
-      // Mid-line follows direction, divergence opens like a proper funnel from zero
-      const targetMid  = anchorPrice * (1 + dirMul * rangePct * progress);
-      const confFactor = 1 + (1 - prob15) * 0.8;
-      const divergence = anchorPrice * rangePct * 2.5 * progress * confFactor;
+      midData.push(  { time: t, value: mid });
+      upperData.push({ time: t, value: mid + spread });
+      lowerData.push({ time: t, value: mid - spread });
+    }
 
-      conePoints.push({ t, upper: targetMid + divergence, mid: targetMid, lower: targetMid - divergence });
+    // ── Apply to series (the chart handles ALL coordinates automatically) ─────
+    this.midLineSeries.setData(midData);
+    this.upperBandSeries.setData(upperData);
+    this.lowerBandSeries.setData(lowerData);
 
-      // Ghost candles hug the mid-line with tiny noise
-      const open   = currentPrice;
-      const noise  = (Math.random() - 0.5) * anchorPrice * 0.0004;
-      const close  = targetMid + noise;
-      const spread = anchorPrice * 0.0004 * (1 + Math.random() * 0.3);
-      ghosts.push({ time: t, open, high: Math.max(open, close) + spread, low: Math.min(open, close) - spread, close });
-      currentPrice = close;
+    // ── Remove old price lines ────────────────────────────────────────────────
+    if (this.entryLine) { this.candleSeries.removePriceLine(this.entryLine); this.entryLine = undefined; }
+    if (this.targetLine) { this.candleSeries.removePriceLine(this.targetLine); this.targetLine = undefined; }
 
-      futureVols.push({
-        time:  t,
-        value: 350 + Math.random() * 400,
-        color: bullish ? 'rgba(0, 240, 255, 0.70)' : 'rgba(255, 0, 170, 0.70)',
+    if (!neutral) {
+      const finalTarget = anchorPrice * (1 + dirMul * rangePct);
+      const tColor = bullish ? '#00ff88' : '#ff4466';
+
+      // Entry marker at anchor price
+      this.entryLine = this.candleSeries.createPriceLine({
+        price: anchorPrice,
+        color: 'rgba(0,240,255,0.5)',
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: 'ENTRY',
+      });
+
+      // Target marker
+      this.targetLine = this.candleSeries.createPriceLine({
+        price: finalTarget,
+        color: tColor,
+        lineWidth: 2,
+        lineStyle: LineStyle.Dotted,
+        axisLabelVisible: true,
+        title: 'TARGET',
       });
     }
 
-    // Re-generate historical volume bars aligned with realCandles
+    // ── Update volume bars to include projected bars ──────────────────────────
     const histVols = this.realCandles.map(c => ({
       time:  c.time,
       value: Math.random() * 900 + 200,
-      color: c.close > c.open ? 'rgba(0, 255, 136, 0.45)' : 'rgba(255, 68, 102, 0.45)',
+      color: c.close > c.open ? 'rgba(0,255,136,0.45)' : 'rgba(255,68,102,0.45)',
     }));
-
-    this.volumeSeries.setData([...histVols, ...futureVols]);
-    this.ghostCandleSeries.setData(ghosts);
-
-    // Store cone data for canvas drawing — anchor is now EXACTLY the last real candle
-    this.coneData = { anchorTime, anchorPrice, points: conePoints, bullish };
+    const futureVols = midData.slice(1).map(pt => ({
+      time:  pt.time,
+      value: 200 + Math.random() * 300,
+      color: bullish ? 'rgba(0,240,255,0.35)' : 'rgba(255,0,170,0.35)',
+    }));
+    this.volumeSeries?.setData([...histVols, ...futureVols]);
 
     this.chart?.timeScale().fitContent();
-    // Give the chart time to layout before drawing canvas polygon
-    setTimeout(() => this.drawConeOnCanvas(), 80);
-  }
-
-  /**
-   * Draws the holographic cone on a Canvas 2D overlay using the chart's own
-   * coordinate API.  The funnel uses multiple gradient layers + glow ribbons
-   * for a pro cyberpunk look rather than a flat triangle.
-   */
-  private drawConeOnCanvas() {
-    if (!this.coneCanvasRef || !this.chart || !this.candleSeries || !this.coneData) return;
-
-    const canvas    = this.coneCanvasRef.nativeElement;
-    const container = this.chartContainerRef.nativeElement;
-    const dpr       = window.devicePixelRatio || 1;
-    const W         = container.clientWidth;
-    const H         = container.clientHeight;
-
-    canvas.width        = W * dpr;
-    canvas.height       = H * dpr;
-    canvas.style.width  = W + 'px';
-    canvas.style.height = H + 'px';
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, W, H);
-
-    const { anchorTime, anchorPrice, points, bullish } = this.coneData;
-    const ts     = this.chart.timeScale();
-    const series = this.candleSeries;
-
-    // ── Convert anchor → pixel ───────────────────────────────────────────────
-    const ax = ts.timeToCoordinate(anchorTime as any);
-    const ay = series.priceToCoordinate(anchorPrice);
-    if (ax === null || ay === null) return;
-
-    // ── Build pixel arrays ───────────────────────────────────────────────────
-    const upperPx: [number, number][] = [];
-    const lowerPx: [number, number][] = [];
-    const midPx:   [number, number][] = [];
-
-    for (const pt of points) {
-      const x  = ts.timeToCoordinate(pt.t as any);
-      const yu = series.priceToCoordinate(pt.upper);
-      const yl = series.priceToCoordinate(pt.lower);
-      const ym = series.priceToCoordinate(pt.mid);
-      if (x !== null && yu !== null && yl !== null && ym !== null) {
-        upperPx.push([x, yu]);
-        lowerPx.push([x, yl]);
-        midPx.push([x,  ym]);
-      }
-    }
-    if (upperPx.length === 0) return;
-
-    const lastX  = upperPx[upperPx.length - 1][0];
-    const lastYu = upperPx[upperPx.length - 1][1];
-    const lastYl = lowerPx[lowerPx.length - 1][1];
-    const neon   = bullish ? '0, 255, 136' : '255, 68, 102';
-    const cyan   = '0, 240, 255';
-
-    // Helper: trace the full cone outline as a closed path
-    const traceFull = () => {
-      ctx.moveTo(ax, ay);
-      upperPx.forEach(([x, y]) => ctx.lineTo(x, y));
-      lowerPx.slice().reverse().forEach(([x, y]) => ctx.lineTo(x, y));
-      ctx.closePath();
-    };
-
-    // ── Layer 1: deep ambient fill ───────────────────────────────────────────
-    {
-      const grad = ctx.createLinearGradient(ax, 0, lastX, 0);
-      grad.addColorStop(0,   `rgba(${neon}, 0.00)`);
-      grad.addColorStop(0.15,`rgba(${neon}, 0.06)`);
-      grad.addColorStop(0.6, `rgba(${neon}, 0.12)`);
-      grad.addColorStop(1,   `rgba(${neon}, 0.05)`);
-      ctx.save();
-      ctx.beginPath(); traceFull();
-      ctx.fillStyle = grad;
-      ctx.fill();
-      ctx.restore();
-    }
-
-    // ── Layer 2: vertical center-glow (radial-like via y-gradient) ───────────
-    {
-      const midYEnd = midPx[midPx.length - 1]?.[1] ?? ay;
-      const grad = ctx.createLinearGradient(0, Math.min(ay, midYEnd), 0, Math.max(ay, midYEnd) + 80);
-      grad.addColorStop(0,   `rgba(${cyan}, 0.00)`);
-      grad.addColorStop(0.5, `rgba(${cyan}, 0.08)`);
-      grad.addColorStop(1,   `rgba(${cyan}, 0.00)`);
-      ctx.save();
-      ctx.beginPath(); traceFull();
-      ctx.fillStyle = grad;
-      ctx.fill();
-      ctx.restore();
-    }
-
-    // ── Layer 3: horizontal scan lines inside the cone ───────────────────────
-    ctx.save();
-    ctx.globalAlpha = 0.18;
-    ctx.strokeStyle = `rgba(${cyan}, 1)`;
-    ctx.lineWidth   = 0.5;
-    // Clip to the cone shape
-    ctx.beginPath(); traceFull(); ctx.clip();
-    const scanStep = 8;
-    for (let y = 0; y < H; y += scanStep) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(W, y);
-      ctx.stroke();
-    }
-    ctx.restore();
-
-    // ── Layer 4: upper rim glow (triple-stroke for wide bloom) ───────────────
-    const drawRim = (px: [number, number][], blur: number, alpha: number, lw: number) => {
-      ctx.save();
-      ctx.shadowColor = `rgba(${neon}, 1)`;
-      ctx.shadowBlur  = blur;
-      ctx.strokeStyle = `rgba(${neon}, ${alpha})`;
-      ctx.lineWidth   = lw;
-      ctx.lineJoin    = 'round';
-      ctx.beginPath();
-      ctx.moveTo(ax, ay);
-      px.forEach(([x, y]) => ctx.lineTo(x, y));
-      ctx.stroke();
-      ctx.restore();
-    };
-    // Outer bloom
-    drawRim(upperPx, 24, 0.25, 6);
-    drawRim(lowerPx, 24, 0.25, 6);
-    // Mid bloom
-    drawRim(upperPx, 12, 0.55, 2.5);
-    drawRim(lowerPx, 12, 0.55, 2.5);
-    // Sharp core line
-    drawRim(upperPx,  4, 0.90, 1.0);
-    drawRim(lowerPx,  4, 0.90, 1.0);
-
-    // ── Layer 5: closing vertical rim at the far end ─────────────────────────
-    ctx.save();
-    ctx.shadowColor = `rgba(${neon}, 1)`;
-    ctx.shadowBlur  = 16;
-    ctx.strokeStyle = `rgba(${neon}, 0.55)`;
-    ctx.lineWidth   = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(lastX, lastYu);
-    ctx.lineTo(lastX, lastYl);
-    ctx.stroke();
-    ctx.restore();
-
-    // ── Layer 6: center dashed prediction line ───────────────────────────────
-    ctx.save();
-    ctx.setLineDash([8, 5]);
-    ctx.shadowColor = `rgba(${cyan}, 1)`;
-    ctx.shadowBlur  = 14;
-    ctx.strokeStyle = `rgba(${cyan}, 0.90)`;
-    ctx.lineWidth   = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(ax, ay);
-    midPx.forEach(([x, y]) => ctx.lineTo(x, y));
-    ctx.stroke();
-    ctx.restore();
-
-    // ── Layer 7: anchor dot ──────────────────────────────────────────────────
-    ctx.save();
-    ctx.shadowColor = `rgba(${cyan}, 1)`;
-    ctx.shadowBlur  = 20;
-    ctx.fillStyle   = `rgba(${cyan}, 0.95)`;
-    ctx.beginPath();
-    ctx.arc(ax, ay, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
   }
 
   // ── Private helpers ────────────────────────────────────────────────────────
@@ -707,6 +669,66 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
       this.pushTerminal(this.TERMINAL_MSGS[this.msgIdx % this.TERMINAL_MSGS.length]);
       this.msgIdx++;
     }, 1800);
+  }
+
+  /**
+   * Calculates Hull Moving Average (HMA)
+   * Formula: HMA_n = WMA(2 * WMA(n/2) - WMA(n), sqrt(n))
+   */
+  private calculateHMA(candles: CandlestickData[], period: number): LineData[] {
+    const closes = candles.map(c => c.close);
+    
+    // WMA Helper
+    const wma = (data: number[], p: number) => {
+      const res: number[] = new Array(data.length).fill(NaN);
+      const wSum = (p * (p + 1)) / 2;
+      for (let i = p - 1; i < data.length; i++) {
+        let sum = 0;
+        for (let j = 0; j < p; j++) {
+          sum += data[i - j] * (p - j);
+        }
+        res[i] = sum / wSum;
+      }
+      return res;
+    };
+
+    const halfPeriod = Math.floor(period / 2);
+    const sqrtPeriod = Math.floor(Math.sqrt(period));
+
+    const halfWma = wma(closes, halfPeriod);
+    const fullWma = wma(closes, period);
+
+    const rawDiff: number[] = new Array(closes.length).fill(NaN);
+    for (let i = 0; i < closes.length; i++) {
+      if (!isNaN(halfWma[i]) && !isNaN(fullWma[i])) {
+        rawDiff[i] = (2 * halfWma[i]) - fullWma[i];
+      } else if (!isNaN(halfWma[i])) {
+         // Fallback if fullWma isn't ready
+         rawDiff[i] = halfWma[i]; 
+      }
+    }
+
+    // Now calculate WMA of the diff with sqrtPeriod
+    const wSumSqrt = (sqrtPeriod * (sqrtPeriod + 1)) / 2;
+    const hmaRaw: number[] = new Array(closes.length).fill(NaN);
+    
+    for (let i = sqrtPeriod - 1; i < rawDiff.length; i++) {
+      let sum = 0;
+      let valid = true;
+      for (let j = 0; j < sqrtPeriod; j++) {
+        if (isNaN(rawDiff[i - j])) { valid = false; break; }
+        sum += rawDiff[i - j] * (sqrtPeriod - j);
+      }
+      if (valid) hmaRaw[i] = sum / wSumSqrt;
+    }
+
+    const hmaLine: LineData[] = [];
+    for (let i = 0; i < candles.length; i++) {
+      if (!isNaN(hmaRaw[i])) {
+        hmaLine.push({ time: candles[i].time, value: hmaRaw[i] });
+      }
+    }
+    return hmaLine;
   }
 
   private pushTerminal(line: string) {

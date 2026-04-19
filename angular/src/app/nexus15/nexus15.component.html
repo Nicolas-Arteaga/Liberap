@@ -138,7 +138,7 @@
     <main class="nx15-col nx15-col-center">
 
       <!-- Direction banner -->
-      <div class="nx15-dir-banner" [ngClass]="directionClass()">
+      <div class="nx15-dir-banner" [ngClass]="directionClass()" *ngIf="topResults().length === 0">
         <span class="dir-arrow">{{ directionArrow() }}</span>
         <span class="dir-text">{{ data()?.direction ?? 'WAITING...' }}</span>
         <span class="dir-sub">+{{ ((data()?.next15CandlesProb ?? 0) * 100) | number:'1.0-0' }}% / 15 velas</span>
@@ -147,19 +147,52 @@
         </span>
       </div>
 
-      <!-- Holographic Chart -->
-      <div class="chart-wrap">
-        <div class="chart-label">{{ selectedSymbol() }}</div>
-        <div class="chart-label-right">Nex-15-20</div>
-        <!-- Funnel legend -->
-        <div class="chart-funnel-badge" [ngClass]="directionClass()">
-          <span class="funnel-icon">▷</span>
-          CONE {{ data()?.direction ?? '---' }}
+      <!-- Top 5 List (Horizontal Banner) -->
+      <div class="nx15-top-banner" *ngIf="topResults().length > 0">
+        <div class="tb-title">🏆 TOP 5</div>
+        <div class="tb-items">
+          <div class="tb-item" *ngFor="let tr of topResults()" (click)="onSymbolChange(tr.symbol!, tr)">
+            <span class="tb-sym">{{ tr.symbol?.replace('USDT','') }}</span>
+            <span class="tb-conf" [style.color]="(tr.aiConfidence ?? 0) >= 75 ? '#00ff88' : (tr.aiConfidence ?? 0) >= 45 ? '#ffdd00' : '#ff8888'">
+               {{ tr.aiConfidence | number:'1.1-1' }}%
+            </span>
+            <span class="tb-dir"
+                 [class.bullish]="tr.direction === 'BULLISH'"
+                 [class.bearish]="tr.direction === 'BEARISH'"
+                 [class.neutral]="tr.direction === 'NEUTRAL'">
+               {{ tr.direction === 'BULLISH' ? '▲' : tr.direction === 'BEARISH' ? '▼' : '⬡' }}
+            </span>
+          </div>
+        </div>
+        <div class="tb-clear" (click)="topResults.set([])">⨯</div>
+      </div>
+
+      <!-- Chart -->
+      <div class="nx15-chart-box">
+        <!-- Syncing Overlay -->
+        <div class="nx15-sync-overlay" *ngIf="realCandles.length === 0 && !errorMsg()">
+          <div class="sync-spinner"></div>
+          <span>SYNCHRONIZING {{ selectedSymbol() }}...</span>
+        </div>
+
+        <div class="nx15-chart-container" #chartContainer></div>
+
+        <div class="chart-header-row">
+          <div class="chart-label">{{ selectedSymbol() }}</div>
+          <div class="chart-timeframes">
+            <button class="tf-btn" *ngFor="let tf of availableTimeframes" 
+                    [class.active]="tf === selectedTimeframe()" 
+                    (click)="onTimeframeChange(tf)">
+              {{ tf }}
+            </button>
+          </div>
+        </div>
+
+        <div class="chart-funnel-badge" [ngClass]="directionClass()" *ngIf="data()?.direction && data()?.direction !== 'NEUTRAL'">
+          <span class="funnel-icon">{{ data()?.direction === 'BULLISH' ? '▲' : '▼' }}</span>
+          {{ data()?.direction }}
           ±{{ data()?.estimatedRangePercent | number:'1.1-1' }}%
         </div>
-        <div #chartContainer class="chart-inner"></div>
-        <!-- Canvas overlay for holographic cone (drawn via Canvas 2D API) -->
-        <canvas #coneCanvas class="cone-canvas"></canvas>
         <div class="chart-loading" *ngIf="isLoading()">
           <span class="spin">⟳</span> ANALYZING...
         </div>
@@ -209,8 +242,8 @@
         </div>
       </div>
 
-      <!-- FreqTrade info (Fallback) -->
-      <div class="nx15-freqtrade" *ngIf="topResults().length === 0">
+      <!-- FreqTrade info (Always Visible) -->
+      <div class="nx15-freqtrade">
         <div class="ft-title">
           <span class="ft-logo">FreqTrade</span>
           <span class="ft-live" [style.color]="data() ? '#00ff88' : '#555'">● {{ data() ? 'LIVE' : 'IDLE' }}</span>
@@ -224,31 +257,6 @@
             <b [style.color]="confidenceColor()">{{ data()?.aiConfidence | number:'1.1-1' }}%</b>
           </div>
           <div class="ft-row"><span>Scans</span><b>{{ scanCount() }}</b></div>
-        </div>
-      </div>
-
-      <!-- Top 5 List (Replaces FreqTrade) -->
-      <div class="nx15-top-list" *ngIf="topResults().length > 0">
-        <div class="tl-header">
-          <span class="tl-title">🏆 TOP 5 NEXUS</span>
-          <span class="tl-clear" (click)="topResults.set([])">⨯</span>
-        </div>
-        <div class="tl-row tl-th">
-          <div class="tl-col">ASSET</div>
-          <div class="tl-col">CONF%</div>
-          <div class="tl-col">DIR</div>
-        </div>
-        <div class="tl-row tl-item" *ngFor="let tr of topResults()" (click)="onSymbolChange(tr.symbol!)">
-          <div class="tl-col tl-sym">{{ tr.symbol?.replace('USDT','') }}</div>
-          <div class="tl-col tl-conf" [style.color]="(tr.aiConfidence ?? 0) >= 75 ? '#00ff88' : (tr.aiConfidence ?? 0) >= 45 ? '#ffdd00' : '#ff8888'">
-             {{ tr.aiConfidence | number:'1.1-1' }}%
-          </div>
-          <div class="tl-col tl-dir"
-               [class.bullish]="tr.direction === 'BULLISH'"
-               [class.bearish]="tr.direction === 'BEARISH'"
-               [class.neutral]="tr.direction === 'NEUTRAL'">
-             {{ tr.direction === 'BULLISH' ? '▲ LONG' : tr.direction === 'BEARISH' ? '▼ SHORT' : '⬡ RANGING' }}
-          </div>
         </div>
       </div>
 
