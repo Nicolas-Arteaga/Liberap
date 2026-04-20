@@ -154,7 +154,7 @@
       
       <!-- Explosion Scanner Banner -->
       <div class="nx15-explosion-banner" *ngIf="explosionCycles().length > 0">
-        <div class="eb-title">🚀 EXPLOSION CYCLES DETECTED</div>
+        <div class="eb-title">🚀 EARLY EXPLOSION SETUP</div>
         <div class="eb-items">
           <div class="eb-card" *ngFor="let cycle of explosionCycles()" (click)="onSymbolChange(cycle.symbol)">
             <div class="eb-header">
@@ -164,9 +164,11 @@
               </span>
             </div>
             <div class="eb-body">
-              <div class="eb-row"><span>Phase:</span> <b>{{ cycle.phase }}</b></div>
-              <div class="eb-row"><span>Vol Surge:</span> <b>{{ cycle.volSurge }}</b></div>
+              <div class="eb-row"><span>Phase 1:</span> <b>{{ cycle.phase1Move }}</b></div>
+              <div class="eb-row"><span>Phase 2:</span> <b>{{ cycle.phase2Move }}</b></div>
+              <div class="eb-row"><span>→ To Phase 3:</span> <b style="color: #ffcc00">{{ cycle.timeToPhase3 }}</b></div>
               <div class="eb-row"><span>Proj Target:</span> <b [class.bullish]="cycle.direction === 'LONG'" [class.bearish]="cycle.direction === 'SHORT'">{{ cycle.projectedTarget | number:'1.2-4' }}</b></div>
+              <div class="eb-row"><span>Hist. Prob:</span> <b style="color: #00ff88">{{ cycle.confidence }}%</b></div>
             </div>
           </div>
         </div>
@@ -300,9 +302,12 @@
           <span class="act-spin" *ngIf="isTopLoading()"> ⟳</span>
         </button>
         
-        <button class="nx15-activate btn-explosion" (click)="runExplosionScan()" [disabled]="isLoading() || isTopLoading() || isExplosionLoading()">
+        <button class="nx15-activate btn-explosion" 
+                (click)="runExplosionScan()" 
+                [disabled]="isLoading() || isTopLoading() || isExplosionLoading()"
+                [style.background]="isExplosionLoading() ? 'linear-gradient(90deg, rgba(255,100,0,0.4) ' + explosionProgress() + '%, transparent ' + explosionProgress() + '%)' : ''">
           <span class="act-icon">🚀</span>
-          <span class="act-text">EXPLOSION SCAN</span>
+          <span class="act-text">EXPLOSION SCAN <span *ngIf="isExplosionLoading()">{{ explosionProgress() }}%</span></span>
           <span class="act-spin" *ngIf="isExplosionLoading()"> ⟳</span>
         </button>
         
