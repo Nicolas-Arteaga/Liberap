@@ -20,6 +20,9 @@ export interface Nexus15FeaturesDto {
   rsi14: number;
   macdHistogram: number;
   atrPercent: number;
+  volumeExplosion?: boolean;
+  explosionBullish?: boolean;
+  explosionBearish?: boolean;
 }
 
 export interface Nexus15GroupScoresDto {
@@ -43,6 +46,7 @@ export interface Nexus15ResultDto {
   next20CandlesProb: number;
   estimatedRangePercent: number;
   regime?: string;
+  volumeExplosion?: boolean;
   groupScores: Nexus15GroupScoresDto;
   features: Nexus15FeaturesDto;
   detectivity: Record<string, string>;

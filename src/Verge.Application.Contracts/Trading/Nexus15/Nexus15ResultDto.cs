@@ -16,6 +16,7 @@ public class Nexus15ResultDto
     public double Next20CandlesProb { get; set; }
     public double EstimatedRangePercent { get; set; }
     public string Regime { get; set; }
+    public bool VolumeExplosion { get; set; }
     public Nexus15GroupScoresDto GroupScores { get; set; }
     public Nexus15FeaturesDto Features { get; set; }
     public Dictionary<string, string> Detectivity { get; set; }
@@ -54,4 +55,7 @@ public class Nexus15FeaturesDto
     public double Rsi14 { get; set; }
     public double MacdHistogram { get; set; }
     public double AtrPercent { get; set; }
+    public bool VolumeExplosion { get; set; }
+    public bool ExplosionBullish { get; set; }
+    public bool ExplosionBearish { get; set; }
 }

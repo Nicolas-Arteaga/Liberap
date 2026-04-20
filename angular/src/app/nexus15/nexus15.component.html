@@ -145,6 +145,32 @@
         <span class="dir-rec" [ngClass]="data()?.recommendation?.toLowerCase()">
           {{ data()?.recommendation ?? '--' }}
         </span>
+        <div class="badge-explosion" 
+             *ngIf="data()?.features?.volumeExplosion"
+             [ngClass]="data()?.features?.explosionBullish ? 'bullish' : (data()?.features?.explosionBearish ? 'bearish' : '')">
+          ⚡ EXPLOSION
+        </div>
+      </div>
+      
+      <!-- Explosion Scanner Banner -->
+      <div class="nx15-explosion-banner" *ngIf="explosionCycles().length > 0">
+        <div class="eb-title">🚀 EXPLOSION CYCLES DETECTED</div>
+        <div class="eb-items">
+          <div class="eb-card" *ngFor="let cycle of explosionCycles()" (click)="onSymbolChange(cycle.symbol)">
+            <div class="eb-header">
+              <span class="eb-sym">{{ cycle.symbol.replace('USDT','') }}</span>
+              <span class="eb-dir" [class.bullish]="cycle.direction === 'LONG'" [class.bearish]="cycle.direction === 'SHORT'">
+                {{ cycle.direction }}
+              </span>
+            </div>
+            <div class="eb-body">
+              <div class="eb-row"><span>Phase:</span> <b>{{ cycle.phase }}</b></div>
+              <div class="eb-row"><span>Vol Surge:</span> <b>{{ cycle.volSurge }}</b></div>
+              <div class="eb-row"><span>Proj Target:</span> <b [class.bullish]="cycle.direction === 'LONG'" [class.bearish]="cycle.direction === 'SHORT'">{{ cycle.projectedTarget | number:'1.2-4' }}</b></div>
+            </div>
+          </div>
+        </div>
+        <div class="tb-clear" (click)="explosionCycles.set([])">⨯</div>
       </div>
 
       <!-- Top 5 List (Horizontal Banner) -->
@@ -262,17 +288,27 @@
 
       <!-- ⚡ ACTIVATE BUTTONS — below G6 -->
       <div class="nx15-actions-panel">
-        <button class="nx15-activate" (click)="runOnDemand()" [disabled]="isLoading() || isTopLoading()">
+        <button class="nx15-activate" (click)="runOnDemand()" [disabled]="isLoading() || isTopLoading() || isExplosionLoading()">
           <span class="act-icon">⚡</span>
           <span class="act-text">ACTIVAR NEXUS-15</span>
           <span class="act-spin" *ngIf="isLoading()"> ⟳</span>
         </button>
 
-        <button class="nx15-activate btn-top5" (click)="runTopScan()" [disabled]="isLoading() || isTopLoading()">
+        <button class="nx15-activate btn-top5" (click)="runTopScan()" [disabled]="isLoading() || isTopLoading() || isExplosionLoading()">
           <span class="act-icon">🏆</span>
           <span class="act-text">TOP DE NEXUS-15</span>
           <span class="act-spin" *ngIf="isTopLoading()"> ⟳</span>
         </button>
+        
+        <button class="nx15-activate btn-explosion" (click)="runExplosionScan()" [disabled]="isLoading() || isTopLoading() || isExplosionLoading()">
+          <span class="act-icon">🚀</span>
+          <span class="act-text">EXPLOSION SCAN</span>
+          <span class="act-spin" *ngIf="isExplosionLoading()"> ⟳</span>
+        </button>
+        
+        <div class="explosion-msg" *ngIf="explosionScanMessage()">
+          {{ explosionScanMessage() }}
+        </div>
       </div>
 
     </aside>

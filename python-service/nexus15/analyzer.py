@@ -124,6 +124,7 @@ class Nexus15Analyzer:
             next_20_candles_prob=round(base_prob * atr_decay * 0.82, 4),
             estimated_range_percent=estimated_range,
             regime=regime,
+            volume_explosion=feats.get("volume_explosion", False),
             group_scores=GroupScores(
                 g1_price_action=round(g1 * 100, 2),
                 g2_smc_ict=round(g2 * 100, 2),
@@ -222,6 +223,6 @@ class Nexus15Analyzer:
             "g2_smc_ict": f"OB: {'✅' if f['order_block_detected'] else '❌'} | FVG: {'✅' if f['fair_value_gap'] else '❌'} | BOS: {'✅' if f['bos_detected'] else '❌'} | Sweep: {'✅' if f.get('liquidity_sweep', False) else '❌'}",
             "g3_wyckoff": f"Fase: {f['wyckoff_phase']} | Spring: {'✅' if f['spring_detected'] else '❌'} | Upthrust: {'✅' if f['upthrust_detected'] else '❌'}",
             "g4_fractals": f"Estructura: {'HH/HL ↑' if f['trend_structure'] == 1 else 'LH/LL ↓' if f['trend_structure'] == -1 else 'Lateral'} | Fractal Alto: {'✅' if f['fractal_high_5'] else '❌'}",
-            "g5_volume": f"Vol ratio {f['volume_ratio_20']:.2f}x | CVD {'📈' if f['cvd_delta'] > 0 else '📉'} {f['cvd_delta']:,.0f} | Surge: {'✅' if f['volume_surge_bullish'] else '❌'}",
+            "g5_volume": f"Vol ratio {f['volume_ratio_20']:.2f}x | CVD {'📈' if f['cvd_delta'] > 0 else '📉'} {f['cvd_delta']:,.0f} | Surge: {'✅' if f['volume_surge_bullish'] else '❌'} | VolExpl: {'✅' if f.get('volume_explosion', False) else '❌'}",
             "g6_ml": f"XGBoost prob: {g6*100:.1f}% | RSI: {f['rsi_14']:.1f} | MACD hist: {f['macd_histogram']:.4f}",
         }

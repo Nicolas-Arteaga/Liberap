@@ -204,11 +204,29 @@ class Nexus15FeatureEngine:
         current_price = df['close'].iloc[-1]
         poc_proximity = abs(current_price - poc_price) / (current_price + EPSILON)
 
+        # Volume explosion detection
+        volume_explosion = False
+        explosion_bullish = False
+        explosion_bearish = False
+        
+        # Avoid dojis: body needs to be at least 1.5% of open price
+        body_pct = abs(df['close'].iloc[-1] - df['open'].iloc[-1]) / (df['open'].iloc[-1] + EPSILON)
+        
+        if vol_ratio >= 2.0 and body_pct > 0.015:
+            volume_explosion = True
+            if df['close'].iloc[-1] > df['open'].iloc[-1]:
+                explosion_bullish = True
+            elif df['close'].iloc[-1] < df['open'].iloc[-1]:
+                explosion_bearish = True
+
         return {
             "volume_ratio_20": round(vol_ratio, 4),
             "cvd_delta": round(cvd_delta, 2),
             "volume_surge_bullish": volume_surge_bullish,
             "poc_proximity": round(poc_proximity, 4),
+            "volume_explosion": volume_explosion,
+            "explosion_bullish": explosion_bullish,
+            "explosion_bearish": explosion_bearish,
         }
 
     # ── Grupo 6: ML Features ──────────────────────────────────────────────

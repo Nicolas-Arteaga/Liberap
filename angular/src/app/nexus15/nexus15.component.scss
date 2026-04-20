@@ -543,6 +543,110 @@ $border:  rgba(0, 240, 255, 0.15);
   &.neutral { .dir-arrow,.dir-text { color: #888; } }
 }
 
+// ── BADGE EXPLOSION ──
+.badge-explosion {
+  margin-left: auto;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  font-weight: 900;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 1px;
+  animation: pulse-glow 1.5s ease infinite;
+
+  &.bullish { background: rgba($green, 0.2); color: $green; border: 1px solid rgba($green, 0.5); text-shadow: 0 0 8px $green; }
+  &.bearish { background: rgba(#ff4466, 0.2); color: #ff4466; border: 1px solid rgba(#ff4466, 0.5); text-shadow: 0 0 8px #ff4466; }
+}
+
+// ── EXPLOSION SCANNER BANNER ──
+.nx15-explosion-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba($magenta, 0.4);
+  background: rgba(0, 0, 0, 0.5);
+  animation: fade-in 0.3s ease;
+  margin-top: 6px;
+
+  .eb-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 13px;
+    font-weight: 900;
+    color: $magenta;
+    text-shadow: 0 0 10px $magenta;
+    letter-spacing: 1px;
+  }
+
+  .eb-items {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    
+    &::-webkit-scrollbar { height: 3px; }
+    &::-webkit-scrollbar-thumb { background: rgba($magenta, 0.3); border-radius: 2px; }
+  }
+
+  .eb-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 140px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    padding: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover { background: rgba($magenta, 0.15); border-color: rgba($magenta, 0.5); box-shadow: 0 0 12px rgba($magenta, 0.2); }
+
+    .eb-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+      .eb-sym { font-family: 'Orbitron', sans-serif; font-size: 13px; font-weight: 700; color: #fff; }
+      .eb-dir {
+        font-size: 11px; font-weight: 900;
+        &.bullish { color: $green; text-shadow: 0 0 6px currentColor; }
+        &.bearish { color: #ff4466; text-shadow: 0 0 6px currentColor; }
+      }
+    }
+
+    .eb-body {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.6);
+
+      .eb-row {
+        display: flex;
+        justify-content: space-between;
+        b { color: #fff; font-weight: normal; }
+        b.bullish { color: $green; font-weight: bold; }
+        b.bearish { color: #ff4466; font-weight: bold; }
+      }
+    }
+  }
+
+  .tb-clear {
+    align-self: flex-end;
+    font-size: 18px;
+    color: rgba(255, 255, 255, 0.4);
+    cursor: pointer;
+    line-height: 1;
+    margin-top: -30px;
+    transition: color 0.2s;
+    &:hover { color: #ff4466; text-shadow: 0 0 10px #ff4466; }
+  }
+}
+
 // ── CHART ──
 .chart-wrap {
   position: relative;
@@ -972,6 +1076,28 @@ $border:  rgba(0, 240, 255, 0.15);
     border-color: $cyan;
     box-shadow: 0 0 24px rgba($cyan,0.4), 0 0 48px rgba($cyan,0.15);
   }
+}
+
+.btn-explosion {
+  border-color: rgba($magenta, 0.7);
+  background: linear-gradient(135deg, rgba($magenta,0.20), rgba($magenta,0.05));
+  animation: pulse-glow 3s ease infinite;
+  
+  .act-icon { filter: drop-shadow(0 0 6px $magenta); }
+  
+  &:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgba($magenta,0.40), rgba($magenta,0.15));
+    border-color: $magenta;
+    box-shadow: 0 0 24px rgba($magenta,0.5), 0 0 48px rgba($magenta,0.2);
+  }
+}
+
+.explosion-msg {
+  font-size: 11px;
+  color: $magenta;
+  text-align: center;
+  margin-top: 4px;
+  animation: flicker 2s infinite;
 }
 
 // ── RESPONSIVE ──

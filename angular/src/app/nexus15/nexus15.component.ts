@@ -64,6 +64,15 @@ export interface CheckItem {
   status: 'ok' | 'warn' | 'neutral';
 }
 
+export interface ExplosionCycleResult {
+  symbol: string;
+  direction: 'LONG' | 'SHORT';
+  phase: string;
+  volSurge: string;
+  priceChange: number;
+  projectedTarget: number;
+}
+
 @Component({
   selector: 'app-nexus15',
   standalone: true,
@@ -89,6 +98,12 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
   scanCount      = signal(0);
   topResults     = signal<Nexus15ResultDto[]>([]);
   isTopLoading   = signal(false);
+
+  // ── Explosion Scanner ──────────────────────────────────────────────────────
+  explosionCycles       = signal<ExplosionCycleResult[]>([]);
+  isExplosionLoading    = signal(false);
+  explosionScanMessage  = signal('');
+  lastExplosionScanTime = signal<number>(0);
 
   // ── Dynamic Pair Selector ──────────────────────────────────────────────────
   availableSymbols = signal<string[]>(BINANCE_FUTURES_PAIRS);
@@ -286,6 +301,133 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
         this.pushTerminal('⚠ TOP SCAN ERROR');
       }
     });
+  }
+
+  // ── Explosion Scanner logic ────────────────────────────────────────────────
+  async runExplosionScan() {
+    // 8-minute cache/throttle (480000 ms)
+    const now = Date.now();
+    if (now - this.lastExplosionScanTime() < 480000 && this.explosionCycles().length > 0) {
+      this.pushTerminal(`> EXPLOSION SCANNER: Mostrando resultados cacheados.`);
+      return;
+    }
+
+    this.isExplosionLoading.set(true);
+    this.explosionCycles.set([]);
+    this.explosionScanMessage.set(`Buscando ciclos en ${this.availableSymbols().length} pares...`);
+    this.pushTerminal('> EXPLOSION SCANNER INIT: SCANNING 1D DATA...');
+    
+    const results: ExplosionCycleResult[] = [];
+    const symbols = this.availableSymbols();
+    
+    // Batch processing to avoid rate limits
+    const batchSize = 10;
+    
+    for (let i = 0; i < symbols.length; i += batchSize) {
+      const batch = symbols.slice(i, i + batchSize);
+      this.explosionScanMessage.set(`Analizando ${i + batch.length}/${symbols.length} pares...`);
+      
+      const promises = batch.map(async sym => {
+        try {
+          const binanceSym = this.toBinanceSymbol(sym);
+          const response = await fetch(`https://api.binance.com/api/v3/klines?symbol=${binanceSym}&interval=1d&limit=100`);
+          if (!response.ok) return null;
+          
+          const raw = await response.json();
+          if (!raw || raw.length < 50) return null;
+          
+          // Parse OHLCV
+          const data = raw.map((k: any) => ({
+            open: parseFloat(k[1]),
+            high: parseFloat(k[2]),
+            low: parseFloat(k[3]),
+            close: parseFloat(k[4]),
+            volume: parseFloat(k[5])
+          }));
+          
+          // Calculate Moving Averages and ranges
+          const getRange = (idx: number) => data[idx].high - data[idx].low;
+          const getVol = (idx: number) => data[idx].volume;
+          
+          // Helper for rolling means
+          const rollingMean = (arr: number[], window: number, endIdx: number) => {
+            if (endIdx - window + 1 < 0) return 0;
+            let sum = 0;
+            for (let j = 0; j < window; j++) sum += arr[endIdx - j];
+            return sum / window;
+          };
+          
+          const lastIdx = data.length - 1;
+          
+          // Ranges and Volumes
+          const ranges = data.map((_, idx) => getRange(idx));
+          const volumes = data.map((_, idx) => getVol(idx));
+          
+          // Phase 1: Accumulation (last 20-40 candles roughly) -> Check 20 periods ago
+          // Phase 2: Acceleration in the last 5-8 days
+          // Phase 3: Explosion today or yesterday
+          
+          // Let's implement the specific logic
+          // 1. vol_ma50
+          const vol_ma50 = rollingMean(volumes, 50, lastIdx);
+          const vol_ratio = data[lastIdx].volume / (vol_ma50 || 1);
+          
+          // 3. phase3_explosion: vol_ratio >= 4.0 and abs(pct_change) > 15%
+          const pct_change_1 = Math.abs((data[lastIdx].close - data[lastIdx - 1].close) / data[lastIdx - 1].close) * 100;
+          const phase3_explosion = vol_ratio >= 4.0 && pct_change_1 > 15;
+          
+          if (!phase3_explosion) return null;
+          
+          // 2. phase2_acceleration: price_change_5 > 30 and < 100
+          const price_change_5 = Math.abs((data[lastIdx].close - data[lastIdx - 5].close) / data[lastIdx - 5].close) * 100;
+          const phase2_acceleration = price_change_5 > 30 && price_change_5 < 100;
+          
+          if (!phase2_acceleration) return null;
+          
+          // 1. phase1_accumulation: check 20 days range and volume before phase 2
+          const acc_end_idx = lastIdx - 5;
+          if (acc_end_idx < 20) return null;
+          
+          const range_20_acc = rollingMean(ranges, 20, acc_end_idx);
+          const vol_20_acc = rollingMean(volumes, 20, acc_end_idx);
+          
+          // very simplistic approximation of quantiles to avoid heavy stats
+          const phase1_accumulation = vol_20_acc < (vol_ma50 * 0.7); // volume is dry
+          
+          if (phase1_accumulation) {
+             const isLong = data[lastIdx].close > data[lastIdx].open;
+             return {
+                symbol: sym,
+                direction: isLong ? 'LONG' : 'SHORT' as 'LONG' | 'SHORT',
+                phase: 'EXPLOSION DETECTED',
+                volSurge: `${vol_ratio.toFixed(1)}x`,
+                priceChange: pct_change_1,
+                projectedTarget: isLong ? data[lastIdx].close * 3.0 : data[lastIdx].close * 0.33
+             };
+          }
+          return null;
+        } catch (e) {
+          return null;
+        }
+      });
+      
+      const batchResults = await Promise.all(promises);
+      batchResults.forEach(r => { if (r) results.push(r as ExplosionCycleResult); });
+      
+      // Delay to respect rate limits
+      await new Promise(r => setTimeout(r, 200));
+    }
+    
+    this.explosionCycles.set(results);
+    this.lastExplosionScanTime.set(now);
+    this.isExplosionLoading.set(false);
+    this.explosionScanMessage.set('');
+    
+    if (results.length > 0) {
+      this.pushTerminal(`✓ EXPLOSION SCANNER: ${results.length} CICLOS DETECTADOS`);
+    } else {
+      this.pushTerminal(`✓ EXPLOSION SCANNER: SIN CICLOS ACTIVOS HOY`);
+    }
   }
 
   // ── Pairs loading ──────────────────────────────────────────────────────────
@@ -781,6 +923,7 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
       case 'g5Volume': return [
         { label: 'Vol Ratio',  value: `${f.volumeRatio20?.toFixed(2)}×`,          status: f.volumeRatio20 > 1.5 ? 'ok' : 'neutral' },
         { label: 'Vol Surge',  value: f.volumeSurgeBullish ? '✓' : '✗',           status: f.volumeSurgeBullish ? 'ok' : 'warn' },
+        { label: 'Vol Expl',   value: f.volumeExplosion ? '✓' : '✗',              status: f.volumeExplosion ? 'ok' : 'neutral' },
         { label: 'POC Prox',   value: `${(f.pocProximity * 100).toFixed(1)}%`,    status: f.pocProximity < 0.005 ? 'ok' : 'neutral' },
       ];
       case 'g6Ml': return [

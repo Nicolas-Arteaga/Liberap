@@ -47,6 +47,9 @@ class Nexus15Features(BaseModel):
     cvd_delta: float
     volume_surge_bullish: bool
     poc_proximity: float
+    volume_explosion: bool
+    explosion_bullish: bool
+    explosion_bearish: bool
     # G6
     rsi_14: float
     macd_histogram: float
@@ -64,6 +67,7 @@ class Nexus15Response(BaseModel):
     next_20_candles_prob: float
     estimated_range_percent: float
     regime: str
+    volume_explosion: bool
     group_scores: GroupScores
     features: Nexus15Features
     detectivity: Dict[str, str]
