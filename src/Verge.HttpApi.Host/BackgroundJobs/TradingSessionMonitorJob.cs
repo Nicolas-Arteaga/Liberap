@@ -89,6 +89,8 @@ public class TradingSessionMonitorJob : BackgroundService
         var unitOfWorkManager = scope.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
         var eventBus = scope.ServiceProvider.GetRequiredService<IDistributedEventBus>();
 
+        using var uow = unitOfWorkManager.Begin();
+
         var activeSessions = await sessionRepository.GetListAsync(x => x.IsActive && x.CurrentStage < TradingStage.SellActive);
         if (!activeSessions.Any())
         {

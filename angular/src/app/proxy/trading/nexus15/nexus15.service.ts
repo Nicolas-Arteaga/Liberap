@@ -19,19 +19,20 @@ export class Nexus15Service {
     { apiName: this.apiName,...config });
   
 
-  getLatest = (symbol: string, config?: Partial<Rest.Config>) =>
-    this.restService.request<any, Nexus15ResultDto>({
-      method: 'GET',
-      url: '/api/app/nexus15/latest',
-      params: { symbol },
-    },
-    { apiName: this.apiName,...config });
-
   analyzeTopAvailable = (topN: number = 5, config?: Partial<Rest.Config>) =>
     this.restService.request<any, Nexus15ResultDto[]>({
       method: 'POST',
       url: '/api/app/nexus15/analyze-top-available',
       params: { topN },
+    },
+    { apiName: this.apiName,...config });
+  
+
+  getLatest = (symbol: string, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, Nexus15ResultDto>({
+      method: 'GET',
+      url: '/api/app/nexus15/latest',
+      params: { symbol },
     },
     { apiName: this.apiName,...config });
 }

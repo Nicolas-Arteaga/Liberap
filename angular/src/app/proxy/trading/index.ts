@@ -1,5 +1,6 @@
 import * as Dtos from './dtos';
 import * as Nexus15 from './nexus15';
+import * as Scar from './scar';
 export * from './alert-history.service';
 export * from './alert-type.enum';
 export * from './analysis-log-type.enum';
@@ -22,4 +23,4 @@ export * from './trading-stage.enum';
 export * from './trading-style.enum';
 export * from './trading.service';
 export * from './validation.service';
-export { Dtos, Nexus15 };
+export { Dtos, Nexus15, Scar };

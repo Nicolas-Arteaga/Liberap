@@ -1,0 +1,131 @@
+<div class="radar-container ion-padding">
+  
+  <!-- HEADER -->
+  <header class="radar-header">
+    <div class="title-area">
+      <h1>MARKET RADAR</h1>
+      <p class="subtitle">Nexus Proactive Intelligence Engine</p>
+    </div>
+    <div class="status-badge" [class.loading]="isScarLoading() || isExplosionLoading()">
+      <div class="pulse-ring"></div>
+      <span>{{ (isScarLoading() || isExplosionLoading()) ? 'ESCANEO ACTIVO' : 'SISTEMA ONLINE' }}</span>
+    </div>
+  </header>
+
+  <!-- CONTROL BAR -->
+  <div class="control-bar glass">
+    <div class="filter-tabs">
+      <button [class.active]="filterType() === 'all'" (click)="filterType.set('all')">TODO</button>
+      <button [class.active]="filterType() === 'whales'" (click)="filterType.set('whales')">
+        <span class="dot whale"></span> WHALES
+      </button>
+      <button [class.active]="filterType() === 'explosions'" (click)="filterType.set('explosions')">
+        <span class="dot explosion"></span> EXPLOSIONES
+      </button>
+    </div>
+    
+    <button class="scan-btn" (click)="runExplosionScanner()" [disabled]="isExplosionLoading()">
+      <ion-icon name="aperture-outline"></ion-icon>
+      {{ isExplosionLoading() ? 'ESCANEANDO...' : 'REESCANEAR TODO' }}
+    </button>
+  </div>
+
+  <!-- PROGRESS OVERLAY -->
+  <div class="scan-progress-bar" *ngIf="isExplosionLoading()">
+    <div class="progress-fill" [style.width.%]="explosionProgress()"></div>
+    <span class="progress-text">{{ explosionScanMessage() }}</span>
+  </div>
+
+  <div class="radar-grid">
+    
+    <!-- SECTION 1: WHALE ALERTS -->
+    <section class="radar-section" *ngIf="filterType() !== 'explosions'">
+      <div class="section-header">
+        <ion-icon name="water-outline" class="whale-icon"></ion-icon>
+        <h2>Whale Liquidity Extraction</h2>
+        <span class="live-tag">LIVE ON-CHAIN</span>
+      </div>
+
+      <div class="whale-alerts-grid" *ngIf="scarAlerts().length > 0; else noWhales">
+        <div class="whale-card glass" *ngFor="let alert of scarAlerts()" (click)="analyzeInNexus(alert.symbol)">
+          <div class="card-glow"></div>
+          <div class="card-header">
+            <span class="symbol">{{ alert.symbol }}</span>
+            <span class="score" [style.color]="'#00ff88'">GRIAL: {{ alert.scoreGrial }}/5</span>
+          </div>
+          <div class="card-body">
+            <p class="message">{{ alert.prediction }}</p>
+            <div class="signals-mini">
+              <span class="sig" [class.ok]="alert.flagWhaleWithdrawal">🏦 WITHDRAWALS</span>
+              <span class="sig" [class.ok]="alert.flagSupplyDrying">💧 DRYING</span>
+              <span class="sig" [class.ok]="alert.flagFundingNegative">📉 FUNDING</span>
+            </div>
+          </div>
+          <div class="card-footer">
+            <span class="time">{{ getDaysAgo(alert.analyzedAt) }}</span>
+            <span class="action">ANALIZAR <ion-icon name="chevron-forward"></ion-icon></span>
+          </div>
+        </div>
+      </div>
+      <ng-template #noWhales>
+        <div class="empty-state glass">
+          <ion-icon name="search-outline"></ion-icon>
+          <p>No se detectaron anomalías de ballenas en los últimos bloques.</p>
+        </div>
+      </ng-template>
+    </section>
+
+    <!-- SECTION 2: EXPLOSION CYCLES -->
+    <section class="radar-section" *ngIf="filterType() !== 'whales'">
+      <div class="section-header">
+        <ion-icon name="rocket-outline" class="explosion-icon"></ion-icon>
+        <h2>Proactive Explosion Setup</h2>
+        <span class="time-tag" *ngIf="lastExplosionScanTime() > 0">
+          Último scan: {{ getDaysAgo(lastExplosionScanTime()) }}
+        </span>
+      </div>
+
+      <div class="explosion-list" *ngIf="explosionCycles().length > 0; else noExplosions">
+        <div class="exp-item glass" *ngFor="let exp of explosionCycles()" (click)="analyzeInNexus(exp.symbol)">
+          <div class="exp-side-info" [class.long]="exp.direction === 'LONG'" [class.short]="exp.direction === 'SHORT'">
+             <span class="dir-badge">{{ exp.direction }}</span>
+             <span class="conf">{{ exp.confidence }}%</span>
+          </div>
+          <div class="exp-main">
+            <div class="exp-header">
+              <span class="symbol">{{ exp.symbol }}</span>
+              <span class="phase">{{ exp.phase }}</span>
+            </div>
+            <div class="exp-details">
+              <div class="detail">
+                <label>Volumen</label>
+                <span>{{ exp.volSurge }}</span>
+              </div>
+              <div class="detail">
+                <label>Fase 2</label>
+                <span>{{ exp.phase2Move }}</span>
+              </div>
+              <div class="detail">
+                <label>Est. Explosion</label>
+                <span>{{ exp.timeToPhase3 }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="exp-target">
+             <label>Target Est.</label>
+             <span class="price">{{ exp.projectedTarget | number:'1.2-6' }}</span>
+          </div>
+        </div>
+      </div>
+      <ng-template #noExplosions>
+        <div class="empty-state glass" *ngIf="!isExplosionLoading()">
+          <ion-icon name="flash-outline"></ion-icon>
+          <p>Iniciá un escaneo para detectar ciclos Wyckoff en formación.</p>
+          <button class="glass-btn" (click)="runExplosionScanner()">ESCANEAR AHORA</button>
+        </div>
+      </ng-template>
+    </section>
+
+  </div>
+
+</div>

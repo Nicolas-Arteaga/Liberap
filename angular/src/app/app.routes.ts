@@ -64,6 +64,10 @@ export const APP_ROUTES: Routes = [
         loadComponent: () => import('./nexus15/nexus15.component').then(c => c.Nexus15Component),
       },
       {
+        path: 'market-radar',
+        loadComponent: () => import('./radar/radar.component').then(c => c.RadarComponent),
+      },
+      {
         path: 'admin/users/create',
         canActivate: [adminGuard],
         loadComponent: () => import('./identity/create-user/create-user.component').then(c => c.CreateUserComponent),

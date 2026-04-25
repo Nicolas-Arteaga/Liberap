@@ -6,13 +6,13 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { Nexus15Service } from '../proxy/trading/nexus15/nexus15.service';
-import { Nexus15ResultDto, Nexus15FeaturesDto as BaseNexus15FeaturesDto } from '../proxy/trading/nexus15/models';
+import { Nexus15ResultDto, Nexus15FeaturesDto } from '../proxy/trading/nexus15/models';
 
-export interface Nexus15FeaturesDto extends BaseNexus15FeaturesDto {
-  liquiditySweep?: boolean;
-}
 import { BotService } from '../proxy/trading/bot.service';
+import { ScarService } from '../proxy/trading/scar/scar.service';
 import { TradingSignalrService } from '../services/trading-signalr.service';
+import { ActivatedRoute } from '@angular/router';
+import { BINANCE_FUTURES_PAIRS, ExplosionCycleResult } from '../proxy/trading/models-shared';
 import {
   createChart, IChartApi, ISeriesApi,
   CandlestickData, CandlestickSeries,
@@ -20,22 +20,7 @@ import {
   ColorType, CrosshairMode, IPriceLine, LineStyle
 } from 'lightweight-charts';
 
-// ── Default Binance Futures pairs (full list) ────────────────────────────────
-export const BINANCE_FUTURES_PAIRS = [
-  'BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT',
-  'DOTUSDT','MATICUSDT','LINKUSDT','LTCUSDT','UNIUSDT','ATOMUSDT','XLMUSDT','ETCUSDT',
-  'TRXUSDT','NEARUSDT','FILUSDT','AAVEUSDT','ALGOUSDT','VETUSDT','ICPUSDT','APTUSDT',
-  'ARBUSDT','OPUSDT','INJUSDT','SUIUSDT','SEIUSDT','TIAUSDT','STXUSDT','RUNEUSDT',
-  'MKRUSDT','LDOUSDT','SNXUSDT','CRVUSDT','APEUSDT','SANDUSDT','MANAUSDT','AXSUSDT',
-  'GALAUSDT','FTMUSDT','GMXUSDT','PERPUSDT','BLURUSDT','PENDLEUSDT','WLDUSDT','CYBERUSDT',
-  'HBARUSDT','EGLDUSDT','FLOWUSDT','IMXUSDT','GRTUSDT','1INCHUSDT','ENJUSDT','CHZUSDT',
-  'ZECUSDT','DASHUSDT','XMRUSDT','NEOUSDT','IOSTUSDT','ZILUSDT','WAVESUSDT','BALUSDT',
-  'COMPUSDT','YFIUSDT','SUSHIUSDT','DYDXUSDT','LRCUSDT','KSMUSDT','CELOUSDT','KAVAUSDT',
-  'BANDUSDT','STORJUSDT','SKLUSDT','MASKUSDT','RAREUSDT','TONUSDT','FETUSDT','AGIXUSDT',
-  'RENDERUSDT','THETAUSDT','EGPUSDT','HOOKUSDT','MAGICUSDT','HIGHUSDT','JASMYUSDT','CFXUSDT',
-  'CKBUSDT','TRUUSDT','LQTYUSDT','OXTUSDT','XVSUSDT','BLZUSDT','DEGOUSDT','ARKUSDT',
-  'BNTUSDT','CTKUSDT','BELUSDT','CELRUSDT','IOTXUSDT','COTIUSDT','BAKEUSDT','STMXUSDT',
-];
+
 
 // ── Group meta ─────────────────────────────────────────────────────────────
 const GROUPS_META = [
@@ -64,18 +49,7 @@ export interface CheckItem {
   status: 'ok' | 'warn' | 'neutral';
 }
 
-export interface ExplosionCycleResult {
-  symbol: string;
-  direction: 'LONG' | 'SHORT';
-  phase: string;
-  phase1Move: string;
-  phase2Move: string;
-  timeToPhase3: string;
-  confidence: number;
-  volSurge: string;
-  priceChange: number;
-  projectedTarget: number;
-}
+
 
 @Component({
   selector: 'app-nexus15',
@@ -89,7 +63,9 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
 
   private nexus15Svc = inject(Nexus15Service);
   private botSvc     = inject(BotService);
+  private scarSvc    = inject(ScarService);
   private signalR    = inject(TradingSignalrService);
+  private route      = inject(ActivatedRoute);
 
   // ── State ──────────────────────────────────────────────────────────────────
   selectedSymbol = signal('BTCUSDT');
@@ -103,12 +79,7 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
   topResults     = signal<Nexus15ResultDto[]>([]);
   isTopLoading   = signal(false);
 
-  // ── Explosion Scanner ──────────────────────────────────────────────────────
-  explosionCycles       = signal<ExplosionCycleResult[]>([]);
-  isExplosionLoading    = signal(false);
-  explosionScanMessage  = signal('');
-  explosionProgress     = signal<number>(0);
-  lastExplosionScanTime = signal<number>(0);
+
 
   // ── Dynamic Pair Selector ──────────────────────────────────────────────────
   availableSymbols = signal<string[]>(BINANCE_FUTURES_PAIRS);
@@ -192,7 +163,16 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
   ngOnInit() {
     this.startTerminal();
     this.loadActivePairs();
-    this.loadLatest();
+    
+    // Check for symbol in URL
+    this.route.queryParams.subscribe(params => {
+      const sym = params['symbol'];
+      if (sym) {
+        this.selectedSymbol.set(sym.toUpperCase());
+        this.loadBinanceCandles(sym.toUpperCase());
+      }
+      this.loadLatest();
+    });
 
     this.sub = this.signalR.nexus15$.subscribe(p => {
       if (!p) return;
@@ -203,6 +183,8 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
         this.renderProjection(p);
       }
     });
+
+
   }
 
   ngAfterViewInit() {
@@ -312,147 +294,7 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  // ── Explosion Scanner logic ────────────────────────────────────────────────
-  async runExplosionScan() {
-    // 8-minute cache/throttle (480000 ms)
-    const now = Date.now();
-    if (now - this.lastExplosionScanTime() < 480000 && this.explosionCycles().length > 0) {
-      this.pushTerminal(`> EXPLOSION SCANNER: Mostrando resultados cacheados.`);
-      return;
-    }
 
-    this.isExplosionLoading.set(true);
-    this.explosionCycles.set([]);
-    this.explosionScanMessage.set(`Buscando ciclos en ${this.availableSymbols().length} pares...`);
-    this.pushTerminal('> EARLY EXPLOSION SCANNER INIT: SCANNING 4H DATA...');
-    
-    const results: ExplosionCycleResult[] = [];
-    const symbols = this.availableSymbols();
-    
-    // Batch processing to avoid rate limits
-    const batchSize = 10;
-    
-    for (let i = 0; i < symbols.length; i += batchSize) {
-      this.explosionProgress.set(Math.round((i / symbols.length) * 100));
-      const batch = symbols.slice(i, i + batchSize);
-      this.explosionScanMessage.set(`Analizando ${i + batch.length}/${symbols.length} pares...`);
-      
-      const promises = batch.map(async sym => {
-        try {
-          const binanceSym = this.toBinanceSymbol(sym);
-          const response = await fetch(`https://api.binance.com/api/v3/klines?symbol=${binanceSym}&interval=4h&limit=300`);
-          if (!response.ok) return null;
-          
-          const raw = await response.json();
-          if (!raw || raw.length < 100) return null;
-          
-          // Parse OHLCV
-          const data = raw.map((k: any) => ({
-            open: parseFloat(k[1]),
-            high: parseFloat(k[2]),
-            low: parseFloat(k[3]),
-            close: parseFloat(k[4]),
-            volume: parseFloat(k[5])
-          }));
-          
-          // Calculate Moving Averages and ranges
-          const getVol = (idx: number) => data[idx].volume;
-          
-          // Helper for rolling means
-          const rollingMean = (arr: number[], window: number, endIdx: number) => {
-            if (endIdx - window + 1 < 0) return 0;
-            let sum = 0;
-            for (let j = 0; j < window; j++) sum += arr[endIdx - j];
-            return sum / window;
-          };
-          
-          const lastIdx = data.length - 1;
-          const volumes = data.map((_, idx) => getVol(idx));
-          
-          // Fase 1: Acumulación (volumen seco). Calculamos volAvg en base a 50 períodos de velas completas
-          const volAvg = rollingMean(volumes, 50, lastIdx - 1);
-          if (volAvg === 0) return null;
-
-          // Analizamos la Fase 1 en las velas anteriores a la Fase 2 (por ejemplo de -60 a -11)
-          const phase1StartIdx = Math.max(0, lastIdx - 60);
-          const phase1EndIdx = lastIdx - 11;
-          
-          let phase1VolSum = 0;
-          for (let j = phase1StartIdx; j <= phase1EndIdx; j++) {
-            phase1VolSum += volumes[j];
-          }
-          const phase1VolAvg = phase1VolSum / (phase1EndIdx - phase1StartIdx + 1);
-          
-          // Condición Fase 1: El volumen promedio debe ser tranquilo (relajado a < 1.25x del MA50 para no bloquear)
-          const isPhase1Complete = phase1VolAvg < (volAvg * 1.25);
-
-          // Fase 2 iniciada (aceleración moderada en las últimas 10 velas COMPLETAS)
-          const latest = data[lastIdx - 1]; // Vela anterior cerrada, no la actual en curso
-          const prev10 = data[lastIdx - 11];
-          const priceChangePhase2 = ((latest.close - prev10.close) / prev10.close) * 100;
-          const volRatioLatest = latest.volume / volAvg;
-          
-          // Precio Fase 1 (para display)
-          const pricePhase1Start = data[phase1StartIdx].close;
-          const pricePhase1End = data[phase1EndIdx].close;
-          const priceChangePhase1 = ((pricePhase1End - pricePhase1Start) / pricePhase1Start) * 100;
-          const phase1Days = Math.round(((phase1EndIdx - phase1StartIdx) * 4) / 24);
-
-          const isPhase2Starting = isPhase1Complete &&
-                                  volRatioLatest >= 1.8 && volRatioLatest <= 3.5 &&
-                                  Math.abs(priceChangePhase2) >= 3 && Math.abs(priceChangePhase2) <= 12;
-
-          if (isPhase2Starting) {
-            // Estimación histórica de tiempo hasta Fase 3
-            const hoursToPhase3 = this.estimateHoursToExplosion(data);
-
-            return {
-              symbol: sym,
-              direction: latest.close > prev10.close ? 'LONG' : 'SHORT' as 'LONG' | 'SHORT',
-              phase: 'ENTRE FASE 2 Y 3',
-              phase1Move: `${priceChangePhase1 > 0 ? '+' : ''}${priceChangePhase1.toFixed(1)}% en ~${phase1Days} días`,
-              phase2Move: `${priceChangePhase2 > 0 ? '+' : ''}${priceChangePhase2.toFixed(1)}% en 10 velas 4H`,
-              timeToPhase3: `${hoursToPhase3} horas (±12h)`,
-              projectedTarget: latest.close > prev10.close ? latest.close * 1.8 : latest.close * 0.55, 
-              volSurge: `${volRatioLatest.toFixed(1)}x`,
-              confidence: Math.floor(75 + Math.random() * 15),
-              priceChange: Math.abs(priceChangePhase2)
-            } as ExplosionCycleResult;
-          }
-          return null;
-        } catch (e) {
-          return null;
-        }
-      });
-      
-      const batchResults = await Promise.all(promises);
-      batchResults.forEach(r => { if (r) results.push(r as ExplosionCycleResult); });
-      
-      // Delay to respect rate limits
-      await new Promise(r => setTimeout(r, 200));
-    }
-    
-    this.explosionProgress.set(100);
-    // Sort by volume surge descending
-    results.sort((a, b) => parseFloat(b.volSurge) - parseFloat(a.volSurge));
-
-    this.explosionCycles.set(results);
-    this.lastExplosionScanTime.set(now);
-    this.isExplosionLoading.set(false);
-    this.explosionScanMessage.set('');
-    
-    if (results.length > 0) {
-      this.pushTerminal(`✓ EARLY EXPLOSION SCANNER: ${results.length} SETUPS DETECTADOS`);
-    } else {
-      this.pushTerminal(`✓ EARLY EXPLOSION SCANNER: SIN SETUPS EARLY HOY`);
-    }
-  }
-
-  private estimateHoursToExplosion(klines: any[]): number {
-    // Lógica simple: promedio histórico de velas 4H entre Fase 2 y Fase 3
-    // Usamos un valor base ajustable por ahora
-    return Math.floor(24 + Math.random() * 24); // entre 24 y 48 horas
-  }
 
   // ── Pairs loading ──────────────────────────────────────────────────────────
   private loadActivePairs() {
@@ -681,7 +523,8 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
         const { candles, volumes } = parseKlines(raw);
         apply(candles, volumes);
       })
-      .catch(() => {
+      .catch((e) => {
+        console.error('Binance Futures Error:', e);
         // Fallback: Spot API
         const spotUrl = `https://api.binance.com/api/v3/klines?symbol=${binanceSym}&interval=${interval}&limit=${limit}`;
         this.pushTerminal(`  → Futures n/d para ${binanceSym}, probando SPOT...`);
@@ -695,7 +538,8 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
             const { candles, volumes } = parseKlines(raw);
             apply(candles, volumes);
           })
-          .catch(() => {
+          .catch((e2) => {
+            console.error('Binance Spot Error:', e2);
             this.pushTerminal(`⚠ ${binanceSym} no encontrado en Binance — DEMO MODE`);
             this.errorMsg.set(`${binanceSym} no disponible en Binance. Mostrando datos demo.`);
             this.loadFallbackDemo();

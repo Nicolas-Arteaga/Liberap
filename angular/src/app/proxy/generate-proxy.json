@@ -2502,6 +2502,23 @@
                     "type": "Verge.Trading.Nexus15.Nexus15ResultDto",
                     "typeSimple": "Verge.Trading.Nexus15.Nexus15ResultDto"
                   }
+                },
+                {
+                  "name": "AnalyzeTopAvailableAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "topN",
+                      "typeAsString": "System.Int32, System.Private.CoreLib",
+                      "type": "System.Int32",
+                      "typeSimple": "number",
+                      "isOptional": true,
+                      "defaultValue": 5
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "System.Collections.Generic.List<Verge.Trading.Nexus15.Nexus15ResultDto>",
+                    "typeSimple": "[Verge.Trading.Nexus15.Nexus15ResultDto]"
+                  }
                 }
               ]
             }
@@ -2577,6 +2594,43 @@
               "returnValue": {
                 "type": "Verge.Trading.Nexus15.Nexus15ResultDto",
                 "typeSimple": "Verge.Trading.Nexus15.Nexus15ResultDto"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.Nexus15.INexus15AppService"
+            },
+            "AnalyzeTopAvailableAsyncByTopN": {
+              "uniqueName": "AnalyzeTopAvailableAsyncByTopN",
+              "name": "AnalyzeTopAvailableAsync",
+              "httpMethod": "POST",
+              "url": "api/app/nexus15/analyze-top-available",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "topN",
+                  "typeAsString": "System.Int32, System.Private.CoreLib",
+                  "type": "System.Int32",
+                  "typeSimple": "number",
+                  "isOptional": true,
+                  "defaultValue": 5
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "topN",
+                  "name": "topN",
+                  "jsonName": null,
+                  "type": "System.Int32",
+                  "typeSimple": "number",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "System.Collections.Generic.List<Verge.Trading.Nexus15.Nexus15ResultDto>",
+                "typeSimple": "[Verge.Trading.Nexus15.Nexus15ResultDto]"
               },
               "allowAnonymous": null,
               "implementFrom": "Verge.Trading.Nexus15.INexus15AppService"
@@ -2742,6 +2796,240 @@
               },
               "allowAnonymous": null,
               "implementFrom": "Verge.Trading.IRealTradeAppService"
+            }
+          }
+        },
+        "Verge.Trading.Scar.ScarAppService": {
+          "controllerName": "Scar",
+          "controllerGroupName": "Scar",
+          "isRemoteService": true,
+          "isIntegrationService": false,
+          "apiVersion": null,
+          "type": "Verge.Trading.Scar.ScarAppService",
+          "interfaces": [
+            {
+              "type": "Verge.Trading.Scar.IScarAppService",
+              "name": "IScarAppService",
+              "methods": [
+                {
+                  "name": "ScanAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "symbols",
+                      "typeAsString": "System.Collections.Generic.List`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                      "type": "System.Collections.Generic.List<System.String>",
+                      "typeSimple": "[string]",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "System.Collections.Generic.List<Verge.Trading.Scar.ScarResultDto>",
+                    "typeSimple": "[Verge.Trading.Scar.ScarResultDto]"
+                  }
+                },
+                {
+                  "name": "GetScoreAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "symbol",
+                      "typeAsString": "System.String, System.Private.CoreLib",
+                      "type": "System.String",
+                      "typeSimple": "string",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "Verge.Trading.Scar.ScarResultDto",
+                    "typeSimple": "Verge.Trading.Scar.ScarResultDto"
+                  }
+                },
+                {
+                  "name": "GetActiveAlertsAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "threshold",
+                      "typeAsString": "System.Int32, System.Private.CoreLib",
+                      "type": "System.Int32",
+                      "typeSimple": "number",
+                      "isOptional": true,
+                      "defaultValue": 3
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "System.Collections.Generic.List<Verge.Trading.Scar.ScarResultDto>",
+                    "typeSimple": "[Verge.Trading.Scar.ScarResultDto]"
+                  }
+                },
+                {
+                  "name": "GetTopSetupsAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "limit",
+                      "typeAsString": "System.Int32, System.Private.CoreLib",
+                      "type": "System.Int32",
+                      "typeSimple": "number",
+                      "isOptional": true,
+                      "defaultValue": 10
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "System.Collections.Generic.List<Verge.Trading.Scar.ScarTopSetupDto>",
+                    "typeSimple": "[Verge.Trading.Scar.ScarTopSetupDto]"
+                  }
+                }
+              ]
+            }
+          ],
+          "actions": {
+            "ScanAsyncBySymbols": {
+              "uniqueName": "ScanAsyncBySymbols",
+              "name": "ScanAsync",
+              "httpMethod": "POST",
+              "url": "api/app/scar/scan",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "symbols",
+                  "typeAsString": "System.Collections.Generic.List`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                  "type": "System.Collections.Generic.List<System.String>",
+                  "typeSimple": "[string]",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "symbols",
+                  "name": "symbols",
+                  "jsonName": null,
+                  "type": "System.Collections.Generic.List<System.String>",
+                  "typeSimple": "[string]",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "Body",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "System.Collections.Generic.List<Verge.Trading.Scar.ScarResultDto>",
+                "typeSimple": "[Verge.Trading.Scar.ScarResultDto]"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.Scar.IScarAppService"
+            },
+            "GetScoreAsyncBySymbol": {
+              "uniqueName": "GetScoreAsyncBySymbol",
+              "name": "GetScoreAsync",
+              "httpMethod": "GET",
+              "url": "api/app/scar/score",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "symbol",
+                  "typeAsString": "System.String, System.Private.CoreLib",
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "symbol",
+                  "name": "symbol",
+                  "jsonName": null,
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "Verge.Trading.Scar.ScarResultDto",
+                "typeSimple": "Verge.Trading.Scar.ScarResultDto"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.Scar.IScarAppService"
+            },
+            "GetActiveAlertsAsyncByThreshold": {
+              "uniqueName": "GetActiveAlertsAsyncByThreshold",
+              "name": "GetActiveAlertsAsync",
+              "httpMethod": "GET",
+              "url": "api/app/scar/active-alerts",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "threshold",
+                  "typeAsString": "System.Int32, System.Private.CoreLib",
+                  "type": "System.Int32",
+                  "typeSimple": "number",
+                  "isOptional": true,
+                  "defaultValue": 3
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "threshold",
+                  "name": "threshold",
+                  "jsonName": null,
+                  "type": "System.Int32",
+                  "typeSimple": "number",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "System.Collections.Generic.List<Verge.Trading.Scar.ScarResultDto>",
+                "typeSimple": "[Verge.Trading.Scar.ScarResultDto]"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.Scar.IScarAppService"
+            },
+            "GetTopSetupsAsyncByLimit": {
+              "uniqueName": "GetTopSetupsAsyncByLimit",
+              "name": "GetTopSetupsAsync",
+              "httpMethod": "GET",
+              "url": "api/app/scar/top-setups",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "limit",
+                  "typeAsString": "System.Int32, System.Private.CoreLib",
+                  "type": "System.Int32",
+                  "typeSimple": "number",
+                  "isOptional": true,
+                  "defaultValue": 10
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "limit",
+                  "name": "limit",
+                  "jsonName": null,
+                  "type": "System.Int32",
+                  "typeSimple": "number",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "System.Collections.Generic.List<Verge.Trading.Scar.ScarTopSetupDto>",
+                "typeSimple": "[Verge.Trading.Scar.ScarTopSetupDto]"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.Scar.IScarAppService"
             }
           }
         },
@@ -11672,6 +11960,18 @@
           "regex": null
         },
         {
+          "name": "LiquiditySweep",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
           "name": "WyckoffPhase",
           "jsonName": null,
           "type": "System.String",
@@ -11820,6 +12120,42 @@
           "jsonName": null,
           "type": "System.Double",
           "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "VolumeExplosion",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "ExplosionBullish",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "ExplosionBearish",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
           "isRequired": false,
           "minLength": null,
           "maxLength": null,
@@ -12042,6 +12378,18 @@
           "jsonName": null,
           "type": "System.String",
           "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "VolumeExplosion",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
           "isRequired": false,
           "minLength": null,
           "maxLength": null,
@@ -12606,6 +12954,264 @@
           "jsonName": null,
           "type": "System.Decimal",
           "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.Scar.ScarResultDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Symbol",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "ScoreGrial",
+          "jsonName": null,
+          "type": "System.Int32",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Prediction",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "EstimatedHours",
+          "jsonName": null,
+          "type": "System.Int32?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "FlagWhaleWithdrawal",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "FlagSupplyDrying",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "FlagPriceStable",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "FlagFundingNegative",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "FlagSilence",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "DaysSinceLastPump",
+          "jsonName": null,
+          "type": "System.Int32?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "EstimatedNextWindow",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "WithdrawalDaysCount",
+          "jsonName": null,
+          "type": "System.Int32",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "TotalWithdrawnUsd",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Mode",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "AnalyzedAt",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.Scar.ScarTopSetupDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Symbol",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "ScoreGrial",
+          "jsonName": null,
+          "type": "System.Int32",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Prediction",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "EstimatedHours",
+          "jsonName": null,
+          "type": "System.Int32?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Mode",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
           "isRequired": false,
           "minLength": null,
           "maxLength": null,

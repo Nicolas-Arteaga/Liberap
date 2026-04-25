@@ -14,6 +14,8 @@ from datetime import datetime, timedelta
 from sentiment_service import SentimentService
 from dotenv import load_dotenv
 from nexus15 import router as nexus15_router
+from scar import router as scar_router
+from scar import data_store as scar_db
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', handlers=[logging.StreamHandler(sys.stdout)])
@@ -40,6 +42,12 @@ load_dotenv()
 
 app = FastAPI(title="VERGE AI - Phase 2.0 Multi-Style", version="2.0.0")
 app.include_router(nexus15_router)
+app.include_router(scar_router)
+
+@app.on_event("startup")
+async def _startup():
+    scar_db.init_db()
+    logger.info("🐋 SCAR module initialized")
 
 # --- Helper Models & Schema ---
 

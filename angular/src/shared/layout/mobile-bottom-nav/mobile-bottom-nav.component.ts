@@ -2,7 +2,7 @@ import { Component } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { IonFooter, IonIcon } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { homeOutline, cardOutline, personOutline, hardwareChipOutline, pulseOutline } from 'ionicons/icons';
+import { homeOutline, cardOutline, personOutline, hardwareChipOutline, pulseOutline, radioOutline } from 'ionicons/icons';
 
 
 @Component({
@@ -14,7 +14,7 @@ import { homeOutline, cardOutline, personOutline, hardwareChipOutline, pulseOutl
 })
 export class MobileBottomNavComponent {
   constructor() {
-    addIcons({ homeOutline, cardOutline, personOutline, hardwareChipOutline, pulseOutline });
+    addIcons({ homeOutline, cardOutline, personOutline, hardwareChipOutline, pulseOutline, radioOutline });
 
   }
 }

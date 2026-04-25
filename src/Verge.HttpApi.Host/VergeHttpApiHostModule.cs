@@ -150,6 +150,7 @@ public class VergeHttpApiHostModule : AbpModule
         context.Services.AddHostedService<BotSyncJob>();
         context.Services.AddHostedService<Verge.Trading.Nexus15.Nexus15ScannerJob>();
         context.Services.AddScoped<Verge.Trading.Nexus15.IPythonNexus15Service, Verge.Trading.Nexus15.PythonNexus15Service>();
+        context.Services.AddScoped<Verge.Trading.Scar.IPythonScarService, Verge.Trading.Scar.PythonScarService>();
 
 
         // Redis Configuration (Graceful startup)
@@ -180,6 +181,14 @@ public class VergeHttpApiHostModule : AbpModule
 
         // Python Nexus 15 HTTP Client
         context.Services.AddHttpClient("PythonNexus15", client =>
+        {
+            var url = configuration["PythonService:Url"] ?? "http://localhost:8000";
+            client.BaseAddress = new Uri(url);
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
+
+        // Python SCAR HTTP Client
+        context.Services.AddHttpClient("PythonScar", client =>
         {
             var url = configuration["PythonService:Url"] ?? "http://localhost:8000";
             client.BaseAddress = new Uri(url);
