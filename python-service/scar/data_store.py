@@ -15,6 +15,8 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "..", "scar_data.db")
 
 
 def _get_conn() -> sqlite3.Connection:
+    # Ensure directory exists
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
@@ -25,6 +27,7 @@ def init_db():
     conn = _get_conn()
     try:
         c = conn.cursor()
+        logger.info("Initializing SCAR DB at %s", DB_PATH)
 
         # Table 1: Daily signals per token
         c.execute("""
@@ -44,7 +47,7 @@ def init_db():
             )
         """)
 
-        # Table 2: Historical cycles (pump events)
+        # Table 2: Historical cycles
         c.execute("""
             CREATE TABLE IF NOT EXISTS scar_cycles (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -60,7 +63,7 @@ def init_db():
             )
         """)
 
-        # Table 3: Token templates (learned from past cycles)
+        # Table 3: Token templates
         c.execute("""
             CREATE TABLE IF NOT EXISTS scar_templates (
                 token_symbol          TEXT PRIMARY KEY,
@@ -70,14 +73,60 @@ def init_db():
                 last_pump_date        TEXT,
                 last_pump_price       REAL,
                 total_cycles          INTEGER DEFAULT 0,
-                last_updated          TEXT DEFAULT (datetime('now'))
+                last_updated          TEXT DEFAULT (datetime('now')),
+                cooldown_until        TEXT
+            )
+        """)
+
+        # Table 4: Predictions
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS scar_predictions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                token_symbol TEXT,
+                alert_date TEXT,
+                score_grial INTEGER,
+                price_at_alert REAL,
+                estimated_hours INTEGER,
+                status TEXT DEFAULT 'pending',
+                result_date TEXT,
+                max_price_24h REAL,
+                pattern_detected INTEGER DEFAULT 0,
+                trader_roi_pct REAL,
+                created_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+
+        # Table 5: Accuracy
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS scar_accuracy (
+                token_symbol TEXT PRIMARY KEY,
+                total_predictions INTEGER DEFAULT 0,
+                total_hits INTEGER DEFAULT 0,
+                total_false_alarms INTEGER DEFAULT 0,
+                system_hit_rate REAL DEFAULT 0.0,
+                avg_trader_roi REAL DEFAULT 0.0,
+                last_updated TEXT
+            )
+        """)
+
+        # Table 6: Adjustments
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS scar_template_adjustments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                token_symbol TEXT,
+                adjustment_date TEXT,
+                old_avg_days REAL,
+                new_avg_days REAL,
+                reason TEXT,
+                learning_mode INTEGER DEFAULT 1
             )
         """)
 
         conn.commit()
-        logger.info("✅ SCAR DB initialized at %s", DB_PATH)
+        logger.info("✅ SCAR DB schema verified.")
     except Exception as e:
         logger.error("❌ SCAR DB init error: %s", e)
+        raise e
     finally:
         conn.close()
 
@@ -191,3 +240,60 @@ def get_active_alerts(threshold: int = 3) -> List[Dict]:
         return [dict(r) for r in rows]
     finally:
         conn.close()
+
+
+def get_cooldown_from_db(symbol: str) -> Optional[str]:
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            "SELECT cooldown_until FROM scar_templates WHERE token_symbol = ?", (symbol,)
+        ).fetchone()
+        return row["cooldown_until"] if row and row["cooldown_until"] else None
+    finally:
+        conn.close()
+
+
+def set_cooldown(symbol: str, cooldown_until: str) -> None:
+    conn = _get_conn()
+    try:
+        conn.execute("""
+            UPDATE scar_templates SET cooldown_until = ? WHERE token_symbol = ?
+        """, (cooldown_until, symbol))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_template_or_default(symbol: str) -> Dict:
+    template = get_template(symbol)
+    if template:
+        return template
+    
+    # Create default template
+    default_avg_days = 10.0
+    default_avg_usd = 5_000_000.0
+    default_supply_reduction = 20.0
+    
+    conn = _get_conn()
+    try:
+        conn.execute("""
+            INSERT INTO scar_templates
+                (token_symbol, avg_withdrawal_days, avg_withdrawal_usd, avg_supply_reduction, total_cycles)
+            VALUES (?, ?, ?, ?, 0)
+        """, (symbol, default_avg_days, default_avg_usd, default_supply_reduction))
+        conn.commit()
+    except Exception as e:
+        logger.error("Error creating default template for %s: %s", symbol, e)
+    finally:
+        conn.close()
+        
+    return {
+        "token_symbol": symbol,
+        "avg_withdrawal_days": default_avg_days,
+        "avg_withdrawal_usd": default_avg_usd,
+        "avg_supply_reduction": default_supply_reduction,
+        "last_pump_date": None,
+        "last_pump_price": None,
+        "total_cycles": 0,
+        "cooldown_until": None
+    }

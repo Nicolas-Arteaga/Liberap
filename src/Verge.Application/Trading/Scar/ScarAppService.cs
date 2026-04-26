@@ -74,4 +74,57 @@ public class ScarAppService : ApplicationService, IScarAppService
             AnalyzedAt = model.AnalyzedAt
         };
     }
+
+    public async Task<List<ScarPredictionDto>> GetPredictionsAsync(string? status = null, int limit = 50)
+    {
+        var models = await _pythonService.GetPredictionsAsync(status, limit);
+        return models.Select(m => new ScarPredictionDto
+        {
+            Id = m.Id,
+            TokenSymbol = m.TokenSymbol,
+            AlertDate = m.AlertDate,
+            ScoreGrial = m.ScoreGrial,
+            PriceAtAlert = m.PriceAtAlert,
+            EstimatedHours = m.EstimatedHours,
+            Status = m.Status,
+            MaxPrice24h = m.MaxPrice24h,
+            PatternDetected = m.PatternDetected,
+            TraderRoiPct = m.TraderRoiPct,
+            ResultDate = m.ResultDate
+        }).ToList();
+    }
+
+    public async Task<ScarAccuracyDto> GetAccuracyAsync(string? symbol = null)
+    {
+        var m = await _pythonService.GetAccuracyAsync(symbol);
+        return new ScarAccuracyDto
+        {
+            TokenSymbol = m.TokenSymbol,
+            TotalPredictions = m.TotalPredictions,
+            TotalHits = m.TotalHits,
+            TotalFalseAlarms = m.TotalFalseAlarms,
+            SystemHitRate = m.SystemHitRate,
+            AvgTraderRoi = m.AvgTraderRoi,
+            LastUpdated = m.LastUpdated
+        };
+    }
+
+    public async Task SubmitFeedbackAsync(int predictionId, string result)
+    {
+        await _pythonService.SubmitFeedbackAsync(predictionId, result);
+    }
+
+    public async Task<List<ScarTemplateAdjustmentDto>> GetAdjustmentsAsync(int limit = 20)
+    {
+        var models = await _pythonService.GetAdjustmentsAsync(limit);
+        return models.Select(m => new ScarTemplateAdjustmentDto
+        {
+            Id = m.Id,
+            TokenSymbol = m.TokenSymbol,
+            AdjustmentDate = m.AdjustmentDate,
+            OldAvgDays = m.OldAvgDays,
+            NewAvgDays = m.NewAvgDays,
+            Reason = m.Reason
+        }).ToList();
+    }
 }

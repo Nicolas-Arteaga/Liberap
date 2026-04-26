@@ -64,6 +64,10 @@ export const APP_ROUTES: Routes = [
         loadComponent: () => import('./nexus15/nexus15.component').then(c => c.Nexus15Component),
       },
       {
+        path: 'scar/analytics',
+        loadComponent: () => import('./scar-analytics/scar-analytics.component').then(c => c.ScarAnalyticsComponent),
+      },
+      {
         path: 'market-radar',
         loadComponent: () => import('./radar/radar.component').then(c => c.RadarComponent),
       },

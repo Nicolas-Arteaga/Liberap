@@ -13,3 +13,4 @@ redis
 imbalanced-learn
 lightgbm
 joblib
+apscheduler

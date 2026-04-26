@@ -4,16 +4,23 @@ SCAR FastAPI Router — Exposes /scar endpoints consumed by the ABP backend.
 import logging
 from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 
 from .schemas import (
     ScarScanRequest, ScarResultDto,
-    ScarTopSetup, ScarHistoryResponse, ScarHistoryEntry
+    ScarTopSetup, ScarHistoryResponse, ScarHistoryEntry, ScarFlagDetail
 )
-from . import detector, data_store
+from . import detector, data_store, learn, proxies
+from .learn_router import router as learn_router
 
 logger = logging.getLogger("SCAR_ROUTER")
 
+# Fire-and-forget executor for recording predictions
+executor = ThreadPoolExecutor(max_workers=2)
+
 router = APIRouter(prefix="/scar", tags=["SCAR - Whale Extraction Detector"])
+router.include_router(learn_router)
 
 
 @router.post("/scan", response_model=List[ScarResultDto])
@@ -40,9 +47,53 @@ async def scar_scan(request: ScarScanRequest):
 async def get_score(symbol: str):
     """Get SCAR score for a single symbol (triggers fresh analysis)."""
     symbol = symbol.upper()
+    
+    # 1. Verificar cooldown ANTES de cualquier análisis pesado
+    cooldown_until = data_store.get_cooldown_from_db(symbol)
+    if cooldown_until:
+        try:
+            cd_date = datetime.fromisoformat(cooldown_until)
+            # Make sure both are offset-aware or offset-naive. We use UTC.
+            if cd_date.tzinfo is None:
+                cd_date = cd_date.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) < cd_date:
+                return ScarResultDto(
+                    symbol=symbol,
+                    score_grial=0,
+                    prediction=f"⏸️ En cooldown hasta {cooldown_until[:10]}",
+                    estimated_hours=None,
+                    flag_whale_withdrawal=False,
+                    flag_supply_drying=False,
+                    flag_price_stable=False,
+                    flag_funding_negative=False,
+                    flag_silence=False,
+                    detail_whale_withdrawal=ScarFlagDetail(triggered=False),
+                    detail_supply_drying=ScarFlagDetail(triggered=False),
+                    detail_price_stable=ScarFlagDetail(triggered=False),
+                    detail_funding_negative=ScarFlagDetail(triggered=False),
+                    detail_silence=ScarFlagDetail(triggered=False),
+                    mode="cooldown",
+                    analyzed_at=datetime.now(timezone.utc).isoformat()
+                )
+        except Exception as e:
+            logger.error("Error checking cooldown for %s: %s", symbol, e)
+            
+    # 2. Si no está en cooldown, recién ejecutar el análisis normal
     result = detector.analyze_symbol(symbol)
     if result is None:
         raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
+        
+    # Hook de registro fire-and-forget
+    if result.score_grial >= 4:
+        current_price = proxies.get_current_price(symbol)
+        executor.submit(
+            learn.record_prediction, 
+            symbol, 
+            result.score_grial, 
+            current_price, 
+            result.estimated_hours
+        )
+        
     return result
 
 

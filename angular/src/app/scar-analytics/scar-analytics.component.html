@@ -1,0 +1,123 @@
+<div class="analytics-container">
+  
+  <div class="header-section">
+    <div class="title-row">
+      <h2>🐋 SCAR FEEDBACK LOOP</h2>
+      <a routerLink="/nexus-15" class="btn-back">← Volver a Nexus-15</a>
+    </div>
+
+    <div class="controls-row">
+      <!-- Learning Mode Toggle (Admin only / disabled for now) -->
+      <div class="toggle-group tooltip-container">
+        <label class="switch disabled">
+          <input type="checkbox" checked disabled>
+          <span class="slider round"></span>
+        </label>
+        <span class="label-text">Learning Mode</span>
+        <span class="tooltip-text">Próximamente: Ajuste de EMA Automático</span>
+      </div>
+
+      <!-- Auto Refresh Toggle -->
+      <div class="toggle-group">
+        <label class="switch">
+          <input type="checkbox" [checked]="autoRefresh()" (change)="toggleAutoRefresh()">
+          <span class="slider round"></span>
+        </label>
+        <span class="label-text">Auto-Refresh (30s)</span>
+      </div>
+
+      <button class="btn-refresh" (click)="loadData()" [disabled]="isLoading()">
+        <span *ngIf="isLoading()">⏳</span>
+        <span *ngIf="!isLoading()">🔄</span> Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs-container">
+    <button class="tab-btn" [class.active]="activeTab() === 'system'" (click)="activeTab.set('system')">
+      🖥️ PRECISIÓN DEL SISTEMA
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'trader'" (click)="activeTab.set('trader')">
+      📈 ROI DEL TRADER
+    </button>
+  </div>
+
+  <!-- KPI Panel -->
+  <div class="kpi-panel" *ngIf="accuracy()">
+    <div class="kpi-card" *ngIf="activeTab() === 'system'">
+      <h3>Hit Rate Sistema</h3>
+      <div class="kpi-value" [style.color]="getHitRateColor(accuracy()!.systemHitRate)">
+        {{ accuracy()!.systemHitRate | number:'1.1-1' }}%
+      </div>
+      <div class="kpi-sub">Patrones detectados exitosamente</div>
+    </div>
+
+    <div class="kpi-card" *ngIf="activeTab() === 'trader'">
+      <h3>ROI Promedio x Alerta</h3>
+      <div class="kpi-value" [style.color]="getRoiColor(accuracy()!.avgTraderRoi)">
+        {{ accuracy()!.avgTraderRoi > 0 ? '+' : '' }}{{ (accuracy()!.avgTraderRoi * 100) | number:'1.1-1' }}%
+      </div>
+      <div class="kpi-sub">Rentabilidad neta con 0.85 slippage</div>
+    </div>
+
+    <div class="kpi-card">
+      <h3>Total Alertas</h3>
+      <div class="kpi-value highlight">{{ accuracy()!.totalPredictions }}</div>
+      <div class="kpi-sub">{{ accuracy()!.totalHits }} Aciertos / {{ accuracy()!.totalFalseAlarms }} Fallos</div>
+    </div>
+  </div>
+
+  <!-- Table Section -->
+  <div class="table-container">
+    <h3>Últimas Evaluaciones</h3>
+    
+    <div class="loading-state" *ngIf="isLoading()">Cargando datos del motor de inferencia...</div>
+    
+    <table class="scar-table" *ngIf="!isLoading()">
+      <thead>
+        <tr>
+          <th>Token</th>
+          <th>Score Inicial</th>
+          <th>Precio Alerta</th>
+          <th *ngIf="activeTab() === 'system'">Precio Max 24h</th>
+          <th *ngIf="activeTab() === 'trader'">ROI Trader</th>
+          <th>Estado / Patrón</th>
+          <th>Cooldown</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let p of predictions()">
+          <td class="symbol-col">{{ p.tokenSymbol }}</td>
+          <td><span class="score-badge">{{ p.scoreGrial }}</span></td>
+          <td class="price-col">{{ p.priceAtAlert | number:'1.2-6' }}</td>
+          
+          <td class="price-col highlight" *ngIf="activeTab() === 'system'">
+            {{ p.maxPrice24h ? (p.maxPrice24h | number:'1.2-6') : '--' }}
+          </td>
+          
+          <td class="roi-col" *ngIf="activeTab() === 'trader'" [style.color]="getRoiColor(p.traderRoiPct)">
+            {{ p.traderRoiPct ? ((p.traderRoiPct * 100) | number:'1.1-2') + '%' : '--' }}
+          </td>
+
+          <td>
+            <ng-container *ngIf="getStatusBadge(p.status, p.traderRoiPct, p.maxPrice24h, p.priceAtAlert) as badge">
+              <span class="status-badge" [ngClass]="badge.class">
+                {{ badge.icon }} {{ badge.text }}
+              </span>
+            </ng-container>
+          </td>
+
+          <td>
+            <span *ngIf="p.status === 'hit' || p.status === 'hit_strong'" class="cooldown-badge">
+              🧊 Activo (10d)
+            </span>
+            <span *ngIf="p.status !== 'hit' && p.status !== 'hit_strong'" class="cooldown-none">
+              --
+            </span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

@@ -67,8 +67,8 @@ def analyze_symbol(symbol: str, external_funding: Optional[float] = None) -> Opt
         # ── Score ─────────────────────────────────────────────────────────
         score = sum([s1, s2, s3, s4, s5])
 
-        # Pull historical template for this token
-        template = data_store.get_template(symbol)
+        # Pull historical template for this token (create default if missing)
+        template = data_store.get_template_or_default(symbol)
 
         # Count consecutive withdrawal days from history
         history = data_store.get_history(symbol, days=14)

@@ -12,7 +12,7 @@ import { BotService } from '../proxy/trading/bot.service';
 import { ScarService } from '../proxy/trading/scar/scar.service';
 import { TradingSignalrService } from '../services/trading-signalr.service';
 import { ActivatedRoute } from '@angular/router';
-import { BINANCE_FUTURES_PAIRS, ExplosionCycleResult } from '../proxy/trading/models-shared';
+import { BINANCE_FUTURES_PAIRS, ExplosionCycleResult } from '../shared/models/models-shared';
 import {
   createChart, IChartApi, ISeriesApi,
   CandlestickData, CandlestickSeries,

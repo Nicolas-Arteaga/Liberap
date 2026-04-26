@@ -24,9 +24,9 @@
       </button>
     </div>
     
-    <button class="scan-btn" (click)="runExplosionScanner()" [disabled]="isExplosionLoading()">
+    <button class="scan-btn" (click)="scanAll()" [disabled]="isExplosionLoading() || isScarLoading()">
       <ion-icon name="aperture-outline"></ion-icon>
-      {{ isExplosionLoading() ? 'ESCANEANDO...' : 'REESCANEAR TODO' }}
+      {{ (isExplosionLoading() || isScarLoading()) ? 'ESCANEANDO...' : 'REESCANEAR TODO' }}
     </button>
   </div>
 
@@ -40,10 +40,15 @@
     
     <!-- SECTION 1: WHALE ALERTS -->
     <section class="radar-section" *ngIf="filterType() !== 'explosions'">
-      <div class="section-header">
-        <ion-icon name="water-outline" class="whale-icon"></ion-icon>
-        <h2>Whale Liquidity Extraction</h2>
-        <span class="live-tag">LIVE ON-CHAIN</span>
+      <div class="section-header" style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <ion-icon name="water-outline" class="whale-icon"></ion-icon>
+          <h2>Whale Liquidity Extraction</h2>
+          <span class="live-tag">LIVE ON-CHAIN</span>
+        </div>
+        <button class="glass-btn" routerLink="/scar/analytics" style="padding: 6px 12px; border-color: #00f0ff; color:#00f0ff; background: rgba(0,240,255,0.1);">
+          🐋 ANALYTICS
+        </button>
       </div>
 
       <div class="whale-alerts-grid" *ngIf="scarAlerts().length > 0; else noWhales">

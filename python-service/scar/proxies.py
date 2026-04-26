@@ -19,11 +19,23 @@ _session.headers.update({"Accept": "application/json"})
 def _get(url: str, params: dict = None, timeout: int = 8) -> Optional[dict]:
     try:
         r = _session.get(url, params=params, timeout=timeout)
+        if r.status_code == 400:
+            logger.debug("SCAR proxy: Symbol not supported or bad request [%s] (400)", url)
+            return None
         r.raise_for_status()
         return r.json()
     except Exception as e:
         logger.warning("SCAR proxy request failed [%s]: %s", url, e)
         return None
+
+def get_current_price(symbol: str) -> float:
+    try:
+        data = _get(f"{BINANCE_API}/api/v3/ticker/price", {"symbol": symbol})
+        if data and "price" in data:
+            return float(data["price"])
+    except Exception:
+        pass
+    return 0.0
 
 
 # ── Signal 1 Proxy: Whale Withdrawal Detection ─────────────────────────────

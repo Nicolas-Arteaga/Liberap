@@ -99,4 +99,85 @@ public class PythonScarService : IPythonScarService
             return new List<ScarTopSetupModel>();
         }
     }
+
+    public async Task<List<ScarPredictionModel>> GetPredictionsAsync(string? status, int limit)
+    {
+        try
+        {
+            var url = $"/scar/learn/predictions?limit={limit}";
+            if (!string.IsNullOrEmpty(status)) url += $"&status={status}";
+            
+            var response = await _http.GetAsync(url);
+            if (!response.IsSuccessStatusCode) return new List<ScarPredictionModel>();
+
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<List<ScarPredictionModel>>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            }) ?? new List<ScarPredictionModel>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ [SCAR] Python GetPredictions call failed");
+            return new List<ScarPredictionModel>();
+        }
+    }
+
+    public async Task<ScarAccuracyModel> GetAccuracyAsync(string? symbol)
+    {
+        try
+        {
+            var url = "/scar/learn/accuracy";
+            if (!string.IsNullOrEmpty(symbol)) url += $"?symbol={symbol}";
+            
+            var response = await _http.GetAsync(url);
+            if (!response.IsSuccessStatusCode) return new ScarAccuracyModel();
+
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<ScarAccuracyModel>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            }) ?? new ScarAccuracyModel();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ [SCAR] Python GetAccuracy call failed");
+            return new ScarAccuracyModel();
+        }
+    }
+
+    public async Task SubmitFeedbackAsync(int predictionId, string result)
+    {
+        try
+        {
+            var payload = new { result = result };
+            var response = await _http.PostAsJsonAsync($"/scar/learn/feedback/{predictionId}", payload);
+            response.EnsureSuccessStatusCode();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ [SCAR] Python SubmitFeedback call failed");
+            throw;
+        }
+    }
+
+    public async Task<List<ScarTemplateAdjustmentModel>> GetAdjustmentsAsync(int limit)
+    {
+        try
+        {
+            var response = await _http.GetAsync($"/scar/learn/adjustments?limit={limit}");
+            if (!response.IsSuccessStatusCode) return new List<ScarTemplateAdjustmentModel>();
+
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<List<ScarTemplateAdjustmentModel>>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            }) ?? new List<ScarTemplateAdjustmentModel>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ [SCAR] Python GetAdjustments call failed");
+            return new List<ScarTemplateAdjustmentModel>();
+        }
+    }
 }

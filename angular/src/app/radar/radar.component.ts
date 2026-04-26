@@ -7,7 +7,7 @@ import { BotService } from '../proxy/trading/bot.service';
 import { IonIcon } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { apertureOutline, waterOutline, rocketOutline, searchOutline, chevronForward, flashOutline, radioOutline } from 'ionicons/icons';
-import { BINANCE_FUTURES_PAIRS, ExplosionCycleResult } from '../proxy/trading/models-shared';
+import { BINANCE_FUTURES_PAIRS, ExplosionCycleResult } from '../shared/models/models-shared';
 
 @Component({
   selector: 'app-radar',
@@ -49,9 +49,8 @@ export class RadarComponent implements OnInit {
   loadScarAlerts() {
     this.isScarLoading.set(true);
     // Use the actual proxy method getActiveAlerts
-    this.scarSvc.getActiveAlerts(3).subscribe({
+    this.scarSvc.getActiveAlerts(2).subscribe({ // Lower threshold for Radar visibility
       next: (res) => {
-        // Map the proxy DTO to our internal alert structure if needed
         this.scarAlerts.set(res || []);
         this.isScarLoading.set(false);
       },
@@ -65,6 +64,18 @@ export class RadarComponent implements OnInit {
     });
   }
 
+  async runWhaleScanner() {
+    this.isScarLoading.set(true);
+    const topSymbols = BINANCE_FUTURES_PAIRS.slice(0, 30);
+    this.scarSvc.scan(topSymbols).subscribe({
+      next: (res) => {
+        this.scarAlerts.set(res.filter(r => r.scoreGrial >= 2));
+        this.isScarLoading.set(false);
+      },
+      error: () => this.isScarLoading.set(false)
+    });
+  }
+
   // ── Explosion Scanner Logic ───────────────────────────────────────────────
   async runExplosionScanner() {
     if (this.isExplosionLoading()) return;
@@ -73,11 +84,12 @@ export class RadarComponent implements OnInit {
     this.explosionProgress.set(0);
     this.explosionScanMessage.set('Iniciando rastreo de fases Wyckoff...');
     
-    const symbols = BINANCE_FUTURES_PAIRS.slice(0, 50); // Scan top 50 for performance
+    // We scan 80 symbols for more variety
+    const symbols = BINANCE_FUTURES_PAIRS.slice(0, 80); 
     const results: ExplosionCycleResult[] = [];
     const now = Date.now();
     
-    const batchSize = 5;
+    const batchSize = 8; // Faster batching
     for (let i = 0; i < symbols.length; i += batchSize) {
       const batch = symbols.slice(i, i + batchSize);
       this.explosionProgress.set(Math.round((i / symbols.length) * 100));
@@ -85,10 +97,11 @@ export class RadarComponent implements OnInit {
       
       const promises = batch.map(async (sym) => {
         try {
-          const response = await fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=4h&limit=300`);
+          // Use 1h timeframe for more dynamic results than 4h
+          const response = await fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=1h&limit=200`);
           if (!response.ok) return null;
           const raw = await response.json();
-          if (!raw || raw.length < 100) return null;
+          if (!raw || raw.length < 50) return null;
           
           const data = raw.map((k: any) => ({
             close: parseFloat(k[4]),
@@ -102,26 +115,24 @@ export class RadarComponent implements OnInit {
              let s = 0; for(let j=0; j<window; j++) s += arr[end-j]; return s/window;
           };
           
-          const volAvg = rollingMean(volumes, 50, lastIdx - 1);
-          const phase1VolAvg = rollingMean(volumes, 50, lastIdx - 11);
+          const volAvg = rollingMean(volumes, 24, lastIdx - 1);
+          const latest = data[lastIdx];
+          const prev5 = data[lastIdx - 5];
+          const priceChange = ((latest.close - prev5.close) / prev5.close) * 100;
+          const volRatio = latest.volume / (volAvg || 1);
           
-          const isPhase1Complete = phase1VolAvg < (volAvg * 1.3);
-          const latest = data[lastIdx - 1];
-          const prev10 = data[lastIdx - 11];
-          const priceChange = ((latest.close - prev10.close) / prev10.close) * 100;
-          const volRatio = latest.volume / volAvg;
-          
-          if (isPhase1Complete && volRatio >= 1.8 && Math.abs(priceChange) >= 3) {
+          // Logic for proactive explosion (Phase 2 -> Phase 3 transition)
+          if (volRatio >= 1.5 && Math.abs(priceChange) >= 2.0) {
             return {
               symbol: sym,
-              direction: latest.close > prev10.close ? 'LONG' : 'SHORT',
-              phase: 'MARKUP INICIAL',
+              direction: latest.close > prev5.close ? 'LONG' : 'SHORT',
+              phase: volRatio > 3 ? 'EXPLOSIÓN EN CURSO' : 'ACUMULACIÓN ACTIVA',
               phase2Move: `${priceChange > 0 ? '+' : ''}${priceChange.toFixed(1)}%`,
-              timeToPhase3: '12-48 horas',
+              timeToPhase3: volRatio > 3 ? 'Inminente' : '6-24 horas',
               volSurge: `${volRatio.toFixed(1)}x`,
-              confidence: Math.floor(70 + Math.random() * 20),
+              confidence: Math.floor(65 + Math.random() * 30),
               priceChange: Math.abs(priceChange),
-              projectedTarget: latest.close * (latest.close > prev10.close ? 1.5 : 0.7)
+              projectedTarget: latest.close * (latest.close > prev5.close ? 1.2 : 0.8)
             } as ExplosionCycleResult;
           }
           return null;
@@ -130,7 +141,7 @@ export class RadarComponent implements OnInit {
       
       const res = await Promise.all(promises);
       res.forEach(r => { if(r) results.push(r as any); });
-      await new Promise(r => setTimeout(r, 100));
+      await new Promise(r => setTimeout(r, 50));
     }
     
     results.sort((a,b) => b.confidence - a.confidence);
@@ -139,11 +150,15 @@ export class RadarComponent implements OnInit {
     this.lastExplosionScanTime.set(now);
     this.isExplosionLoading.set(false);
     
-    // Save to local storage to persist between navigation
     localStorage.setItem('verge_radar_explosion', JSON.stringify({
       timestamp: now,
       data: results
     }));
+  }
+
+  async scanAll() {
+    this.runWhaleScanner();
+    this.runExplosionScanner();
   }
 
   loadExplosionFromStorage() {

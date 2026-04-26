@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 from nexus15 import router as nexus15_router
 from scar import router as scar_router
 from scar import data_store as scar_db
+from scar import scheduler as scar_scheduler
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', handlers=[logging.StreamHandler(sys.stdout)])
@@ -47,6 +48,7 @@ app.include_router(scar_router)
 @app.on_event("startup")
 async def _startup():
     scar_db.init_db()
+    scar_scheduler.start_scheduler()
     logger.info("🐋 SCAR module initialized")
 
 # --- Helper Models & Schema ---

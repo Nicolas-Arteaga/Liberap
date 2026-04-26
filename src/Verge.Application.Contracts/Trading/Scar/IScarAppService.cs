@@ -17,4 +17,10 @@ public interface IScarAppService : IApplicationService
 
     /// <summary>Return top N tokens by score_grial from today's cached results.</summary>
     Task<List<ScarTopSetupDto>> GetTopSetupsAsync(int limit = 10);
+
+    // --- Analytics & Feedback Loop ---
+    Task<List<ScarPredictionDto>> GetPredictionsAsync(string? status = null, int limit = 50);
+    Task<ScarAccuracyDto> GetAccuracyAsync(string? symbol = null);
+    Task SubmitFeedbackAsync(int predictionId, string result);
+    Task<List<ScarTemplateAdjustmentDto>> GetAdjustmentsAsync(int limit = 20);
 }
