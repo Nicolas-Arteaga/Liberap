@@ -287,3 +287,9 @@ freqtrade/user_data/plot/
 freqtrade/user_data/*.sqlite
 freqtrade/user_data/*.sqlite-shm
 freqtrade/user_data/*.sqlite-wal
+
+# VERGE Agent & Python Service
+__pycache__/
+*.pyc
+agent/data/
+scratch/create_agent_profile.*

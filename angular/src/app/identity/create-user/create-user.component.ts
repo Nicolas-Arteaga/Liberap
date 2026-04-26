@@ -38,7 +38,7 @@ export class CreateUserComponent implements OnInit {
             name: ['', [Validators.required]],
             email: ['', [Validators.required, Validators.email]],
             password: ['', [Validators.required, Validators.minLength(6)]],
-            roleNames: [['Trader']]
+            roleNames: [[]]
         });
     }
 
@@ -92,7 +92,7 @@ export class CreateUserComponent implements OnInit {
             next: (response) => {
                 this.successMessage = 'Usuario creado con éxito';
                 this.userForm.reset({
-                    roleNames: ['Trader']
+                    roleNames: []
                 });
                 this.isLoading = false;
                 // Opcional: navegar a listado si existe
