@@ -86,8 +86,20 @@
   <!-- Checkboxes -->
   <div class="mb-3">
     <div class="d-flex align-items-center gap-2 mb-2">
-      <input type="checkbox" class="form-check-input bg-dark border-white-10">
+      <input type="checkbox" [(ngModel)]="showTpSl" class="form-check-input bg-dark border-white-10">
       <span class="text-white-50" style="font-size: 11px;">TP/SL</span>
+    </div>
+
+    <!-- TP/SL Inputs -->
+    <div *ngIf="showTpSl" class="animate-fade-in mb-2 ps-2 border-start border-white-10">
+      <div class="input-group-binance p-1 bg-dark-accent rounded border border-white-05 mb-1">
+        <label class="text-success text-xxs d-block mb-0" style="font-size: 8px;">Take Profit (USDT)</label>
+        <input type="number" [(ngModel)]="tpPrice" class="bg-transparent border-0 text-white w-100 outline-none text-xs" placeholder="0.00">
+      </div>
+      <div class="input-group-binance p-1 bg-dark-accent rounded border border-white-05">
+        <label class="text-danger text-xxs d-block mb-0" style="font-size: 8px;">Stop Loss (USDT)</label>
+        <input type="number" [(ngModel)]="slPrice" class="bg-transparent border-0 text-white w-100 outline-none text-xs" placeholder="0.00">
+      </div>
     </div>
     <div class="d-flex align-items-center gap-2 mb-3">
       <input type="checkbox" class="form-check-input bg-dark border-white-10">

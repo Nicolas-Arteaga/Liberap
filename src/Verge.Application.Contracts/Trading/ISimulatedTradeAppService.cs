@@ -15,4 +15,5 @@ public interface ISimulatedTradeAppService : IApplicationService
     Task<decimal> GetVirtualBalanceAsync();
     Task<SimulationPerformanceDto> GetPerformanceStatsAsync();
     Task<List<SimulatedTradeDto>> GetRecentTradesAsync(int limit = 20);
+    Task UpdateTpSlAsync(Guid tradeId, UpdateTpSlInputDto input);
 }

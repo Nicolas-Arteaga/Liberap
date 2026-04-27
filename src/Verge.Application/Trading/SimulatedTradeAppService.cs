@@ -43,15 +43,23 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId)
             ?? throw new UserFriendlyException("Trader profile not found. Please complete your profile first.");
 
-        // 2. Normalize and get current mark price from Binance Futures
+        // 2. Normalize and get current mark price (Try fast WebSocket cache first)
         var symbol = input.Symbol.ToUpper().Replace("/", "").Replace("-", "").Trim();
         if (!symbol.EndsWith("USDT") && !symbol.Contains("USD")) symbol += "USDT";
 
-        var tickers = await _marketDataManager.GetTickersAsync();
-        var ticker = tickers.FirstOrDefault(t => t.Symbol == symbol)
-            ?? throw new UserFriendlyException($"Symbol '{symbol}' not found on Binance Futures. Asegurate de usar el par con USDT (ej: BTCUSDT)");
-
-        var entryPrice = ticker.LastPrice;
+        decimal entryPrice;
+        var wsPrice = _marketDataManager.GetWebSocketPrice(symbol);
+        if (wsPrice.HasValue && wsPrice.Value > 0)
+        {
+            entryPrice = wsPrice.Value;
+        }
+        else
+        {
+            var tickers = await _marketDataManager.GetTickersAsync();
+            var ticker = tickers.FirstOrDefault(t => t.Symbol == symbol)
+                ?? throw new UserFriendlyException($"Symbol '{symbol}' not found on Binance Futures. Asegurate de usar el par con USDT (ej: BTCUSDT)");
+            entryPrice = ticker.LastPrice;
+        }
 
         // 3. Calculate position values
         // input.Amount is now treated as MARGIN (the cost the user wants to risk)
@@ -85,6 +93,8 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
             margin: margin,
             liquidationPrice: liquidationPrice,
             entryFee: entryFee,
+            tpPrice: input.TpPrice,
+            slPrice: input.SlPrice,
             tradingSignalId: input.TradingSignalId);
 
         await _tradeRepo.InsertAsync(trade, autoSave: true);
@@ -109,14 +119,25 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
             throw new UserFriendlyException("You don't have permission to close this trade.");
 
         if (trade.Status != TradeStatus.Open)
-            throw new UserFriendlyException("This trade is not open.");
+        {
+            Logger.LogWarning("⚠️ [Simulation] Attempted to close a trade that is already {Status}: {TradeId}", trade.Status, tradeId);
+            return MapToDto(trade); // Devuelve el trade como esta (probablemente ya cerrado por stop loss/take profit/liquidacion)
+        }
 
-        // 1. Get current mark price
-        var tickers = await _marketDataManager.GetTickersAsync();
-        var ticker = tickers.FirstOrDefault(t => t.Symbol == trade.Symbol)
-            ?? throw new UserFriendlyException($"Could not fetch current price for {trade.Symbol}.");
-
-        var closePrice = ticker.LastPrice;
+        // 1. Get current mark price (Try fast WebSocket cache first)
+        decimal closePrice;
+        var wsPrice = _marketDataManager.GetWebSocketPrice(trade.Symbol);
+        if (wsPrice.HasValue && wsPrice.Value > 0)
+        {
+            closePrice = wsPrice.Value;
+        }
+        else
+        {
+            var tickers = await _marketDataManager.GetTickersAsync();
+            var ticker = tickers.FirstOrDefault(t => t.Symbol == trade.Symbol)
+                ?? throw new UserFriendlyException($"Could not fetch current price for {trade.Symbol}.");
+            closePrice = ticker.LastPrice;
+        }
 
         // 2. Calculate exit fee and realized PnL
         var exitFee = _simulationService.CalculateExitFee(trade.Size, closePrice);
@@ -242,6 +263,29 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
                      .ToList();
     }
 
+    public async Task UpdateTpSlAsync(Guid tradeId, UpdateTpSlInputDto input)
+    {
+        var userId = CurrentUser.Id!.Value;
+        var trade = await _tradeRepo.GetAsync(tradeId);
+
+        if (trade.UserId != userId)
+            throw new UserFriendlyException("You don't have permission to update this trade.");
+
+        if (trade.Status != TradeStatus.Open)
+            throw new UserFriendlyException("You can only update TP/SL for open trades.");
+
+        trade.TpPrice = input.TpPrice;
+        trade.SlPrice = input.SlPrice;
+
+        await _tradeRepo.UpdateAsync(trade, autoSave: true);
+        
+        // Broadcast update to client
+        await _hubContext.Clients.User(userId.ToString()).SendAsync("ReceiveTradeUpdate", MapToDto(trade));
+        
+        Logger.LogInformation("🎯 [Simulation] TP/SL updated for {Symbol}: TP {Tp}, SL {Sl}", 
+            trade.Symbol, trade.TpPrice, trade.SlPrice);
+    }
+
     private static SimulatedTradeDto MapToDto(SimulatedTrade t) => new SimulatedTradeDto
     {
         Id = t.Id,
@@ -266,6 +310,8 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         TotalFundingPaid = t.TotalFundingPaid,
         OpenedAt = t.OpenedAt,
         ClosedAt = t.ClosedAt,
+        TpPrice = t.TpPrice,
+        SlPrice = t.SlPrice,
         TradingSignalId = t.TradingSignalId
     };
 }

@@ -1,4 +1,4 @@
-import type { OpenTradeInputDto, SimulatedTradeDto, SimulationPerformanceDto } from './dtos/models';
+import type { OpenTradeInputDto, SimulatedTradeDto, SimulationPerformanceDto, UpdateTpSlInputDto } from './dtos/models';
 import { RestService, Rest } from '@abp/ng.core';
 import { Injectable, inject } from '@angular/core';
 
@@ -63,6 +63,15 @@ export class SimulatedTradeService {
     this.restService.request<any, SimulatedTradeDto>({
       method: 'POST',
       url: '/api/app/simulated-trade/open-trade',
+      body: input,
+    },
+    { apiName: this.apiName,...config });
+  
+
+  updateTpSl = (tradeId: string, input: UpdateTpSlInputDto, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'PUT',
+      url: `/api/app/simulated-trade/tp-sl/${tradeId}`,
       body: input,
     },
     { apiName: this.apiName,...config });

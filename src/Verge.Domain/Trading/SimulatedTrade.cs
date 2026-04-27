@@ -25,6 +25,9 @@ public class SimulatedTrade : FullAuditedAggregateRoot<Guid>
     public decimal? ClosePrice { get; set; }
     public decimal? RealizedPnl { get; set; }
     
+    public decimal? TpPrice { get; set; }
+    public decimal? SlPrice { get; set; }
+    
     public decimal EntryFee { get; set; }
     public decimal ExitFee { get; set; }
     public decimal TotalFundingPaid { get; set; }
@@ -48,6 +51,8 @@ public class SimulatedTrade : FullAuditedAggregateRoot<Guid>
         decimal margin,
         decimal liquidationPrice,
         decimal entryFee,
+        decimal? tpPrice = null,
+        decimal? slPrice = null,
         Guid? tradingSignalId = null) : base(id)
     {
         UserId = userId;
@@ -61,6 +66,8 @@ public class SimulatedTrade : FullAuditedAggregateRoot<Guid>
         Margin = margin;
         LiquidationPrice = liquidationPrice;
         EntryFee = entryFee;
+        TpPrice = tpPrice;
+        SlPrice = slPrice;
         TradingSignalId = tradingSignalId;
         Status = TradeStatus.Open;
         OpenedAt = DateTime.UtcNow;

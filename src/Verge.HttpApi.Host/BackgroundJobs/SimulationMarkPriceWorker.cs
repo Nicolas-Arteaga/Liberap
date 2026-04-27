@@ -29,6 +29,7 @@ public class SimulationMarkPriceWorker : BackgroundService
     private readonly ILogger<SimulationMarkPriceWorker> _logger;
 
     private static DateTime _lastFundingTime = DateTime.UtcNow;
+    private static DateTime _binanceBannedUntil = DateTime.MinValue; // REST ban tracker
 
     public SimulationMarkPriceWorker(
         IServiceProvider serviceProvider,
@@ -106,14 +107,28 @@ public class SimulationMarkPriceWorker : BackgroundService
                     
                     if (price == null)
                     {
-                        if (fallbackPriceMap == null)
+                        // Don't hit REST if we know Binance has us banned
+                        if (DateTime.UtcNow < _binanceBannedUntil)
+                        {
+                            _logger.LogWarning("⏳ [SimulationWorker] Binance REST ban active until {Until}. Skipping REST fallback.", _binanceBannedUntil);
+                        }
+                        else if (fallbackPriceMap == null)
                         {
                             _logger.LogInformation("[SimulationWorker] WS cache miss, fetching all tickers via REST...");
                             var tickers = await marketDataManager.GetTickersAsync();
-                            fallbackPriceMap = tickers.GroupBy(t => t.Symbol).ToDictionary(g => g.Key, g => g.First().LastPrice);
+                            if (!tickers.Any())
+                            {
+                                // Empty = 418 ban. Back off for 10 minutes.
+                                _binanceBannedUntil = DateTime.UtcNow.AddMinutes(10);
+                                _logger.LogWarning("🚫 [SimulationWorker] Binance returned 418/empty. REST cooldown set for 10 min until {Until}.", _binanceBannedUntil);
+                            }
+                            else
+                            {
+                                fallbackPriceMap = tickers.GroupBy(t => t.Symbol).ToDictionary(g => g.Key, g => g.First().LastPrice);
+                            }
                         }
-                        
-                        if (fallbackPriceMap.TryGetValue(cleanSymbol, out var restPrice))
+
+                        if (fallbackPriceMap != null && fallbackPriceMap.TryGetValue(cleanSymbol, out var restPrice))
                         {
                             price = restPrice;
                             source = "REST Tickers Fallback";
@@ -144,6 +159,59 @@ public class SimulationMarkPriceWorker : BackgroundService
                         await uow.CompleteAsync();
 
                         _logger.LogInformation("📢 [SimulationWorker] SignalR: Sending Liquidation event to user {UserId}", trade.UserId);
+                        await _hubContext.Clients.User(trade.UserId.ToString()).SendAsync("ReceiveTradeUpdate", MapToDto(trade));
+                        continue;
+                    }
+
+                    // Check Take Profit
+                    bool isClosed = false;
+                    string closeReason = "";
+                    if (trade.TpPrice.HasValue && trade.TpPrice.Value > 0)
+                    {
+                        bool tpTriggered = trade.Side == SignalDirection.Long ? markPrice >= trade.TpPrice.Value : markPrice <= trade.TpPrice.Value;
+                        if (tpTriggered)
+                        {
+                            isClosed = true;
+                            closeReason = "Take Profit";
+                        }
+                    }
+
+                    // Check Stop Loss
+                    if (!isClosed && trade.SlPrice.HasValue && trade.SlPrice.Value > 0)
+                    {
+                        bool slTriggered = trade.Side == SignalDirection.Long ? markPrice <= trade.SlPrice.Value : markPrice >= trade.SlPrice.Value;
+                        if (slTriggered)
+                        {
+                            isClosed = true;
+                            closeReason = "Stop Loss";
+                        }
+                    }
+
+                    if (isClosed)
+                    {
+                        _logger.LogInformation("🎯 [SimulationWorker] {Reason} reached for {Symbol} at {Price}. Closing trade...", closeReason, trade.Symbol, markPrice);
+                        
+                        trade.Status = closeReason == "Take Profit" ? TradeStatus.Win : TradeStatus.Loss;
+                        trade.ClosePrice = markPrice;
+                        trade.ClosedAt = DateTime.UtcNow;
+                        
+                        var exitFee = simulationService.CalculateExitFee(trade.Amount, markPrice);
+                        var pnl = simulationService.CalculateUnrealizedPnl(trade.EntryPrice, markPrice, trade.Size, trade.Side);
+                        trade.RealizedPnl = pnl - exitFee;
+                        trade.ExitFee = exitFee;
+
+                        // Return margin + PnL (net of fees) to user
+                        var profileToCredit = await profileRepo.FirstOrDefaultAsync(p => p.UserId == trade.UserId);
+                        if (profileToCredit != null)
+                        {
+                            profileToCredit.VirtualBalance += (trade.Margin + trade.RealizedPnl.Value);
+                            await profileRepo.UpdateAsync(profileToCredit);
+                        }
+
+                        await tradeRepo.UpdateAsync(trade);
+                        await uow.CompleteAsync();
+
+                        _logger.LogInformation("📢 [SimulationWorker] SignalR: Sending {Reason} event to user {UserId}", closeReason, trade.UserId);
                         await _hubContext.Clients.User(trade.UserId.ToString()).SendAsync("ReceiveTradeUpdate", MapToDto(trade));
                         continue;
                     }
@@ -209,6 +277,8 @@ public class SimulationMarkPriceWorker : BackgroundService
         TotalFundingPaid = t.TotalFundingPaid,
         OpenedAt = t.OpenedAt,
         ClosedAt = t.ClosedAt,
+        TpPrice = t.TpPrice,
+        SlPrice = t.SlPrice,
         TradingSignalId = t.TradingSignalId
     };
 }

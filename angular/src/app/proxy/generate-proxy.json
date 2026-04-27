@@ -3399,6 +3399,31 @@
                     "type": "System.Collections.Generic.List<Verge.Trading.DTOs.SimulatedTradeDto>",
                     "typeSimple": "[Verge.Trading.DTOs.SimulatedTradeDto]"
                   }
+                },
+                {
+                  "name": "UpdateTpSlAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "tradeId",
+                      "typeAsString": "System.Guid, System.Private.CoreLib",
+                      "type": "System.Guid",
+                      "typeSimple": "string",
+                      "isOptional": false,
+                      "defaultValue": null
+                    },
+                    {
+                      "name": "input",
+                      "typeAsString": "Verge.Trading.DTOs.UpdateTpSlInputDto, Verge.Application.Contracts",
+                      "type": "Verge.Trading.DTOs.UpdateTpSlInputDto",
+                      "typeSimple": "Verge.Trading.DTOs.UpdateTpSlInputDto",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "System.Void",
+                    "typeSimple": "System.Void"
+                  }
                 }
               ]
             }
@@ -3571,6 +3596,63 @@
               "returnValue": {
                 "type": "System.Collections.Generic.List<Verge.Trading.DTOs.SimulatedTradeDto>",
                 "typeSimple": "[Verge.Trading.DTOs.SimulatedTradeDto]"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.ISimulatedTradeAppService"
+            },
+            "UpdateTpSlAsyncByTradeIdAndInput": {
+              "uniqueName": "UpdateTpSlAsyncByTradeIdAndInput",
+              "name": "UpdateTpSlAsync",
+              "httpMethod": "PUT",
+              "url": "api/app/simulated-trade/tp-sl/{tradeId}",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "tradeId",
+                  "typeAsString": "System.Guid, System.Private.CoreLib",
+                  "type": "System.Guid",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null
+                },
+                {
+                  "name": "input",
+                  "typeAsString": "Verge.Trading.DTOs.UpdateTpSlInputDto, Verge.Application.Contracts",
+                  "type": "Verge.Trading.DTOs.UpdateTpSlInputDto",
+                  "typeSimple": "Verge.Trading.DTOs.UpdateTpSlInputDto",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "tradeId",
+                  "name": "tradeId",
+                  "jsonName": null,
+                  "type": "System.Guid",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": [],
+                  "bindingSourceId": "Path",
+                  "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "input",
+                  "name": "input",
+                  "jsonName": null,
+                  "type": "Verge.Trading.DTOs.UpdateTpSlInputDto",
+                  "typeSimple": "Verge.Trading.DTOs.UpdateTpSlInputDto",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "Body",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "System.Void",
+                "typeSimple": "System.Void"
               },
               "allowAnonymous": null,
               "implementFrom": "Verge.Trading.ISimulatedTradeAppService"
@@ -10106,6 +10188,30 @@
           "regex": null
         },
         {
+          "name": "TpPrice",
+          "jsonName": null,
+          "type": "System.Decimal?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "SlPrice",
+          "jsonName": null,
+          "type": "System.Decimal?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
           "name": "TradingSignalId",
           "jsonName": null,
           "type": "System.Guid?",
@@ -10574,6 +10680,30 @@
           "regex": null
         },
         {
+          "name": "TpPrice",
+          "jsonName": null,
+          "type": "System.Decimal?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "SlPrice",
+          "jsonName": null,
+          "type": "System.Decimal?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
           "name": "EntryFee",
           "jsonName": null,
           "type": "System.Decimal",
@@ -10916,6 +11046,39 @@
           "name": "Score",
           "jsonName": null,
           "type": "System.Int32?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.DTOs.UpdateTpSlInputDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "TpPrice",
+          "jsonName": null,
+          "type": "System.Decimal?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "SlPrice",
+          "jsonName": null,
+          "type": "System.Decimal?",
           "typeSimple": "number?",
           "isRequired": false,
           "minLength": null,

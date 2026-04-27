@@ -1,0 +1,70 @@
+<div class="modal-backdrop d-flex align-items-center justify-content-center">
+  <div class="tpsl-modal bg-dark-deep rounded-3 shadow-xl overflow-hidden border border-white-05" style="width: 400px;">
+    <!-- Header -->
+    <div class="d-flex align-items-center justify-content-between p-3 border-bottom border-white-05">
+      <h5 class="text-white fw-bold mb-0" style="font-size: 16px;">TP/SL for Entire Position</h5>
+      <ion-icon name="close-outline" class="text-white-50 fs-4 pointer hover-text-white" (click)="close.emit()"></ion-icon>
+    </div>
+
+    <div class="p-3">
+      <!-- Symbol Info -->
+      <div class="symbol-info mb-3">
+        <div class="d-flex justify-content-between mb-1">
+          <span class="text-white-50 text-xs">Symbol</span>
+          <span class="text-success fw-bold text-xs">{{ trade.symbol }} Perp / {{ trade.side === 0 ? 'Long' : 'Short' }} {{ trade.leverage }}x</span>
+        </div>
+        <div class="d-flex justify-content-between mb-1">
+          <span class="text-white-50 text-xs">Entry Price</span>
+          <span class="text-white text-xs">{{ trade.entryPrice | number:'1.2-4' }} USDT</span>
+        </div>
+        <div class="d-flex justify-content-between">
+          <span class="text-white-50 text-xs">Mark Price</span>
+          <span class="text-white text-xs">{{ trade.markPrice | number:'1.2-4' }} USDT</span>
+        </div>
+      </div>
+
+      <!-- Take Profit Section -->
+      <div class="mb-3">
+        <div class="d-flex justify-content-between mb-1">
+          <label class="text-white-50 text-xs">Take Profit</label>
+          <span class="text-warning text-xs pointer" style="font-size: 10px;">Mark <ion-icon name="caret-down-outline"></ion-icon></span>
+        </div>
+        <div class="d-flex gap-2">
+          <div class="input-group-binance flex-grow-1 p-2 bg-dark-accent rounded border border-white-05">
+            <input type="number" [(ngModel)]="tpPrice" class="bg-transparent border-0 text-white w-100 outline-none text-sm fw-bold" placeholder="Price">
+          </div>
+          <div class="input-group-binance p-2 bg-dark-accent rounded border border-white-05 text-white-30" style="width: 100px;">
+             PnL <ion-icon name="caret-down-outline"></ion-icon>
+          </div>
+        </div>
+        <div class="mt-1 text-white-30" style="font-size: 10px;" *ngIf="tpPrice">
+          When Mark Price reaches <span class="text-white">{{ tpPrice }}</span>, it will trigger Take Profit Market order. Estimated PnL will be <span [class.text-success]="estimatedTpPnl >= 0" [class.text-danger]="estimatedTpPnl < 0">{{ estimatedTpPnl | number:'1.2-2' }} USDT</span>.
+        </div>
+      </div>
+
+      <!-- Stop Loss Section -->
+      <div class="mb-4">
+        <div class="d-flex justify-content-between mb-1">
+          <label class="text-white-50 text-xs">Stop Loss</label>
+          <span class="text-warning text-xs pointer" style="font-size: 10px;">Mark <ion-icon name="caret-down-outline"></ion-icon></span>
+        </div>
+        <div class="d-flex gap-2">
+          <div class="input-group-binance flex-grow-1 p-2 bg-dark-accent rounded border border-white-05">
+            <input type="number" [(ngModel)]="slPrice" class="bg-transparent border-0 text-white w-100 outline-none text-sm fw-bold" placeholder="Price">
+          </div>
+          <div class="input-group-binance p-2 bg-dark-accent rounded border border-white-05 text-white-30" style="width: 100px;">
+             PnL <ion-icon name="caret-down-outline"></ion-icon>
+          </div>
+        </div>
+        <div class="mt-1 text-white-30" style="font-size: 10px;" *ngIf="slPrice">
+          When Mark Price reaches <span class="text-white">{{ slPrice }}</span>, it will trigger Stop Loss Market order. Estimated PnL will be <span [class.text-success]="estimatedSlPnl >= 0" [class.text-danger]="estimatedSlPnl < 0">{{ estimatedSlPnl | number:'1.2-2' }} USDT</span>.
+        </div>
+      </div>
+
+      <!-- Confirm Button -->
+      <button class="btn btn-warning w-100 py-2 fw-bold text-dark" (click)="confirm()" [disabled]="isSaving">
+        {{ isSaving ? 'Confirming...' : 'Confirm' }}
+      </button>
+    </div>
+  </div>
+</div>

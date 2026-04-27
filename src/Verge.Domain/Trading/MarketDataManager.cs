@@ -21,7 +21,8 @@ public class MarketDataManager : DomainService
     private const string FuturesBaseUrl = "https://fapi.binance.com";
 
     private readonly IDatabase _redis;
-    private static readonly SemaphoreSlim _binanceGate = new(5, 5); // Max 5 parallel REST calls globally
+    private static readonly SemaphoreSlim _binanceGate = new(10, 10);    // Max 10 parallel REST calls
+    private static readonly SemaphoreSlim _tickerGate  = new(3, 3);      // Dedicated slots for ticker calls (Nexus-15 top scan)
 
     public MarketDataManager(IHttpClientFactory httpClientFactory, BinanceWebSocketService webSocketService, IConnectionMultiplexer redis)
     {
@@ -322,7 +323,7 @@ public class MarketDataManager : DomainService
 
     public async Task<List<SymbolTickerModel>> GetTickersAsync()
     {
-        await _binanceGate.WaitAsync();
+        await _tickerGate.WaitAsync();  // dedicated gate - doesn't compete with klines calls
         try
         {
             var client = _httpClientFactory.CreateClient();
@@ -357,7 +358,7 @@ public class MarketDataManager : DomainService
         }
         finally
         {
-            _binanceGate.Release();
+            _tickerGate.Release();
         }
     }
     

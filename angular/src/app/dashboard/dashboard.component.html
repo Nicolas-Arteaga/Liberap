@@ -395,6 +395,7 @@
                   <th>Precio de entrada</th>
                   <th>Precio de marca</th>
                   <th>Precio de Liq.</th>
+                  <th>TP/SL para la posición</th>
                   <th>Margen (Aislado)</th>
                   <th>PnL (%ROI)</th>
                   <th>Cerrar</th>
@@ -421,6 +422,12 @@
                   <td class="align-middle text-white">{{ trade.entryPrice | number:'1.2-4' }}</td>
                   <td class="align-middle text-white">{{ trade.markPrice | number:'1.2-4' }}</td>
                   <td class="align-middle text-warning fw-bold">{{ trade.liquidationPrice | number:'1.2-4' }}</td>
+                  <td class="align-middle cursor-pointer hover:bg-white-05" (click)="openTpSlModal(trade)">
+                    <div class="d-flex flex-column" style="font-size: 9px;">
+                      <span class="text-success" title="Take Profit">{{ trade.tpPrice != null ? (trade.tpPrice | number:'1.2-4') : '--' }}</span>
+                      <span class="text-danger" title="Stop Loss">{{ trade.slPrice != null ? (trade.slPrice | number:'1.2-4') : '--' }}</span>
+                    </div>
+                  </td>
                   <td class="align-middle text-white">
                     <div>{{ trade.margin | number:'1.2-2' }} USDT</div>
                     <div class="text-white-50" style="font-size: 8px;">(1x: {{ (trade.amount / trade.leverage) | number:'1.2-2' }})</div>
@@ -702,6 +709,14 @@
       <app-glass-button variant="danger" (click)="confirmEndHunt()">Sí, finalizar</app-glass-button>
     </div>
   </app-dialog>
+
+  <!-- TP/SL Modal -->
+  <app-tpsl-modal 
+    *ngIf="showTpSlModal && selectedTradeForModal" 
+    [trade]="selectedTradeForModal"
+    (close)="showTpSlModal = false"
+    (updated)="loadActiveTrades()">
+  </app-tpsl-modal>
 
 </div>
 

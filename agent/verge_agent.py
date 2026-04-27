@@ -45,6 +45,9 @@ class VergeAgent:
             logger.error("FATAL: Could not authenticate with ABP Backend. Stopping agent.")
             return
 
+        # [NEW] Sync and repair existing positions TP/SL if missing
+        self._repair_existing_positions()
+
         while True:
             try:
                 self.loop_cycle()
@@ -161,44 +164,108 @@ class VergeAgent:
             if current_price <= 0:
                 continue
                 
+            # Check if backend already closed it (Server-side TP/SL/Liquidation)
+            # We don't want to spam the server if it's already closed.
+            # The close_trade method in position_manager handles the 400/already-closed case,
+            # but let's be more proactive.
+            
             should_close = False
             close_reason = ""
             
-            # Check TP/SL
+            # 1. Check TP/SL locally as fallback
             if side == 0: # LONG
                 if current_price >= tp:
-                    should_close, close_reason = True, "Take Profit reached"
+                    should_close, close_reason = True, "Take Profit reached (Local Check)"
                 elif current_price <= sl:
-                    should_close, close_reason = True, "Stop Loss reached"
+                    should_close, close_reason = True, "Stop Loss reached (Local Check)"
             else: # SHORT
                 if current_price <= tp:
-                    should_close, close_reason = True, "Take Profit reached"
+                    should_close, close_reason = True, "Take Profit reached (Local Check)"
                 elif current_price >= sl:
-                    should_close, close_reason = True, "Stop Loss reached"
+                    should_close, close_reason = True, "Stop Loss reached (Local Check)"
                     
-            # Check Max Duration
+            # 2. Check Max Duration
             opened_at = datetime.fromisoformat(pos["opened_at"])
             hours_open = (datetime.utcnow() - opened_at).total_seconds() / 3600.0
             if hours_open >= config.MAX_POSITION_DURATION_HOURS:
                 should_close, close_reason = True, "Max duration exceeded (48h)"
                 
+            # 3. IF we didn't trigger locally, verify with backend just in case
+            if not should_close:
+                # We fetch active trades once per loop if we have positions
+                active_backend_trades = self.positions.get_active_trades()
+                backend_ids = [t["id"] for t in active_backend_trades]
+                if trade_id not in backend_ids:
+                    logger.info(f"Position {symbol} ({trade_id}) was closed by the Server (TP/SL/Liq). Syncing local state.")
+                    self.state.remove_position(trade_id)
+                    continue
+
             if should_close:
                 logger.info(f"Action required for {symbol}: {close_reason} @ {current_price}")
                 success = self.positions.close_trade(trade_id)
                 
                 if success:
-                    # To get final stats (RealizedPnL), we could fetch the history, 
-                    # but for now we just use the current price to estimate or we can trust the backend.
-                    # As a quick workaround, we inject the closePrice into a fake dict to pass to the report
                     fake_backend_trade_data = {
                         "closePrice": current_price,
-                        # Rough estimate for PnL
                         "realizedPnl": pos["margin"] * (current_price - pos["entry_price"]) / pos["entry_price"] * (1 if side == 0 else -1) * pos["leverage"],
-                        # We don't know Win/Loss exact enum here without fetching, but we estimate:
-                        "status": 1 if close_reason == "Take Profit reached" else 2
+                        "status": 1 if close_reason == "Take Profit reached (Local Check)" else 2
                     }
                     self.report.log_trade_closed(pos, fake_backend_trade_data)
                     self.state.remove_position(trade_id)
+
+    def _repair_existing_positions(self):
+        """
+        Checks open positions in the backend. If any are missing TP/SL (from before the update),
+        it calculates them based on entry price and updates the backend.
+        """
+        logger.info("🔍 Checking for positions missing TP/SL protection...")
+        active_trades = self.positions.get_active_trades()
+        logger.info(f"📋 Backend reported {len(active_trades)} active trades.")
+        
+        for trade in active_trades:
+            symbol = trade["symbol"]
+            trade_id = trade["id"]
+            tp = trade.get("tpPrice")
+            sl = trade.get("slPrice")
+            
+            logger.info(f"  -> Found {symbol} ({trade_id}): TP={tp}, SL={sl}")
+            
+            if tp is None or sl is None or tp == 0 or sl == 0:
+                logger.info(f"🔧 Repairing TP/SL for {symbol} ({trade_id})...")
+                
+                # Basic signal data fallback
+                fake_signal = {
+                    "side": trade["side"],
+                    "estimated_range_pct": 2.0 
+                }
+                
+                recalc = self.risk.calculate_position(symbol, fake_signal, available_balance=10000)
+                if recalc:
+                    entry = float(trade["entryPrice"])
+                    range_pct = 0.02 
+                    
+                    tp_dist = range_pct * config.TP_MULTIPLIER
+                    sl_dist = range_pct * config.SL_MULTIPLIER
+                    
+                    if trade["side"] == 0: # Long
+                        tp_val = entry * (1 + tp_dist)
+                        sl_val = entry * (1 - sl_dist)
+                    else: # Short
+                        tp_val = entry * (1 - tp_dist)
+                        sl_val = entry * (1 + sl_dist)
+                        
+                    payload = {
+                        "tpPrice": round(tp_val, 4),
+                        "slPrice": round(sl_val, 4)
+                    }
+                    
+                    success = self.positions.update_tp_sl(trade_id, payload)
+                    if success:
+                        logger.info(f"✅ Successfully protected legacy position {symbol}")
+                        # Update local state too!
+                        self.state.update_position_tpsl(trade_id, payload["tpPrice"], payload["slPrice"])
+                    else:
+                        logger.error(f"❌ Failed to update TP/SL for {symbol}")
 
 
 if __name__ == "__main__":

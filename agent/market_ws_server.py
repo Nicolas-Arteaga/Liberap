@@ -47,7 +47,10 @@ BINANCE_FAPI = "https://fapi.binance.com"
 # Seed inicial: pedir historial REST una sola vez al arrancar
 # ─────────────────────────────────────────────────────────────
 def seed_history_from_rest():
-    """Llama a Binance REST UNA VEZ al inicio para sembrar el historial de cada simbolo."""
+    """Llama a Binance REST UNA VEZ al inicio para sembrar el historial de cada simbolo.
+    Si Binance devuelve 418 (IP baneada), aborta INMEDIATAMENTE el seed
+    para no renovar el ban. El WebSocket live acumulara historial por su cuenta.
+    """
     logger.info("[Seed] Sembrando historial inicial desde REST (una sola vez)...")
     session = requests.Session()
 
@@ -56,6 +59,15 @@ def seed_history_from_rest():
             url = f"{BINANCE_FAPI}/fapi/v1/klines"
             params = {"symbol": symbol, "interval": "15m", "limit": 100}
             r = session.get(url, params=params, timeout=10)
+
+            if r.status_code == 418 or r.status_code == 429:
+                # IP baneada: no seguir pegando, abortar el seed completo
+                logger.warning(
+                    f"[Seed] ABORTANDO seed — Binance ban activo (HTTP {r.status_code}). "
+                    f"El WebSocket acumulara historial en tiempo real. "
+                    f"Simbolos sembrados hasta ahora: {len(history)}"
+                )
+                break  # Salir del loop, no tocar mas REST
 
             if r.status_code == 200:
                 candles = []
@@ -71,14 +83,13 @@ def seed_history_from_rest():
                         "is_final": True
                     })
                 history[symbol] = deque(candles, maxlen=100)
-                # Ultima vela como live
                 if candles:
                     live_candle[symbol] = candles[-1]
                 logger.info(f"[Seed] {symbol}: {len(candles)} velas cargadas.")
             else:
                 logger.warning(f"[Seed] No se pudo cargar {symbol}: {r.status_code} {r.text[:80]}")
 
-            time.sleep(0.3)  # 300ms entre symbols para no agotar el rate limit en el seed
+            time.sleep(0.3)
 
         except Exception as e:
             logger.error(f"[Seed] Error con {symbol}: {e}")

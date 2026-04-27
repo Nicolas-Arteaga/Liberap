@@ -288,6 +288,8 @@ export class TradingSignalrService {
         normalized.status = trade.status ?? trade.Status;
         normalized.closePrice = trade.closePrice ?? trade.ClosePrice;
         normalized.realizedPnl = trade.realizedPnl ?? trade.RealizedPnl;
+        normalized.tpPrice = trade.tpPrice ?? trade.TpPrice;
+        normalized.slPrice = trade.slPrice ?? trade.SlPrice;
         normalized.entryFee = trade.entryFee ?? trade.EntryFee;
         normalized.exitFee = trade.exitFee ?? trade.ExitFee;
         normalized.totalFundingPaid = trade.totalFundingPaid ?? trade.TotalFundingPaid;

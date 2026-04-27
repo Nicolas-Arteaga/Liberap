@@ -27,6 +27,9 @@ export class TradingPanelComponent implements OnInit {
   leverage: number = 10;
   marginType: 'Cruzado' | 'Aislado' = 'Aislado';
   showLeverageModal: boolean = false;
+  showTpSl: boolean = false;
+  tpPrice: number | null = null;
+  slPrice: number | null = null;
 
   async ngOnInit() {
     this.refreshBalance();
@@ -55,7 +58,9 @@ export class TradingPanelComponent implements OnInit {
       symbol: this.symbol,
       side: side,
       amount: this.amount,
-      leverage: this.leverage
+      leverage: this.leverage,
+      tpPrice: this.showTpSl ? this.tpPrice : null,
+      slPrice: this.showTpSl ? this.slPrice : null
     }).subscribe({
       next: (res) => {
         console.log('Trade success:', res);

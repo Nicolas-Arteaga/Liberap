@@ -40,24 +40,29 @@ class AuthManager:
         if config.CLIENT_SECRET:
             payload["client_secret"] = config.CLIENT_SECRET
 
-        try:
-            # verify=False because localhost dev certs are self-signed
-            response = requests.post(url, data=payload, verify=False, timeout=10)
-            
-            if response.status_code == 200:
-                data = response.json()
-                self.access_token = data.get("access_token")
-                expires_in = data.get("expires_in", 3600)
-                self.expires_at = time.time() + expires_in
-                logger.info("[Auth] JWT token successfully obtained. Expires in %ds", expires_in)
-                return self.access_token
-            else:
-                logger.error("[Auth] Failed to obtain JWT token: %s - %s", response.status_code, response.text)
-                return None
+        # Intento de reconexión / Reintentos (3 intentos)
+        for attempt in range(3):
+            try:
+                # verify=False because localhost dev certs are self-signed
+                response = requests.post(url, data=payload, verify=False, timeout=30)
                 
-        except requests.exceptions.RequestException as e:
-            logger.error("[Auth] Connection error while obtaining JWT: %s", e)
-            return None
+                if response.status_code == 200:
+                    data = response.json()
+                    self.access_token = data.get("access_token")
+                    expires_in = data.get("expires_in", 3600)
+                    self.expires_at = time.time() + expires_in
+                    logger.info("[Auth] JWT token successfully obtained. Expires in %ds", expires_in)
+                    return self.access_token
+                else:
+                    logger.error("[Auth] Failed to obtain JWT token (Attempt %d/3): %s - %s", attempt + 1, response.status_code, response.text)
+                    
+            except requests.exceptions.RequestException as e:
+                logger.warning("[Auth] Connection error (Attempt %d/3): %s", attempt + 1, e)
+            
+            if attempt < 2:
+                time.sleep(5) # Esperar 5 seg antes de reintentar
+                
+        return None
 
     def get_auth_headers(self) -> dict:
         """

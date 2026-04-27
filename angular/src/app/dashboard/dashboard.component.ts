@@ -23,6 +23,7 @@ import { AUTH_TOKEN_KEY } from '../core/auth.service';
 import { AlertsComponent } from '../shared/components/alerts/alerts.component';
 import { AlertService } from '../services/alert.service';
 import { TradingPanelComponent } from 'src/shared/components/trading-panel/trading-panel.component';
+import { TpSlModalComponent } from 'src/shared/components/tpsl-modal/tpsl-modal.component';
 
 interface TradingSignal {
   id: number;
@@ -55,7 +56,8 @@ interface StageInfo {
     IonIcon,
     DialogComponent,
     AlertsComponent,
-    TradingPanelComponent
+    TradingPanelComponent,
+    TpSlModalComponent
   ],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss']
@@ -183,6 +185,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   activeTrades: SimulatedTradeDto[] = [];
   tradeHistory: SimulatedTradeDto[] = [];
   consoleTab: 'positions' | 'orders' | 'history' = 'positions';
+  showTpSlModal = false;
+  selectedTradeForModal: SimulatedTradeDto | null = null;
   private simulatedTradeService = inject(SimulatedTradeService);
 
   // Señales activas (reemplazado por logs reales)
@@ -320,7 +324,13 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.signalrService.tradeUpdate$.pipe(takeUntil(this.destroy$)).subscribe(update => {
       const index = this.activeTrades.findIndex(t => t.id === update.id);
       if (index !== -1) {
-        this.activeTrades[index] = { ...this.activeTrades[index], ...update };
+        const oldTrade = this.activeTrades[index];
+        this.activeTrades[index] = { 
+          ...oldTrade, 
+          ...update,
+          tpPrice: update.tpPrice != null ? update.tpPrice : oldTrade.tpPrice,
+          slPrice: update.slPrice != null ? update.slPrice : oldTrade.slPrice
+        };
         // Trigger CD by reassigning the array (immutable pattern)
         this.activeTrades = [...this.activeTrades];
       }
@@ -373,6 +383,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         });
       }
     });
+  }
+
+  openTpSlModal(trade: SimulatedTradeDto) {
+    this.selectedTradeForModal = trade;
+    this.showTpSlModal = true;
   }
 
   private processInstitutionalAlert(alert: any) {

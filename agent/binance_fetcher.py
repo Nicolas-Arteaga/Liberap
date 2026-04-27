@@ -147,11 +147,12 @@ class BinanceFetcher:
     def get_klines_for_nexus(self, symbol: str, interval: str = "15m", limit: int = 50) -> list:
         """
         Obtiene velas OHLCV para alimentar a Nexus-15.
-        1. Primero consulta el historial completo del WS server local (SIN rate limit).
-        2. Solo usa Binance REST si el WS no esta disponible.
+        1. Si WS server esta up: usa historial del cache local (SIN rate limit).
+           Si el simbolo no tiene historial todavia (seed fallido), devuelve []
+           para saltear ese simbolo. NUNCA cae a REST mientras WS esta up.
+        2. Solo usa REST si el WS server esta completamente caido.
         """
         if self._is_ws_server_up():
-            # Pedir el historial completo al servidor local
             try:
                 r = self.session.get(
                     f"{WS_SERVER_URL}/market/candles/{symbol}",
@@ -159,7 +160,6 @@ class BinanceFetcher:
                 )
                 if r.status_code == 200:
                     candles = r.json()
-                    # Devolver las ultimas `limit` velas en el formato de Nexus-15
                     return [{
                         "timestamp": c["timestamp"],
                         "open":   float(c["open"]),
@@ -168,12 +168,18 @@ class BinanceFetcher:
                         "close":  float(c["close"]),
                         "volume": float(c["volume"])
                     } for c in candles[-limit:]]
+                else:
+                    # 404 = seed fallo para este simbolo, WS aun no tiene historial.
+                    # Saltear silenciosamente — NO ir a REST (evita el ban).
+                    logger.debug(f"[WS] {symbol} sin historial todavia (HTTP {r.status_code}). Saltando.")
+                    return []
             except Exception as e:
                 self.ws_available = False
                 logger.warning(f"[WS] Error consultando historial para {symbol}: {e}")
+                return []
 
-        # Fallback: REST de Binance
-        logger.warning(f"[REST] Usando fallback REST para {symbol} (WS no disponible)")
+        # WS completamente caido: usar REST de Binance como ultimo recurso
+        logger.warning(f"[REST] WS server caido. Usando REST para {symbol}.")
         return self._fetch_klines_rest(symbol, interval, limit)
 
     def _fetch_klines_rest(self, symbol: str, interval: str, limit: int) -> list:

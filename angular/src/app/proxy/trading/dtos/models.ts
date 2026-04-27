@@ -47,6 +47,8 @@ export interface OpenTradeInputDto {
   side?: SignalDirection;
   amount: number;
   leverage: number;
+  tpPrice?: number;
+  slPrice?: number;
   tradingSignalId?: string;
 }
 
@@ -95,6 +97,8 @@ export interface SimulatedTradeDto extends EntityDto<string> {
   status?: TradeStatus;
   closePrice?: number;
   realizedPnl?: number;
+  tpPrice?: number;
+  slPrice?: number;
   entryFee: number;
   exitFee: number;
   totalFundingPaid: number;
@@ -131,6 +135,11 @@ export interface TradingSignalDto extends EntityDto<string> {
   durationMinutes?: number;
   equityAfter?: number;
   score?: number;
+}
+
+export interface UpdateTpSlInputDto {
+  tpPrice?: number;
+  slPrice?: number;
 }
 
 export interface VergeAlertDto {

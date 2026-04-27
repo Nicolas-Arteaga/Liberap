@@ -1,0 +1,44 @@
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 2000;
+}
+
+.tpsl-modal {
+  background: #1e2329;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  animation: slideUp 0.3s ease-out;
+}
+
+.input-group-binance {
+  background: #2b3139;
+  border: 1px solid #474d57;
+  transition: border-color 0.2s;
+  
+  &:focus-within {
+    border-color: #f0b90b;
+  }
+}
+
+.text-white-30 {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.text-xxs {
+  font-size: 9px;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.hover-text-white:hover {
+  color: white !important;
+}

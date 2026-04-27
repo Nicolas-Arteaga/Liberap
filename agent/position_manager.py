@@ -30,8 +30,10 @@ class PositionManager:
             "symbol": position_data["symbol"],
             "side": position_data["side"],
             "amount": position_data["margin"], 
-            "leverage": position_data["leverage"]
-            # "tradingSignalId": None # omitted as optional
+            "leverage": position_data["leverage"],
+            "tpPrice": position_data.get("tp_price"),
+            "slPrice": position_data.get("sl_price"),
+            "tradingSignalId": position_data.get("tradingSignalId")
         }
         
         try:
@@ -75,6 +77,25 @@ class PositionManager:
                 
         except Exception as e:
             logger.error(f" Connection error while closing trade {trade_id}: {e}")
+            return False
+
+    def update_tp_sl(self, trade_id: str, tp_sl_data: dict) -> bool:
+        """
+        Updates TP/SL for an existing trade in the backend.
+        """
+        headers = self.auth_manager.get_auth_headers()
+        if not headers:
+            return False
+
+        url = f"{self.base_url}/api/app/simulated-trade/tp-sl/{trade_id}"
+        try:
+            logger.info(f" Updating TP/SL for ID {trade_id}: {tp_sl_data}")
+            response = requests.put(url, json=tp_sl_data, headers=headers, verify=False, timeout=30)
+            if response.status_code not in [200, 204]:
+                logger.error(f" Backend rejected TP/SL update. Status: {response.status_code}, Body: {response.text}")
+            return response.status_code == 200 or response.status_code == 204
+        except Exception as e:
+            logger.error(f" Connection error while updating TP/SL: {e}")
             return False
 
     def get_active_trades(self) -> list:

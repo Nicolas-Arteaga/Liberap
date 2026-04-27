@@ -22,6 +22,8 @@ public class SimulatedTradeDto : EntityDto<Guid>
     public TradeStatus Status { get; set; }
     public decimal? ClosePrice { get; set; }
     public decimal? RealizedPnl { get; set; }
+    public decimal? TpPrice { get; set; }
+    public decimal? SlPrice { get; set; }
     public decimal EntryFee { get; set; }
     public decimal ExitFee { get; set; }
     public decimal TotalFundingPaid { get; set; }
@@ -36,6 +38,8 @@ public class OpenTradeInputDto
     public SignalDirection Side { get; set; }
     public decimal Amount { get; set; } // In USDT
     public int Leverage { get; set; }
+    public decimal? TpPrice { get; set; }
+    public decimal? SlPrice { get; set; }
     public Guid? TradingSignalId { get; set; }
 }
 
@@ -57,4 +61,10 @@ public class EquityPointDto
 {
     public DateTime Timestamp { get; set; }
     public decimal Balance { get; set; }
+}
+
+public class UpdateTpSlInputDto
+{
+    public decimal? TpPrice { get; set; }
+    public decimal? SlPrice { get; set; }
 }

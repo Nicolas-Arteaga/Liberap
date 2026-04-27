@@ -61,7 +61,14 @@ public class BotSyncJob : BackgroundService
         var botRepo = scope.ServiceProvider.GetRequiredService<IRepository<TradingBot, Guid>>();
         var freqtradeService = scope.ServiceProvider.GetRequiredService<IFreqtradeAppService>();
         var uowManager = scope.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
+        var principalAccessor = scope.ServiceProvider.GetRequiredService<Volo.Abp.Security.Claims.ICurrentPrincipalAccessor>();
 
+        // Simular un usuario autenticado para el background job (evita AbpAuthorizationException)
+        var claims = new[] { new System.Security.Claims.Claim(Volo.Abp.Security.Claims.AbpClaimTypes.UserId, Guid.Empty.ToString()) };
+        var identity = new System.Security.Claims.ClaimsIdentity(claims, "BackgroundJob");
+        var principal = new System.Security.Claims.ClaimsPrincipal(identity);
+
+        using var principalScope = principalAccessor.Change(principal);
         using var uow = uowManager.Begin();
         
         // 1. Obtener bots activos de la DB

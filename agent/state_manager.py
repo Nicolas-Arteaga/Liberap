@@ -98,3 +98,16 @@ class StateManager:
 
     def get_position_count(self) -> int:
         return len(self.get_open_positions())
+
+    def update_position_tpsl(self, trade_id: str, tp_price: float, sl_price: float):
+        """Updates TP/SL for an existing position in the local state."""
+        positions = self.get_open_positions()
+        updated = False
+        for p in positions:
+            if p.get("trade_id") == trade_id:
+                p["tp_price"] = tp_price
+                p["sl_price"] = sl_price
+                updated = True
+                break
+        if updated:
+            self._save_json(self.positions_file, positions)
