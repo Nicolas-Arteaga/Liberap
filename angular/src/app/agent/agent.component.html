@@ -1,0 +1,344 @@
+<div class="agent-dashboard">
+  
+  <!-- TOP ROW -->
+  <div class="grid-row">
+    <!-- Control Panel -->
+    <div class="col-3 glass-card control-panel">
+      <div class="card-header">
+        <h3><ion-icon name="options-outline"></ion-icon> Control del Agente</h3>
+        <ion-icon name="close" style="cursor:pointer; color: #64748b;"></ion-icon>
+      </div>
+      
+      <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.25rem;">ESTADO ACTUAL</div>
+      <div class="status-indicator">
+        <span class="dot"></span> {{ agentStatus }}
+      </div>
+
+      <div class="uptime-grid">
+        <div>
+          <div class="stat-label">Uptime</div>
+          <div class="stat-value font-mono">{{ uptime }}</div>
+        </div>
+        <div>
+          <div class="stat-label">Iniciado</div>
+          <div class="stat-value" style="font-size: 0.9rem;">{{ startTime }}</div>
+        </div>
+      </div>
+
+      <div class="action-buttons">
+        <button class="btn-start"><ion-icon name="play"></ion-icon> INICIAR AGENTE</button>
+        <button class="btn-stop"><ion-icon name="square"></ion-icon> DETENER AGENTE</button>
+        <button class="btn-restart"><ion-icon name="refresh"></ion-icon> REINICIAR</button>
+      </div>
+
+      <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.5rem;">SERVICIOS</div>
+      <div class="services-list">
+        <div class="service-item" *ngFor="let s of services">
+          <span class="s-name"><ion-icon name="cube-outline"></ion-icon> {{ s.name }}</span>
+          <span class="s-status" [ngClass]="s.statusClass">{{ s.status }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Terminal -->
+    <div class="col-6 glass-card">
+      <div class="card-header">
+        <h3><ion-icon name="terminal-outline"></ion-icon> Terminal del Agente</h3>
+        <button style="background:transparent; border:1px solid rgba(255,255,255,0.1); color:#cbd5e1; border-radius:4px; font-size:0.7rem; padding:0.2rem 0.5rem; cursor:pointer;">
+          <ion-icon name="trash-outline"></ion-icon> Limpiar
+        </button>
+      </div>
+      
+      <div class="terminal font-mono">
+        <div class="log-line" *ngFor="let log of terminalLogs" [class.highlight]="log.highlight">
+          <span class="log-time">[{{ log.time }}]</span>
+          <span class="log-text">{{ log.text }}</span>
+        </div>
+        <div class="log-line">
+          <span class="log-time">[{{ terminalLogs[terminalLogs.length-1].time }}]</span>
+          <span class="log-text" style="color: #10b981;">AGENTE EJECUTÁNDOSE... <span class="cursor"></span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Performance -->
+    <div class="col-3 glass-card">
+      <div class="card-header">
+        <h3><ion-icon name="stats-chart-outline"></ion-icon> Rendimiento General</h3>
+        <span style="font-size:0.75rem; color:#64748b;">Hoy <ion-icon name="chevron-down-outline"></ion-icon></span>
+      </div>
+
+      <div class="perf-stats">
+        <div class="stat-box">
+          <div class="s-label">Balance Actual</div>
+          <div class="s-val">{{ balance }} <span style="font-size:0.8rem; font-weight:normal; color:#94a3b8;">USDT</span></div>
+          <div class="s-sub text-success">+4.32%</div>
+        </div>
+        <div class="stat-box">
+          <div class="s-label">Win Rate</div>
+          <div class="s-val">{{ winRate }}</div>
+          <div class="s-sub text-success">+12.4%</div>
+        </div>
+        <div class="stat-box">
+          <div class="s-label">Trades</div>
+          <div class="s-val">{{ trades }}</div>
+          <div class="s-sub text-success">+8</div>
+        </div>
+        <div class="stat-box">
+          <div class="s-label">PnL Total</div>
+          <div class="s-val text-success">{{ pnlTotal }} <span style="font-size:0.8rem; font-weight:normal;">USDT</span></div>
+          <div class="s-sub text-success">+4.47%</div>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#64748b; margin-bottom:0.5rem;">
+        <span>EQUITY CURVE</span>
+        <span>PnL Acumulado <ion-icon name="chevron-down-outline"></ion-icon></span>
+      </div>
+      <div class="equity-curve-placeholder"></div>
+    </div>
+  </div>
+
+  <!-- MIDDLE ROW: Strategies -->
+  <div class="grid-row">
+    <!-- SCAR -->
+    <div class="col-3 glass-card strategy-card border-purple">
+      <div class="strat-title">¿SON RENTABLES LAS SEÑALES DE SCAR?</div>
+      <div class="strat-grid">
+        <div class="sg-item">
+          <div class="sg-label">WIN RATE</div>
+          <div class="sg-val">{{ scarStats.winRate }}</div>
+        </div>
+        <div class="sg-item">
+          <div class="sg-label">PnL</div>
+          <div class="sg-val text-success">{{ scarStats.pnl }} USDT</div>
+        </div>
+        <div class="sg-item">
+          <div class="sg-label">TRADES</div>
+          <div class="sg-val">{{ scarStats.trades }}</div>
+        </div>
+        <div class="sg-item" style="display:flex; gap:1rem;">
+          <div>
+            <div class="sg-label">PROM. WIN</div>
+            <div class="sg-sub text-success">{{ scarStats.promWin }}</div>
+          </div>
+          <div>
+            <div class="sg-label">PROM. LOSS</div>
+            <div class="sg-sub text-danger">{{ scarStats.promLoss }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="equity-curve-placeholder" style="height: 60px; border-bottom-color:#a855f7; background:linear-gradient(180deg, rgba(168,85,247,0.1) 0%, rgba(168,85,247,0) 100%);"></div>
+    </div>
+
+    <!-- Nexus-15 -->
+    <div class="col-3 glass-card strategy-card border-blue">
+      <div class="strat-title">¿NEXUS-15 SOLO ES MEJOR?</div>
+      <div class="strat-grid">
+        <div class="sg-item">
+          <div class="sg-label">WIN RATE</div>
+          <div class="sg-val">{{ nexusStats.winRate }}</div>
+        </div>
+        <div class="sg-item">
+          <div class="sg-label">PnL</div>
+          <div class="sg-val text-success">{{ nexusStats.pnl }} USDT</div>
+        </div>
+        <div class="sg-item">
+          <div class="sg-label">TRADES</div>
+          <div class="sg-val">{{ nexusStats.trades }}</div>
+        </div>
+        <div class="sg-item" style="display:flex; gap:1rem;">
+          <div>
+            <div class="sg-label">PROM. WIN</div>
+            <div class="sg-sub text-success">{{ nexusStats.promWin }}</div>
+          </div>
+          <div>
+            <div class="sg-label">PROM. LOSS</div>
+            <div class="sg-sub text-danger">{{ nexusStats.promLoss }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="equity-curve-placeholder" style="height: 60px; border-bottom-color:#3b82f6; background:linear-gradient(180deg, rgba(59,130,246,0.1) 0%, rgba(59,130,246,0) 100%);"></div>
+    </div>
+
+    <!-- Confluence -->
+    <div class="col-3 glass-card strategy-card border-green" style="box-shadow: 0 0 15px rgba(16,185,129,0.1);">
+      <div class="strat-title" style="display:flex; justify-content:space-between;">
+        <span>¿CONFLUENCIA (AMBOS) ES MEJOR?</span>
+        <span style="background:rgba(16,185,129,0.2); color:#10b981; padding:2px 6px; border-radius:4px; font-size:0.6rem;">TOP PERFORMER</span>
+      </div>
+      <div class="strat-grid">
+        <div class="sg-item">
+          <div class="sg-label">WIN RATE</div>
+          <div class="sg-val">{{ confluenceStats.winRate }} <ion-icon name="trophy" style="color:#f59e0b; font-size:1rem;"></ion-icon></div>
+        </div>
+        <div class="sg-item">
+          <div class="sg-label">PnL</div>
+          <div class="sg-val text-success">{{ confluenceStats.pnl }} USDT</div>
+        </div>
+        <div class="sg-item">
+          <div class="sg-label">TRADES</div>
+          <div class="sg-val">{{ confluenceStats.trades }}</div>
+        </div>
+        <div class="sg-item" style="display:flex; gap:1rem;">
+          <div>
+            <div class="sg-label">PROM. WIN</div>
+            <div class="sg-sub text-success">{{ confluenceStats.promWin }}</div>
+          </div>
+          <div>
+            <div class="sg-label">PROM. LOSS</div>
+            <div class="sg-sub text-danger">{{ confluenceStats.promLoss }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="equity-curve-placeholder" style="height: 60px;"></div>
+    </div>
+
+    <!-- Dynamic TP/SL -->
+    <div class="col-3 glass-card strategy-card border-yellow">
+      <div class="strat-title">¿TP/SL DINÁMICO FUNCIONA?</div>
+      <div class="strat-grid">
+        <div class="sg-item">
+          <div class="sg-label">EFECTIVIDAD</div>
+          <div class="sg-val">{{ tpslStats.effectiveness }}</div>
+        </div>
+        <div class="sg-item">
+          <div class="sg-label">TRADES</div>
+          <div class="sg-val">{{ tpslStats.trades }}</div>
+        </div>
+        <div class="sg-item">
+          <div class="sg-label">TP HIT RATE</div>
+          <div class="sg-sub text-success">{{ tpslStats.tpRate }}</div>
+        </div>
+        <div class="sg-item" style="display:flex; gap:1rem;">
+          <div>
+            <div class="sg-label">SL HIT RATE</div>
+            <div class="sg-sub text-danger">{{ tpslStats.slRate }}</div>
+          </div>
+          <div>
+            <div class="sg-label">R:R PROMEDIO</div>
+            <div class="sg-sub text-info">{{ tpslStats.rr }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="equity-curve-placeholder" style="height: 60px; border-bottom-color:#f59e0b; background:linear-gradient(180deg, rgba(245,158,11,0.1) 0%, rgba(245,158,11,0) 100%);"></div>
+    </div>
+  </div>
+
+  <!-- BOTTOM ROW: Tables -->
+  <div class="grid-row">
+    <!-- Operations Table -->
+    <div class="col-6 glass-card" style="flex: 2.5 1 800px;">
+      <div class="card-header">
+        <h3><ion-icon name="list-outline"></ion-icon> Operaciones Recientes</h3>
+      </div>
+      <div style="overflow-x: auto;">
+        <table class="v-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>SÍMBOLO</th>
+              <th>DIRECCIÓN</th>
+              <th>ENTRADA</th>
+              <th>SALIDA</th>
+              <th>TP/SL</th>
+              <th>RESULTADO</th>
+              <th>ESTRATEGIA</th>
+              <th>GRUPO PREDICCIÓN</th>
+              <th>CONFLUENCIA</th>
+              <th>FECHA</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let op of operations">
+              <td style="color:#64748b;">{{ op.id }}</td>
+              <td class="fw-bold">{{ op.symbol }}</td>
+              <td [ngClass]="op.direction === 'LONG' ? 'badge-long' : 'badge-short'">{{ op.direction }}</td>
+              <td>{{ op.entry }}</td>
+              <td>{{ op.exit }}</td>
+              <td><span [ngClass]="op.resultType === 'TP' ? 'badge-tp' : 'badge-sl'">{{ op.resultType }}</span></td>
+              <td [ngClass]="op.resultVal.includes('+') ? 'text-success' : 'text-danger'">{{ op.resultVal }}</td>
+              <td>{{ op.strategy }}</td>
+              <td><span style="font-size:0.75rem; color:#94a3b8;">{{ op.group }}</span></td>
+              <td>
+                <div class="progress-bar">
+                  <div class="fill" [style.width.%]="op.conf" [style.backgroundColor]="op.conf > 70 ? '#10b981' : '#f59e0b'"></div>
+                </div>
+                <span style="font-size:0.75rem; color:#cbd5e1;">{{ op.conf }}%</span>
+              </td>
+              <td style="font-size:0.75rem; color:#64748b;">{{ op.date }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:1rem; display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; color:#64748b;">
+        <span>Mostrando 5 de 47 operaciones</span>
+        <button style="background:transparent; border:1px solid rgba(255,255,255,0.1); color:#cbd5e1; padding:0.4rem 1rem; border-radius:4px; cursor:pointer;">VER HISTORIAL COMPLETO</button>
+      </div>
+    </div>
+
+    <!-- Op Detail / Top Symbols -->
+    <div class="col-3" style="display: flex; flex-direction: column; gap: 1rem;">
+      <!-- Top Symbols -->
+      <div class="glass-card" style="padding-bottom:0.5rem;">
+        <div class="card-header" style="margin-bottom:0.5rem;">
+          <h3 style="font-size:0.75rem;"><ion-icon name="star-outline"></ion-icon> Mejores Símbolos</h3>
+        </div>
+        <table class="v-table" style="font-size:0.75rem;">
+          <thead>
+            <tr>
+              <th>SÍMBOLO</th>
+              <th>WIN RATE</th>
+              <th>PnL</th>
+              <th>TRADES</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let s of topSymbols">
+              <td class="fw-bold">{{ s.symbol }}</td>
+              <td class="text-success">{{ s.winRate }}</td>
+              <td class="text-success">{{ s.pnl }}</td>
+              <td>{{ s.trades }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Op Detail -->
+      <div class="glass-card op-details" style="flex:1;">
+        <div class="card-header">
+          <h3><ion-icon name="information-circle-outline"></ion-icon> Detalle de Operación {{ operations[0].id }}</h3>
+        </div>
+        
+        <div class="op-header">
+          <ion-icon name="ellipse" class="text-success" style="font-size:0.6rem;"></ion-icon>
+          <h4>{{ operations[0].symbol }}</h4>
+          <span style="margin-left:auto;" class="dir text-success">{{ operations[0].direction }}</span>
+        </div>
+
+        <div class="detail-grid" style="margin-bottom:1.5rem;">
+          <div>
+            <div class="dg-row"><span class="lbl">Precio Entrada</span><span class="val">{{ operations[0].entry }}</span></div>
+            <div class="dg-row"><span class="lbl">Precio Salida</span><span class="val">{{ operations[0].exit }}</span></div>
+            <div class="dg-row"><span class="lbl">Cantidad</span><span class="val">15.23 SOL</span></div>
+            <div class="dg-row"><span class="lbl">PnL</span><span class="val text-success">{{ operations[0].resultVal }} (+2.63 USDT)</span></div>
+          </div>
+          <div>
+            <div class="dg-row"><span class="lbl">Estrategia</span><span class="val">{{ operations[0].strategy }}</span></div>
+            <div class="dg-row"><span class="lbl">Grupo Predicción</span><span class="val">Momentum Burst</span></div>
+            <div class="dg-row"><span class="lbl">NEXUS-15 Conf.</span><span class="val" style="color:#3b82f6;">75%</span></div>
+            <div class="dg-row"><span class="lbl">SCAR Conf.</span><span class="val" style="color:#a855f7;">68%</span></div>
+            <div class="dg-row"><span class="lbl" style="color:#fff;">Confluencia Total</span><span class="val text-success">75%</span></div>
+            <div class="dg-row" style="margin-top:0.5rem;"><span class="lbl" style="font-size:0.7rem;">Fecha/Hora</span><span class="val" style="font-size:0.75rem;">{{ operations[0].date }}</span></div>
+          </div>
+        </div>
+
+        <div class="reason-box">
+          <div class="rb-title">Motivo Entrada</div>
+          <div class="rb-text">Señal de momentum alcista confirmada en marco 15m. Ruptura de resistencia local en 150.50 con volumen creciente. Flujo de capital de ballenas positivo (+2.4M). SCAR detecta debilidad vendedora.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>

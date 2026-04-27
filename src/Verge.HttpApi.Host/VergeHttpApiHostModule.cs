@@ -45,7 +45,7 @@ using Volo.Abp.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
 using Volo.Abp.AspNetCore.SignalR;
 using StackExchange.Redis;
-using Verge.BackgroundJobs;
+
 
 namespace Verge;
 
@@ -146,8 +146,6 @@ public class VergeHttpApiHostModule : AbpModule
         context.Services.AddHostedService<MarketScannerService>();
         context.Services.AddHostedService<LiveSignalCollectorJob>();
         context.Services.AddHostedService<SimulationMarkPriceWorker>();
-        context.Services.AddHostedService<BotDataPublisherService>();
-        context.Services.AddHostedService<BotSyncJob>();
         context.Services.AddHostedService<Verge.Trading.Nexus15.Nexus15ScannerJob>();
         context.Services.AddScoped<Verge.Trading.Nexus15.IPythonNexus15Service, Verge.Trading.Nexus15.PythonNexus15Service>();
         context.Services.AddScoped<Verge.Trading.Scar.IPythonScarService, Verge.Trading.Scar.PythonScarService>();
@@ -164,12 +162,6 @@ public class VergeHttpApiHostModule : AbpModule
 
         // Execution Service
         context.Services.AddSingleton<BinanceFuturesExecutionService>();
-
-        context.Services.AddHttpClient("Freqtrade", client =>
-        {
-            var baseUrl = configuration["RemoteServices:Freqtrade:BaseUrl"] ?? "http://localhost:8080";
-            client.BaseAddress = new Uri(baseUrl);
-        });
 
         // Python AI Service HTTP Client
         context.Services.AddHttpClient<PythonIntegrationService>(client =>

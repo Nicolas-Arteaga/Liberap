@@ -20,8 +20,8 @@ export const APP_ROUTES: Routes = [
         loadComponent: () => import('./home/home.component').then(c => c.HomeComponent),
       },
       {
-        path: 'signals',
-        loadComponent: () => import('./signals/bot.component').then(c => c.BotComponent),
+        path: 'agent',
+        loadComponent: () => import('./agent/agent.component').then(c => c.AgentComponent),
       },
       {
         path: 'profile',

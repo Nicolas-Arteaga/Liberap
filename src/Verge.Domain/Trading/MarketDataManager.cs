@@ -122,10 +122,8 @@ public class MarketDataManager : DomainService
     {
         try
         {
-            // Normalize symbol: handle Freqtrade format (e.g. "SIREN/USDT:USDT" → "SIRENUSDT")
-            // Strip the ":USDT" settle suffix first, then remove / and -
-            var normalized = symbol.Contains(':') ? symbol.Split(':')[0] : symbol;
-            var cleanSymbol = normalized.ToUpper().Replace("/", "").Replace("-", "").Trim();
+            // Normalize symbol
+            var cleanSymbol = symbol.ToUpper().Replace("/", "").Replace("-", "").Trim();
 
             var binanceInterval = interval.ToLower() switch
             {

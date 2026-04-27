@@ -142,15 +142,5 @@ public static class TradingModelBuilderExtensions
             b.Property(x => x.ActualPnlPct).HasColumnType("decimal(18,8)");
         });
 
-        builder.Entity<TradingBot>(b =>
-        {
-            b.ToTable("TradingBots");
-            b.ConfigureByConvention();
-            b.Property(x => x.Symbol).IsRequired().HasMaxLength(20);
-            b.Property(x => x.Strategy).IsRequired().HasMaxLength(128);
-            b.Property(x => x.Timeframe).IsRequired().HasMaxLength(10);
-            b.HasIndex(x => x.Symbol);
-            b.HasIndex(x => x.IsActive);
-        });
     }
 }
