@@ -59,8 +59,8 @@ export class TradingPanelComponent implements OnInit {
       side: side,
       amount: this.amount,
       leverage: this.leverage,
-      tpPrice: this.showTpSl ? this.tpPrice : null,
-      slPrice: this.showTpSl ? this.slPrice : null
+      tpPrice: this.showTpSl ? (this.tpPrice ?? undefined) : undefined,
+      slPrice: this.showTpSl ? (this.slPrice ?? undefined) : undefined
     }).subscribe({
       next: (res) => {
         console.log('Trade success:', res);

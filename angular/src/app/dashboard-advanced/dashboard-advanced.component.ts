@@ -9,7 +9,6 @@ import { LabelComponent } from 'src/shared/components/label/label.component';
 import { ToggleComponent } from 'src/shared/components/toggle/toggle.component';
 import { IonIcon } from '@ionic/angular/standalone';
 import { IconService } from 'src/shared/services/icon.service';
-import { FreqtradeService } from '../proxy/freqtrade/freqtrade.service';
 import { ToasterService } from '@abp/ng.theme.shared';
 
 interface MarketMetric {
@@ -47,7 +46,6 @@ export class DashboardAdvancedComponent implements AfterViewInit, OnDestroy {
   private iconService = inject(IconService);
   private router = inject(Router);
 
-  private freqtradeService = inject(FreqtradeService);
   private toaster = inject(ToasterService);
   isForcingTrade = false;
 
@@ -122,16 +120,7 @@ export class DashboardAdvancedComponent implements AfterViewInit, OnDestroy {
   }
 
   fetchRealStatus() {
-    this.freqtradeService.getStatus().subscribe({
-      next: (status) => {
-        if (status.activePairs && status.activePairs.length > 0) {
-          const firstPair = status.activePairs[0];
-          this.activeTrade.crypto = firstPair;
-          this.selectedChart = firstPair;
-        }
-      },
-      error: () => {}
-    });
+    // Simulado
   }
 
   ngOnDestroy() {
@@ -178,22 +167,14 @@ export class DashboardAdvancedComponent implements AfterViewInit, OnDestroy {
 
   onForceEnter(side: string) {
     const pair = this.selectedChart || 'BTC/USDT';
-    const stake = this.activeTrade.invested || 100;
     
     this.isForcingTrade = true;
-    this.toaster.info(`Enviando orden Force ${side} para ${pair}...`);
+    this.toaster.info(`Enviando orden simulada Force ${side} para ${pair}...`);
 
-    this.freqtradeService.forceEnter(pair, side, stake, 10).subscribe({
-      next: () => {
+    setTimeout(() => {
         this.toaster.success(`Trade ${side} abierto exitosamente en ${pair}`, 'Ejecución Correcta');
         this.isForcingTrade = false;
-      },
-      error: (err: any) => {
-        this.toaster.error('Error al forzar orden.', 'Binance Reject');
-        this.isForcingTrade = false;
-        console.error(err);
-      }
-    });
+    }, 1000);
   }
 
   onAddAlert() {

@@ -19,6 +19,7 @@ using Verge.Trading;
 using Verge.Trading.BackgroundJobs;
 using Microsoft.AspNetCore.SignalR;
 using Verge.HealthChecks;
+using Verge.Agent;
 using Microsoft.OpenApi.Models;
 using Volo.Abp;
 using Volo.Abp.Studio;

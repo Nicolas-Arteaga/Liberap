@@ -5,13 +5,16 @@
     <!-- Control Panel -->
     <div class="col-3 glass-card control-panel">
       <div class="card-header">
-        <h3><ion-icon name="options-outline"></ion-icon> Control del Agente</h3>
+        <h3><ion-icon name="options-outline"></ion-icon> 
+          {{ systemState === 'STOPPED' ? 'INICIAR SERVICIO PARA EL AGENTE' : (systemState === 'STARTING_SERVER' ? 'INICIANDO MARKET WS' : 'CONTROL DEL AGENTE') }}
+        </h3>
         <ion-icon name="close" style="cursor:pointer; color: #64748b;"></ion-icon>
       </div>
       
       <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.25rem;">ESTADO ACTUAL</div>
       <div class="status-indicator">
-        <span class="dot"></span> {{ agentStatus }}
+        <span class="dot" [style.backgroundColor]="agentStatusColor"></span> 
+        <span [style.color]="agentStatusColor">{{ agentStatusText }}</span>
       </div>
 
       <div class="uptime-grid">
@@ -26,16 +29,35 @@
       </div>
 
       <div class="action-buttons">
-        <button class="btn-start"><ion-icon name="play"></ion-icon> INICIAR AGENTE</button>
-        <button class="btn-stop"><ion-icon name="square"></ion-icon> DETENER AGENTE</button>
-        <button class="btn-restart"><ion-icon name="refresh"></ion-icon> REINICIAR</button>
+        <!-- STOPPED -->
+        <button *ngIf="systemState === 'STOPPED'" class="btn-start" style="width: 100%; justify-content: center;" (click)="startServer()">
+          <ion-icon name="power"></ion-icon> INICIAR MARKET WS
+        </button>
+
+        <!-- STARTING -->
+        <button *ngIf="systemState === 'STARTING_SERVER'" class="btn-start" style="width: 100%; justify-content: center; opacity: 0.7; cursor: not-allowed;" disabled>
+          <ion-icon name="sync" class="spin"></ion-icon> INICIANDO...
+        </button>
+
+        <!-- SERVER READY -->
+        <button *ngIf="systemState === 'SERVER_READY'" class="btn-start" style="flex: 2;" (click)="startAgent()">
+          <ion-icon name="play"></ion-icon> INICIAR AGENTE
+        </button>
+        <button *ngIf="systemState === 'SERVER_READY'" class="btn-stop" style="flex: 1;" (click)="stopServer()">
+          <ion-icon name="square"></ion-icon> DETENER SERVER
+        </button>
+
+        <!-- AGENT RUNNING -->
+        <button *ngIf="systemState === 'AGENT_RUNNING'" class="btn-stop" style="flex: 1; justify-content: center;" (click)="stopAgent()">
+          <ion-icon name="square"></ion-icon> DETENER AGENTE
+        </button>
       </div>
 
       <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.5rem;">SERVICIOS</div>
       <div class="services-list">
         <div class="service-item" *ngFor="let s of services">
           <span class="s-name"><ion-icon name="cube-outline"></ion-icon> {{ s.name }}</span>
-          <span class="s-status" [ngClass]="s.statusClass">{{ s.status }}</span>
+          <span class="s-status" [ngClass]="getServiceStatus(s.key).class">{{ getServiceStatus(s.key).text }}</span>
         </div>
       </div>
     </div>
@@ -44,7 +66,7 @@
     <div class="col-6 glass-card">
       <div class="card-header">
         <h3><ion-icon name="terminal-outline"></ion-icon> Terminal del Agente</h3>
-        <button style="background:transparent; border:1px solid rgba(255,255,255,0.1); color:#cbd5e1; border-radius:4px; font-size:0.7rem; padding:0.2rem 0.5rem; cursor:pointer;">
+        <button (click)="clearLogs()" style="background:transparent; border:1px solid rgba(255,255,255,0.1); color:#cbd5e1; border-radius:4px; font-size:0.7rem; padding:0.2rem 0.5rem; cursor:pointer;">
           <ion-icon name="trash-outline"></ion-icon> Limpiar
         </button>
       </div>
@@ -52,11 +74,10 @@
       <div class="terminal font-mono">
         <div class="log-line" *ngFor="let log of terminalLogs" [class.highlight]="log.highlight">
           <span class="log-time">[{{ log.time }}]</span>
-          <span class="log-text">{{ log.text }}</span>
+          <span class="log-text" [style.color]="log.color || '#cbd5e1'">{{ log.text }}</span>
         </div>
-        <div class="log-line">
-          <span class="log-time">[{{ terminalLogs[terminalLogs.length-1].time }}]</span>
-          <span class="log-text" style="color: #10b981;">AGENTE EJECUTÁNDOSE... <span class="cursor"></span></span>
+        <div class="log-line" *ngIf="systemState === 'AGENT_RUNNING' || systemState === 'STARTING_SERVER'">
+          <span class="log-text" style="color: #10b981; margin-left: 5.5rem;"><span class="cursor"></span></span>
         </div>
       </div>
     </div>

@@ -70,6 +70,9 @@ class BinanceFetcher:
             r = self.session.get(f"{WS_SERVER_URL}/market/candle/{symbol}", timeout=1)
             if r.status_code == 200:
                 return r.json()
+            elif r.status_code == 404:
+                # El servidor esta up pero no trackea este simbolo (no esta en watchlist)
+                return {"error": "not_found"}
         except Exception:
             self.ws_available = False  # Marcar como caido para forzar re-chequeo
         return None
@@ -109,32 +112,35 @@ class BinanceFetcher:
     def get_current_price(self, symbol: str) -> float:
         """
         Obtiene el precio actual del simbolo.
-        - Si WS server esta activo: usa dato en tiempo real. Si el simbolo
-          todavia no esta cacheado (seed fallido), espera hasta 5s y devuelve 0
-          (el agente saltea ese simbolo en este ciclo, sin tocar REST).
-        - Si WS server no esta disponible: usa REST de Binance como fallback.
+        - Si WS server esta activo: usa dato en tiempo real.
+        - Si el simbolo no esta en WS (404) o el WS falla despues de 5s: cae a REST.
         """
         if self._is_ws_server_up():
-            # Intentar obtener del cache WS
-            candle = self._get_candle_from_ws(symbol)
-            if candle:
-                return float(candle.get("close", 0))
+            # 1. Intentar obtener del cache WS
+            res = self._get_candle_from_ws(symbol)
+            
+            # Caso Exito
+            if isinstance(res, dict) and "close" in res:
+                return float(res["close"])
 
-            # El simbolo no esta cacheado todavia (seed fallido, esperando WS)
-            # Esperar hasta 5s para que llegue el primer update
-            logger.debug(f"[WS] {symbol} no en cache. Esperando hasta 5s por dato en vivo...")
-            for _ in range(10):
-                time.sleep(0.5)
-                candle = self._get_candle_from_ws(symbol)
-                if candle:
-                    return float(candle.get("close", 0))
+            # Caso 404: No esta en watchlist. No esperar 5s, ir directo a REST.
+            if isinstance(res, dict) and res.get("error") == "not_found":
+                logger.debug(f"[WS] {symbol} no esta en watchlist del servidor. Usando REST.")
+            else:
+                # Caso Error/Timeout: Esperar hasta 5s por si esta conectando
+                logger.debug(f"[WS] {symbol} sin dato. Esperando hasta 5s...")
+                for _ in range(10):
+                    time.sleep(0.5)
+                    res = self._get_candle_from_ws(symbol)
+                    if isinstance(res, dict) and "close" in res:
+                        return float(res["close"])
+                    if isinstance(res, dict) and res.get("error") == "not_found":
+                        break # No va a aparecer, salir del loop
 
-            # Si en 5s no llego, saltear (no usar REST, el ban es peor)
-            logger.warning(f"[WS] {symbol} sin dato en vivo aun. Saltando este ciclo.")
-            return 0.0
+            # Si llegamos aca, el WS no sirvió. Fallback a REST (con cuidado).
+            logger.warning(f"[REST] Fallback para {symbol} (WS no tiene el dato)")
 
-        # WS no disponible: usar REST de Binance
-        logger.warning(f"[REST] Fallback REST para precio de {symbol}")
+        # REST de Binance
         url = f"{self.BINANCE_FAPI}/fapi/v1/premiumIndex"
         try:
             response = self._make_rest_request("GET", url, params={"symbol": symbol}, timeout=5)
@@ -148,9 +154,8 @@ class BinanceFetcher:
         """
         Obtiene velas OHLCV para alimentar a Nexus-15.
         1. Si WS server esta up: usa historial del cache local (SIN rate limit).
-           Si el simbolo no tiene historial todavia (seed fallido), devuelve []
-           para saltear ese simbolo. NUNCA cae a REST mientras WS esta up.
-        2. Solo usa REST si el WS server esta completamente caido.
+        2. Si el WS server no tiene el simbolo (404), cae a REST (con rate limit).
+        3. Solo usa REST masivo si el WS server esta completamente caido.
         """
         if self._is_ws_server_up():
             try:
@@ -168,18 +173,19 @@ class BinanceFetcher:
                         "close":  float(c["close"]),
                         "volume": float(c["volume"])
                     } for c in candles[-limit:]]
+                elif r.status_code == 404:
+                    # El servidor no trackea este simbolo. Usar REST.
+                    logger.debug(f"[WS] {symbol} no esta en cache. Usando REST para historial.")
                 else:
-                    # 404 = seed fallo para este simbolo, WS aun no tiene historial.
-                    # Saltear silenciosamente — NO ir a REST (evita el ban).
-                    logger.debug(f"[WS] {symbol} sin historial todavia (HTTP {r.status_code}). Saltando.")
+                    logger.warning(f"[WS] Error {r.status_code} para {symbol}. Saltando.")
                     return []
             except Exception as e:
                 self.ws_available = False
                 logger.warning(f"[WS] Error consultando historial para {symbol}: {e}")
                 return []
 
-        # WS completamente caido: usar REST de Binance como ultimo recurso
-        logger.warning(f"[REST] WS server caido. Usando REST para {symbol}.")
+        # Fallback a REST (por WS caido o por simbolo faltante)
+        logger.debug(f"[REST] Pidiendo klines para {symbol}...")
         return self._fetch_klines_rest(symbol, interval, limit)
 
     def _fetch_klines_rest(self, symbol: str, interval: str, limit: int) -> list:
