@@ -20,11 +20,12 @@ class ReportEngine:
             try:
                 with open(self.csv_file, mode='w', newline='') as file:
                     writer = csv.writer(file)
-                    # date, symbol, source, scar_score, nexus_confidence, confluence, direction, entry, tp, sl, exit_price, pnl_pct, result, duration_h
+                    # date, symbol, source, scar_score, nexus_confidence, confluence, direction, entry, tp, sl, exit_price, pnl_pct, result, duration_h, entry_reason, nexus_group, tier
                     writer.writerow([
                         "date", "symbol", "source", "scar_score", "nexus_confidence", 
                         "confluence", "direction", "entry", "tp", "sl", 
-                        "exit_price", "pnl_usd", "result", "duration_h"
+                        "exit_price", "pnl_usd", "result", "duration_h",
+                        "entry_reason", "nexus_group", "tier"
                     ])
             except Exception as e:
                 logger.error(f"Failed to create CSV file: {e}")
@@ -62,12 +63,17 @@ class ReportEngine:
                 opened_at = datetime.fromisoformat(opened_at_str)
                 duration_h = round((datetime.utcnow() - opened_at).total_seconds() / 3600.0, 1)
 
-            with open(self.csv_file, mode='a', newline='') as file:
+            entry_reason = local_pos_data.get("entry_reason", "")
+            nexus_group = local_pos_data.get("nexus_group", "")
+            tier = local_pos_data.get("tier", "N/A")
+
+            with open(self.csv_file, mode='a', newline='', encoding='utf-8') as file:
                 writer = csv.writer(file)
                 writer.writerow([
                     date_str, symbol, source, scar_score, nexus_conf,
                     confluence, direction, entry, tp, sl,
-                    exit_price, round(pnl_usd, 2), status_str, duration_h
+                    exit_price, round(pnl_usd, 2), status_str, duration_h,
+                    entry_reason, nexus_group, tier
                 ])
                 
             logger.info(f" Trade log saved to CSV for {symbol}. PnL: ${pnl_usd:.2f}")

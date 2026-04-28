@@ -1,208 +1,151 @@
 """
-BinanceFetcher - Market Data Provider
-======================================
-Prioridad de datos:
-  1. WebSocket Server local (http://localhost:8001) - SIN rate limits
-  2. Binance REST API - Fallback con proteccion anti-ban
+BinanceFetcher — Market Data Provider (Phase 2: Multi-Exchange)
+===============================================================
+Data priority (strict order, no exceptions):
+  1. SQLite KlineCache (live_prices table) — zero latency, zero exchange calls
+  2. Multi-Exchange REST chain (Binance → Bybit → OKX) — only when cache empty
 
-El WebSocket Server debe estar corriendo en una terminal separada:
-    python market_ws_server.py
+Changes from Phase 1:
+  - REST fallback now goes through MultiSourceFetcher instead of direct Binance-only calls.
+  - If Binance REST is banned, Bybit/OKX REST will be tried automatically.
+  - Circuit breaker state is tracked per exchange in circuit_breaker.py.
+  - The BinanceRateLimiter is still used for Binance-specific weight tracking.
+
+Rules:
+  - NEVER call any exchange REST directly from this file.
+  - Always use self._multi_fetcher for REST calls.
+  - The WS server writes to KlineCache continuously. This fetcher only reads from it.
+  - REST is used ONLY for on-demand history when cache has < 25 candles.
 """
 
-import requests
 import logging
 import time
+from typing import Optional
+
+from rate_limiter import get_limiter
+from kline_cache import get_cache
+from multi_source_fetcher import get_multi_fetcher
 
 logger = logging.getLogger("BinanceFetcher")
-
-WS_SERVER_URL = "http://localhost:8001"
 
 
 class BinanceFetcher:
     """
-    Fetches raw market data, prioritizing the local WebSocket cache server
-    to avoid Binance REST API rate limits.
+    Reads market data from:
+      1. KlineCache (SQLite) — primary, always checked first
+      2. Multi-exchange REST chain — fallback for missing history only
+
+    Thread-safe (uses thread-local connections in KlineCache).
+    The name 'BinanceFetcher' is kept for backward compatibility with verge_agent.py.
     """
-    BINANCE_FAPI = "https://fapi.binance.com"
-    BINANCE_API  = "https://api.binance.com"
 
     def __init__(self):
-        self.session = requests.Session()
-        self.ws_available = None      # None = no chequeado aun
-        self.last_ws_check = 0
-        self.last_request_time = 0
-        self.min_delay = 1.0
+        self._limiter       = get_limiter()          # Binance weight tracker (still used for Binance calls)
+        self._cache         = get_cache()
+        self._multi_fetcher = get_multi_fetcher()    # Multi-exchange REST chain
 
-    # ─────────────────────────────────────────────────────────────
-    # WebSocket Server Local
-    # ─────────────────────────────────────────────────────────────
-
-    def _is_ws_server_up(self) -> bool:
-        """
-        Considera el servidor disponible si tiene historial cargado,
-        independientemente de si el WS esta conectado en este instante.
-        Re-chequea cada 15s.
-        """
-        now = time.time()
-        if self.ws_available is None or (now - self.last_ws_check) > 15:
-            try:
-                r = self.session.get(f"{WS_SERVER_URL}/health", timeout=1)
-                if r.status_code == 200:
-                    data = r.json()
-                    # Disponible si tiene historial cargado O si el WS esta conectado
-                    has_history = data.get("symbols_history", 0) > 0
-                    is_connected = data.get("connected", False)
-                    self.ws_available = has_history or is_connected
-                else:
-                    self.ws_available = False
-            except Exception:
-                self.ws_available = False
-            self.last_ws_check = now
-            if self.ws_available:
-                logger.debug("[WS] Servidor local disponible.")
-            else:
-                logger.warning("[WS] Servidor local NO disponible. Usando REST como fallback.")
-        return self.ws_available
-
-    def _get_candle_from_ws(self, symbol: str) -> dict | None:
-        """Obtiene la ultima vela cacheada del servidor WebSocket local."""
-        try:
-            r = self.session.get(f"{WS_SERVER_URL}/market/candle/{symbol}", timeout=1)
-            if r.status_code == 200:
-                return r.json()
-            elif r.status_code == 404:
-                # El servidor esta up pero no trackea este simbolo (no esta en watchlist)
-                return {"error": "not_found"}
-        except Exception:
-            self.ws_available = False  # Marcar como caido para forzar re-chequeo
-        return None
-
-    # ─────────────────────────────────────────────────────────────
-    # REST Fallback con proteccion anti-ban
-    # ─────────────────────────────────────────────────────────────
-
-    def _wait_for_rate_limit(self):
-        elapsed = time.time() - self.last_request_time
-        if elapsed < self.min_delay:
-            time.sleep(self.min_delay - elapsed)
-        self.last_request_time = time.time()
-
-    def _make_rest_request(self, method, url, **kwargs):
-        """REST request con retry ante rate limits."""
-        for attempt in range(3):
-            self._wait_for_rate_limit()
-            try:
-                response = self.session.request(method, url, **kwargs)
-                if response.status_code in (429, 418):
-                    wait_time = int(response.headers.get("Retry-After", 15))
-                    logger.warning(f"[REST] Rate limit Binance. Esperando {wait_time}s...")
-                    time.sleep(wait_time)
-                    continue
-                return response
-            except Exception as e:
-                if attempt == 2:
-                    raise e
-                time.sleep(1)
-        return None
-
-    # ─────────────────────────────────────────────────────────────
-    # Interfaz publica
-    # ─────────────────────────────────────────────────────────────
+    # ──────────────────────────────────────────────────────────
+    # Public API (unchanged interface — backward compatible)
+    # ──────────────────────────────────────────────────────────
 
     def get_current_price(self, symbol: str) -> float:
         """
-        Obtiene el precio actual del simbolo.
-        - Si WS server esta activo: usa dato en tiempo real.
-        - Si el simbolo no esta en WS (404) o el WS falla despues de 5s: cae a REST.
+        Returns the latest price for a symbol.
+
+        Priority:
+          1. Live price from KlineCache (updated by any WS exchange every ~2s)
+          2. Last close from klines in cache
+          3. Multi-source REST (tries Binance → Bybit → OKX in order)
         """
-        if self._is_ws_server_up():
-            # 1. Intentar obtener del cache WS
-            res = self._get_candle_from_ws(symbol)
-            
-            # Caso Exito
-            if isinstance(res, dict) and "close" in res:
-                return float(res["close"])
+        # 1. Live price from cache
+        price = self._cache.get_live_price(symbol)
+        if price > 0:
+            return price
 
-            # Caso 404: No esta en watchlist. No esperar 5s, ir directo a REST.
-            if isinstance(res, dict) and res.get("error") == "not_found":
-                logger.debug(f"[WS] {symbol} no esta en watchlist del servidor. Usando REST.")
-            else:
-                # Caso Error/Timeout: Esperar hasta 5s por si esta conectando
-                logger.debug(f"[WS] {symbol} sin dato. Esperando hasta 5s...")
-                for _ in range(10):
-                    time.sleep(0.5)
-                    res = self._get_candle_from_ws(symbol)
-                    if isinstance(res, dict) and "close" in res:
-                        return float(res["close"])
-                    if isinstance(res, dict) and res.get("error") == "not_found":
-                        break # No va a aparecer, salir del loop
+        # 2. Last kline close from cache
+        klines = self._cache.get_klines(symbol, "15m", limit=1)
+        if klines:
+            return float(klines[-1]["close"])
 
-            # Si llegamos aca, el WS no sirvió. Fallback a REST (con cuidado).
-            logger.warning(f"[REST] Fallback para {symbol} (WS no tiene el dato)")
+        # 3. Multi-source REST fallback
+        logger.info(f"[Fetcher] Cache miss for {symbol} price. Trying multi-source REST...")
+        fetched = self._multi_fetcher.fetch_klines(symbol, "15m", limit=1)
+        if fetched:
+            return float(fetched[-1]["close"])
 
-        # REST de Binance
-        url = f"{self.BINANCE_FAPI}/fapi/v1/premiumIndex"
-        try:
-            response = self._make_rest_request("GET", url, params={"symbol": symbol}, timeout=5)
-            if response and response.status_code == 200:
-                return float(response.json().get("markPrice", 0))
-        except Exception as e:
-            logger.error(f"[REST] Error precio {symbol}: {e}")
+        logger.warning(f"[Fetcher] No price available for {symbol} from any source.")
         return 0.0
+
+    def get_ticker(self, symbol: str) -> Optional[dict]:
+        """
+        Returns the live ticker data for Tier 2 pre-filtering.
+        Reads exclusively from KlineCache — zero exchange calls.
+        Returns None if no live data available.
+        """
+        ticker = self._cache.get_ticker(symbol)
+        if ticker and ticker.get("is_fresh"):
+            return ticker
+        return None
 
     def get_klines_for_nexus(self, symbol: str, interval: str = "15m", limit: int = 50) -> list:
         """
-        Obtiene velas OHLCV para alimentar a Nexus-15.
-        1. Si WS server esta up: usa historial del cache local (SIN rate limit).
-        2. Si el WS server no tiene el simbolo (404), cae a REST (con rate limit).
-        3. Solo usa REST masivo si el WS server esta completamente caido.
+        Returns OHLCV klines for Nexus-15 analysis.
+
+        Priority:
+          1. KlineCache (SQLite) — always preferred (written by WS from any exchange)
+          2. Multi-source REST fetch if cache has < 25 candles
+
+        Returns [] if insufficient data and all REST sources fail.
         """
-        if self._is_ws_server_up():
-            try:
-                r = self.session.get(
-                    f"{WS_SERVER_URL}/market/candles/{symbol}",
-                    timeout=2
-                )
-                if r.status_code == 200:
-                    candles = r.json()
-                    return [{
-                        "timestamp": c["timestamp"],
-                        "open":   float(c["open"]),
-                        "high":   float(c["high"]),
-                        "low":    float(c["low"]),
-                        "close":  float(c["close"]),
-                        "volume": float(c["volume"])
-                    } for c in candles[-limit:]]
-                elif r.status_code == 404:
-                    # El servidor no trackea este simbolo. Usar REST.
-                    logger.debug(f"[WS] {symbol} no esta en cache. Usando REST para historial.")
-                else:
-                    logger.warning(f"[WS] Error {r.status_code} para {symbol}. Saltando.")
-                    return []
-            except Exception as e:
-                self.ws_available = False
-                logger.warning(f"[WS] Error consultando historial para {symbol}: {e}")
-                return []
+        # 1. Check cache first
+        klines = self._cache.get_klines(symbol, interval, limit)
+        if len(klines) >= 25:
+            return klines
 
-        # Fallback a REST (por WS caido o por simbolo faltante)
-        logger.debug(f"[REST] Pidiendo klines para {symbol}...")
-        return self._fetch_klines_rest(symbol, interval, limit)
+        # 2. On-demand multi-source REST fetch
+        if len(klines) > 0:
+            logger.debug(
+                f"[Fetcher] {symbol} has {len(klines)} klines in cache "
+                f"(need 25+). Fetching via multi-source REST."
+            )
+        else:
+            logger.info(f"[Fetcher] {symbol} has no cache history. Fetching via multi-source REST.")
 
-    def _fetch_klines_rest(self, symbol: str, interval: str, limit: int) -> list:
-        """Obtiene velas historicas directamente de Binance REST."""
-        url = f"{self.BINANCE_FAPI}/fapi/v1/klines"
-        params = {"symbol": symbol, "interval": interval, "limit": limit}
-        try:
-            response = self._make_rest_request("GET", url, params=params, timeout=10)
-            if response and response.status_code == 200:
-                return [{
-                    "timestamp": time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(k[0] / 1000.0)),
-                    "open": float(k[1]), "high": float(k[2]), "low": float(k[3]),
-                    "close": float(k[4]), "volume": float(k[5])
-                } for k in response.json()]
-            else:
-                if response:
-                    logger.warning(f"[REST] Klines para {symbol}: {response.text}")
-        except Exception as e:
-            logger.error(f"[REST] Error klines {symbol}: {e}")
-        return []
+        # Check if Binance-specific limiter blocks us
+        # (MultiSourceFetcher handles per-exchange circuit breakers internally)
+        fetched = self._multi_fetcher.fetch_klines(symbol, interval, limit)
+
+        if fetched:
+            # Persist to cache so subsequent calls are instant
+            rest_klines = [{
+                "open_time": k["open_time"],
+                "open":      k["open"],
+                "high":      k["high"],
+                "low":       k["low"],
+                "close":     k["close"],
+                "volume":    k["volume"],
+                "is_final":  True,
+            } for k in fetched]
+            self._cache.bulk_upsert_klines(symbol, interval, rest_klines)
+            logger.info(
+                f"[Fetcher] {symbol}: fetched {len(fetched)} klines via "
+                f"multi-source REST and saved to cache."
+            )
+            return fetched
+
+        # Return whatever we had (partial is better than nothing)
+        if klines:
+            logger.debug(
+                f"[Fetcher] Returning {len(klines)} partial klines for {symbol} "
+                f"(all REST sources failed)."
+            )
+        return klines
+
+    def get_rate_limiter_status(self) -> dict:
+        """Exposes rate limiter + circuit breaker status for /health endpoints."""
+        limiter_status = self._limiter.get_status()
+        cb_status      = self._multi_fetcher.get_status()
+        return {
+            **limiter_status,
+            "circuit_breakers": cb_status,
+        }

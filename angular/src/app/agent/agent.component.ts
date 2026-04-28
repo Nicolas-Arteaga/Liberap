@@ -38,35 +38,26 @@ export class AgentComponent implements OnInit {
   private uptimeInterval: any;
   private startTimestamp: number = 0;
 
-  // Performance General (Mock)
-  balance = '12,847.32';
-  winRate = '68.7%';
-  trades = 47;
-  pnlTotal = '+547.32';
+  // Performance General
+  balance = '0.00';
+  winRate = '0.0%';
+  trades = 0;
+  pnlTotal = '0.00';
   
-  // Strategy Analysis (Mock)
-  scarStats = { winRate: '61.3%', pnl: '+287.45', trades: 31, promWin: '+2.34%', promLoss: '-1.45%' };
-  nexusStats = { winRate: '63.8%', pnl: '+312.88', trades: 36, promWin: '+2.67%', promLoss: '-1.38%' };
-  confluenceStats = { winRate: '72.4%', pnl: '+524.67', trades: 29, promWin: '+3.12%', promLoss: '-1.12%' };
-  tpslStats = { effectiveness: '68.9%', trades: 47, tpRate: '73.4%', slRate: '26.6%', rr: '2.34' };
+  // Strategy Analysis
+  scarStats = { winRate: '0.0%', pnl: '0.00', trades: 0, promWin: '0.00', promLoss: '0.00' };
+  nexusStats = { winRate: '0.0%', pnl: '0.00', trades: 0, promWin: '0.00', promLoss: '0.00' };
+  confluenceStats = { winRate: '0.0%', pnl: '0.00', trades: 0, promWin: '0.00', promLoss: '0.00' };
+  tpslStats = { effectiveness: '0.0%', trades: 0, tpRate: '0.0%', slRate: '0.0%', rr: '0.00' };
 
-  // Top Performers (Mock)
-  topSymbols = [
-    { symbol: 'SOLUSDT', winRate: '75.6%', pnl: '+156.72', trades: 13 },
-    { symbol: 'SUIUSDT', winRate: '72.2%', pnl: '+128.45', trades: 9 },
-    { symbol: 'BTCUSDT', winRate: '68.3%', pnl: '+98.23', trades: 7 },
-    { symbol: 'ETHUSDT', winRate: '66.7%', pnl: '+87.12', trades: 6 },
-    { symbol: 'LINKUSDT', winRate: '64.3%', pnl: '+76.34', trades: 5 }
-  ];
+  // Top Performers
+  topSymbols: any[] = [];
 
-  // Recent Operations (Mock)
-  operations = [
-    { id: '#8934', symbol: 'SOLUSDT', direction: 'LONG', entry: '150.72', exit: '152.45', resultType: 'TP', resultVal: '+1.73%', strategy: 'CONFLUENCIA', group: 'NEXUS-15 (75%) + SCAR (68%)', conf: 75, date: '26/05 15:32:50' },
-    { id: '#8933', symbol: 'SUIUSDT', direction: 'LONG', entry: '1.8721', exit: '1.9345', resultType: 'TP', resultVal: '+3.34%', strategy: 'NEXUS-15', group: 'Grupo Impulso Alcista', conf: 72, date: '26/05 15:18:23' },
-    { id: '#8932', symbol: 'BTCUSDT', direction: 'SHORT', entry: '68,432.10', exit: '67,891.20', resultType: 'TP', resultVal: '+0.79%', strategy: 'SCAR', group: 'Grupo Mean Reversion', conf: 61, date: '26/05 15:05:11' },
-    { id: '#8931', symbol: 'ETHUSDT', direction: 'LONG', entry: '3,245.50', exit: '3,198.20', resultType: 'SL', resultVal: '-1.46%', strategy: 'CONFLUENCIA', group: 'NEXUS-15 (62%) + SCAR (65%)', conf: 62, date: '26/05 14:45:33' },
-    { id: '#8930', symbol: 'LINKUSDT', direction: 'LONG', entry: '15.872', exit: '16.234', resultType: 'TP', resultVal: '+2.28%', strategy: 'NEXUS-15', group: 'Grupo Breakout', conf: 71, date: '26/05 14:32:18' }
-  ];
+  // Recent Operations
+  operations: any[] = [];
+  openPositions: any[] = [];
+
+  private refreshInterval: any;
 
   private agentService = inject(AgentService);
   private agentSignalrService = inject(AgentSignalrService);
@@ -88,8 +79,10 @@ export class AgentComponent implements OnInit {
         this.systemState = state as SystemState;
         if (state === 'SERVER_READY' && !this.uptimeInterval) {
           this.startUptime();
+          this.startDataRefresh();
         } else if (state === 'STOPPED') {
           this.stopUptime();
+          this.stopDataRefresh();
         }
       })
     );
@@ -98,6 +91,86 @@ export class AgentComponent implements OnInit {
   ngOnDestroy(): void {
     this.subscriptions.unsubscribe();
     this.stopUptime();
+    this.stopDataRefresh();
+  }
+
+  // --- Data Fetching ---
+
+  private startDataRefresh() {
+    this.refreshData();
+    this.refreshInterval = setInterval(() => this.refreshData(), 10000);
+  }
+
+  private stopDataRefresh() {
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval);
+    }
+  }
+
+  refreshData() {
+    this.agentService.getAuditSummary().subscribe(data => {
+      if (data) {
+        this.balance = data.balance?.toLocaleString('en-US') || '0.00';
+        this.winRate = (data.winRate || 0) + '%';
+        this.trades = data.trades || 0;
+        this.pnlTotal = (data.pnlTotal > 0 ? '+' : '') + (data.pnlTotal || 0).toLocaleString('en-US');
+      }
+    });
+
+    this.agentService.getStrategyStats().subscribe(data => {
+      if (data) {
+        const formatStat = (s: any) => ({
+          winRate: (s.winRate || 0) + '%',
+          pnl: (s.pnl > 0 ? '+' : '') + (s.pnl || 0),
+          trades: s.trades || 0,
+          promWin: '+' + (s.promWin || 0),
+          promLoss: (s.promLoss || 0).toString()
+        });
+        
+        if (data.scar) this.scarStats = formatStat(data.scar);
+        if (data.nexus) this.nexusStats = formatStat(data.nexus);
+        if (data.confluence) this.confluenceStats = formatStat(data.confluence);
+        if (data.tpsl) {
+          this.tpslStats = {
+            effectiveness: (data.tpsl.effectiveness || 0) + '%',
+            trades: data.tpsl.trades || 0,
+            tpRate: (data.tpsl.tpRate || 0) + '%',
+            slRate: (data.tpsl.slRate || 0) + '%',
+            rr: (data.tpsl.rr || 0).toString()
+          };
+        }
+      }
+    });
+
+    this.agentService.getRecentTrades().subscribe(data => {
+      if (data && data.length) {
+        this.operations = data.map((t: any, i: number) => ({
+          id: '#' + (1000 + i),
+          symbol: t.symbol,
+          direction: t.direction,
+          entry: t.entry,
+          exit: t.exit_price,
+          resultType: t.result,
+          resultVal: (parseFloat(t.pnl_usd) > 0 ? '+' : '') + t.pnl_usd + ' USDT',
+          strategy: t.source,
+          group: t.nexus_group || 'N/A',
+          conf: t.confluence || t.nexus_confidence || 0,
+          date: t.date,
+          reason: t.entry_reason || 'Sin detalles'
+        }));
+      }
+    });
+
+    this.agentService.getTopSymbols().subscribe(data => {
+      if (data) {
+        this.topSymbols = data.map((s: any) => ({
+          symbol: s.symbol,
+          winRate: s.winRate + '%',
+          pnl: (s.pnl > 0 ? '+' : '') + s.pnl,
+          trades: s.trades
+        }));
+      }
+    });
   }
 
   // --- UI Helpers ---
@@ -141,8 +214,6 @@ export class AgentComponent implements OnInit {
     this.terminalLogs = [];
     this.addLog('Conectando al hub de señales...', '#64748b');
 
-    // CRITICAL: esperar que SignalR esté conectado ANTES de lanzar el proceso
-    // para no perder el primer log de Python
     this.agentSignalrService.startConnection().then(() => {
       this.addLog('✅ Hub conectado. Iniciando MarketWS...', '#10b981');
       this.agentService.startServer().subscribe({
@@ -157,6 +228,8 @@ export class AgentComponent implements OnInit {
       this.systemState = 'STOPPED';
     });
   }
+
+
 
   startAgent() {
     if (this.systemState !== 'SERVER_READY') return;

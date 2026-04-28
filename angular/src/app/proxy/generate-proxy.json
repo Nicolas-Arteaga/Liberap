@@ -916,6 +916,64 @@
                     "type": "System.Void",
                     "typeSimple": "System.Void"
                   }
+                },
+                {
+                  "name": "GetAuditSummaryAsync",
+                  "parametersOnMethod": [],
+                  "returnValue": {
+                    "type": "System.Object",
+                    "typeSimple": "object"
+                  }
+                },
+                {
+                  "name": "GetStrategyStatsAsync",
+                  "parametersOnMethod": [],
+                  "returnValue": {
+                    "type": "System.Object",
+                    "typeSimple": "object"
+                  }
+                },
+                {
+                  "name": "GetRecentTradesAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "limit",
+                      "typeAsString": "System.Int32, System.Private.CoreLib",
+                      "type": "System.Int32",
+                      "typeSimple": "number",
+                      "isOptional": true,
+                      "defaultValue": 10
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "System.Object",
+                    "typeSimple": "object"
+                  }
+                },
+                {
+                  "name": "GetTopSymbolsAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "limit",
+                      "typeAsString": "System.Int32, System.Private.CoreLib",
+                      "type": "System.Int32",
+                      "typeSimple": "number",
+                      "isOptional": true,
+                      "defaultValue": 5
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "System.Object",
+                    "typeSimple": "object"
+                  }
+                },
+                {
+                  "name": "GetOpenPositionsAsync",
+                  "parametersOnMethod": [],
+                  "returnValue": {
+                    "type": "System.Object",
+                    "typeSimple": "object"
+                  }
                 }
               ]
             }
@@ -977,6 +1035,125 @@
               "returnValue": {
                 "type": "System.Void",
                 "typeSimple": "System.Void"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Agent.IAgentAppService"
+            },
+            "GetAuditSummaryAsync": {
+              "uniqueName": "GetAuditSummaryAsync",
+              "name": "GetAuditSummaryAsync",
+              "httpMethod": "GET",
+              "url": "api/app/agent/audit-summary",
+              "supportedVersions": [],
+              "parametersOnMethod": [],
+              "parameters": [],
+              "returnValue": {
+                "type": "System.Object",
+                "typeSimple": "object"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Agent.IAgentAppService"
+            },
+            "GetStrategyStatsAsync": {
+              "uniqueName": "GetStrategyStatsAsync",
+              "name": "GetStrategyStatsAsync",
+              "httpMethod": "GET",
+              "url": "api/app/agent/strategy-stats",
+              "supportedVersions": [],
+              "parametersOnMethod": [],
+              "parameters": [],
+              "returnValue": {
+                "type": "System.Object",
+                "typeSimple": "object"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Agent.IAgentAppService"
+            },
+            "GetRecentTradesAsyncByLimit": {
+              "uniqueName": "GetRecentTradesAsyncByLimit",
+              "name": "GetRecentTradesAsync",
+              "httpMethod": "GET",
+              "url": "api/app/agent/recent-trades",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "limit",
+                  "typeAsString": "System.Int32, System.Private.CoreLib",
+                  "type": "System.Int32",
+                  "typeSimple": "number",
+                  "isOptional": true,
+                  "defaultValue": 10
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "limit",
+                  "name": "limit",
+                  "jsonName": null,
+                  "type": "System.Int32",
+                  "typeSimple": "number",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "System.Object",
+                "typeSimple": "object"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Agent.IAgentAppService"
+            },
+            "GetTopSymbolsAsyncByLimit": {
+              "uniqueName": "GetTopSymbolsAsyncByLimit",
+              "name": "GetTopSymbolsAsync",
+              "httpMethod": "GET",
+              "url": "api/app/agent/top-symbols",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "limit",
+                  "typeAsString": "System.Int32, System.Private.CoreLib",
+                  "type": "System.Int32",
+                  "typeSimple": "number",
+                  "isOptional": true,
+                  "defaultValue": 5
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "limit",
+                  "name": "limit",
+                  "jsonName": null,
+                  "type": "System.Int32",
+                  "typeSimple": "number",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "System.Object",
+                "typeSimple": "object"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Agent.IAgentAppService"
+            },
+            "GetOpenPositionsAsync": {
+              "uniqueName": "GetOpenPositionsAsync",
+              "name": "GetOpenPositionsAsync",
+              "httpMethod": "GET",
+              "url": "api/app/agent/open-positions",
+              "supportedVersions": [],
+              "parametersOnMethod": [],
+              "parameters": [],
+              "returnValue": {
+                "type": "System.Object",
+                "typeSimple": "object"
               },
               "allowAnonymous": false,
               "implementFrom": "Verge.Agent.IAgentAppService"

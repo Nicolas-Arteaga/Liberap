@@ -1,7 +1,8 @@
-using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using System.Net.Http;
+using System.Net.Http.Json;
 
 namespace Verge.Agent;
 
@@ -14,17 +15,13 @@ public class AgentAppService : VergeAppService, IAgentAppService
     public AgentAppService(AgentProcessManager processManager, IHubContext<AgentHub> hubContext)
     {
         _processManager = processManager;
-        _hubContext = hubContext;
+        _hubContext     = hubContext;
     }
 
     public async Task StartServerAsync()
     {
-        await Task.Delay(500); 
+        await Task.Delay(300);
         await _processManager.StartProcessAsync("MarketWS", "market_ws_server.py");
-        // State will be managed by the frontend based on the logs, 
-        // but let's signal SERVER_READY immediately for the UI state machine if desired, 
-        // OR better: wait for a specific log pattern? 
-        // For now, let's just set it to READY so the user can start the agent.
         await _hubContext.Clients.All.SendAsync("ServerStateChanged", "SERVER_READY");
     }
 
@@ -44,5 +41,35 @@ public class AgentAppService : VergeAppService, IAgentAppService
     {
         await _processManager.StopProcessAsync("Agent");
         await _hubContext.Clients.All.SendAsync("ServerStateChanged", "SERVER_READY");
+    }
+
+    public async Task<object> GetAuditSummaryAsync()
+    {
+        using var client = new HttpClient();
+        return await client.GetFromJsonAsync<object>("http://localhost:8001/audit/summary");
+    }
+
+    public async Task<object> GetStrategyStatsAsync()
+    {
+        using var client = new HttpClient();
+        return await client.GetFromJsonAsync<object>("http://localhost:8001/audit/stats");
+    }
+
+    public async Task<object> GetRecentTradesAsync(int limit = 10)
+    {
+        using var client = new HttpClient();
+        return await client.GetFromJsonAsync<object>($"http://localhost:8001/audit/trades?limit={limit}");
+    }
+
+    public async Task<object> GetTopSymbolsAsync(int limit = 5)
+    {
+        using var client = new HttpClient();
+        return await client.GetFromJsonAsync<object>($"http://localhost:8001/audit/top-symbols?limit={limit}");
+    }
+
+    public async Task<object> GetOpenPositionsAsync()
+    {
+        using var client = new HttpClient();
+        return await client.GetFromJsonAsync<object>("http://localhost:8001/audit/open");
     }
 }

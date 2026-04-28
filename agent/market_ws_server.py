@@ -1,142 +1,308 @@
 """
-VERGE Market WebSocket Server v2.0
-====================================
-- UNA sola conexion WebSocket para todos los simbolos
-- Acumula historial de velas cerradas (hasta 100 por simbolo)
-- HTTP local en puerto 8001:
-    GET /health                     -> estado del servidor
-    GET /market/candle/{symbol}     -> ultima vela (en tiempo real)
-    GET /market/candles/{symbol}    -> historial de hasta 100 velas cerradas
-- Reconexion automatica con backoff exponencial
-- En startup: siembra el historial con una llamada REST por simbolo
+VERGE Market WebSocket Server — Phase 2: Multi-Exchange Architecture
+=====================================================================
+Responsibilities:
+  - Maintain PARALLEL WebSocket connections to Binance, Bybit, OKX and Bitget.
+  - Each exchange runs in its own daemon thread with independent reconnect logic.
+  - All WS message handlers write to the SAME KlineCache (SQLite) — single source of truth.
+  - The 'source' field in live_prices tracks which exchange provided the latest price.
+  - HTTP server on :8001 reads exclusively from KlineCache (zero exchange calls).
+
+WebSocket threads (4 parallel):
+  Thread 1 → Binance  (primary)
+  Thread 2 → Bybit    (secondary)
+  Thread 3 → OKX      (tertiary)
+  Thread 4 → Bitget   (quaternary)
+
+HTTP API (served from SQLite cache):
+    GET /health                     → server status, circuit breaker states
+    GET /market/candle/{symbol}     → latest live kline
+    GET /market/candles/{symbol}    → up to 100 closed klines
+    GET /market/ticker/{symbol}     → mini-ticker for Tier 2 pre-filter
+    GET /audit/*                    → trade audit endpoints
 """
 
 import json
 import time
+import random
 import logging
+import sys
 import threading
-import requests
 import websocket
-from collections import deque
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 
 import config
+from kline_cache import get_cache
+from rate_limiter import get_limiter
+from audit_engine import AuditEngine
+from exchange_registry import EXCHANGES
+from circuit_breaker import get_breakers
+
+cache    = get_cache()
+limiter  = get_limiter()
+audit    = AuditEngine()
+breakers = get_breakers()
+
+if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='backslashreplace')
+    except Exception:
+        pass
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s [%(name)s] %(levelname)s: %(message)s'
+    format='%(asctime)s [%(name)s] %(levelname)s: %(message)s',
+    handlers=[logging.StreamHandler(sys.stdout)]
 )
 logger = logging.getLogger("MarketWS")
 
 # ─────────────────────────────────────────────────────────────
-# Cache global
+# Global counters (per exchange)
 # ─────────────────────────────────────────────────────────────
-# Ultima vela (puede estar abierta, se actualiza cada 2s)
-live_candle: dict = {}   # { "BTCUSDT": { candle_dict } }
+_ws_state: dict = {
+    name: {"connected": False, "reconnects": 0, "messages": 0, "candles": 0}
+    for name in EXCHANGES
+}
+_state_lock = threading.Lock()
 
-# Historial de velas CERRADAS (solo isFinal=True)
-history: dict = {}       # { "BTCUSDT": deque([candle1, candle2, ...], maxlen=100) }
 
-ws_connected: bool = False
-ws_reconnect_count: int = 0
-BINANCE_FAPI = "https://fapi.binance.com"
+def _get_global_status() -> dict:
+    with _state_lock:
+        return {
+            name: dict(v)
+            for name, v in _ws_state.items()
+        }
 
 
 # ─────────────────────────────────────────────────────────────
-# Seed inicial: pedir historial REST una sola vez al arrancar
+# Generic WS runner (one per exchange)
 # ─────────────────────────────────────────────────────────────
-def seed_history_from_rest():
-    """Llama a Binance REST UNA VEZ al inicio para sembrar el historial de cada simbolo.
-    Si Binance devuelve 418 (IP baneada), aborta INMEDIATAMENTE el seed
-    para no renovar el ban. El WebSocket live acumulara historial por su cuenta.
+
+def _run_exchange_ws(exchange_name: str):
     """
-    logger.info("[Seed] Sembrando historial inicial desde REST (una sola vez)...")
-    session = requests.Session()
+    Runs the WebSocket loop for a single exchange.
+    Reconnects automatically with exponential backoff + jitter.
+    """
+    exc = EXCHANGES[exchange_name]
+    cb  = breakers.get(exchange_name)
+    symbols = config.WATCHLIST
 
-    for symbol in config.WATCHLIST:
-        try:
-            url = f"{BINANCE_FAPI}/fapi/v1/klines"
-            params = {"symbol": symbol, "interval": "15m", "limit": 100}
-            r = session.get(url, params=params, timeout=10)
+    backoff = 2
 
-            if r.status_code == 418 or r.status_code == 429:
-                # IP baneada: no seguir pegando, abortar el seed completo
+    while True:
+        # If circuit is OPEN (ban active) — skip until available
+        if cb and not cb.is_available:
+            status = cb.get_status()
+            ban_rem = status.get("ban_remaining_s", 0)
+            if ban_rem > 0:
+                wait = min(ban_rem, 300)   # recheck every 5 min max
                 logger.warning(
-                    f"[Seed] ABORTANDO seed — Binance ban activo (HTTP {r.status_code}). "
-                    f"El WebSocket acumulara historial en tiempo real. "
-                    f"Simbolos sembrados hasta ahora: {len(history)}"
+                    f"[WS:{exchange_name}] Circuit OPEN (ban). "
+                    f"Waiting {wait}s before retry..."
                 )
-                break  # Salir del loop, no tocar mas REST
+                time.sleep(wait)
+                continue
 
-            if r.status_code == 200:
-                candles = []
-                for k in r.json():
-                    candles.append({
-                        "symbol": symbol,
-                        "timestamp": time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(k[0] / 1000.0)),
-                        "open":   float(k[1]),
-                        "high":   float(k[2]),
-                        "low":    float(k[3]),
-                        "close":  float(k[4]),
-                        "volume": float(k[5]),
-                        "is_final": True
-                    })
-                history[symbol] = deque(candles, maxlen=100)
-                if candles:
-                    live_candle[symbol] = candles[-1]
-                logger.info(f"[Seed] {symbol}: {len(candles)} velas cargadas.")
-            else:
-                logger.warning(f"[Seed] No se pudo cargar {symbol}: {r.status_code} {r.text[:80]}")
+        url = exc.ws_url_builder(symbols)
 
-            time.sleep(0.3)
+        def on_open(ws):
+            with _state_lock:
+                _ws_state[exchange_name]["connected"] = True
+            logger.info(
+                f"[WS:{exchange_name}] Connected. "
+                f"Subscribing to {len(symbols)} symbols..."
+            )
+            exc.subscribe_fn(ws, symbols)
+
+        def on_message(ws, raw: str):
+            try:
+                data = json.loads(raw)
+                kline = exc.message_parser(data)
+                if not kline:
+                    return
+
+                symbol   = kline["symbol"]
+                is_final = kline["is_final"]
+
+                # Write live price to cache (tagged with source exchange)
+                cache.upsert_live_price(
+                    symbol  = symbol,
+                    close   = kline["close"],
+                    open_   = kline["open"],
+                    high    = kline["high"],
+                    low     = kline["low"],
+                    volume  = kline["volume"],
+                    source  = exchange_name,
+                )
+
+                # Write kline to history
+                cache.upsert_kline(symbol, "15m", {
+                    "open_time": kline["open_time"],
+                    "open":      kline["open"],
+                    "high":      kline["high"],
+                    "low":       kline["low"],
+                    "close":     kline["close"],
+                    "volume":    kline["volume"],
+                    "is_final":  is_final,
+                })
+
+                with _state_lock:
+                    _ws_state[exchange_name]["messages"] += 1
+                    if is_final:
+                        _ws_state[exchange_name]["candles"] += 1
+
+                # Log Tier-1 candle closes for primary exchange only (reduce noise)
+                if is_final and exchange_name == "binance" and symbol in config.WATCHLIST_TIER1:
+                    cnt = cache.count_klines(symbol, "15m")
+                    logger.info(
+                        f"[WS:binance] T1 closed: {symbol} "
+                        f"C={kline['close']} V={kline['volume']:.0f} "
+                        f"history={cnt}klines"
+                    )
+
+                # Record success in circuit breaker (heartbeat)
+                if cb:
+                    cb.record_success()
+
+            except Exception as e:
+                logger.error(f"[WS:{exchange_name}] Message parse error: {e}")
+
+        def on_error(ws, error):
+            logger.error(f"[WS:{exchange_name}] Error: {error}")
+
+        def on_close(ws, code, msg):
+            with _state_lock:
+                _ws_state[exchange_name]["connected"] = False
+            logger.warning(f"[WS:{exchange_name}] Closed (code={code})")
+
+        try:
+            logger.info(
+                f"[WS:{exchange_name}] Connecting "
+                f"(attempt #{_ws_state[exchange_name]['reconnects'] + 1})..."
+            )
+            ws = websocket.WebSocketApp(
+                url,
+                on_open=on_open,
+                on_message=on_message,
+                on_error=on_error,
+                on_close=on_close,
+            )
+            ws.run_forever(ping_interval=20, ping_timeout=10)
 
         except Exception as e:
-            logger.error(f"[Seed] Error con {symbol}: {e}")
+            logger.error(f"[WS:{exchange_name}] Exception: {e}")
+            if cb:
+                cb.record_failure()
 
-    logger.info(f"[Seed] Listo. {len(history)} simbolos con historial.")
+        with _state_lock:
+            _ws_state[exchange_name]["reconnects"] += 1
+
+        jitter = random.uniform(0, backoff * 0.3)
+        wait   = backoff + jitter
+        logger.warning(f"[WS:{exchange_name}] Reconnecting in {wait:.1f}s...")
+        time.sleep(wait)
+        backoff = min(backoff * 2, 60)
 
 
 # ─────────────────────────────────────────────────────────────
-# Servidor HTTP
+# HTTP Server — reads from SQLite cache (zero exchange calls)
 # ─────────────────────────────────────────────────────────────
+
 class CandleHandler(BaseHTTPRequestHandler):
+
     def do_GET(self):
         path = urlparse(self.path).path.rstrip("/")
 
         # GET /health
         if path == "/health":
-            self._respond(200, {
-                "connected": ws_connected,
-                "symbols_live": len(live_candle),
-                "symbols_history": len(history),
-                "reconnects": ws_reconnect_count
+            ws_status    = _get_global_status()
+            cache_stats  = cache.get_stats()
+            limiter_stat = limiter.get_status()
+            cb_status    = {name: cb.get_status() for name, cb in breakers.items()}
+            self._json(200, {
+                "exchanges":       ws_status,
+                "watchlist_total": len(config.WATCHLIST),
+                "tier1":           len(config.WATCHLIST_TIER1),
+                "tier2":           len(config.WATCHLIST_TIER2),
+                "tier3":           len(config.WATCHLIST_TIER3),
+                "cache":           cache_stats,
+                "rate_limiter":    limiter_stat,
+                "circuit_breakers": cb_status,
             })
             return
 
-        # GET /market/candle/{symbol}  -> ultima vela en tiempo real
+        # GET /market/candle/{symbol}
         if path.startswith("/market/candle/"):
             symbol = path.split("/market/candle/")[-1].upper()
-            data = live_candle.get(symbol)
-            if data:
-                self._respond(200, data)
+            ticker = cache.get_ticker(symbol)
+            if ticker and ticker.get("is_fresh"):
+                self._json(200, {
+                    "symbol":  symbol,
+                    "close":   ticker["close"],
+                    "open":    ticker["open"],
+                    "high":    ticker["high"],
+                    "low":     ticker["low"],
+                    "volume":  ticker["volume"],
+                    "age_s":   ticker["age_s"],
+                })
             else:
-                self._respond(404, {"error": f"No live data for {symbol}"})
+                self._json(404, {"error": f"No live data for {symbol}"})
             return
 
-        # GET /market/candles/{symbol} -> historial completo (hasta 100 velas)
+        # GET /market/candles/{symbol}?limit=N
         if path.startswith("/market/candles/"):
             symbol = path.split("/market/candles/")[-1].upper()
-            hist = history.get(symbol)
-            if hist:
-                self._respond(200, list(hist))
+            qs     = parse_qs(urlparse(self.path).query)
+            limit  = int(qs.get("limit", ["100"])[0])
+            klines = cache.get_klines(symbol, "15m", limit)
+            if klines:
+                self._json(200, klines)
             else:
-                self._respond(404, {"error": f"No history for {symbol}"})
+                self._json(404, {"error": f"No history for {symbol}"})
             return
 
-        self._respond(404, {"error": "Not found"})
+        # GET /market/ticker/{symbol}
+        if path.startswith("/market/ticker/"):
+            symbol = path.split("/market/ticker/")[-1].upper()
+            ticker = cache.get_ticker(symbol)
+            if ticker:
+                ticker["has_history"] = cache.has_history(symbol, "15m", 25)
+                self._json(200, ticker)
+            else:
+                self._json(404, {"error": f"No ticker for {symbol}"})
+            return
 
-    def _respond(self, status: int, body):
+        # GET /market/sources — shows which exchange provided each symbol's latest price
+        if path == "/market/sources":
+            stats = cache.get_stats()
+            self._json(200, {
+                "exchanges": _get_global_status(),
+                "circuit_breakers": {name: cb.get_status() for name, cb in breakers.items()},
+                "cache_stats": stats,
+            })
+            return
+
+        # Audit Endpoints
+        if path == "/audit/summary":
+            self._json(200, audit.get_summary())
+            return
+        if path == "/audit/stats":
+            self._json(200, audit.get_strategy_stats())
+            return
+        if path == "/audit/trades":
+            self._json(200, audit.get_recent_trades())
+            return
+        if path == "/audit/top-symbols":
+            self._json(200, audit.get_top_symbols())
+            return
+        if path == "/audit/open":
+            self._json(200, audit.get_open_positions())
+            return
+
+        self._json(404, {"error": "Not found"})
+
+    def _json(self, status: int, body: dict):
         payload = json.dumps(body).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
@@ -144,116 +310,53 @@ class CandleHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
-    def log_message(self, format, *args):
-        pass  # Silenciar logs HTTP
-
-
-# ─────────────────────────────────────────────────────────────
-# WebSocket Client
-# ─────────────────────────────────────────────────────────────
-def build_ws_url() -> str:
-    streams = "/".join(f"{s.lower()}@kline_15m" for s in config.WATCHLIST)
-    return f"wss://fstream.binance.com/stream?streams={streams}"
-
-
-def on_message(ws, message):
-    try:
-        data = json.loads(message)
-        stream_data = data.get("data", {})
-        if stream_data.get("e") != "kline":
-            return
-
-        k = stream_data["k"]
-        symbol = k["s"].upper()
-
-        candle = {
-            "symbol": symbol,
-            "timestamp": time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(k["t"] / 1000.0)),
-            "open":     float(k["o"]),
-            "high":     float(k["h"]),
-            "low":      float(k["l"]),
-            "close":    float(k["c"]),
-            "volume":   float(k["v"]),
-            "is_final": k.get("x", False),
-            "received_at": time.time()
-        }
-
-        # Siempre actualizar la vela en tiempo real
-        live_candle[symbol] = candle
-
-        # Solo agregar al historial cuando la vela CIERRA
-        if candle["is_final"]:
-            if symbol not in history:
-                history[symbol] = deque(maxlen=100)
-            history[symbol].append(candle)
-            logger.info(f"[WS] Vela cerrada: {symbol} C={candle['close']} V={candle['volume']:.0f}")
-
-    except Exception as e:
-        logger.error(f"[WS] Error procesando mensaje: {e}")
-
-
-def on_error(ws, error):
-    logger.error(f"[WS] Error: {error}")
-
-
-def on_close(ws, close_status_code, close_msg):
-    global ws_connected
-    ws_connected = False
-    logger.warning(f"[WS] Conexion cerrada. Codigo={close_status_code}")
-
-
-def on_open(ws):
-    global ws_connected
-    ws_connected = True
-    logger.info(f"[WS] Conexion activa. Monitoreando {len(config.WATCHLIST)} simbolos en tiempo real.")
-
-
-def run_websocket():
-    global ws_reconnect_count
-    backoff = 1
-    while True:
-        try:
-            url = build_ws_url()
-            logger.info(f"[WS] Conectando... (intento #{ws_reconnect_count + 1})")
-            ws = websocket.WebSocketApp(
-                url,
-                on_open=on_open,
-                on_message=on_message,
-                on_error=on_error,
-                on_close=on_close
-            )
-            ws.run_forever(ping_interval=30, ping_timeout=10)
-        except Exception as e:
-            logger.error(f"[WS] Excepcion: {e}")
-
-        ws_reconnect_count += 1
-        logger.warning(f"[WS] Reconectando en {backoff}s...")
-        time.sleep(backoff)
-        backoff = min(backoff * 2, 60)
+    def log_message(self, fmt, *args):
+        pass   # Silence HTTP access logs
 
 
 # ─────────────────────────────────────────────────────────────
 # Entry Point
 # ─────────────────────────────────────────────────────────────
+
 if __name__ == "__main__":
-    logger.info("=" * 60)
-    logger.info("  VERGE Market WebSocket Server v2.0")
-    logger.info(f"  Simbolos: {len(config.WATCHLIST)}")
-    logger.info(f"  HTTP: http://localhost:8001")
-    logger.info("=" * 60)
+    logger.info("=" * 65)
+    logger.info("  VERGE Market Data Service — Phase 2: Multi-Exchange")
+    logger.info(f"  Symbols: {len(config.WATCHLIST)} total "
+                f"(T1={len(config.WATCHLIST_TIER1)}, "
+                f"T2={len(config.WATCHLIST_TIER2)}, "
+                f"T3={len(config.WATCHLIST_TIER3)})")
+    logger.info("  WS Sources: Binance | Bybit | OKX | Bitget")
+    logger.info("  Mode: WS-only — NO REST seed at startup")
+    logger.info("  Cache: SQLite (data/klines.db)")
+    logger.info("  HTTP:  http://localhost:8001")
+    logger.info("=" * 65)
 
-    # PASO 1: Sembrar historial desde REST (UNICA llamada REST, al inicio)
-    seed_history_from_rest()
+    stats = cache.get_stats()
+    logger.info(
+        f"[Cache] Startup: {stats['symbols_with_history']} symbols, "
+        f"{stats['total_klines']} klines, {stats['live_prices']} live prices."
+    )
+    if stats['symbols_with_history'] > 0:
+        logger.info("[Cache] Existing history loaded. Agent can analyze immediately.")
+    else:
+        logger.info("[Cache] No history yet. WS will accumulate data over ~15-30 min.")
 
-    # PASO 2: Iniciar WebSocket en hilo separado
-    ws_thread = threading.Thread(target=run_websocket, daemon=True)
-    ws_thread.start()
-    time.sleep(2)  # Dar tiempo para que conecte
+    # Start one WS thread per exchange
+    for exchange_name in EXCHANGES:
+        t = threading.Thread(
+            target=_run_exchange_ws,
+            args=(exchange_name,),
+            daemon=True,
+            name=f"WS-{exchange_name}",
+        )
+        t.start()
+        logger.info(f"[WS] Started thread for {exchange_name}")
+        time.sleep(0.5)   # Stagger connections slightly
 
-    # PASO 3: Abrir servidor HTTP
-    logger.info("[HTTP] Servidor listo en http://localhost:8001")
+    # Start HTTP server (blocks main thread)
+    logger.info("[HTTP] Server ready at http://localhost:8001")
     server = HTTPServer(("localhost", 8001), CandleHandler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        logger.info("Servidor detenido.")
+        logger.info("[HTTP] Server stopped.")

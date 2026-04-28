@@ -23,7 +23,8 @@ public class AgentProcessManager : ISingletonDependency
         _logger = logger;
     }
 
-    public async Task StartProcessAsync(string name, string scriptName)
+    public async Task StartProcessAsync(string name, string scriptName,
+        System.Collections.Generic.Dictionary<string, string>? extraEnv = null)
     {
         try
         {
@@ -45,13 +46,20 @@ public class AgentProcessManager : ISingletonDependency
             var startInfo = new ProcessStartInfo
             {
                 FileName = pythonPath,
-                Arguments = scriptName, 
+                Arguments = scriptName,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true,
                 WorkingDirectory = @"C:\Users\Nicolas\Desktop\Verge\Verge\agent"
             };
+
+            // Inject any extra environment variables (e.g. VERGE_SKIP_SEED=1 during ban)
+            if (extraEnv != null)
+            {
+                foreach (var kv in extraEnv)
+                    startInfo.EnvironmentVariables[kv.Key] = kv.Value;
+            }
 
             // EVITAR BUFFERING: Forzar a Python a enviar logs en tiempo real
             startInfo.EnvironmentVariables["PYTHONUNBUFFERED"] = "1";

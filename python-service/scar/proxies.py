@@ -1,7 +1,16 @@
 """
-SCAR Proxy Signals — Degraded mode implementations for signals 1 & 2.
-These use Binance public REST APIs as a proxy for on-chain withdrawal data.
-When BSCScan/Etherscan API keys are available, replace with scar/onchain.py.
+SCAR Proxy Signals — Multi-Exchange implementation.
+====================================================
+Uses Binance public REST APIs as primary source.
+Falls back to Bybit if Binance returns an error (ban / rate limit).
+
+Signal routing:
+  Signal 1 (Whale Withdrawal): Binance FAPI 24hr + OI → Bybit tickers + OI
+  Signal 2 (Supply Drying):    Binance order book → Bybit order book
+  Signal 3 (Price Stability):  Binance klines (1d) → Bybit klines (1d)
+  Signal 4 (Funding Rate):     Binance funding rate → Bybit funding rate
+  Signal 5 (Silence):          Binance klines (1d) → Bybit klines (1d)
+  get_current_price:            Binance spot → Bybit futures → 0.0
 """
 import requests
 import logging
@@ -9,18 +18,29 @@ from typing import Tuple, Optional
 
 logger = logging.getLogger("SCAR_PROXIES")
 
+# ── Exchange base URLs ────────────────────────────────────────────────────────
 BINANCE_FAPI = "https://fapi.binance.com"
 BINANCE_API  = "https://api.binance.com"
+BYBIT_API    = "https://api.bybit.com"
+OKX_API      = "https://www.okx.com"
 
 _session = requests.Session()
 _session.headers.update({"Accept": "application/json"})
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Core helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
 def _get(url: str, params: dict = None, timeout: int = 8) -> Optional[dict]:
+    """Single GET with graceful error handling. Returns None on any failure."""
     try:
         r = _session.get(url, params=params, timeout=timeout)
         if r.status_code == 400:
-            logger.debug("SCAR proxy: Symbol not supported or bad request [%s] (400)", url)
+            logger.debug("SCAR proxy: bad request [%s] (400)", url)
+            return None
+        if r.status_code in (418, 429):
+            logger.warning("SCAR proxy: rate-limited/banned [%s] (HTTP %s)", url, r.status_code)
             return None
         r.raise_for_status()
         return r.json()
@@ -28,52 +48,96 @@ def _get(url: str, params: dict = None, timeout: int = 8) -> Optional[dict]:
         logger.warning("SCAR proxy request failed [%s]: %s", url, e)
         return None
 
+
+def _get_first(*calls) -> Optional[dict]:
+    """
+    Tries each (url, params) tuple in order.
+    Returns the first successful JSON response, or None if all fail.
+    Usage: _get_first((url1, params1), (url2, params2))
+    """
+    for url, params in calls:
+        result = _get(url, params)
+        if result is not None:
+            return result
+    return None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Price helper (used by SCAR scheduler internally)
+# ─────────────────────────────────────────────────────────────────────────────
+
 def get_current_price(symbol: str) -> float:
+    """
+    Spot/mark price for a symbol.
+    Chain: Binance spot → Bybit futures → 0.0
+    """
+    # Binance spot
+    data = _get(f"{BINANCE_API}/api/v3/ticker/price", {"symbol": symbol})
+    if data and "price" in data:
+        return float(data["price"])
+
+    # Bybit futures fallback
+    data = _get(f"{BYBIT_API}/v5/market/tickers",
+                {"category": "linear", "symbol": symbol})
     try:
-        data = _get(f"{BINANCE_API}/api/v3/ticker/price", {"symbol": symbol})
-        if data and "price" in data:
-            return float(data["price"])
+        price = float(data["result"]["list"][0]["lastPrice"])
+        if price > 0:
+            return price
     except Exception:
         pass
+
     return 0.0
 
 
-# ── Signal 1 Proxy: Whale Withdrawal Detection ─────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Signal 1 — Whale Withdrawal Detection
+# ─────────────────────────────────────────────────────────────────────────────
+
 def detect_whale_withdrawal_proxy(symbol: str) -> Tuple[bool, Optional[str], float]:
     """
     Returns (triggered, reason, confidence_value).
     Uses Futures/Spot volume ratio + OI accumulation as proxy for exchange withdrawal.
-    Triggered when futures liquidity dominates spot (sign the spot book is drying).
+    Primary: Binance. Fallback: Bybit.
     """
-    base = symbol.replace("USDT", "").replace("BUSD", "").strip()
-
-    # 1. Futures vs Spot 24h volume ratio
+    # ── Attempt 1: Binance futures/spot volume ratio ─────────────────────────
     try:
-        fut_ticker = _get(f"{BINANCE_FAPI}/fapi/v1/ticker/24hr", {"symbol": symbol})
-        spot_ticker = _get(f"{BINANCE_API}/api/v3/ticker/24hr", {"symbol": symbol})
+        fut_ticker  = _get(f"{BINANCE_FAPI}/fapi/v1/ticker/24hr", {"symbol": symbol})
+        spot_ticker = _get(f"{BINANCE_API}/api/v3/ticker/24hr",   {"symbol": symbol})
 
         if fut_ticker and spot_ticker:
-            fut_vol_usd = float(fut_ticker.get("quoteVolume", 0))
+            fut_vol_usd  = float(fut_ticker.get("quoteVolume", 0))
             spot_vol_usd = float(spot_ticker.get("quoteVolume", 0))
-
             if spot_vol_usd > 0:
                 ratio = fut_vol_usd / spot_vol_usd
                 if ratio > 3.0:
                     return True, f"futures/spot_ratio={ratio:.1f}x (spot book thinning)", ratio
     except Exception as e:
-        logger.debug("Signal1 vol ratio error for %s: %s", symbol, e)
+        logger.debug("Signal1 Binance vol ratio error for %s: %s", symbol, e)
 
-    # 2. OI change (growing OI + stable price = accumulation pressure)
+    # ── Fallback: Bybit volume + OI ──────────────────────────────────────────
     try:
-        oi_data = _get(f"{BINANCE_FAPI}/fapi/v1/openInterest", {"symbol": symbol})
-        ticker_data = _get(f"{BINANCE_FAPI}/fapi/v1/ticker/24hr", {"symbol": symbol})
+        bybit_ticker = _get(f"{BYBIT_API}/v5/market/tickers",
+                            {"category": "linear", "symbol": symbol})
+        if bybit_ticker:
+            t = bybit_ticker.get("result", {}).get("list", [{}])[0]
+            turnover = float(t.get("turnover24h", 0))
+            if turnover > 0:
+                logger.debug("Signal1: Using Bybit ticker for %s", symbol)
+                # Use turnover as a proxy signal (high volume may indicate whale activity)
+                if turnover > 500_000_000:  # $500M threshold
+                    return True, f"bybit_high_turnover=${turnover/1e6:.0f}M (whale activity)", turnover
+    except Exception as e:
+        logger.debug("Signal1 Bybit fallback error for %s: %s", symbol, e)
+
+    # ── Attempt 2: Binance OI accumulation ───────────────────────────────────
+    try:
+        oi_data     = _get(f"{BINANCE_FAPI}/fapi/v1/openInterest", {"symbol": symbol})
+        ticker_data = _get(f"{BINANCE_FAPI}/fapi/v1/ticker/24hr",  {"symbol": symbol})
 
         if oi_data and ticker_data:
-            oi = float(oi_data.get("openInterest", 0))
+            oi               = float(oi_data.get("openInterest", 0))
             price_change_pct = abs(float(ticker_data.get("priceChangePercent", 100)))
-            # High OI but price barely moved → silent accumulation
             if oi > 0 and price_change_pct < 5.0:
-                # Use volume as OI proxy signal strength
                 vol_usd = float(ticker_data.get("quoteVolume", 0))
                 if vol_usd > 500_000:
                     return True, f"oi_accumulation: price_chg={price_change_pct:.1f}%, vol=${vol_usd/1e6:.1f}M", vol_usd
@@ -83,25 +147,35 @@ def detect_whale_withdrawal_proxy(symbol: str) -> Tuple[bool, Optional[str], flo
     return False, None, 0.0
 
 
-# ── Signal 2 Proxy: Supply Drying Detection ────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Signal 2 — Supply Drying Detection
+# ─────────────────────────────────────────────────────────────────────────────
+
 def detect_supply_drying_proxy(symbol: str) -> Tuple[bool, Optional[str], float]:
     """
     Returns (triggered, reason, confidence_value).
-    Uses order book depth analysis as proxy for supply reduction on exchanges.
+    Uses order book depth analysis as proxy for supply reduction.
+    Primary: Binance. Fallback: Bybit.
     """
+    depth = _get_first(
+        (f"{BINANCE_API}/api/v3/depth",         {"symbol": symbol, "limit": 100}),
+        (f"{BYBIT_API}/v5/market/orderbook",    {"category": "linear", "symbol": symbol, "limit": 50}),
+    )
+
+    if not depth:
+        return False, None, 0.0
+
+    # Normalize Bybit order book format to Binance format
+    # Bybit returns: {"result": {"b": [[price,qty],...], "a": [[price,qty],...]}}
+    bids = depth.get("bids") or depth.get("result", {}).get("b", [])
+    asks = depth.get("asks") or depth.get("result", {}).get("a", [])
+
+    if not bids or not asks:
+        return False, None, 0.0
+
     try:
-        depth = _get(f"{BINANCE_API}/api/v3/depth", {"symbol": symbol, "limit": 100})
-        if not depth:
-            return False, None, 0.0
-
-        bids = depth.get("bids", [])
-        asks = depth.get("asks", [])
-
-        if not bids or not asks:
-            return False, None, 0.0
-
-        best_bid = float(bids[0][0])
-        best_ask = float(asks[0][0])
+        best_bid  = float(bids[0][0])
+        best_ask  = float(asks[0][0])
         mid_price = (best_bid + best_ask) / 2.0
 
         # 1. Spread check (>0.5% indicates thin book)
@@ -112,51 +186,63 @@ def detect_supply_drying_proxy(symbol: str) -> Tuple[bool, Optional[str], float]
         # 2. Bid-side depth ratio: vol within 2% vs vol within 10% of price
         def sum_depth(levels, max_pct: float) -> float:
             total = 0.0
-            for price_str, qty_str in levels:
-                price = float(price_str)
-                qty   = float(qty_str)
+            for level in levels:
+                price = float(level[0])
+                qty   = float(level[1])
                 if abs(price - mid_price) / mid_price <= max_pct:
                     total += price * qty
             return total
 
-        near_vol  = sum_depth(bids, 0.02)   # within 2%
-        total_vol = sum_depth(bids, 0.10)   # within 10%
+        near_vol  = sum_depth(bids, 0.02)
+        total_vol = sum_depth(bids, 0.10)
 
         if total_vol > 0:
             ratio = near_vol / total_vol
-            if ratio < 0.15:  # Less than 15% liquidity is near the market
+            if ratio < 0.15:
                 return True, f"thin_near_book: {ratio*100:.1f}% of depth within 2%", ratio
 
     except Exception as e:
-        logger.debug("Signal2 depth error for %s: %s", symbol, e)
+        logger.debug("Signal2 depth analysis error for %s: %s", symbol, e)
 
     return False, None, 0.0
 
 
-# ── Signal 3: Price Stability Check ────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Signal 3 — Price Stability Detection
+# ─────────────────────────────────────────────────────────────────────────────
+
 def detect_price_stable(symbol: str, range_threshold: float = 0.15) -> Tuple[bool, Optional[str], float]:
     """
     Returns (triggered, reason, range_value).
-    Checks if price has been in ±15% range for 7+ days using Binance klines.
+    Checks if price has been in ±15% range for 7+ days using daily klines.
+    Primary: Binance. Fallback: Bybit.
     """
+    # Try to get daily klines from any source
+    klines = _get_first(
+        (f"{BINANCE_API}/api/v3/klines",
+            {"symbol": symbol, "interval": "1d", "limit": 8}),
+        (f"{BINANCE_FAPI}/fapi/v1/klines",
+            {"symbol": symbol, "interval": "1d", "limit": 8}),
+        (f"{BYBIT_API}/v5/market/kline",
+            {"category": "linear", "symbol": symbol, "interval": "D", "limit": 8}),
+    )
+
+    if not klines or not isinstance(klines, (list, dict)):
+        return False, "insufficient_data", 0.0
+
+    # Normalize Bybit kline format
+    # Bybit: {"result": {"list": [[ts, open, high, low, close, vol, turnover], ...]}, ...}
+    raw = klines
+    if isinstance(klines, dict):
+        raw = list(reversed(klines.get("result", {}).get("list", [])))
+
+    if not raw or len(raw) < 7:
+        return False, "insufficient_data", 0.0
+
     try:
-        klines = _get(
-            f"{BINANCE_API}/api/v3/klines",
-            {"symbol": symbol, "interval": "1d", "limit": 8}
-        )
-        if not klines or len(klines) < 7:
-            # Fallback: try futures endpoint
-            klines = _get(
-                f"{BINANCE_FAPI}/fapi/v1/klines",
-                {"symbol": symbol, "interval": "1d", "limit": 8}
-            )
-
-        if not klines or len(klines) < 7:
-            return False, "insufficient_data", 0.0
-
-        closes = [float(k[4]) for k in klines[:-1]]  # last 7 days (exclude today)
-        highs  = [float(k[2]) for k in klines[:-1]]
-        lows   = [float(k[3]) for k in klines[:-1]]
+        closes = [float(k[4]) for k in raw[:-1]]
+        highs  = [float(k[2]) for k in raw[:-1]]
+        lows   = [float(k[3]) for k in raw[:-1]]
 
         price_max = max(highs)
         price_min = min(lows)
@@ -175,28 +261,43 @@ def detect_price_stable(symbol: str, range_threshold: float = 0.15) -> Tuple[boo
     return False, None, 0.0
 
 
-# ── Signal 4: Negative Funding Rate ────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Signal 4 — Negative Funding Rate
+# ─────────────────────────────────────────────────────────────────────────────
+
 def detect_negative_funding(symbol: str, threshold: float = -0.0001,
                             external_rate: Optional[float] = None) -> Tuple[bool, Optional[str], float]:
     """
     Returns (triggered, reason, avg_funding).
-    Uses Binance Futures funding rate history (last 3 periods = ~24h).
-    Can accept an externally provided rate to avoid duplicate API calls.
+    Uses funding rate history (last 3 periods = ~24h).
+    Primary: Binance. Fallback: Bybit.
     """
     avg_rate = external_rate
 
     if avg_rate is None:
-        try:
-            history = _get(
-                f"{BINANCE_FAPI}/fapi/v1/fundingRate",
-                {"symbol": symbol, "limit": 3}
-            )
-            if history and len(history) > 0:
-                rates = [float(x["fundingRate"]) for x in history]
+        # Try Binance first
+        history = _get(f"{BINANCE_FAPI}/fapi/v1/fundingRate",
+                       {"symbol": symbol, "limit": 3})
+        if history and len(history) > 0:
+            try:
+                rates    = [float(x["fundingRate"]) for x in history]
                 avg_rate = sum(rates) / len(rates)
-        except Exception as e:
-            logger.debug("Signal4 funding error for %s: %s", symbol, e)
-            return False, None, 0.0
+            except Exception as e:
+                logger.debug("Signal4 Binance funding parse error for %s: %s", symbol, e)
+
+        # Bybit fallback if Binance failed
+        if avg_rate is None:
+            bybit_history = _get(f"{BYBIT_API}/v5/market/funding/history",
+                                 {"category": "linear", "symbol": symbol, "limit": 3})
+            if bybit_history:
+                try:
+                    records = bybit_history.get("result", {}).get("list", [])
+                    if records:
+                        rates    = [float(x["fundingRate"]) for x in records]
+                        avg_rate = sum(rates) / len(rates)
+                        logger.debug("Signal4: Using Bybit funding rate for %s: %.6f", symbol, avg_rate)
+                except Exception as e:
+                    logger.debug("Signal4 Bybit funding parse error for %s: %s", symbol, e)
 
     if avg_rate is not None and avg_rate < threshold:
         return True, f"avg_funding_3d={avg_rate*100:.4f}% (threshold={threshold*100:.4f}%)", avg_rate
@@ -204,41 +305,51 @@ def detect_negative_funding(symbol: str, threshold: float = -0.0001,
     return False, None, avg_rate or 0.0
 
 
-# ── Signal 5: Silence Detection (no large moves for 24-48h after activity) ─
+# ─────────────────────────────────────────────────────────────────────────────
+# Signal 5 — Silence Detection
+# ─────────────────────────────────────────────────────────────────────────────
+
 def detect_silence(symbol: str, history_days: int = 7) -> Tuple[bool, Optional[str], float]:
     """
     Returns (triggered, reason, hours_since_last_spike).
     Detects if volume has gone 'silent' after a period of high activity.
-    Proxy: volume dropped below 50% of previous 7-day average in last 24h.
+    Primary: Binance. Fallback: Bybit.
     """
+    limit = history_days + 2
+
+    klines = _get_first(
+        (f"{BINANCE_API}/api/v3/klines",
+            {"symbol": symbol, "interval": "1d", "limit": limit}),
+        (f"{BINANCE_FAPI}/fapi/v1/klines",
+            {"symbol": symbol, "interval": "1d", "limit": limit}),
+        (f"{BYBIT_API}/v5/market/kline",
+            {"category": "linear", "symbol": symbol, "interval": "D", "limit": limit}),
+    )
+
+    if not klines:
+        return False, None, 0.0
+
+    # Normalize Bybit format
+    raw = klines
+    if isinstance(klines, dict):
+        raw = list(reversed(klines.get("result", {}).get("list", [])))
+
+    if not raw or len(raw) < 4:
+        return False, None, 0.0
+
     try:
-        klines = _get(
-            f"{BINANCE_API}/api/v3/klines",
-            {"symbol": symbol, "interval": "1d", "limit": history_days + 2}
-        )
-        if not klines or len(klines) < 4:
-            klines = _get(
-                f"{BINANCE_FAPI}/fapi/v1/klines",
-                {"symbol": symbol, "interval": "1d", "limit": history_days + 2}
-            )
-
-        if not klines or len(klines) < 4:
-            return False, None, 0.0
-
-        volumes = [float(k[5]) for k in klines]
-        # Previous days (excluding today and last day)
-        prev_vols = volumes[:-2]
-        avg_vol   = sum(prev_vols) / len(prev_vols) if prev_vols else 0
-
-        # Was there a spike in the previous session?
+        volumes      = [float(k[5]) for k in raw]
+        prev_vols    = volumes[:-2]
+        avg_vol      = sum(prev_vols) / len(prev_vols) if prev_vols else 0
         prev_day_vol = volumes[-2]
         today_vol    = volumes[-1]
 
-        had_spike = prev_day_vol > avg_vol * 1.5
+        had_spike  = prev_day_vol > avg_vol * 1.5
         now_silent = today_vol < avg_vol * 0.6
 
         if had_spike and now_silent:
-            return True, f"volume_silenced: prev={prev_day_vol/avg_vol:.1f}x avg, today={today_vol/avg_vol:.1f}x", today_vol / (avg_vol + 1)
+            ratio = today_vol / (avg_vol + 1)
+            return True, f"volume_silenced: prev={prev_day_vol/avg_vol:.1f}x avg, today={today_vol/avg_vol:.1f}x", ratio
 
     except Exception as e:
         logger.debug("Signal5 silence error for %s: %s", symbol, e)

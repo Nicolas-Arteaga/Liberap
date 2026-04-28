@@ -326,7 +326,7 @@
       </div>
 
       <!-- Op Detail -->
-      <div class="glass-card op-details" style="flex:1;">
+      <div class="glass-card op-details" style="flex:1;" *ngIf="operations.length > 0">
         <div class="card-header">
           <h3><ion-icon name="information-circle-outline"></ion-icon> Detalle de Operación {{ operations[0].id }}</h3>
         </div>
@@ -341,23 +341,26 @@
           <div>
             <div class="dg-row"><span class="lbl">Precio Entrada</span><span class="val">{{ operations[0].entry }}</span></div>
             <div class="dg-row"><span class="lbl">Precio Salida</span><span class="val">{{ operations[0].exit }}</span></div>
-            <div class="dg-row"><span class="lbl">Cantidad</span><span class="val">15.23 SOL</span></div>
-            <div class="dg-row"><span class="lbl">PnL</span><span class="val text-success">{{ operations[0].resultVal }} (+2.63 USDT)</span></div>
+            <div class="dg-row"><span class="lbl">PnL</span><span class="val text-success">{{ operations[0].resultVal }}</span></div>
           </div>
           <div>
             <div class="dg-row"><span class="lbl">Estrategia</span><span class="val">{{ operations[0].strategy }}</span></div>
-            <div class="dg-row"><span class="lbl">Grupo Predicción</span><span class="val">Momentum Burst</span></div>
-            <div class="dg-row"><span class="lbl">NEXUS-15 Conf.</span><span class="val" style="color:#3b82f6;">75%</span></div>
-            <div class="dg-row"><span class="lbl">SCAR Conf.</span><span class="val" style="color:#a855f7;">68%</span></div>
-            <div class="dg-row"><span class="lbl" style="color:#fff;">Confluencia Total</span><span class="val text-success">75%</span></div>
+            <div class="dg-row"><span class="lbl">Grupo Predicción</span><span class="val">{{ operations[0].group }}</span></div>
+            <div class="dg-row"><span class="lbl">Confianza / Confluencia</span><span class="val" style="color:#3b82f6;">{{ operations[0].conf }}%</span></div>
             <div class="dg-row" style="margin-top:0.5rem;"><span class="lbl" style="font-size:0.7rem;">Fecha/Hora</span><span class="val" style="font-size:0.75rem;">{{ operations[0].date }}</span></div>
           </div>
         </div>
 
         <div class="reason-box">
           <div class="rb-title">Motivo Entrada</div>
-          <div class="rb-text">Señal de momentum alcista confirmada en marco 15m. Ruptura de resistencia local en 150.50 con volumen creciente. Flujo de capital de ballenas positivo (+2.4M). SCAR detecta debilidad vendedora.</div>
+          <div class="rb-text">{{ operations[0].reason }}</div>
         </div>
+      </div>
+      <div class="glass-card op-details" style="flex:1;" *ngIf="operations.length === 0">
+        <div class="card-header">
+          <h3><ion-icon name="information-circle-outline"></ion-icon> Detalle de Operación</h3>
+        </div>
+        <div style="text-align: center; color: #64748b; padding: 2rem 0;">No hay operaciones registradas aún.</div>
       </div>
     </div>
   </div>
