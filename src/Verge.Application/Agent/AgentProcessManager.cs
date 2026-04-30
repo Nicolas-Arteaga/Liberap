@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Net.NetworkInformation;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.SignalR;
@@ -11,9 +12,11 @@ namespace Verge.Agent;
 
 public class AgentProcessManager : ISingletonDependency
 {
+    private const int MarketWsPort = 8001;
     private readonly IHubContext<AgentHub> _hubContext;
     private readonly ILogger<AgentProcessManager> _logger;
     private readonly ConcurrentDictionary<string, Process> _processes = new();
+    private readonly ConcurrentDictionary<string, DateTime> _startTimes = new();
 
     public AgentProcessManager(
         IHubContext<AgentHub> hubContext,
@@ -28,10 +31,18 @@ public class AgentProcessManager : ISingletonDependency
     {
         try
         {
-            if (_processes.TryGetValue(name, out var existingProcess) && !existingProcess.HasExited)
+            if (IsProcessRunning(name))
             {
                 _logger.LogWarning("{Name} is already running.", name);
                 return;
+            }
+
+            // Cleanup if it was in the dictionary but exited
+            _processes.TryRemove(name, out _);
+
+            if (name == "MarketWS")
+            {
+                await EnsureMarketWsPortIsFreeAsync();
             }
 
             string pythonPath = "python";
@@ -67,6 +78,13 @@ public class AgentProcessManager : ISingletonDependency
             startInfo.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
 
             var process = new Process { StartInfo = startInfo };
+            process.EnableRaisingEvents = true;
+            process.Exited += (_, _) =>
+            {
+                _processes.TryRemove(name, out _);
+                _startTimes.TryRemove(name, out _);
+                _logger.LogInformation("{Name} process exited.", name);
+            };
 
             process.OutputDataReceived += async (sender, args) =>
             {
@@ -91,6 +109,7 @@ public class AgentProcessManager : ISingletonDependency
             process.BeginErrorReadLine();
 
             _processes[name] = process;
+            _startTimes[name] = DateTime.Now;
 
             await _hubContext.Clients.All.SendAsync("ReceiveAgentLog", $"▶️ Proceso {scriptName} iniciado.", "#3b82f6");
         }
@@ -103,18 +122,52 @@ public class AgentProcessManager : ISingletonDependency
 
     public async Task StopProcessAsync(string name)
     {
-        if (_processes.TryRemove(name, out var process) && !process.HasExited)
+        if (_processes.TryRemove(name, out var process))
         {
             _logger.LogInformation("Stopping {Name} process...", name);
-            process.Kill();
-            process.Dispose();
+            try
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                    if (!process.WaitForExit(5000))
+                    {
+                        _logger.LogWarning("{Name} did not exit after kill timeout.", name);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error stopping {Name} process cleanly.", name);
+            }
+            finally
+            {
+                process.Dispose();
+            }
+            _startTimes.TryRemove(name, out _);
             await _hubContext.Clients.All.SendAsync("ReceiveAgentLog", $"⏹️ Proceso {name} detenido.", "#ef4444");
         }
     }
 
     public bool IsProcessRunning(string name)
     {
-        return _processes.TryGetValue(name, out var process) && !process.HasExited;
+        if (_processes.TryGetValue(name, out var process))
+        {
+            try {
+                return !process.HasExited;
+            } catch {
+                _processes.TryRemove(name, out _);
+                return false;
+            }
+        }
+        return false;
+    }
+
+    public DateTime? GetStartTime(string name)
+    {
+        if (_startTimes.TryGetValue(name, out var startTime))
+            return startTime;
+        return null;
     }
 
     public async Task StopAllAsync()
@@ -124,4 +177,93 @@ public class AgentProcessManager : ISingletonDependency
             await StopProcessAsync(key);
         }
     }
+
+    private async Task EnsureMarketWsPortIsFreeAsync()
+    {
+        var listeners = IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners();
+        var occupied = false;
+        foreach (var endpoint in listeners)
+        {
+            if (endpoint.Port == MarketWsPort)
+            {
+                occupied = true;
+                break;
+            }
+        }
+
+        if (!occupied)
+        {
+            return;
+        }
+
+        _logger.LogWarning("Port {Port} is already in use. Attempting stale process cleanup.", MarketWsPort);
+
+        var netstat = new ProcessStartInfo
+        {
+            FileName = "netstat",
+            Arguments = "-ano -p tcp",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        using var netstatProcess = Process.Start(netstat);
+        if (netstatProcess == null)
+        {
+            return;
+        }
+
+        var output = await netstatProcess.StandardOutput.ReadToEndAsync();
+        netstatProcess.WaitForExit(2000);
+
+        var pids = new System.Collections.Generic.HashSet<int>();
+        var lines = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (var line in lines)
+        {
+            try
+            {
+                if (!line.Contains($":{MarketWsPort} "))
+                {
+                    continue;
+                }
+
+                var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 5)
+                {
+                    continue;
+                }
+
+                if (int.TryParse(parts[4], out var pid))
+                {
+                    pids.Add(pid);
+                }
+            }
+            catch
+            {
+                // Best-effort parsing.
+            }
+        }
+
+        foreach (var pid in pids)
+        {
+            try
+            {
+                using var proc = Process.GetProcessById(pid);
+                if (!proc.HasExited)
+                {
+                    proc.Kill(entireProcessTree: true);
+                    proc.WaitForExit(2000);
+                }
+            }
+            catch
+            {
+                // Best-effort cleanup.
+            }
+        }
+
+        await Task.Delay(300);
+    }
 }
+
+

@@ -29,7 +29,7 @@ import logging
 import sys
 import threading
 import websocket
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
 import config
@@ -62,7 +62,7 @@ logger = logging.getLogger("MarketWS")
 # ─────────────────────────────────────────────────────────────
 _ws_state: dict = {
     name: {"connected": False, "reconnects": 0, "messages": 0, "candles": 0}
-    for name in EXCHANGES
+    for name in list(EXCHANGES.keys()) + ["pyth"]
 }
 _state_lock = threading.Lock()
 
@@ -234,6 +234,10 @@ def _run_exchange_ws(exchange_name: str):
 
 class CandleHandler(BaseHTTPRequestHandler):
 
+    def log_message(self, format, *args):
+        # Override to see requests in the agent terminal
+        logger.info(f"[HTTP] {self.address_string} - {format%args}")
+
     def do_GET(self):
         path = urlparse(self.path).path.rstrip("/")
 
@@ -338,6 +342,21 @@ class CandleHandler(BaseHTTPRequestHandler):
             # Client disconnected before response was fully sent — ignore silently
             pass
 
+    def do_OPTIONS(self):
+        """Handle CORS preflight requests from browser."""
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
+
+    def handle_one_request(self):
+        try:
+            super().handle_one_request()
+        except (ConnectionResetError, BrokenPipeError, TimeoutError, OSError):
+            # Clients can drop sockets during polling bursts; treat as harmless.
+            pass
+
     def log_message(self, fmt, *args):
         pass   # Silence HTTP access logs
 
@@ -419,8 +438,11 @@ if __name__ == "__main__":
                                     volume=0.0,
                                     source="pyth"
                                 )
-                                # Record success for Pyth CB
+                                # Record success for Pyth CB and status
                                 breakers["pyth"].record_success()
+                                with _state_lock:
+                                    _ws_state["pyth"]["connected"] = True
+                                    _ws_state["pyth"]["messages"] += 1
                 time.sleep(10) # Pyth polling interval
             except Exception as e:
                 logger.error(f"[Pyth] Polling error: {e}")
@@ -432,8 +454,8 @@ if __name__ == "__main__":
     logger.info("[Pyth] Started polling thread (decentralized backup).")
 
     # Start HTTP server (blocks main thread)
-    logger.info("[HTTP] Server ready at http://localhost:8001")
-    server = HTTPServer(("localhost", 8001), CandleHandler)
+    logger.info("[HTTP] Server ready at http://0.0.0.0:8001")
+    server = ThreadingHTTPServer(("0.0.0.0", 8001), CandleHandler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

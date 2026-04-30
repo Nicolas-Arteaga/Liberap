@@ -918,6 +918,14 @@
                   }
                 },
                 {
+                  "name": "GetSystemStateAsync",
+                  "parametersOnMethod": [],
+                  "returnValue": {
+                    "type": "System.Object",
+                    "typeSimple": "object"
+                  }
+                },
+                {
                   "name": "GetAuditSummaryAsync",
                   "parametersOnMethod": [],
                   "returnValue": {
@@ -988,11 +996,11 @@
               "parametersOnMethod": [],
               "parameters": [],
               "returnValue": {
-                "type": "System.String",
-                "typeSimple": "string"
+                "type": "System.Object",
+                "typeSimple": "object"
               },
-              "allowAnonymous": false,
-              "implementFrom": "Verge.Agent.AgentAppService"
+              "allowAnonymous": true,
+              "implementFrom": "Verge.Agent.IAgentAppService"
             },
             "StartServerAsync": {
               "uniqueName": "StartServerAsync",

@@ -391,6 +391,7 @@
               <thead>
                 <tr class="text-white-50">
                   <th>Símbolo</th>
+                  <th>Inicio</th>
                   <th>Tamaño</th>
                   <th>Precio de entrada</th>
                   <th>Precio de marca</th>
@@ -414,6 +415,9 @@
                       </span>
                       <span class="badge bg-dark-accent text-white-50">{{ trade.leverage }}x</span>
                     </div>
+                  </td>
+                  <td class="align-middle text-white-50">
+                    {{ trade.openedAt | date:'HH:mm:ss' }}
                   </td>
                   <td class="align-middle">
                     <div class="text-white">{{ trade.amount | number:'1.2-2' }} USDT</div>

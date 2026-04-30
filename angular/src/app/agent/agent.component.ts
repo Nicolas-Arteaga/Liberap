@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonIcon } from '@ionic/angular/standalone';
 import { AgentService } from '../proxy/agent/agent.service';
@@ -14,7 +14,8 @@ export type SystemState = 'STOPPED' | 'STARTING_SERVER' | 'SERVER_READY' | 'AGEN
   templateUrl: './agent.component.html',
   styleUrls: ['./agent.component.scss']
 })
-export class AgentComponent implements OnInit {
+export class AgentComponent implements OnInit, OnDestroy, AfterViewChecked {
+  @ViewChild('terminalContainer') private terminalContainer!: ElementRef;
 
   // State Machine
   systemState: SystemState = 'STOPPED';
@@ -24,13 +25,17 @@ export class AgentComponent implements OnInit {
   startTime = '-';
   
   services = [
-    { name: 'API Binance', key: 'binance' },
-    { name: 'WebSocket Stream', key: 'ws' },
-    { name: 'Datos de Velas', key: 'klines' },
-    { name: 'Motor de Predicción (NEXUS-15)', key: 'nexus' },
-    { name: 'SCAR Signal Engine', key: 'scar' },
-    { name: 'Gestor de Riesgo', key: 'risk' }
+    { name: 'Binance (Futures)', key: 'binance' },
+    { name: 'Bybit (Futures)', key: 'bybit' },
+    { name: 'OKX (Futures)', key: 'okx' },
+    { name: 'Bitget (Futures)', key: 'bitget' },
+    { name: 'Pyth Network (Oracle)', key: 'pyth' },
+    { name: 'Motor de Predicción', key: 'nexus' },
+    { name: 'SCAR Signal Engine', key: 'scar' }
   ];
+
+  // Store real-time exchange status from health check
+  private exchangeStats: any = null;
 
   // Terminal Logs
   terminalLogs: { time: string, text: string, highlight?: boolean, color?: string }[] = [];
@@ -58,6 +63,7 @@ export class AgentComponent implements OnInit {
   openPositions: any[] = [];
 
   private refreshInterval: any;
+  private isRefreshing = false;
 
   private agentService = inject(AgentService);
   private agentSignalrService = inject(AgentSignalrService);
@@ -68,12 +74,26 @@ export class AgentComponent implements OnInit {
   ngOnInit(): void {
     this.addLog('Sistema inicializado. Sincronizando estado...', '#64748b');
 
-    // Sync state on load (Fix for F5)
+    // 1. Connect to SignalR immediately to receive any ongoing logs
+    this.agentSignalrService.startConnection().then(() => {
+      this.addLog('✅ Conectado al hub de señales.', '#10b981');
+    }).catch(err => {
+      console.error('Error connecting to SignalR:', err);
+    });
+
+    // 2. Sync state on load (Fix for F5)
     this.agentService.getSystemState().subscribe({
-      next: (state) => {
-        this.systemState = state as SystemState;
+      next: (data: any) => {
+        this.systemState = data.state as SystemState;
+
         if (this.systemState !== 'STOPPED') {
           this.addLog(`✅ Sistema detectado en ejecución: ${this.systemState}`, '#10b981');
+          
+          if (data.startTime) {
+            this.startTimestamp = new Date(data.startTime).getTime();
+            this.startTime = `Iniciado ${new Date(data.startTime).toLocaleTimeString()}`;
+          }
+
           this.startUptime();
           this.startDataRefresh();
         }
@@ -84,6 +104,9 @@ export class AgentComponent implements OnInit {
       }
     });
 
+    // 3. Initial data refresh (includes health via backend)
+    this.refreshData();
+
     this.subscriptions.add(
       this.agentSignalrService.logs$.subscribe((log: AgentLog) => {
         this.addLog(log.message, log.color);
@@ -93,9 +116,12 @@ export class AgentComponent implements OnInit {
     this.subscriptions.add(
       this.agentSignalrService.state$.subscribe((state: any) => {
         this.systemState = state as SystemState;
-        if (state === 'SERVER_READY' && !this.uptimeInterval) {
-          this.startUptime();
-          this.startDataRefresh();
+        if (state === 'SERVER_READY' || state === 'AGENT_RUNNING') {
+          if (!this.uptimeInterval) {
+            this.startTimestamp = Date.now();
+            this.startUptime();
+            this.startDataRefresh();
+          }
         } else if (state === 'STOPPED') {
           this.stopUptime();
           this.stopDataRefresh();
@@ -108,13 +134,31 @@ export class AgentComponent implements OnInit {
     this.subscriptions.unsubscribe();
     this.stopUptime();
     this.stopDataRefresh();
+    this.agentSignalrService.stopConnection();
+  }
+
+  ngAfterViewChecked() {
+    this.scrollToBottom();
+  }
+
+  private scrollToBottom(): void {
+    try {
+      const element = this.terminalContainer.nativeElement;
+      const threshold = 100; // pixels from bottom to consider "at the end"
+      const isAtBottom = element.scrollHeight - element.scrollTop - element.clientHeight < threshold;
+      
+      // Only force scroll if they were already near the bottom
+      if (isAtBottom) {
+        element.scrollTop = element.scrollHeight;
+      }
+    } catch (err) { }
   }
 
   // --- Data Fetching ---
 
   private startDataRefresh() {
     this.refreshData();
-    this.refreshInterval = setInterval(() => this.refreshData(), 10000);
+    this.refreshInterval = setInterval(() => this.refreshData(), 5000);
   }
 
   private stopDataRefresh() {
@@ -124,6 +168,28 @@ export class AgentComponent implements OnInit {
   }
 
   refreshData() {
+    if (this.isRefreshing) {
+      return;
+    }
+    this.isRefreshing = true;
+
+    // Refresh backend state; backend is source of truth for MarketWS health.
+    this.agentService.getSystemState().subscribe((data: any) => {
+      if (data?.health) {
+        this.exchangeStats = data.health;
+      } else if (data?.isServerHealthy === false) {
+        this.exchangeStats = null;
+      }
+
+      if (data?.state) {
+        this.systemState = data.state as SystemState;
+      }
+    }, () => {
+      // Keep previous telemetry on transient failures.
+    }, () => {
+      this.isRefreshing = false;
+    });
+
     this.agentService.getAuditSummary().subscribe((data: any) => {
       if (data) {
         this.balance = data.balance?.toLocaleString('en-US') || '0.00';
@@ -216,10 +282,37 @@ export class AgentComponent implements OnInit {
       return { text: 'DESCONECTADO', class: 'text-danger' };
     }
     
-    // In SERVER_READY or AGENT_RUNNING, all services are ready
-    if (key === 'binance' || key === 'ws') return { text: 'CONECTADO', class: 'text-success' };
-    if (key === 'klines') return { text: 'SINCRONIZADO', class: 'text-success' };
-    return { text: 'ACTIVO', class: 'text-success' };
+    // Check real-time status if available
+    if (this.exchangeStats) {
+        // 1. Check WebSocket status
+        const ws = this.exchangeStats.exchanges?.[key];
+        if (ws?.connected) return { text: 'CONECTADO', class: 'text-success' };
+
+        // 2. Check Circuit Breaker status (most reliable for REST fallbacks)
+        const cb = this.exchangeStats.circuit_breakers?.[key];
+        if (cb) {
+            if (cb.state === 'OPEN' || cb.stat_418s > 0) {
+              return { text: 'BANEADO (418)', class: 'text-danger' };
+            }
+            if (cb.state === 'HALF_OPEN') return { text: 'PROBANDO...', class: 'text-warning' };
+            if (cb.is_available) return { text: 'STANDBY / OK', class: 'text-success' };
+        }
+
+        if (ws?.reconnects > 0) return { text: 'RECONECTANDO...', class: 'text-warning' };
+    }
+
+    // If backend is online but health telemetry is unavailable, do not show "initializing" forever.
+    if (!this.exchangeStats) {
+      if (key === 'nexus' || key === 'scar') return { text: 'ACTIVO', class: 'text-success' };
+      return this.systemState === 'AGENT_RUNNING' || this.systemState === 'SERVER_READY'
+        ? { text: 'ACTIVO', class: 'text-success' }
+        : { text: 'CONECTANDO...', class: 'text-warning' };
+    }
+
+    // Default statuses for non-exchange items
+    if (key === 'nexus' || key === 'scar') return { text: 'ACTIVO', class: 'text-success' };
+    
+    return { text: 'INICIALIZANDO...', class: 'text-warning' };
   }
 
   // --- Actions ---
@@ -227,7 +320,6 @@ export class AgentComponent implements OnInit {
   startServer() {
     if (this.systemState !== 'STOPPED') return;
     this.systemState = 'STARTING_SERVER';
-    this.terminalLogs = [];
     this.addLog('Conectando al hub de señales...', '#64748b');
 
     this.agentSignalrService.startConnection().then(() => {
@@ -277,8 +369,8 @@ export class AgentComponent implements OnInit {
       text: text,
       color: color
     });
-    // Optional: Keep terminal array size manageable
-    if (this.terminalLogs.length > 50) {
+    // Keep terminal history large enough (like a real terminal)
+    if (this.terminalLogs.length > 10000) {
       this.terminalLogs.shift();
     }
   }
@@ -289,8 +381,15 @@ export class AgentComponent implements OnInit {
   }
 
   private startUptime() {
-    this.startTime = `Hoy ${this.getCurrentTime()}`;
-    this.startTimestamp = Date.now();
+    if (!this.startTimestamp) {
+        this.startTimestamp = Date.now();
+    }
+    if (this.startTime === '-') {
+        this.startTime = `Hoy ${this.getCurrentTime()}`;
+    }
+
+    if (this.uptimeInterval) clearInterval(this.uptimeInterval);
+    
     this.uptimeInterval = setInterval(() => {
       const diff = Math.floor((Date.now() - this.startTimestamp) / 1000);
       const h = Math.floor(diff / 3600).toString().padStart(2, '0');

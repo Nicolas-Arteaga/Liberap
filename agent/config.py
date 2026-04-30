@@ -199,16 +199,20 @@ WATCHLIST_TIER3 = TIERED_WATCHLIST["tier3"]
 
 def get_symbols_for_exchange(exchange_name: str) -> list:
     """
-    Returns a subset of the WATCHLIST assigned to a specific exchange.
-    Ensures 200 symbols are balanced (approx 50 per exchange).
-    Priority exchanges (Binance/Bybit) get T1 symbols first.
+    Returns symbols assigned to a specific exchange.
+    RESILIENCE UPDATE: 
+      - TIER 1 (and Open Positions) are monitored by ALL exchanges for redundancy (HA).
+      - TIER 2 & 3 are distributed among exchanges to balance load.
     """
-    all_syms = WATCHLIST
-    if not all_syms:
+    if not WATCHLIST:
         return []
 
-    # Map exchange names to their index for distribution
-    # Order matches EXCHANGES priority in registry
+    # 1. Start with TIER 1 (High Priority - Monitored by everyone)
+    symbols = list(WATCHLIST_TIER1)
+
+    # 2. Distribute TIER 2 & 3 (Lower Priority - Distributed)
+    distributed_syms = WATCHLIST_TIER2 + WATCHLIST_TIER3
+    
     mapping = {
         "binance": 0,
         "bybit":   1,
@@ -217,24 +221,19 @@ def get_symbols_for_exchange(exchange_name: str) -> list:
     }
 
     if exchange_name not in mapping:
-        return []
+        return symbols # return at least T1 if unknown
 
     idx = mapping[exchange_name]
     num_exchanges = len(mapping)
 
-    # Distribute symbols: each exchange takes its slice
-    # Example: 200 symbols / 4 = 50 each
-    chunk_size = len(all_syms) // num_exchanges
+    chunk_size = len(distributed_syms) // num_exchanges
     start = idx * chunk_size
-    # Last exchange takes any remainder
-    end = (idx + 1) * chunk_size if idx < num_exchanges - 1 else len(all_syms)
+    end = (idx + 1) * chunk_size if idx < num_exchanges - 1 else len(distributed_syms)
 
-    subset = all_syms[start:end]
+    # Add the distributed slice
+    symbols.extend(distributed_syms[start:end])
 
-    # Special rule: Pyth doesn't have a WS thread (it's REST/Oracle),
-    # so we don't assign it symbols for WS monitoring here.
-
-    return subset
+    return list(set(symbols)) # Unique symbols just in case
 
 
 def get_primary_exchange_for_symbol(symbol: str) -> str:

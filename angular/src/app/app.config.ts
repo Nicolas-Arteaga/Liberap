@@ -122,6 +122,18 @@ import {
   repeatOutline,
   toggleOutline,
   eyeOutline
+  ,
+  optionsOutline,
+  power,
+  sync,
+  play,
+  square,
+  cubeOutline,
+  terminalOutline,
+  trophy,
+  listOutline,
+  starOutline,
+  ellipse
 } from 'ionicons/icons';
 
 addIcons({
@@ -209,7 +221,18 @@ addIcons({
   'bar-chart-outline': barChartOutline,
   'repeat-outline': repeatOutline,
   'toggle-outline': toggleOutline,
-  'eye-outline': eyeOutline
+  'eye-outline': eyeOutline,
+  'options-outline': optionsOutline,
+  'power': power,
+  'sync': sync,
+  'play': play,
+  'square': square,
+  'cube-outline': cubeOutline,
+  'terminal-outline': terminalOutline,
+  'trophy': trophy,
+  'list-outline': listOutline,
+  'star-outline': starOutline,
+  'ellipse': ellipse
 });
 
 export const appConfig: ApplicationConfig = {

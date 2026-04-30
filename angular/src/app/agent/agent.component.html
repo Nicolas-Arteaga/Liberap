@@ -62,22 +62,29 @@
       </div>
     </div>
 
-    <!-- Terminal -->
-    <div class="col-6 glass-card">
-      <div class="card-header">
-        <h3><ion-icon name="terminal-outline"></ion-icon> Terminal del Agente</h3>
-        <button (click)="clearLogs()" style="background:transparent; border:1px solid rgba(255,255,255,0.1); color:#cbd5e1; border-radius:4px; font-size:0.7rem; padding:0.2rem 0.5rem; cursor:pointer;">
+    <!-- Terminal Estilo Nexus-15 -->
+    <div class="col-6 glass-card terminal-card">
+      <div class="nexus-header">
+        <div class="traffic-lights">
+          <span class="red"></span>
+          <span class="yellow"></span>
+          <span class="green"></span>
+        </div>
+        <div class="nexus-title">VERGE TERMINAL CORE v1.0</div>
+        <button class="btn-clear" (click)="clearLogs()">
           <ion-icon name="trash-outline"></ion-icon> Limpiar
         </button>
       </div>
       
-      <div class="terminal font-mono">
+      <div class="terminal font-mono" #terminalContainer>
         <div class="log-line" *ngFor="let log of terminalLogs" [class.highlight]="log.highlight">
+          <span class="prompt">></span>
           <span class="log-time">[{{ log.time }}]</span>
-          <span class="log-text" [style.color]="log.color || '#cbd5e1'">{{ log.text }}</span>
+          <span class="log-text" [style.color]="log.color || '#00f3ff'">{{ log.text }}</span>
         </div>
         <div class="log-line" *ngIf="systemState === 'AGENT_RUNNING' || systemState === 'STARTING_SERVER'">
-          <span class="log-text" style="color: #10b981; margin-left: 5.5rem;"><span class="cursor"></span></span>
+          <span class="prompt">></span>
+          <span class="log-text" style="color: #00ffaa;"><span class="cursor"></span></span>
         </div>
       </div>
     </div>
@@ -293,7 +300,7 @@
         </table>
       </div>
       <div style="margin-top:1rem; display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; color:#64748b;">
-        <span>Mostrando 5 de 47 operaciones</span>
+        <span>Mostrando {{ operations.length }} de {{ trades }} operaciones</span>
         <button style="background:transparent; border:1px solid rgba(255,255,255,0.1); color:#cbd5e1; padding:0.4rem 1rem; border-radius:4px; cursor:pointer;">VER HISTORIAL COMPLETO</button>
       </div>
     </div>

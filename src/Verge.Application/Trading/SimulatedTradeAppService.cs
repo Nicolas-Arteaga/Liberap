@@ -11,6 +11,9 @@ using Verge.Trading.DTOs;
 using AutoMapper;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Mvc;
+using System.Net.Http;
+using System.Text.Json;
+using System.Globalization;
 
 namespace Verge.Trading;
 
@@ -21,6 +24,7 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
     private readonly MarketDataManager _marketDataManager;
     private readonly TradingSimulationService _simulationService;
     private readonly IHubContext<TradingHub> _hubContext;
+    private readonly HttpClient _priceClient = new() { Timeout = TimeSpan.FromSeconds(3) };
 
     public SimulatedTradeAppService(
         IRepository<SimulatedTrade, Guid> tradeRepo,
@@ -40,69 +44,41 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
     {
         // 1. Get current user profile
         var userId = CurrentUser.Id!.Value;
-        var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId)
-            ?? throw new UserFriendlyException("Trader profile not found. Please complete your profile first.");
 
         // 2. Normalize and get current mark price (Try fast WebSocket cache first)
-        var symbol = input.Symbol.ToUpper().Replace("/", "").Replace("-", "").Trim();
-        if (!symbol.EndsWith("USDT") && !symbol.Contains("USD")) symbol += "USDT";
-
-        decimal entryPrice;
-        var wsPrice = _marketDataManager.GetWebSocketPrice(symbol);
-        if (wsPrice.HasValue && wsPrice.Value > 0)
-        {
-            entryPrice = wsPrice.Value;
-        }
-        else
-        {
-            var tickers = await _marketDataManager.GetTickersAsync();
-            var ticker = tickers.FirstOrDefault(t => t.Symbol == symbol);
-            
-            if (ticker != null)
-            {
-                entryPrice = ticker.LastPrice;
-            }
-            else
-            {
-                // 🔥 Fallback Dinámico: Si no está en el TOP 24h, buscamos el precio directo
-                Logger.LogInformation("🔍 [Simulation] Symbol '{Symbol}' not in top tickers. Fetching real-time price fallback...", symbol);
-                try {
-                    using var client = new System.Net.Http.HttpClient();
-                    var response = await client.GetAsync($"https://fapi.binance.com/fapi/v1/ticker/price?symbol={symbol}");
-                    if (response.IsSuccessStatusCode) {
-                        var content = await response.Content.ReadAsStringAsync();
-                        using var doc = System.Text.Json.JsonDocument.Parse(content);
-                        entryPrice = decimal.Parse(doc.RootElement.GetProperty("price").GetString()!, System.Globalization.CultureInfo.InvariantCulture);
-                        Logger.LogInformation("✅ [Simulation] Fallback price found for {Symbol}: {Price}", symbol, entryPrice);
-                    } else {
-                        Logger.LogWarning("⚠️ [Simulation] Trade failed: Symbol '{Symbol}' not found even in real-time fallback.", symbol);
-                        return null; 
-                    }
-                } catch (Exception ex) {
-                    Logger.LogError("💥 [Simulation] Error during fallback for {Symbol}: {Message}", symbol, ex.Message);
-                    return null;
-                }
-            }
-        }
+        var symbol = NormalizeSymbol(input.Symbol);
+        var entryPrice = await ResolveCurrentPriceAsync(symbol)
+            ?? throw new UserFriendlyException($"Could not fetch current price for {symbol}.");
 
         // 3. Calculate position values
-        // input.Amount is now treated as MARGIN (the cost the user wants to risk)
         var margin = input.Amount;
         var exposureValue = margin * input.Leverage;
         var entryFee = _simulationService.CalculateEntryFee(exposureValue);
         var totalCost = margin + entryFee;
 
-        // 4. Validate virtual balance
+        // 4. Validate virtual balance (Loading here to minimize concurrency window)
+        var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId)
+            ?? throw new UserFriendlyException("Trader profile not found.");
+
         if (profile.VirtualBalance < totalCost)
-            throw new UserFriendlyException($"Insufficient virtual balance. Required: {totalCost:N2} USDT (Margin: {margin:N2} + Fee: {entryFee:N2}), Available: {profile.VirtualBalance:N2} USDT.");
+            throw new UserFriendlyException($"Insufficient virtual balance. Required: {totalCost:N2} USDT, Available: {profile.VirtualBalance:N2} USDT.");
 
         // 5. Calculate position size (quantity) and liquidation price
         var size = _simulationService.CalculatePositionSize(exposureValue, entryPrice);
         var liquidationPrice = _simulationService.CalculateLiquidationPrice(entryPrice, input.Leverage, input.Side);
 
-        // 6. Deduct balance (margin + entry fee)
+        // 6. Deduct balance with Retry logic for Concurrency
         profile.VirtualBalance -= totalCost;
-        await _profileRepo.UpdateAsync(profile);
+        
+        try {
+            await _profileRepo.UpdateAsync(profile, autoSave: true);
+        } catch (Volo.Abp.Data.AbpDbConcurrencyException) {
+            Logger.LogWarning("🔄 [Simulation] Concurrency conflict for profile {UserId}. Retrying...", userId);
+            profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
+            if (profile!.VirtualBalance < totalCost) throw new UserFriendlyException("Insufficient balance after retry.");
+            profile.VirtualBalance -= totalCost;
+            await _profileRepo.UpdateAsync(profile, autoSave: true);
+        }
 
         // 7. Create trade record
         var trade = new SimulatedTrade(
@@ -149,19 +125,8 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         }
 
         // 1. Get current mark price (Try fast WebSocket cache first)
-        decimal closePrice;
-        var wsPrice = _marketDataManager.GetWebSocketPrice(trade.Symbol);
-        if (wsPrice.HasValue && wsPrice.Value > 0)
-        {
-            closePrice = wsPrice.Value;
-        }
-        else
-        {
-            var tickers = await _marketDataManager.GetTickersAsync();
-            var ticker = tickers.FirstOrDefault(t => t.Symbol == trade.Symbol)
-                ?? throw new UserFriendlyException($"Could not fetch current price for {trade.Symbol}.");
-            closePrice = ticker.LastPrice;
-        }
+        var closePrice = await ResolveCurrentPriceAsync(trade.Symbol)
+            ?? throw new UserFriendlyException($"Could not fetch current price for {trade.Symbol}.");
 
         // 2. Calculate exit fee and realized PnL
         var exitFee = _simulationService.CalculateExitFee(trade.Size, closePrice);
@@ -190,7 +155,16 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         if (profile != null)
         {
             profile.VirtualBalance += trade.Margin + realizedPnl;
-            await _profileRepo.UpdateAsync(profile, autoSave: true);
+            try {
+                await _profileRepo.UpdateAsync(profile, autoSave: true);
+            } catch (Volo.Abp.Data.AbpDbConcurrencyException) {
+                Logger.LogWarning("🔄 [Simulation] Concurrency conflict closing trade for {UserId}. Retrying...", userId);
+                profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
+                if (profile != null) {
+                    profile.VirtualBalance += trade.Margin + realizedPnl;
+                    await _profileRepo.UpdateAsync(profile, autoSave: true);
+                }
+            }
         }
 
         var dto = MapToDto(trade);
@@ -233,7 +207,11 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
             if (!hasTrades)
             {
                 profile.VirtualBalance = 10000;
-                await _profileRepo.UpdateAsync(profile, autoSave: true);
+                try {
+                    await _profileRepo.UpdateAsync(profile, autoSave: true);
+                } catch (Volo.Abp.Data.AbpDbConcurrencyException) {
+                    // Ignore, someone else might have initialized it
+                }
             }
         }
 
@@ -338,4 +316,78 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         SlPrice = t.SlPrice,
         TradingSignalId = t.TradingSignalId
     };
+
+    private static string NormalizeSymbol(string rawSymbol)
+    {
+        var symbol = rawSymbol.ToUpper().Replace("/", "").Replace("-", "").Trim();
+        if (!symbol.EndsWith("USDT") && !symbol.Contains("USD"))
+        {
+            symbol += "USDT";
+        }
+        return symbol;
+    }
+
+    private async Task<decimal?> ResolveCurrentPriceAsync(string rawSymbol)
+    {
+        var symbol = NormalizeSymbol(rawSymbol);
+
+        for (int i = 0; i < 3; i++)
+        {
+            // 1) Fast path: in-memory WS cache
+            var wsPrice = _marketDataManager.GetWebSocketPrice(symbol);
+            if (wsPrice.HasValue && wsPrice.Value > 0) return wsPrice.Value;
+
+            // 2) Local Python Service (Multi-exchange source)
+            var pythonPrice = await TryFetchDirectPriceAsync($"http://127.0.0.1:8001/market/ticker/{symbol}");
+            if (pythonPrice.HasValue && pythonPrice.Value > 0) return pythonPrice.Value;
+
+            // 3) Aggregated 24h tickers
+            try
+            {
+                var tickers = await _marketDataManager.GetTickersAsync();
+                var ticker = tickers.FirstOrDefault(t => t.Symbol == symbol);
+                if (ticker != null && ticker.LastPrice > 0) return ticker.LastPrice;
+            }
+            catch { }
+
+            // 4) External Binance Fallbacks
+            var futures = await TryFetchDirectPriceAsync($"https://fapi.binance.com/fapi/v1/ticker/price?symbol={symbol}");
+            if (futures.HasValue && futures.Value > 0) return futures.Value;
+
+            var spot = await TryFetchDirectPriceAsync($"https://api.binance.com/api/v3/ticker/price?symbol={symbol}");
+            if (spot.HasValue && spot.Value > 0) return spot.Value;
+
+            if (i < 2) await Task.Delay(500);
+        }
+
+        Logger.LogWarning("⚠️ [Simulation] No valid price source found for {Symbol} after retries.", symbol);
+        return null;
+    }
+
+    private async Task<decimal?> TryFetchDirectPriceAsync(string url)
+    {
+        try
+        {
+            var response = await _priceClient.GetAsync(url);
+            if (!response.IsSuccessStatusCode) return null;
+
+            var content = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(content);
+            
+            string priceStr = null;
+            if (doc.RootElement.TryGetProperty("price", out var pNode)) priceStr = pNode.GetString();
+            else if (doc.RootElement.TryGetProperty("close", out var cNode)) 
+            {
+                if (cNode.ValueKind == JsonValueKind.Number) return cNode.GetDecimal();
+                priceStr = cNode.GetString();
+            }
+
+            if (decimal.TryParse(priceStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var value) && value > 0)
+            {
+                return value;
+            }
+        }
+        catch { }
+        return null;
+    }
 }

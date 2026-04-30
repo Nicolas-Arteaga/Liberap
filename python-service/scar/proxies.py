@@ -25,7 +25,7 @@ BYBIT_API    = "https://api.bybit.com"
 OKX_API      = "https://www.okx.com"
 
 # URL of the local Market Data Service (market_ws_server.py)
-MARKET_WS_URL = "http://localhost:8001"
+MARKET_WS_URL = "http://127.0.0.1:8001"
 
 
 # ─────────────────────────────────────────────────────────────────────────────

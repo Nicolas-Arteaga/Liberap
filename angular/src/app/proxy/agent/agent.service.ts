@@ -43,9 +43,8 @@ export class AgentService {
   
 
   getSystemState = (config?: Partial<Rest.Config>) =>
-    this.restService.request<any, string>({
+    this.restService.request<any, object>({
       method: 'GET',
-      responseType: 'text',
       url: '/api/app/agent/system-state',
     },
     { apiName: this.apiName,...config });
