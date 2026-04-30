@@ -131,7 +131,7 @@ class BinanceFetcher:
                 f"[Fetcher] {symbol}: fetched {len(fetched)} klines via "
                 f"multi-source REST and saved to cache."
             )
-            return fetched
+            return self._cache.get_klines(symbol, interval, limit)
 
         # Return whatever we had (partial is better than nothing)
         if klines:
@@ -143,6 +143,7 @@ class BinanceFetcher:
 
     def get_rate_limiter_status(self) -> dict:
         """Exposes rate limiter + circuit breaker status for /health endpoints."""
+        logger.debug("[TRACE] Entering get_rate_limiter_status")
         limiter_status = self._limiter.get_status()
         cb_status      = self._multi_fetcher.get_status()
         return {

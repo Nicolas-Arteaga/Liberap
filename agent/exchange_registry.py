@@ -289,6 +289,13 @@ class ExchangeConfig:
     to_exchange: Callable        # fn(canonical_symbol) -> exchange_symbol
     from_exchange: Callable      # fn(exchange_symbol) -> canonical_symbol
 
+    # API Keys (Loaded from .env)
+    api_key:    Optional[str] = None
+    api_secret: Optional[str] = None
+
+    # Heartbeat
+    ping_payload: Optional[str] = None  # e.g., "ping" for OKX
+
     # REST — watchlist (optional)
     rest_watchlist_url: Optional[str] = None
     rest_watchlist_parser: Optional[Callable] = None
@@ -301,11 +308,15 @@ class ExchangeConfig:
 # Exchange Registry
 # ─────────────────────────────────────────────────────────────
 
+import os
+
 EXCHANGES: Dict[str, ExchangeConfig] = {
 
     "binance": ExchangeConfig(
         name="binance",
         priority=1,
+        api_key=os.getenv("BINANCE_API_KEY"),
+        api_secret=os.getenv("BINANCE_API_SECRET"),
         ws_url_builder=lambda syms: "wss://fstream.binance.com/stream?streams=" + "/".join(
             f"{s.lower()}@kline_15m" for s in syms
         ),
@@ -326,6 +337,8 @@ EXCHANGES: Dict[str, ExchangeConfig] = {
     "bybit": ExchangeConfig(
         name="bybit",
         priority=2,
+        api_key=os.getenv("BYBIT_API_KEY"),
+        api_secret=os.getenv("BYBIT_API_SECRET"),
         ws_url_builder=lambda syms: "wss://stream.bybit.com/v5/public/linear",
         subscribe_fn=_subscribe_bybit,
         message_parser=_parse_bybit,
@@ -346,6 +359,9 @@ EXCHANGES: Dict[str, ExchangeConfig] = {
     "okx": ExchangeConfig(
         name="okx",
         priority=3,
+        api_key=os.getenv("OKX_API_KEY"),
+        api_secret=os.getenv("OKX_API_SECRET"),
+        ping_payload="ping",
         ws_url_builder=lambda syms: "wss://ws.okx.com:8443/ws/v5/public",
         subscribe_fn=_subscribe_okx,
         message_parser=_parse_okx,
@@ -366,6 +382,9 @@ EXCHANGES: Dict[str, ExchangeConfig] = {
     "bitget": ExchangeConfig(
         name="bitget",
         priority=4,
+        api_key=os.getenv("BITGET_API_KEY"),
+        api_secret=os.getenv("BITGET_API_SECRET"),
+        ping_payload="ping",
         ws_url_builder=lambda syms: "wss://ws.bitget.com/v2/ws/public",
         subscribe_fn=_subscribe_bitget,
         message_parser=_parse_bitget,
@@ -381,6 +400,20 @@ EXCHANGES: Dict[str, ExchangeConfig] = {
         rest_watchlist_url="https://api.bitget.com/api/v2/mix/market/tickers?productType=USDT-FUTURES",
         rest_watchlist_parser=None,  # Bitget watchlist format varies — skip for now
         interval_map={"15m": "15m", "1h": "1H", "4h": "4H", "1d": "1Dutc"},
+    ),
+
+    "pyth": ExchangeConfig(
+        name="pyth",
+        priority=5,
+        ws_url_builder=lambda syms: "https://hermes.pyth.network", # Dummy URL
+        subscribe_fn=lambda ws, syms: None,
+        message_parser=lambda data: None,
+        rest_kline_url="https://hermes.pyth.network/v2/updates/price/latest",
+        rest_kline_params=lambda sym, ivl, lim: {}, # Pyth uses IDs, handled specially
+        rest_kline_parser=lambda raw: [],
+        to_exchange=_identity,
+        from_exchange=_identity,
+        interval_map={},
     ),
 }
 

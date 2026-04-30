@@ -57,7 +57,7 @@ class KlineCache:
     def _conn(self) -> sqlite3.Connection:
         """Returns a thread-local SQLite connection (created on first access per thread)."""
         if not hasattr(self._local, "conn") or self._local.conn is None:
-            conn = sqlite3.connect(self._db_path, timeout=15, check_same_thread=False)
+            conn = sqlite3.connect(self._db_path, timeout=30, check_same_thread=False)
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA journal_mode=WAL")   # Concurrent reads + writes
             conn.execute("PRAGMA synchronous=NORMAL") # Safe + fast (not FULL)
@@ -252,16 +252,17 @@ class KlineCache:
 
         age = time.time() - row["updated_at"]
         return {
-            "symbol":     symbol,
-            "close":      row["close"],
-            "open":       row["open"],
-            "high":       row["high"],
-            "low":        row["low"],
-            "volume":     row["volume"],
-            "change_pct": row["change_pct"],
-            "source":     row["source"] if "source" in row.keys() else "binance",
-            "age_s":      round(age, 1),
-            "is_fresh":   age <= LIVE_PRICE_MAX_AGE_S,
+            "symbol":      symbol,
+            "close":       row["close"],
+            "open":        row["open"],
+            "high":        row["high"],
+            "low":         row["low"],
+            "volume":      row["volume"],
+            "change_pct":  row["change_pct"],
+            "source":      row["source"] if "source" in row.keys() else "binance",
+            "age_s":       round(age, 1),
+            "is_fresh":    age <= LIVE_PRICE_MAX_AGE_S,
+            "has_history": self.has_history(symbol),  # True if ≥25 closed candles in cache
         }
 
     def has_history(self, symbol: str, interval: str = "15m", min_candles: int = 25) -> bool:
@@ -272,6 +273,22 @@ class KlineCache:
             WHERE symbol = ? AND interval = ? AND is_final = 1
         """, (symbol, interval)).fetchone()
         return row["cnt"] >= min_candles
+
+    def get_symbols_with_history(self, interval: str = "15m", min_candles: int = 25) -> list:
+        """
+        Returns all symbols that have enough closed candles for Nexus-15 analysis.
+        This enables the agent to scan everything in the cache, not just a fixed rotation.
+        """
+        conn = self._conn()
+        rows = conn.execute("""
+            SELECT symbol, COUNT(*) as cnt
+            FROM klines
+            WHERE interval = ? AND is_final = 1
+            GROUP BY symbol
+            HAVING cnt >= ?
+            ORDER BY cnt DESC
+        """, (interval, min_candles)).fetchall()
+        return [row["symbol"] for row in rows]
 
     def count_klines(self, symbol: str, interval: str = "15m") -> int:
         """Returns total kline count for a symbol."""

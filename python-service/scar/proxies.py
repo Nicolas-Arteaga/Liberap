@@ -24,8 +24,8 @@ BINANCE_API  = "https://api.binance.com"
 BYBIT_API    = "https://api.bybit.com"
 OKX_API      = "https://www.okx.com"
 
-_session = requests.Session()
-_session.headers.update({"Accept": "application/json"})
+# URL of the local Market Data Service (market_ws_server.py)
+MARKET_WS_URL = "http://localhost:8001"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -69,14 +69,19 @@ def _get_first(*calls) -> Optional[dict]:
 def get_current_price(symbol: str) -> float:
     """
     Spot/mark price for a symbol.
-    Chain: Binance spot → Bybit futures → 0.0
+    Chain: Local Cache (WS Server) → Binance spot → Bybit futures → 0.0
     """
-    # Binance spot
+    # 1. Try Local Market WS Cache (Phase 3: Shared Source of Truth)
+    data = _get(f"{MARKET_WS_URL}/market/candle/{symbol}")
+    if data and "close" in data:
+        return float(data["close"])
+
+    # 2. Binance spot (Legacy fallback)
     data = _get(f"{BINANCE_API}/api/v3/ticker/price", {"symbol": symbol})
     if data and "price" in data:
         return float(data["price"])
 
-    # Bybit futures fallback
+    # 3. Bybit futures fallback
     data = _get(f"{BYBIT_API}/v5/market/tickers",
                 {"category": "linear", "symbol": symbol})
     try:
@@ -215,10 +220,16 @@ def detect_price_stable(symbol: str, range_threshold: float = 0.15) -> Tuple[boo
     """
     Returns (triggered, reason, range_value).
     Checks if price has been in ±15% range for 7+ days using daily klines.
-    Primary: Binance. Fallback: Bybit.
+    Chain: Local Cache → Binance → Bybit.
     """
+    # 1. Try Local Market WS Cache first (Zero external REST)
+    # Note: market_ws_server currently caches 15m klines. 
+    # For daily stability, we might still need external or build it from 15m.
+    # For now, we try to get it from cache if possible, otherwise fallback.
+    
     # Try to get daily klines from any source
     klines = _get_first(
+        (f"{MARKET_WS_URL}/market/candles/{symbol}", {"limit": 100}), # 100 x 15m = ~24h
         (f"{BINANCE_API}/api/v3/klines",
             {"symbol": symbol, "interval": "1d", "limit": 8}),
         (f"{BINANCE_FAPI}/fapi/v1/klines",

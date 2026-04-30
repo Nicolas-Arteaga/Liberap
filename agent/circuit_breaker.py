@@ -216,11 +216,11 @@ def get_breakers() -> Dict[str, ExchangeCircuitBreaker]:
     Returns the global dict of ExchangeCircuitBreakers.
     Initialized lazily from the exchange registry.
     """
+    from exchange_registry import EXCHANGES
     global _breakers
     if not _breakers:
         with _breakers_lock:
             if not _breakers:
-                from exchange_registry import EXCHANGES
                 for name in EXCHANGES:
                     # Binance gets longer recovery (4h ban is real)
                     # Others get faster recovery (5 min)

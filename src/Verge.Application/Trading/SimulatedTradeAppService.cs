@@ -56,9 +56,33 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         else
         {
             var tickers = await _marketDataManager.GetTickersAsync();
-            var ticker = tickers.FirstOrDefault(t => t.Symbol == symbol)
-                ?? throw new UserFriendlyException($"Symbol '{symbol}' not found on Binance Futures. Asegurate de usar el par con USDT (ej: BTCUSDT)");
-            entryPrice = ticker.LastPrice;
+            var ticker = tickers.FirstOrDefault(t => t.Symbol == symbol);
+            
+            if (ticker != null)
+            {
+                entryPrice = ticker.LastPrice;
+            }
+            else
+            {
+                // 🔥 Fallback Dinámico: Si no está en el TOP 24h, buscamos el precio directo
+                Logger.LogInformation("🔍 [Simulation] Symbol '{Symbol}' not in top tickers. Fetching real-time price fallback...", symbol);
+                try {
+                    using var client = new System.Net.Http.HttpClient();
+                    var response = await client.GetAsync($"https://fapi.binance.com/fapi/v1/ticker/price?symbol={symbol}");
+                    if (response.IsSuccessStatusCode) {
+                        var content = await response.Content.ReadAsStringAsync();
+                        using var doc = System.Text.Json.JsonDocument.Parse(content);
+                        entryPrice = decimal.Parse(doc.RootElement.GetProperty("price").GetString()!, System.Globalization.CultureInfo.InvariantCulture);
+                        Logger.LogInformation("✅ [Simulation] Fallback price found for {Symbol}: {Price}", symbol, entryPrice);
+                    } else {
+                        Logger.LogWarning("⚠️ [Simulation] Trade failed: Symbol '{Symbol}' not found even in real-time fallback.", symbol);
+                        return null; 
+                    }
+                } catch (Exception ex) {
+                    Logger.LogError("💥 [Simulation] Error during fallback for {Symbol}: {Message}", symbol, ex.Message);
+                    return null;
+                }
+            }
         }
 
         // 3. Calculate position values

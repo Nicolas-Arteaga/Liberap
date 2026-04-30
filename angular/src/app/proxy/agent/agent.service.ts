@@ -42,6 +42,15 @@ export class AgentService {
     { apiName: this.apiName,...config });
   
 
+  getSystemState = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, string>({
+      method: 'GET',
+      responseType: 'text',
+      url: '/api/app/agent/system-state',
+    },
+    { apiName: this.apiName,...config });
+  
+
   getTopSymbols = (limit: number = 5, config?: Partial<Rest.Config>) =>
     this.restService.request<any, object>({
       method: 'GET',

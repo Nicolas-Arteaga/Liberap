@@ -112,6 +112,11 @@ public class AgentProcessManager : ISingletonDependency
         }
     }
 
+    public bool IsProcessRunning(string name)
+    {
+        return _processes.TryGetValue(name, out var process) && !process.HasExited;
+    }
+
     public async Task StopAllAsync()
     {
         foreach (var key in _processes.Keys)

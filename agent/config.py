@@ -7,7 +7,7 @@ import time
 # ==========================================
 
 # 1. API Endpoints
-PYTHON_SERVICE_URL = os.getenv("PYTHON_SERVICE_URL", "http://localhost:8000")
+PYTHON_SERVICE_URL = os.getenv("PYTHON_SERVICE_URL", "http://localhost:8005")
 ABP_BACKEND_URL = os.getenv("ABP_BACKEND_URL", "https://localhost:44396")
 
 # 2. ABP Agent Credentials
@@ -53,7 +53,7 @@ TELEGRAM_CHAT_ID   = os.getenv("TELEGRAM_CHAT_ID", None)
 # TIER SYSTEM
 # ==========================================
 TIER2_MIN_VOLATILITY_PCT = 0.3   # Min price move % to pass Tier 2 pre-filter
-TIER3_ROTATE_PER_CYCLE   = 5     # Symbols to rotate per cycle in Tier 3
+TIER3_ROTATE_PER_CYCLE   = 10    # Symbols to rotate per cycle in Tier 3 (10 = ~50min full coverage)
 
 # Tier sizes
 _TIER1_SIZE  = 30
@@ -191,3 +191,63 @@ WATCHLIST       = TIERED_WATCHLIST["all"]
 WATCHLIST_TIER1 = TIERED_WATCHLIST["tier1"]
 WATCHLIST_TIER2 = TIERED_WATCHLIST["tier2"]
 WATCHLIST_TIER3 = TIERED_WATCHLIST["tier3"]
+
+
+# ─────────────────────────────────────────────────────────────
+# SYMBOL DISTRIBUTION (Load Balancing)
+# ─────────────────────────────────────────────────────────────
+
+def get_symbols_for_exchange(exchange_name: str) -> list:
+    """
+    Returns a subset of the WATCHLIST assigned to a specific exchange.
+    Ensures 200 symbols are balanced (approx 50 per exchange).
+    Priority exchanges (Binance/Bybit) get T1 symbols first.
+    """
+    all_syms = WATCHLIST
+    if not all_syms:
+        return []
+
+    # Map exchange names to their index for distribution
+    # Order matches EXCHANGES priority in registry
+    mapping = {
+        "binance": 0,
+        "bybit":   1,
+        "okx":     2,
+        "bitget":  3,
+    }
+
+    if exchange_name not in mapping:
+        return []
+
+    idx = mapping[exchange_name]
+    num_exchanges = len(mapping)
+
+    # Distribute symbols: each exchange takes its slice
+    # Example: 200 symbols / 4 = 50 each
+    chunk_size = len(all_syms) // num_exchanges
+    start = idx * chunk_size
+    # Last exchange takes any remainder
+    end = (idx + 1) * chunk_size if idx < num_exchanges - 1 else len(all_syms)
+
+    subset = all_syms[start:end]
+
+    # Special rule: Pyth doesn't have a WS thread (it's REST/Oracle),
+    # so we don't assign it symbols for WS monitoring here.
+
+    return subset
+
+
+def get_primary_exchange_for_symbol(symbol: str) -> str:
+    """Returns which exchange is 'responsible' for this symbol's live data."""
+    all_syms = WATCHLIST
+    if symbol not in all_syms:
+        return "binance"  # default fallback
+
+    num_exchanges = 4
+    try:
+        s_idx = all_syms.index(symbol)
+        chunk_size = len(all_syms) // num_exchanges
+        e_idx = min(s_idx // chunk_size, num_exchanges - 1)
+        return ["binance", "bybit", "okx", "bitget"][e_idx]
+    except ValueError:
+        return "binance"

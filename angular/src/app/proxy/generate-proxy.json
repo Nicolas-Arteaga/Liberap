@@ -979,6 +979,21 @@
             }
           ],
           "actions": {
+            "GetSystemStateAsync": {
+              "uniqueName": "GetSystemStateAsync",
+              "name": "GetSystemStateAsync",
+              "httpMethod": "GET",
+              "url": "api/app/agent/system-state",
+              "supportedVersions": [],
+              "parametersOnMethod": [],
+              "parameters": [],
+              "returnValue": {
+                "type": "System.String",
+                "typeSimple": "string"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Agent.AgentAppService"
+            },
             "StartServerAsync": {
               "uniqueName": "StartServerAsync",
               "name": "StartServerAsync",

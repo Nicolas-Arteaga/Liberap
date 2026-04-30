@@ -54,10 +54,23 @@ class MultiSourceFetcher:
         limit:    int = 50,
     ) -> List[dict]:
         """
-        Fetches klines for a symbol from the first available exchange.
-        Returns normalized list of kline dicts, or [] if all fail.
+        Fetches klines for a symbol.
+        1. Tries the 'assigned' exchange first (load balancing).
+        2. Falls back to others in priority order.
         """
-        for exc in EXCHANGE_PRIORITY_LIST:
+        import config
+        primary_name = config.get_primary_exchange_for_symbol(symbol)
+        
+        # Build prioritized list: [Primary, Others...]
+        others = [e for e in EXCHANGE_PRIORITY_LIST if e.name != primary_name]
+        priority_chain = []
+        if primary_name in [e.name for e in EXCHANGE_PRIORITY_LIST]:
+            primary_exc = next(e for e in EXCHANGE_PRIORITY_LIST if e.name == primary_name)
+            priority_chain = [primary_exc] + others
+        else:
+            priority_chain = EXCHANGE_PRIORITY_LIST
+
+        for exc in priority_chain:
             cb = self._breakers.get(exc.name)
             if cb and not cb.is_available:
                 logger.debug(f"[MSF] {exc.name} skipped (circuit {cb.state})")
@@ -111,7 +124,11 @@ class MultiSourceFetcher:
         cb = self._breakers.get(exc.name)
         try:
             params = exc.rest_kline_params(symbol, interval, limit)
-            resp   = self._session.get(exc.rest_kline_url, params=params, timeout=self._timeout)
+            resp   = self._session.get(
+                exc.rest_kline_url, 
+                params=params, 
+                timeout=self._timeout
+            )
 
             if resp.status_code == 200:
                 klines = exc.rest_kline_parser(resp.json())
@@ -152,7 +169,10 @@ class MultiSourceFetcher:
     def _do_fetch_watchlist(self, exc: ExchangeConfig, limit: int) -> List[str]:
         cb = self._breakers.get(exc.name)
         try:
-            resp = self._session.get(exc.rest_watchlist_url, timeout=self._timeout)
+            resp = self._session.get(
+                exc.rest_watchlist_url, 
+                timeout=self._timeout
+            )
 
             if resp.status_code == 200:
                 symbols = exc.rest_watchlist_parser(resp.json())

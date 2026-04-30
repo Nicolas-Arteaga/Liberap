@@ -45,6 +45,9 @@ class PositionManager:
                 trade_result = response.json()
                 logger.info(f" Trade successfully opened! Trade ID: {trade_result.get('id')}")
                 return trade_result
+            elif response.status_code == 204:
+                logger.warning(f" ⚠️ Trade skipped by backend: {payload['symbol']} is temporarily unavailable or filtered.")
+                return None
             else:
                 logger.error(f" Failed to open trade. Server returned {response.status_code}: {response.text}")
                 return None

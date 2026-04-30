@@ -86,38 +86,23 @@ class VergeAgent:
     # Main cycle
     # ─────────────────────────────────────────────────────────
     def loop_cycle(self):
+        logger.debug("[TRACE] Entering loop_cycle")
         logger.info("--- Starting new analysis cycle ---")
 
-        # 0. Check system health across ALL exchanges
-        # Degraded mode only activates when EVERY exchange is unavailable.
-        # A Binance ban alone is NOT enough to degrade — Bybit/OKX keep running.
+        # 0. Check exchange health
         breakers     = get_breakers()
         available    = [name for name, cb in breakers.items() if cb.is_available]
-        all_down     = len(available) == 0
-        is_degraded  = all_down
+        is_degraded  = len(available) == 0
 
         if available:
             logger.info(f"[MultiExchange] Active sources: {available}")
         else:
             logger.warning("[MultiExchange] ALL exchange sources unavailable — running on cache only.")
 
-        # Log individual Binance ban status (informational only — not blocking)
-        rl_status = self.fetcher.get_rate_limiter_status()
-        if rl_status.get("degraded", False):
-            rem = rl_status.get("degraded_remaining_s", 0)
-            logger.warning(
-                f"⚠️  Binance IP ban active ({rem}s remaining). "
-                f"WS data continues via: {[x for x in available if x != 'binance'] or 'cache'}"
-            )
-
-        if is_degraded:
-            logger.warning(
-                "⚠️ FULL SYSTEM DEGRADED — all exchanges unavailable. "
-                "Running on SQLite cache only. Skipping new signal search."
-            )
-
         # 1. Monitor open positions (always runs, uses cached live prices)
+        logger.info("[Step 1/6] Checking open positions...")
         self._manage_open_positions()
+        logger.info("[Step 1/6] Done.")
 
         # 2. Check trade limits
         open_count = self.state.get_position_count()
@@ -129,37 +114,64 @@ class VergeAgent:
             logger.info("Max daily trades reached. Skipping new signals.")
             return
 
-        # 3. Gather global signals (SCAR proxy — lightweight)
-        logger.info("Fetching SCAR alerts...")
+        # 3. Fetch SCAR alerts (lightweight — reads from DB, not exchanges)
+        logger.info("[Step 3/6] Fetching SCAR alerts...")
         scar_alerts = self.signals.get_scar_alerts()
+        logger.info(f"[Step 3/6] Received {len(scar_alerts)} alerts.")
 
+        # 4. Scan ALL watchlist symbols with Nexus-15
+        #    - Symbols with cache history: instant (SQLite read)
+        #    - Symbols without cache history: on-demand REST fetch (Bybit/OKX)
+        #    - Mirrors exactly what the Nexus-15 dashboard analyzes
+        all_targets = config.WATCHLIST  # All 200 symbols, no exceptions
+
+        logger.info(
+            f"[Step 4/6] Scanning {len(all_targets)} symbols with Nexus-15..."
+        )
+
+        # 5. Run Nexus-15 on all watchlist symbols
         candidates = []
+        skipped_trading = 0
+        analyzed = 0
+        no_data = 0
 
-        # 4. TIER 1 — Full analysis, every cycle
-        logger.info(f"[T1] Scanning {len(config.WATCHLIST_TIER1)} priority symbols...")
-        candidates += self._scan_tier1(scar_alerts, is_degraded=is_degraded)
+        for symbol in all_targets:
+            try:
+                if self._should_skip(symbol):
+                    skipped_trading += 1
+                    continue
 
-        # 5. TIER 2 — Pre-filter first, Nexus-15 only if interesting
-        if not is_degraded and len(candidates) < 3:
-            logger.info(f"[T2] Pre-filtering {len(config.WATCHLIST_TIER2)} secondary symbols...")
-            candidates += self._scan_tier2(scar_alerts)
-        elif is_degraded:
-            logger.info("[T2] Skipped (System Degraded).")
+                # Fetch prediction with a strict timeout (handled inside signal_engine)
+                nexus_data = self.signals.get_nexus15_prediction(symbol)
+                if not nexus_data:
+                    no_data += 1
+                    continue
 
-        # 6. TIER 3 — Rotate N symbols per cycle (lightweight scan)
-        if not is_degraded and len(candidates) < 3:
-            t3_batch = self._get_tier3_batch()
-            if t3_batch:
-                logger.info(f"[T3] Scanning {len(t3_batch)} rotational symbols...")
-                candidates += self._scan_tier1(scar_alerts, symbols=t3_batch, is_degraded=is_degraded)
-        elif is_degraded:
-            logger.info("[T3] Skipped (System Degraded).")
+                analyzed += 1
+                scar_data  = scar_alerts.get(symbol, {})
+                confluence = self.signals.calculate_confluence(symbol, scar_data, nexus_data)
+
+                if confluence["confluence_score"] >= config.MIN_CONFLUENCE_SCORE:
+                    candidates.append(confluence)
+                    logger.info(
+                        f"✅ CANDIDATE: {symbol} | Score={confluence['confluence_score']:.1f} | "
+                        f"Dir={confluence['trade_direction']} | Nexus={confluence['nexus_confidence']}%"
+                    )
+            except Exception as e:
+                logger.error(f"⚠️ Error analyzing {symbol}: {e}")
+                continue
+
+
+        logger.info(
+            f"[Step 5/6] Done: {analyzed} analyzed | "
+            f"{len(candidates)} candidates | {skipped_trading} skipped | {no_data} no data"
+        )
 
         if not candidates:
             logger.info("No candidates met the minimum confluence score.")
             return
 
-        # Sort by confluence score
+        # 6. Sort by score and execute best
         candidates.sort(key=lambda x: x["confluence_score"], reverse=True)
         top = candidates[0]
         logger.info(
@@ -168,6 +180,8 @@ class VergeAgent:
         )
 
         self._execute_trade(top)
+
+
 
     # ─────────────────────────────────────────────────────────
     # Tier scanning methods
@@ -205,28 +219,35 @@ class VergeAgent:
 
     def _scan_tier2(self, scar_alerts: dict) -> list:
         """
-        Pre-filter scan: checks local SQLite cache (via get_ticker) for volatility/volume.
-        Only runs heavy Nexus-15 on symbols that pass the filter.
+        Pre-filter scan for Tier 2 symbols.
+        - If fresh live price available: apply volatility filter (change_pct > threshold)
+        - If no live price but has kline history: still run Nexus-15 (skip volatility check)
+        - If no live price AND no history: skip entirely
         """
         candidates = []
         nexus_calls = 0
         filtered_in = 0
+        skipped_no_data = 0
 
         for symbol in config.WATCHLIST_TIER2:
             if self._should_skip(symbol):
                 continue
 
-            # Quick pre-filter via cache (zero Binance calls)
             ticker = self.fetcher.get_ticker(symbol)
-            if not ticker or not ticker.get("is_fresh"):
-                continue
 
-            change_pct  = abs(ticker.get("change_pct", 0))
-            has_history = ticker.get("has_history", False)
-
-            # Rule: Must have > X% move AND history in cache
-            if change_pct < config.TIER2_MIN_VOLATILITY_PCT or not has_history:
-                continue
+            if ticker and ticker.get("is_fresh"):
+                # Has live price — apply volatility + history filter
+                change_pct  = abs(ticker.get("change_pct", 0))
+                has_history = ticker.get("has_history", False)
+                if change_pct < config.TIER2_MIN_VOLATILITY_PCT or not has_history:
+                    continue
+            else:
+                # No live price yet — check if we have kline history in cache
+                # (WS may not have reached this symbol yet, but REST history exists)
+                if not self.fetcher._cache.has_history(symbol):
+                    skipped_no_data += 1
+                    continue
+                # Has history but no live price — run Nexus-15 anyway
 
             filtered_in += 1
             nexus_data = self.signals.get_nexus15_prediction(symbol)
@@ -238,7 +259,10 @@ class VergeAgent:
                 if confluence["confluence_score"] >= config.MIN_CONFLUENCE_SCORE:
                     candidates.append(confluence)
 
-        logger.info(f"[T2] Pre-filter passed: {filtered_in}/{len(config.WATCHLIST_TIER2)} | Nexus-15 calls: {nexus_calls}")
+        logger.info(
+            f"[T2] Pre-filter passed: {filtered_in}/{len(config.WATCHLIST_TIER2)} | "
+            f"Nexus-15 calls: {nexus_calls} | Skipped (no data): {skipped_no_data}"
+        )
         return candidates
 
     def _get_tier3_batch(self) -> list:

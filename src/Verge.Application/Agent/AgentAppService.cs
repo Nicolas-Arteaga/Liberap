@@ -3,6 +3,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Collections.Generic;
+using System;
+using Microsoft.Extensions.Logging;
 
 namespace Verge.Agent;
 
@@ -16,6 +19,25 @@ public class AgentAppService : VergeAppService, IAgentAppService
     {
         _processManager = processManager;
         _hubContext     = hubContext;
+    }
+
+    [AllowAnonymous]
+    public async Task<string> GetSystemStateAsync()
+    {
+        try 
+        {
+            bool isServerRunning = _processManager.IsProcessRunning("MarketWS");
+            bool isAgentRunning  = _processManager.IsProcessRunning("Agent");
+
+            if (isAgentRunning)  return "AGENT_RUNNING";
+            if (isServerRunning) return "SERVER_READY";
+            return "STOPPED";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning("⚠️ Error getting system state: {Message}", ex.Message);
+            return "STOPPED";
+        }
     }
 
     public async Task StartServerAsync()
@@ -45,31 +67,41 @@ public class AgentAppService : VergeAppService, IAgentAppService
 
     public async Task<object> GetAuditSummaryAsync()
     {
-        using var client = new HttpClient();
-        return await client.GetFromJsonAsync<object>("http://localhost:8001/audit/summary");
+        try {
+            using var client = new HttpClient();
+            return await client.GetFromJsonAsync<object>("http://localhost:8001/audit/summary");
+        } catch { return new { balance = 0, winRate = 0, trades = 0, pnlTotal = 0 }; }
     }
 
     public async Task<object> GetStrategyStatsAsync()
     {
-        using var client = new HttpClient();
-        return await client.GetFromJsonAsync<object>("http://localhost:8001/audit/stats");
+        try {
+            using var client = new HttpClient();
+            return await client.GetFromJsonAsync<object>("http://localhost:8001/audit/stats");
+        } catch { return new { }; }
     }
 
     public async Task<object> GetRecentTradesAsync(int limit = 10)
     {
-        using var client = new HttpClient();
-        return await client.GetFromJsonAsync<object>($"http://localhost:8001/audit/trades?limit={limit}");
+        try {
+            using var client = new HttpClient();
+            return await client.GetFromJsonAsync<object>($"http://localhost:8001/audit/trades?limit={limit}");
+        } catch { return new List<object>(); }
     }
 
     public async Task<object> GetTopSymbolsAsync(int limit = 5)
     {
-        using var client = new HttpClient();
-        return await client.GetFromJsonAsync<object>($"http://localhost:8001/audit/top-symbols?limit={limit}");
+        try {
+            using var client = new HttpClient();
+            return await client.GetFromJsonAsync<object>($"http://localhost:8001/audit/top-symbols?limit={limit}");
+        } catch { return new List<object>(); }
     }
 
     public async Task<object> GetOpenPositionsAsync()
     {
-        using var client = new HttpClient();
-        return await client.GetFromJsonAsync<object>("http://localhost:8001/audit/open");
+        try {
+            using var client = new HttpClient();
+            return await client.GetFromJsonAsync<object>("http://localhost:8001/audit/open");
+        } catch { return new List<object>(); }
     }
 }

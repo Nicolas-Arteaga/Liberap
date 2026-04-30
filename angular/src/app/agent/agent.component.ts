@@ -66,7 +66,23 @@ export class AgentComponent implements OnInit {
   constructor() { }
 
   ngOnInit(): void {
-    this.addLog('Sistema inicializado. Presioná INICIAR MARKET WS para comenzar.', '#64748b');
+    this.addLog('Sistema inicializado. Sincronizando estado...', '#64748b');
+
+    // Sync state on load (Fix for F5)
+    this.agentService.getSystemState().subscribe({
+      next: (state) => {
+        this.systemState = state as SystemState;
+        if (this.systemState !== 'STOPPED') {
+          this.addLog(`✅ Sistema detectado en ejecución: ${this.systemState}`, '#10b981');
+          this.startUptime();
+          this.startDataRefresh();
+        }
+      },
+      error: (err) => {
+        this.addLog('⚠️ No se pudo sincronizar el estado inicial con el servidor.', '#f59e0b');
+        console.error('Error syncing state:', err);
+      }
+    });
 
     this.subscriptions.add(
       this.agentSignalrService.logs$.subscribe((log: AgentLog) => {
@@ -108,7 +124,7 @@ export class AgentComponent implements OnInit {
   }
 
   refreshData() {
-    this.agentService.getAuditSummary().subscribe(data => {
+    this.agentService.getAuditSummary().subscribe((data: any) => {
       if (data) {
         this.balance = data.balance?.toLocaleString('en-US') || '0.00';
         this.winRate = (data.winRate || 0) + '%';
@@ -117,7 +133,7 @@ export class AgentComponent implements OnInit {
       }
     });
 
-    this.agentService.getStrategyStats().subscribe(data => {
+    this.agentService.getStrategyStats().subscribe((data: any) => {
       if (data) {
         const formatStat = (s: any) => ({
           winRate: (s.winRate || 0) + '%',
@@ -142,7 +158,7 @@ export class AgentComponent implements OnInit {
       }
     });
 
-    this.agentService.getRecentTrades().subscribe(data => {
+    this.agentService.getRecentTrades().subscribe((data: any) => {
       if (data && data.length) {
         this.operations = data.map((t: any, i: number) => ({
           id: '#' + (1000 + i),
@@ -161,8 +177,8 @@ export class AgentComponent implements OnInit {
       }
     });
 
-    this.agentService.getTopSymbols().subscribe(data => {
-      if (data) {
+    this.agentService.getTopSymbols().subscribe((data: any) => {
+      if (data && data.length) {
         this.topSymbols = data.map((s: any) => ({
           symbol: s.symbol,
           winRate: s.winRate + '%',

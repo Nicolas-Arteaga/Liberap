@@ -86,7 +86,12 @@ def _run_exchange_ws(exchange_name: str):
     """
     exc = EXCHANGES[exchange_name]
     cb  = breakers.get(exchange_name)
-    symbols = config.WATCHLIST
+    
+    # NEW: Distribute 200 symbols across 4 exchanges (50 each)
+    symbols = config.get_symbols_for_exchange(exchange_name)
+    if not symbols:
+        logger.warning(f"[WS:{exchange_name}] No symbols assigned. Thread exiting.")
+        return
 
     backoff = 2
 
@@ -115,7 +120,25 @@ def _run_exchange_ws(exchange_name: str):
             )
             exc.subscribe_fn(ws, symbols)
 
+            # Start custom heartbeat if required
+            if exc.ping_payload:
+                def run_heartbeat():
+                    while _ws_state.get(exchange_name, {}).get("connected"):
+                        try:
+                            ws.send(exc.ping_payload)
+                            logger.debug(f"[WS:{exchange_name}] Heartbeat sent.")
+                        except:
+                            break
+                        time.sleep(20) # OKX requires every 30s
+                
+                hb_t = threading.Thread(target=run_heartbeat, daemon=True, name=f"HB-{exchange_name}")
+                hb_t.start()
+
         def on_message(ws, raw: str):
+            if raw == "pong":
+                logger.debug(f"[WS:{exchange_name}] Heartbeat received (pong).")
+                return
+
             try:
                 data = json.loads(raw)
                 kline = exc.message_parser(data)
@@ -303,12 +326,17 @@ class CandleHandler(BaseHTTPRequestHandler):
         self._json(404, {"error": "Not found"})
 
     def _json(self, status: int, body: dict):
-        payload = json.dumps(body).encode()
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", len(payload))
-        self.end_headers()
-        self.wfile.write(payload)
+        try:
+            payload = json.dumps(body, default=str).encode()
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", len(payload))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(payload)
+        except (ConnectionAbortedError, BrokenPipeError, OSError):
+            # Client disconnected before response was fully sent — ignore silently
+            pass
 
     def log_message(self, fmt, *args):
         pass   # Silence HTTP access logs
@@ -343,6 +371,9 @@ if __name__ == "__main__":
 
     # Start one WS thread per exchange
     for exchange_name in EXCHANGES:
+        if exchange_name == "pyth":
+            continue # Pyth is handled by its own REST polling thread below
+            
         t = threading.Thread(
             target=_run_exchange_ws,
             args=(exchange_name,),
@@ -352,6 +383,53 @@ if __name__ == "__main__":
         t.start()
         logger.info(f"[WS] Started thread for {exchange_name}")
         time.sleep(0.5)   # Stagger connections slightly
+
+    # Start Pyth Polling thread (Decentralized Source #5)
+    def _run_pyth_polling():
+        import requests
+        # Mapping for critical symbols
+        PYTH_MAPPING = {
+            "BTCUSDT": "e62df6c8b4a85fe1a67db44dc12de5bb330f8f27cf5097240a0593e9f05a9140",
+            "ETHUSDT": "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
+            "SOLUSDT": "ef0d8b6fda2ceba41da3678a2abd3690def3a5932a37ee18f7090f8d05b11fb1",
+        }
+        url = "https://hermes.pyth.network/v2/updates/price/latest"
+        
+        while True:
+            try:
+                ids = list(PYTH_MAPPING.values())
+                params = [('ids[]', id) for id in ids]
+                resp = requests.get(url, params=params, timeout=10)
+                if resp.status_code == 200:
+                    data = resp.json().get("parsed", [])
+                    for item in data:
+                        feed_id = item.get("id")
+                        # Find symbol for this feed_id
+                        symbol = next((s for s, i in PYTH_MAPPING.items() if i == feed_id), None)
+                        if symbol:
+                            p = item.get("price", {})
+                            price = float(p.get("price", 0)) * (10 ** int(p.get("expo", 0)))
+                            if price > 0:
+                                cache.upsert_live_price(
+                                    symbol=symbol,
+                                    close=price,
+                                    open_=price, # Pyth doesn't give open easily here
+                                    high=price,
+                                    low=price,
+                                    volume=0.0,
+                                    source="pyth"
+                                )
+                                # Record success for Pyth CB
+                                breakers["pyth"].record_success()
+                time.sleep(10) # Pyth polling interval
+            except Exception as e:
+                logger.error(f"[Pyth] Polling error: {e}")
+                breakers["pyth"].record_failure()
+                time.sleep(30)
+
+    t_pyth = threading.Thread(target=_run_pyth_polling, daemon=True, name="Pyth-Polling")
+    t_pyth.start()
+    logger.info("[Pyth] Started polling thread (decentralized backup).")
 
     # Start HTTP server (blocks main thread)
     logger.info("[HTTP] Server ready at http://localhost:8001")
