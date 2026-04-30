@@ -466,6 +466,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       takeProfit: takeProfit,
       patternName: patternName
     });
+    
+    // Debug: Log scanner size to identify if data is arriving
+    if (this.scannerData.size % 10 === 0 || symbol === 'BTCUSDT') {
+       console.log(`[Dashboard] 📊 Scanner actualizado: ${symbol} (${score}%). Total en lista: ${this.scannerData.size}`);
+    }
 
     // 2. Whale Tab
     if (whaleScore > 0) {

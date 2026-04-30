@@ -45,10 +45,15 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         // 1. Get current user profile
         var userId = CurrentUser.Id!.Value;
 
-        // 2. Normalize and get current mark price (Try fast WebSocket cache first)
+        // 2. Normalize and get current mark price
         var symbol = NormalizeSymbol(input.Symbol);
-        var entryPrice = await ResolveCurrentPriceAsync(symbol)
-            ?? throw new UserFriendlyException($"Could not fetch current price for {symbol}.");
+        var entryPrice = await ResolveCurrentPriceAsync(symbol);
+
+        if (!entryPrice.HasValue)
+        {
+            Logger.LogWarning("🚫 [Simulation] Skipping trade for {Symbol}: Price not found in any source.", symbol);
+            return null; // Return null so the caller knows the trade wasn't opened
+        }
 
         // 3. Calculate position values
         var margin = input.Amount;
@@ -64,8 +69,8 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
             throw new UserFriendlyException($"Insufficient virtual balance. Required: {totalCost:N2} USDT, Available: {profile.VirtualBalance:N2} USDT.");
 
         // 5. Calculate position size (quantity) and liquidation price
-        var size = _simulationService.CalculatePositionSize(exposureValue, entryPrice);
-        var liquidationPrice = _simulationService.CalculateLiquidationPrice(entryPrice, input.Leverage, input.Side);
+        var size = _simulationService.CalculatePositionSize(exposureValue, entryPrice.Value);
+        var liquidationPrice = _simulationService.CalculateLiquidationPrice(entryPrice.Value, input.Leverage, input.Side);
 
         // 6. Deduct balance with Retry logic for Concurrency
         profile.VirtualBalance -= totalCost;
@@ -87,7 +92,7 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
             symbol: symbol,
             side: input.Side,
             leverage: input.Leverage,
-            entryPrice: entryPrice,
+            entryPrice: entryPrice.Value,
             size: size, // Coin quantity
             amount: exposureValue, // Nominal exposure in USDT
             margin: margin,

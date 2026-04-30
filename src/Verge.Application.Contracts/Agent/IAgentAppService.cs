@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using Volo.Abp.Application.Services;
 
 namespace Verge.Agent;
@@ -16,4 +17,6 @@ public interface IAgentAppService : IApplicationService
     Task<object> GetRecentTradesAsync(int limit = 10);
     Task<object> GetTopSymbolsAsync(int limit = 5);
     Task<object> GetOpenPositionsAsync();
+    Task BroadcastSignalAsync(object signal);
+    Task BroadcastSignalsAsync(List<object> signals);
 }

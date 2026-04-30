@@ -136,3 +136,49 @@ class PositionManager:
             logger.warning(f"Error fetching virtual balance, using default: {e}")
             
         return config.VIRTUAL_CAPITAL_BASE
+
+    def broadcast_signal(self, signal_data: dict) -> bool:
+        """
+        Pushes a real-time signal/score to the ABP backend to be broadcasted via SignalR.
+        """
+        headers = self.auth_manager.get_auth_headers()
+        if not headers:
+            return False
+
+        url = f"{self.base_url}/api/app/agent/broadcast-signal"
+        try:
+            # We don't need to log every single broadcast to avoid spamming the console
+            response = requests.post(url, json=signal_data, headers=headers, verify=False, timeout=5)
+            return response.status_code in [200, 204]
+        except Exception:
+            return False
+
+    def broadcast_signals(self, signals: list) -> bool:
+        """
+        Pushes a batch of signals/scores to the ABP backend to be broadcasted via SignalR.
+        This avoids spamming 100+ HTTP requests per cycle.
+        Falls back to per-signal sending if the batch endpoint isn't available.
+        """
+        if not signals:
+            return True
+
+        headers = self.auth_manager.get_auth_headers()
+        if not headers:
+            return False
+
+        url = f"{self.base_url}/api/app/agent/broadcast-signals"
+        try:
+            response = requests.post(url, json=signals, headers=headers, verify=False, timeout=15)
+            if response.status_code in [200, 204]:
+                return True
+
+            # Fallback: batch endpoint not available / rejected → send individually
+            ok = True
+            for s in signals:
+                ok = self.broadcast_signal(s) and ok
+            return ok
+        except Exception:
+            ok = True
+            for s in signals:
+                ok = self.broadcast_signal(s) and ok
+            return ok

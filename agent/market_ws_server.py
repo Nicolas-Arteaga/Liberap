@@ -289,6 +289,12 @@ class CandleHandler(BaseHTTPRequestHandler):
                 self._json(404, {"error": f"No history for {symbol}"})
             return
 
+        # GET /market/tickers
+        if path == "/market/tickers":
+            tickers = cache.get_all_tickers()
+            self._json(200, tickers)
+            return
+
         # GET /market/ticker/{symbol}
         if path.startswith("/market/ticker/"):
             symbol = path.split("/market/ticker/")[-1].upper()

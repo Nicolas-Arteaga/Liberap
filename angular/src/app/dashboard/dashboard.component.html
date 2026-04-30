@@ -686,7 +686,9 @@
                 <span class="text-white-50 fw-bold" style="font-size: 9px;">🏆 TOP OPORTUNIDADES</span>
               </div>
               <div class="d-flex flex-column gap-1">
-                <div *ngFor="let opp of topOpportunities" class="mini-opp-card p-2 rounded bg-dark-accent d-flex justify-content-between align-items-center">
+                <div *ngFor="let opp of topOpportunities" 
+                     class="mini-opp-card p-2 rounded bg-dark-accent d-flex justify-content-between align-items-center pointer hover:bg-white-05"
+                     (click)="selectSymbol(opp.symbol)">
                   <span class="text-white fw-bold" style="font-size: 10px;">{{ opp.symbol }}</span>
                   <span class="text-success fw-bold text-xs">{{ opp.score }} pts</span>
                 </div>

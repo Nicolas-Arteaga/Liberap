@@ -151,19 +151,72 @@ export class TradingSignalrService {
         this.connection.on('ReceiveSuperScore', (payload: any) => {
             try {
                 const data = typeof payload === 'string' ? JSON.parse(payload) : payload;
-                console.log('[SignalR] 🧠 SuperScore Recibido:', data);
+                console.log('[SignalR] 🧠 SuperScore Recibido RAW:', data);
                 
+                // Normalizar data para que dashboard no tenga que parsear llaves raras
+                const confidence = data.confluence_score ?? data.score ?? (data.confidence * 100) ?? 0;
+                
+                if (!data.confidence) data.confidence = confidence / 100; // si usa escala 0-1
+                if (!data.score) data.score = confidence;
+                
+                if (data.direction === undefined) {
+                    const d = data.trade_direction ?? data.nexus_direction ?? data.direction;
+                    if (d === 'BULLISH' || d === 'LONG' || d === 0) data.direction = 0;
+                    else if (d === 'BEARISH' || d === 'SHORT' || d === 1) data.direction = 1;
+                    else data.direction = 2; // neutral o wait
+                }
+                
+                if (!data.crypto && (data.symbol || data.Symbol)) data.crypto = data.symbol || data.Symbol;
+                if (!data.symbol && data.crypto) data.symbol = data.crypto;
+
                 // REGLA: Toast para SuperScore si es >= 55%
-                // Los SuperScores suelen venir desde el bot/python y tienen 'confidence' o 'prob'
-                const confidence = (data.confidence * 100) || data.score || 0;
                 if (confidence >= 55) {
-                    const symbol = data.symbol || 'Global';
+                    const symbol = data.crypto || 'Global';
                     this.toaster.success(`::Nueva señal IA para ${symbol} - Confianza: ${confidence.toFixed(1)}%`, '::AI Intelligence', { life: 5000 });
                 }
 
+                console.log('[SignalR] 🧠 SuperScore Normalizado:', data);
                 this.superScoreSource.next(data);
             } catch (e) {
                 console.error('[SignalR] ❌ Error parsing SuperScore:', e);
+            }
+        });
+
+        // --- AI Scores Batch Handler (preferred) ---
+        this.connection.on('ReceiveSuperScores', (payload: any) => {
+            try {
+                const arr = typeof payload === 'string' ? JSON.parse(payload) : payload;
+                if (!Array.isArray(arr)) {
+                    console.warn('[SignalR] ⚠️ ReceiveSuperScores payload is not an array:', arr);
+                    return;
+                }
+
+                // Normalize each item and emit one-by-one to keep dashboard code unchanged.
+                for (const item of arr) {
+                    try {
+                        const data = typeof item === 'string' ? JSON.parse(item) : item;
+                        const confidence = data.confluence_score ?? data.score ?? (data.confidence * 100) ?? 0;
+
+                        if (!data.confidence) data.confidence = confidence / 100;
+                        if (!data.score) data.score = confidence;
+
+                        if (data.direction === undefined) {
+                            const d = data.trade_direction ?? data.nexus_direction ?? data.direction;
+                            if (d === 'BULLISH' || d === 'LONG' || d === 0) data.direction = 0;
+                            else if (d === 'BEARISH' || d === 'SHORT' || d === 1) data.direction = 1;
+                            else data.direction = 2;
+                        }
+
+                        if (!data.crypto && (data.symbol || data.Symbol)) data.crypto = data.symbol || data.Symbol;
+                        if (!data.symbol && data.crypto) data.symbol = data.crypto;
+
+                        this.superScoreSource.next(data);
+                    } catch (inner) {
+                        console.error('[SignalR] ❌ Error normalizing SuperScore batch item:', inner, item);
+                    }
+                }
+            } catch (e) {
+                console.error('[SignalR] ❌ Error parsing SuperScores batch:', e);
             }
         });
 

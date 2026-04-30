@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using Verge.Trading;
 
 namespace Verge.Agent;
 
@@ -20,7 +21,8 @@ public class AgentAppService : VergeAppService, IAgentAppService
         "http://localhost:8001"
     };
     private readonly AgentProcessManager _processManager;
-    private readonly IHubContext<AgentHub> _hubContext;
+    private readonly IHubContext<AgentHub> _agentHubContext;
+    private readonly IHubContext<TradingHub> _tradingHubContext;
     private readonly HttpClient _marketWsClient;
     private string _activeMarketWsBaseUrl = MarketWsBaseUrls[0];
     private DateTime _lastMarketWsProbeUtc = DateTime.MinValue;
@@ -28,10 +30,14 @@ public class AgentAppService : VergeAppService, IAgentAppService
     private DateTime _lastHealthSnapshotUtc = DateTime.MinValue;
     private DateTime _nextFullProbeUtc = DateTime.MinValue;
 
-    public AgentAppService(AgentProcessManager processManager, IHubContext<AgentHub> hubContext)
+    public AgentAppService(
+        AgentProcessManager processManager,
+        IHubContext<AgentHub> agentHubContext,
+        IHubContext<TradingHub> tradingHubContext)
     {
         _processManager = processManager;
-        _hubContext     = hubContext;
+        _agentHubContext = agentHubContext;
+        _tradingHubContext = tradingHubContext;
         _marketWsClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(3)
@@ -79,25 +85,25 @@ public class AgentAppService : VergeAppService, IAgentAppService
     {
         await Task.Delay(300);
         await _processManager.StartProcessAsync("MarketWS", "market_ws_server.py");
-        await _hubContext.Clients.All.SendAsync("ServerStateChanged", "SERVER_READY");
+        await _agentHubContext.Clients.All.SendAsync("ServerStateChanged", "SERVER_READY");
     }
 
     public async Task StopServerAsync()
     {
         await _processManager.StopAllAsync();
-        await _hubContext.Clients.All.SendAsync("ServerStateChanged", "STOPPED");
+        await _agentHubContext.Clients.All.SendAsync("ServerStateChanged", "STOPPED");
     }
 
     public async Task StartAgentAsync()
     {
         await _processManager.StartProcessAsync("Agent", "verge_agent.py");
-        await _hubContext.Clients.All.SendAsync("ServerStateChanged", "AGENT_RUNNING");
+        await _agentHubContext.Clients.All.SendAsync("ServerStateChanged", "AGENT_RUNNING");
     }
 
     public async Task StopAgentAsync()
     {
         await _processManager.StopProcessAsync("Agent");
-        await _hubContext.Clients.All.SendAsync("ServerStateChanged", "SERVER_READY");
+        await _agentHubContext.Clients.All.SendAsync("ServerStateChanged", "SERVER_READY");
     }
 
     public async Task<object> GetAuditSummaryAsync()
@@ -210,5 +216,22 @@ public class AgentAppService : VergeAppService, IAgentAppService
         }
 
         return null;
+    }
+
+    public async Task BroadcastSignalAsync(object signal)
+    {
+        // IMPORTANT: Dashboard listens on TradingHub (/signalr-hubs/trading), not AgentHub.
+        await _tradingHubContext.Clients.All.SendAsync("ReceiveSuperScore", signal);
+    }
+
+    public async Task BroadcastSignalsAsync(List<object> signals)
+    {
+        if (signals == null || signals.Count == 0)
+        {
+            return;
+        }
+
+        // Single SignalR event with the full batch to avoid 183 HTTP requests and reduce hub spam.
+        await _tradingHubContext.Clients.All.SendAsync("ReceiveSuperScores", signals);
     }
 }

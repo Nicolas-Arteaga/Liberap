@@ -134,6 +134,7 @@ class VergeAgent:
         skipped_trading = 0
         analyzed = 0
         no_data = 0
+        broadcast_batch = []
 
         for symbol in all_targets:
             try:
@@ -151,6 +152,9 @@ class VergeAgent:
                 scar_data  = scar_alerts.get(symbol, {})
                 confluence = self.signals.calculate_confluence(symbol, scar_data, nexus_data)
 
+                # 🟢 BROADCAST: Batch scores to UI scanner (avoid request spam)
+                broadcast_batch.append(confluence)
+
                 if confluence["confluence_score"] >= config.MIN_CONFLUENCE_SCORE:
                     candidates.append(confluence)
                     logger.info(
@@ -161,6 +165,12 @@ class VergeAgent:
                 logger.error(f"⚠️ Error analyzing {symbol}: {e}")
                 continue
 
+        # Flush batch once per cycle (one HTTP request instead of ~183)
+        try:
+            if broadcast_batch:
+                self.positions.broadcast_signals(broadcast_batch)
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to broadcast batch signals: {e}")
 
         logger.info(
             f"[Step 5/6] Done: {analyzed} analyzed | "

@@ -265,6 +265,24 @@ class KlineCache:
             "has_history": self.has_history(symbol),  # True if ≥25 closed candles in cache
         }
 
+    def get_all_tickers(self) -> list:
+        """Returns all live tickers in a format compatible with .NET SymbolTickerModel."""
+        conn = self._conn()
+        rows = conn.execute("SELECT * FROM live_prices").fetchall()
+        
+        tickers = []
+        for r in rows:
+            tickers.append({
+                "symbol":             r["symbol"],
+                "lastPrice":          r["close"],
+                "priceChange":        round(r["close"] - r["open"], 8),
+                "priceChangePercent": r["change_pct"],
+                "volume":             r["volume"],
+                "highPrice":          r["high"],
+                "lowPrice":           r["low"]
+            })
+        return tickers
+
     def has_history(self, symbol: str, interval: str = "15m", min_candles: int = 25) -> bool:
         """Returns True if symbol has enough closed candles for analysis."""
         conn = self._conn()

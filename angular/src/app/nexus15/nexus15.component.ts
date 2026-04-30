@@ -283,13 +283,16 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
     this.pushTerminal('> MASSIVE MARKET SCAN INIT: TOP 20 VOL OVERRIDE...');
     this.nexus15Svc.analyzeTopAvailable(5).subscribe({
       next: res => {
-        this.topResults.set(res || []);
+        const arr = (res as any)?.items || res || [];
+        this.topResults.set(arr);
         this.isTopLoading.set(false);
-        this.pushTerminal(`✓ SCAN COMPLETE: ${res?.length ?? 0} OPPORTUNITIES FOUND`);
+        this.pushTerminal(`✓ SCAN COMPLETE: ${arr.length} OPPORTUNITIES FOUND`);
       },
       error: err => {
         this.isTopLoading.set(false);
-        this.pushTerminal('⚠ TOP SCAN ERROR');
+        const msg = err?.error?.error?.message || err?.message || 'unknown error';
+        this.pushTerminal(`⚠ TOP SCAN ERROR: ${msg}`);
+        console.error('TOP SCAN ERROR:', err);
       }
     });
   }
