@@ -32,6 +32,9 @@ public class SimulatedTradeDto : EntityDto<Guid>
     public Guid? TradingSignalId { get; set; }
     /// <summary>Exchange where the trade was opened (e.g. "Binance"). Used by the worker to avoid cross-exchange price contamination.</summary>
     public string Exchange { get; set; } = "Binance";
+
+    /// <summary>Serialized decision context when the trade was opened by the agent.</summary>
+    public string? AgentDecisionJson { get; set; }
 }
 
 public class OpenTradeInputDto
@@ -45,6 +48,9 @@ public class OpenTradeInputDto
     public Guid? TradingSignalId { get; set; }
     /// <summary>Exchange to lock this trade's price evaluation to. Defaults to "Binance".</summary>
     public string Exchange { get; set; } = "Binance";
+
+    /// <summary>Optional audit blob from the Verge Python agent (Nexus / SCAR / LSE context).</summary>
+    public string? AgentDecisionJson { get; set; }
 }
 
 public class CloseTradeInputDto

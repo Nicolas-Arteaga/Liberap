@@ -21,7 +21,7 @@ import urllib.request
 from datetime import datetime, timezone
 from typing import List, Dict, Optional, Tuple
 
-from .models import CandleInput, LSEEntryMode
+from .models import CandleInput, LSEEntryMode, LSEDetectionMode
 from .detector import run_lse_detection
 from .config import get_config
 from .state_machine import LSEStateMachine
@@ -218,6 +218,7 @@ def run_backtest(
     timeframe: str = "1h",
     limit: int = 1000,
     entry_mode: LSEEntryMode = LSEEntryMode.conservative,
+    detection_mode: LSEDetectionMode = LSEDetectionMode.conservative,
     min_window: int = 150,
 ) -> Dict:
     """
@@ -227,7 +228,8 @@ def run_backtest(
         symbol:     Par de trading (ej. "PEPEUSDT")
         timeframe:  Timeframe de análisis ("1h" recomendado)
         limit:      Cantidad de velas históricas a descargar
-        entry_mode: Agresivo o conservador
+        entry_mode: Entrada agresiva (cierre reclaim) vs conservadora (ruptura high)
+        detection_mode: conservative (equal lows + score sum) vs aggressive (min low + weighted score)
         min_window: Mínimo de velas históricas antes de empezar a detectar
 
     Returns:
@@ -262,6 +264,8 @@ def run_backtest(
             candles_1h=window_1h,
             candles_4h=candles_4h,
             entry_mode=entry_mode,
+            detection_mode=detection_mode,
+            preview_only=False,
         )
 
         if signal is None or signal.entry_price is None:
@@ -314,6 +318,7 @@ def run_backtest(
     metrics["timeframe"] = timeframe
     metrics["limit_used"] = len(candles_1h)
     metrics["entry_mode"] = entry_mode.value
+    metrics["detection_mode"] = detection_mode.value
     metrics["trades"]    = trades
 
     _print_report(metrics)
@@ -400,7 +405,58 @@ def _print_report(m: Dict):
     logger.info("Avg R Multiple  : %.3f", m.get("avg_r_multiple", 0))
     logger.info("Trades/semana   : %.2f", m.get("trades_per_week", 0))
     logger.info("Entry mode      : %s", m.get("entry_mode", "-"))
+    logger.info("Detection mode  : %s", m.get("detection_mode", "-"))
     logger.info("=" * 60)
+
+
+def run_backtest_compare(
+    symbol: str,
+    timeframe: str = "1h",
+    limit: int = 1000,
+    entry_mode: LSEEntryMode = LSEEntryMode.conservative,
+    min_window: int = 150,
+) -> Dict[str, Dict]:
+    """
+    Mismo dataset y condiciones — reporta métricas separadas conservative vs aggressive.
+    """
+    logger.info("🔬 Comparativa LSE: conservative vs aggressive — %s [%s]", symbol, timeframe)
+
+    LSEStateMachine._instance = None
+    conservative = run_backtest(
+        symbol, timeframe, limit,
+        entry_mode=entry_mode,
+        detection_mode=LSEDetectionMode.conservative,
+        min_window=min_window,
+    )
+
+    LSEStateMachine._instance = None
+    aggressive = run_backtest(
+        symbol, timeframe, limit,
+        entry_mode=entry_mode,
+        detection_mode=LSEDetectionMode.aggressive,
+        min_window=min_window,
+    )
+
+    logger.info("")
+    logger.info("╔════════════════════════════════════════════════════════════╗")
+    logger.info("║           LSE COMPARE — mismo dataset                     ║")
+    logger.info("╠════════════════════════════════════════════════════════════╣")
+    for label, m in [("CONSERVATIVE", conservative), ("AGGRESSIVE", aggressive)]:
+        if m.get("error"):
+            logger.info("║ %-12s │ ERROR: %s", label, m.get("error"))
+            continue
+        logger.info(
+            "║ %-12s │ signals=%3d │ WR=%6.2f%% │ PF=%5.2f │ DD=%6.3f │ E=%+.4f",
+            label,
+            m.get("total_signals", 0),
+            m.get("winrate", 0),
+            m.get("profit_factor", 0) if m.get("profit_factor") != float("inf") else 999,
+            m.get("max_drawdown", 0),
+            m.get("expectancy", 0),
+        )
+    logger.info("╚════════════════════════════════════════════════════════════╝")
+
+    return {"conservative": conservative, "aggressive": aggressive}
 
 
 # ---------------------------------------------------------------------------
@@ -411,20 +467,49 @@ if __name__ == "__main__":
     parser.add_argument("--symbol",  default="PEPEUSDT", help="Par de trading")
     parser.add_argument("--tf",      default="1h",       help="Timeframe (1h recomendado)")
     parser.add_argument("--limit",   default=1000, type=int, help="Velas históricas a descargar")
-    parser.add_argument("--mode",    default="conservative", choices=["aggressive", "conservative"])
-    parser.add_argument("--out",     default=None, help="Guardar resultado en JSON")
+    parser.add_argument(
+        "--mode", default="conservative",
+        choices=["aggressive", "conservative"],
+        help="entry_mode (entrada)",
+    )
+    parser.add_argument(
+        "--detection", default="conservative",
+        choices=["conservative", "aggressive"],
+        help="detection_mode del motor LSE",
+    )
+    parser.add_argument("--compare", action="store_true", help="Ejecutar backtest conservative vs aggressive")
+    parser.add_argument("--out", default=None, help="Guardar resultado en JSON")
     args = parser.parse_args()
 
-    result = run_backtest(
-        symbol=args.symbol,
-        timeframe=args.tf,
-        limit=args.limit,
-        entry_mode=LSEEntryMode.aggressive if args.mode == "aggressive" else LSEEntryMode.conservative,
+    entry_mode = LSEEntryMode.aggressive if args.mode == "aggressive" else LSEEntryMode.conservative
+    detection_mode = (
+        LSEDetectionMode.aggressive if args.detection == "aggressive" else LSEDetectionMode.conservative
     )
 
+    if args.compare:
+        result = run_backtest_compare(
+            symbol=args.symbol,
+            timeframe=args.tf,
+            limit=args.limit,
+            entry_mode=entry_mode,
+        )
+    else:
+        result = run_backtest(
+            symbol=args.symbol,
+            timeframe=args.tf,
+            limit=args.limit,
+            entry_mode=entry_mode,
+            detection_mode=detection_mode,
+        )
+
     if args.out:
-        # Guardar sin la lista de trades completa (solo métricas) para consola
-        summary = {k: v for k, v in result.items() if k != "trades"}
+        if args.compare:
+            summary = {
+                "conservative": {k: v for k, v in result["conservative"].items() if k != "trades"},
+                "aggressive": {k: v for k, v in result["aggressive"].items() if k != "trades"},
+            }
+        else:
+            summary = {k: v for k, v in result.items() if k != "trades"}
         with open(args.out, "w", encoding="utf-8") as f:
             json.dump(summary, f, indent=2, ensure_ascii=False)
         logger.info("✅ Reporte guardado en %s", args.out)

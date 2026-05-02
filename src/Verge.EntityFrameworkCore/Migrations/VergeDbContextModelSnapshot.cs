@@ -689,6 +689,9 @@ namespace Verge.Migrations
                     b.Property<decimal>("Amount")
                         .HasColumnType("numeric");
 
+                    b.Property<string>("AgentDecisionJson")
+                        .HasColumnType("text");
+
                     b.Property<decimal?>("ClosePrice")
                         .HasColumnType("numeric");
 

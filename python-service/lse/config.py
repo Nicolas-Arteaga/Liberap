@@ -86,6 +86,11 @@ class LSESymbolConfig:
     # --- Entry mode ---
     entry_mode: str = "conservative"
 
+    # --- Solo detection_mode == aggressive (conservative ignora estos campos) ---
+    aggressive_wick_ratio_min: Optional[float] = None  # None → max(base wick_ratio_min, 0.35)
+    aggressive_volume_spike_mult: Optional[float] = None  # None → 1.2 (volumen más flexible)
+    aggressive_compression_optional: bool = True  # si True, puede seguir sin compresión MA
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Perfiles de configuración (SIN símbolos hardcodeados)

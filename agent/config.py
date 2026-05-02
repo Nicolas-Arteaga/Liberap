@@ -10,6 +10,27 @@ import time
 PYTHON_SERVICE_URL = os.getenv("PYTHON_SERVICE_URL", "http://localhost:8005")
 ABP_BACKEND_URL = os.getenv("ABP_BACKEND_URL", "https://localhost:44396")
 
+# LiquiditySweepEngine (python-service /lse/scan y /lse/scan-batch)
+LSE_ENABLED = os.getenv("LSE_ENABLED", "true").lower() in ("1", "true", "yes")
+LSE_MIN_SCORE = float(os.getenv("LSE_MIN_SCORE", "65"))
+LSE_DETECTION_MODE = os.getenv("LSE_DETECTION_MODE", "conservative")  # conservative | aggressive
+LSE_DUAL_SCAN = os.getenv("LSE_DUAL_SCAN", "true").lower() in ("1", "true", "yes")
+LSE_ENTRY_MODE = os.getenv("LSE_ENTRY_MODE", "conservative")  # conservative | aggressive (timing entrada)
+# UI/LSE pueden tardar 1–3+ min; el agente antes usaba 10s y cortaba todas las respuestas.
+LSE_HTTP_TIMEOUT_SEC = int(os.getenv("LSE_HTTP_TIMEOUT_SEC", "360"))
+# Cuántos pares con historial 1h completo entran al batch TOP-K.
+# Por defecto escanea todo el universo elegible para decidir con contexto completo.
+LSE_MAX_SYMBOLS_PER_CYCLE = int(os.getenv("LSE_MAX_SYMBOLS_PER_CYCLE", "200"))
+LSE_BATCH_TOP_K = int(os.getenv("LSE_BATCH_TOP_K", "10"))
+# Si True: no abrir operación nueva si LSE no completó scan-batch HTTP 200 con suficientes símbolos procesados.
+LSE_REQUIRE_SCAN_BEFORE_ENTRY = os.getenv(
+    "LSE_REQUIRE_SCAN_BEFORE_ENTRY", "true"
+).lower() in ("1", "true", "yes")
+LSE_MIN_SYMBOLS_PROCESSED_GATE = int(os.getenv("LSE_MIN_SYMBOLS_PROCESSED_GATE", "1"))
+LSE_REQUIRE_ALL_QUEUED_PROCESSED = os.getenv(
+    "LSE_REQUIRE_ALL_QUEUED_PROCESSED", "true"
+).lower() in ("1", "true", "yes")
+
 # 2. ABP Agent Credentials
 AGENT_USERNAME = os.getenv("AGENT_USERNAME", "agent@verge.internal")
 AGENT_PASSWORD = os.getenv("AGENT_PASSWORD", "1q2w3E*")

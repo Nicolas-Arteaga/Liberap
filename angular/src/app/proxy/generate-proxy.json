@@ -982,6 +982,40 @@
                     "type": "System.Object",
                     "typeSimple": "object"
                   }
+                },
+                {
+                  "name": "BroadcastSignalAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "signal",
+                      "typeAsString": "System.Object, System.Private.CoreLib",
+                      "type": "System.Object",
+                      "typeSimple": "object",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "System.Void",
+                    "typeSimple": "System.Void"
+                  }
+                },
+                {
+                  "name": "BroadcastSignalsAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "signals",
+                      "typeAsString": "System.Collections.Generic.List`1[[System.Object, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                      "type": "System.Collections.Generic.List<System.Object>",
+                      "typeSimple": "[object]",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "System.Void",
+                    "typeSimple": "System.Void"
+                  }
                 }
               ]
             }
@@ -1177,6 +1211,80 @@
               "returnValue": {
                 "type": "System.Object",
                 "typeSimple": "object"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Agent.IAgentAppService"
+            },
+            "BroadcastSignalAsyncBySignal": {
+              "uniqueName": "BroadcastSignalAsyncBySignal",
+              "name": "BroadcastSignalAsync",
+              "httpMethod": "POST",
+              "url": "api/app/agent/broadcast-signal",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "signal",
+                  "typeAsString": "System.Object, System.Private.CoreLib",
+                  "type": "System.Object",
+                  "typeSimple": "object",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "signal",
+                  "name": "signal",
+                  "jsonName": null,
+                  "type": "System.Object",
+                  "typeSimple": "object",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "Body",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "System.Void",
+                "typeSimple": "System.Void"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Agent.IAgentAppService"
+            },
+            "BroadcastSignalsAsyncBySignals": {
+              "uniqueName": "BroadcastSignalsAsyncBySignals",
+              "name": "BroadcastSignalsAsync",
+              "httpMethod": "POST",
+              "url": "api/app/agent/broadcast-signals",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "signals",
+                  "typeAsString": "System.Collections.Generic.List`1[[System.Object, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                  "type": "System.Collections.Generic.List<System.Object>",
+                  "typeSimple": "[object]",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "signals",
+                  "name": "signals",
+                  "jsonName": null,
+                  "type": "System.Collections.Generic.List<System.Object>",
+                  "typeSimple": "[object]",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "Body",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "System.Void",
+                "typeSimple": "System.Void"
               },
               "allowAnonymous": false,
               "implementFrom": "Verge.Agent.IAgentAppService"
@@ -3366,6 +3474,43 @@
               },
               "allowAnonymous": null,
               "implementFrom": "Verge.Trading.ISimulatedTradeAppService"
+            },
+            "ResolveBinancePriceOnlyAsyncByRawSymbol": {
+              "uniqueName": "ResolveBinancePriceOnlyAsyncByRawSymbol",
+              "name": "ResolveBinancePriceOnlyAsync",
+              "httpMethod": "POST",
+              "url": "api/app/simulated-trade/resolve-binance-price-only",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "rawSymbol",
+                  "typeAsString": "System.String, System.Private.CoreLib",
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "rawSymbol",
+                  "name": "rawSymbol",
+                  "jsonName": null,
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "System.Decimal?",
+                "typeSimple": "number?"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.SimulatedTradeAppService"
             }
           }
         },
@@ -9584,6 +9729,30 @@
           "minimum": null,
           "maximum": null,
           "regex": null
+        },
+        {
+          "name": "Exchange",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "AgentDecisionJson",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
         }
       ]
     },
@@ -10130,6 +10299,30 @@
           "jsonName": null,
           "type": "System.Guid?",
           "typeSimple": "string?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Exchange",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "AgentDecisionJson",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
           "isRequired": false,
           "minLength": null,
           "maxLength": null,

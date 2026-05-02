@@ -114,6 +114,7 @@ public static class TradingModelBuilderExtensions
             b.ConfigureByConvention();
             b.Property(x => x.Symbol).IsRequired().HasMaxLength(20);
             b.Property(x => x.Exchange).IsRequired().HasMaxLength(32).HasDefaultValue("Binance");
+            b.Property(x => x.AgentDecisionJson).HasColumnType("text");
             b.HasIndex(x => x.UserId);
             b.HasIndex(x => x.Symbol);
             b.HasIndex(x => x.Status);

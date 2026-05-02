@@ -8,7 +8,9 @@
       </div>
       <div>
         <div class="lse-header__title">LIQUIDITY ENGINE <span class="lse-badge">LSE</span> <span class="lse-badge lse-badge--active">ACTIVO</span></div>
-        <div class="lse-header__sub">Wyckoff Spring + Liquidity Sweep Detector</div>
+        <div class="lse-header__sub">
+          Wyckoff Spring + Liquidity Sweep · <strong>{{ scanModeLabel() }}</strong>
+        </div>
       </div>
     </div>
 
@@ -108,7 +110,8 @@
             }
           </div>
           <div class="lse-symbol-meta">
-            <span class="lse-tag">1H</span>
+            <span class="lse-tag">{{ activeModeBadge() }}</span>
+            <span class="lse-tag">{{ tfBadge() }}</span>
             <span class="lse-tag">BINANCE</span>
           </div>
         </div>
@@ -132,18 +135,18 @@
           </button>
           <button class="lse-btn lse-btn--scan" style="background: linear-gradient(90deg, #aa00ff 0%, #ff00aa 100%); border: none;" (click)="runTopScan()" [disabled]="isLoading() || isTopLoading()">
             @if (isTopLoading()) { <span class="lse-spin"></span> Buscando... }
-            @else { 🏆 Top 5 LSE }
+            @else { 🏆 Top 10 LSE }
           </button>
         </div>
       </div>
 
-      <!-- Top 5 List (Horizontal Banner) -->
+      <!-- Top 10 List (Horizontal Banner) -->
       @if (topResults().length > 0) {
         <div class="nx15-top-banner lse-top-override">
-          <div class="tb-title">🏆 TOP 5 LSE</div>
+          <div class="tb-title">🏆 TOP 10 LSE</div>
           <div class="tb-items">
             @for (tr of topResults(); track tr.symbol) {
-              <div class="tb-item" (click)="selectSymbol(tr.symbol)">
+              <div class="tb-item" (click)="selectTopResult(tr)">
                 <span class="tb-sym">{{ tr.symbol.replace('USDT','') }}</span>
                 <span class="tb-conf" [style.color]="tr.score >= 75 ? '#00ff88' : tr.score >= 65 ? '#ffdd00' : '#ff8888'">
                    {{ tr.score | number:'1.1-1' }}

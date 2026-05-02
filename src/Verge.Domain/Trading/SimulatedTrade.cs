@@ -45,6 +45,12 @@ public class SimulatedTrade : FullAuditedAggregateRoot<Guid>
     /// </summary>
     public string Exchange { get; set; } = "Binance";
 
+    /// <summary>
+    /// JSON snapshot of Nexus-15 / SCAR / LSE / sizing at open time (Python agent).
+    /// Null for manually opened simulated trades.
+    /// </summary>
+    public string? AgentDecisionJson { get; set; }
+
     protected SimulatedTrade() { }
 
     public SimulatedTrade(

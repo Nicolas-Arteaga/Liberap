@@ -27,6 +27,8 @@ export interface LseSignal {
   symbol: string;
   timeframe: string;
   state: string;
+  /** conservative | aggressive — modo de detección del backend */
+  detection_mode?: string;
   score: number;
   sub_scores: LseSubScores;
   entry_price: number | null;
@@ -77,7 +79,8 @@ export class LseComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // ── State signals ─────────────────────────────────────────────────────────
   selectedSymbol  = signal('ARBUSDT');
-  selectedTf      = signal('1H');
+  /** Binance interval: debe coincidir con `<option value>` del select (15m | 1h | 4h). */
+  selectedTf      = signal('1h');
   selectedMode    = signal<'Agresivo' | 'Conservador'>('Agresivo');
   scoreThreshold  = signal(65);
   isLoading       = signal(false);
@@ -127,6 +130,19 @@ export class LseComponent implements OnInit, AfterViewInit, OnDestroy {
   filteredSymbols = computed(() => {
     const q = this.symbolSearch().toUpperCase().trim();
     return q ? BINANCE_FUTURES_PAIRS.filter(s => s.includes(q)) : BINANCE_FUTURES_PAIRS;
+  });
+
+  /** Selector UI: mismo modo para detección + entrada (conservative/conservative vs aggressive/aggressive). */
+  scanModeLabel = computed(() =>
+    this.selectedMode() === 'Agresivo'
+      ? 'Detección aggressive · entrada aggressive'
+      : 'Detección conservative · entrada conservative',
+  );
+
+  activeModeBadge = computed(() => {
+    const dm = this.lseSignal()?.detection_mode;
+    if (dm) return dm === 'aggressive' ? 'AGGRESSIVE' : 'CONSERVATIVE';
+    return this.selectedMode() === 'Agresivo' ? 'AGGRESSIVE*' : 'CONSERVATIVE*';
   });
 
   scoreColor = computed(() => {
@@ -193,7 +209,19 @@ export class LseComponent implements OnInit, AfterViewInit, OnDestroy {
   private tp2Line?: IPriceLine;
   private slLine?: IPriceLine;
   private realCandles: CandlestickData[] = [];
-  private readonly availableTfs = ['1H', '4H', '15m'];
+  /** Etiqueta corta para UI (badge junto al símbolo). */
+  tfBadge = computed(() => {
+    const v = this.selectedTf().toLowerCase();
+    if (v === '15m') return '15M';
+    if (v === '4h') return '4H';
+    return '1H';
+  });
+
+  /** Intervalo Binance API para velas principales + campo `timeframe` del backend. */
+  private binanceInterval(): string {
+    const v = this.selectedTf().toLowerCase();
+    return v === '15m' || v === '4h' ? v : '1h';
+  }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit() {
@@ -225,8 +253,23 @@ export class LseComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   selectTf(tf: string) {
-    this.selectedTf.set(tf);
+    this.selectedTf.set(tf.toLowerCase());
     this.loadCandles(this.selectedSymbol());
+  }
+
+  /** Click en banner Top LSE: mantiene la señal en panel derecho y sincroniza TF si viene en la respuesta. */
+  selectTopResult(tr: LseSignal) {
+    const tfRaw = (tr.timeframe || this.binanceInterval()).toLowerCase();
+    const tfNorm = tfRaw === '15m' || tfRaw === '4h' ? tfRaw : '1h';
+    this.selectedTf.set(tfNorm);
+    this.selectedSymbol.set(tr.symbol.toUpperCase());
+    this.symbolSearch.set('');
+    this.showSymbolList.set(false);
+    this.errorMsg.set(null);
+    this.lseSignal.set(tr);
+    this.updatePatternStepsFromSignal(tr);
+    this.drawChartOverlays(tr);
+    this.loadCandles(tr.symbol.toUpperCase());
   }
 
   toggleMode() {
@@ -247,13 +290,18 @@ export class LseComponent implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
 
-      const entry_mode = this.selectedMode() === 'Agresivo' ? 'aggressive' : 'conservative';
+      const useAggressive = this.selectedMode() === 'Agresivo';
+      const entry_mode = useAggressive ? 'aggressive' : 'conservative';
+      const detection_mode = useAggressive ? 'aggressive' : 'conservative';
+      const tf = this.binanceInterval();
       const body = {
         symbol:     this.selectedSymbol(),
-        timeframe:  '1h',
+        timeframe:  tf,
         candles_1h: payload.candles1h,
         candles_4h: payload.candles4h,
         entry_mode,
+        detection_mode,
+        preview_only: true,
       };
 
       fetch(`${LSE_PYTHON_URL}/lse/scan`, {
@@ -312,31 +360,49 @@ export class LseComponent implements OnInit, AfterViewInit, OnDestroy {
             const chunk = topPairs.slice(i, i + 15);
             await Promise.all(chunk.map(async sym => {
                try {
-                 const [r1h, r4h] = await Promise.all([
-                   fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${sym}&interval=1h&limit=200`).then(r => r.json()),
+                 const iv = this.binanceInterval();
+                 const [rPrimary, r4h] = await Promise.all([
+                   fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${sym}&interval=${iv}&limit=500`).then(r => r.json()),
                    fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${sym}&interval=4h&limit=200`).then(r => r.json()),
                  ]);
                  const convert = (raw: any[]) => (Array.isArray(raw) ? raw : []).map(k => ({
                    timestamp: String(k[0]), open: +k[1], high: +k[2], low: +k[3], close: +k[4], volume: +k[5],
                  }));
-                 
+                 const candlesPrimary = convert(rPrimary);
+                 // Binance a veces devuelve `{ code, msg }` o pocos datos en listados nuevos — menos de 120 no alcanza para MA99
+                 if (candlesPrimary.length < 120) {
+                   return;
+                 }
+
+                 const useAggressive = this.selectedMode() === 'Agresivo';
                  const body = {
                    symbol: sym,
-                   timeframe: '1h',
-                   candles_1h: convert(r1h),
+                   timeframe: iv,
+                   candles_1h: candlesPrimary,
                    candles_4h: convert(r4h),
-                   entry_mode: this.selectedMode() === 'Agresivo' ? 'aggressive' : 'conservative',
+                   entry_mode: useAggressive ? 'aggressive' : 'conservative',
+                   detection_mode: useAggressive ? 'aggressive' : 'conservative',
+                   preview_only: true,
                  };
-                 
-                 const scanRes = await fetch(`${LSE_PYTHON_URL}/lse/scan`, {
+
+                 const resScan = await fetch(`${LSE_PYTHON_URL}/lse/scan`, {
                    method: 'POST',
                    headers: { 'Content-Type': 'application/json' },
                    body: JSON.stringify(body),
-                 }).then(r => r.json());
-                 
+                 });
+                 let scanRes: Record<string, unknown> = {};
+                 try {
+                   scanRes = await resScan.json() as Record<string, unknown>;
+                 } catch {
+                   return;
+                 }
+                 if (!resScan.ok) {
+                   return;
+                 }
+
                  const minScore = this.scoreThreshold();
-                 if (scanRes.signal_found && scanRes.signal && scanRes.signal.score >= minScore) {
-                    results.push(scanRes.signal);
+                 if (scanRes.signal_found && scanRes.signal && (scanRes.signal as LseSignal).score >= minScore) {
+                    results.push(scanRes.signal as LseSignal);
                  }
                } catch(e) {
                  // ignore
@@ -344,13 +410,21 @@ export class LseComponent implements OnInit, AfterViewInit, OnDestroy {
             }));
          }
          
-         const top5 = results.sort((a,b) => b.score - a.score).slice(0, 5);
-         this.topResults.set(top5);
+         const sorted = results.sort((a, b) => b.score - a.score);
+         const seen = new Set<string>();
+         const top10: LseSignal[] = [];
+         for (const s of sorted) {
+           if (seen.has(s.symbol)) continue;
+           seen.add(s.symbol);
+           top10.push(s);
+           if (top10.length >= 10) break;
+         }
+         this.topResults.set(top10);
          this.isTopLoading.set(false);
-         if(top5.length === 0) {
+         if (top10.length === 0) {
             this.errorMsg.set(
               'Ningún par del Top 150 superó el umbral LSE (compresión MA + sweep + reclaim + volumen + 4H). ' +
-              'Probá bajar el umbral de score, modo Agresivo, o escanear un símbolo concreto — el motor es selectivo a propósito.'
+              'Probá bajar el umbral de score, modo Agresivo, otro timeframe, o escanear un símbolo concreto — el motor es selectivo a propósito.'
             );
          }
       })
@@ -434,16 +508,17 @@ export class LseComponent implements OnInit, AfterViewInit, OnDestroy {
       priceLineVisible: false,
     });
 
-    this.loadCandles(this.selectedSymbol());
+    this.loadCandles(this.selectedSymbol(), this.binanceInterval());
   }
 
-  private loadCandles(symbol: string, interval = '1h', limit = 500) {
-    const futuresUrl = `https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+  private loadCandles(symbol: string, interval?: string, limit = 500) {
+    const iv = interval ?? this.binanceInterval();
+    const futuresUrl = `https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${iv}&limit=${limit}`;
     fetch(futuresUrl)
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then((raw: any[]) => this.applyCandles(symbol, raw))
       .catch(() => {
-        const spotUrl = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+        const spotUrl = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${iv}&limit=${limit}`;
         return fetch(spotUrl).then(r => r.json()).then((raw: any[]) => this.applyCandles(symbol, raw));
       })
       .catch(e => console.error('[LSE] Candle fetch error:', e));
@@ -522,15 +597,16 @@ export class LseComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private async buildCandlePayload(): Promise<{ candles1h: any[], candles4h: any[] } | null> {
     const sym = this.selectedSymbol();
+    const iv = this.binanceInterval();
     try {
-      const [r1h, r4h] = await Promise.all([
-        fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${sym}&interval=1h&limit=200`).then(r => r.json()),
+      const [rPrimary, r4h] = await Promise.all([
+        fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${sym}&interval=${iv}&limit=500`).then(r => r.json()),
         fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${sym}&interval=4h&limit=200`).then(r => r.json()),
       ]);
       const convert = (raw: any[]) => (Array.isArray(raw) ? raw : []).map(k => ({
         timestamp: String(k[0]), open: +k[1], high: +k[2], low: +k[3], close: +k[4], volume: +k[5],
       }));
-      return { candles1h: convert(r1h), candles4h: convert(r4h) };
+      return { candles1h: convert(rPrimary), candles4h: convert(r4h) };
     } catch {
       return null;
     }

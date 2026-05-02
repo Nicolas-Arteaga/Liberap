@@ -50,6 +50,8 @@ export interface OpenTradeInputDto {
   tpPrice?: number;
   slPrice?: number;
   tradingSignalId?: string;
+  exchange?: string;
+  agentDecisionJson?: string;
 }
 
 export interface SentimentAnalysisDto {
@@ -105,6 +107,8 @@ export interface SimulatedTradeDto extends EntityDto<string> {
   openedAt?: string;
   closedAt?: string;
   tradingSignalId?: string;
+  exchange?: string;
+  agentDecisionJson?: string;
 }
 
 export interface SimulationPerformanceDto {

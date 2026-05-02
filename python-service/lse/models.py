@@ -20,6 +20,12 @@ class LSEEntryMode(str, Enum):
     conservative = "conservative"  # Ruptura del high del sweep
 
 
+class LSEDetectionMode(str, Enum):
+    """Modo de detección — conservador (equal lows + reglas actuales) vs agresivo (más permisivo)."""
+    conservative = "conservative"
+    aggressive = "aggressive"
+
+
 class CandleInput(BaseModel):
     timestamp: str
     open: float
@@ -32,9 +38,15 @@ class CandleInput(BaseModel):
 class LSEScanRequest(BaseModel):
     symbol: str
     timeframe: str = "1h"
-    candles_1h: List[CandleInput] = Field(default_factory=list, description="Velas 1H (mínimo 120)")
+    candles_1h: List[CandleInput] = Field(
+        default_factory=list,
+        description="Velas del TF principal (clave histórica candles_1h; puede ser 15m/1h/4h)",
+    )
     candles_4h: List[CandleInput] = Field(default_factory=list, description="Velas 4H para filtro HTF")
     entry_mode: LSEEntryMode = LSEEntryMode.conservative
+    detection_mode: LSEDetectionMode = LSEDetectionMode.conservative
+    # Dashboard / Top scan: no escribe cooldown ni bloquea por SM (el agente NO debe usar esto)
+    preview_only: bool = False
 
 
 class LSESubScores(BaseModel):
@@ -53,6 +65,7 @@ class LSESignal(BaseModel):
     symbol: str
     timeframe: str
     state: LSEState
+    detection_mode: LSEDetectionMode = LSEDetectionMode.conservative
     score: float = Field(0.0, ge=0, le=100)
     sub_scores: LSESubScores
     entry_price: Optional[float] = None
@@ -97,3 +110,38 @@ class LSEBacktestResult(BaseModel):
     avg_r_multiple: float
     trades_per_week: float
     trades: List[Dict] = Field(default_factory=list)
+
+
+class LSEBatchItem(BaseModel):
+    """Un símbolo con velas para un único POST batch (evita N timeouts cortos en el agente)."""
+    symbol: str
+    timeframe: str = "1h"
+    candles_1h: List[CandleInput] = Field(default_factory=list)
+    candles_4h: List[CandleInput] = Field(default_factory=list)
+
+
+class LSEBatchScanRequest(BaseModel):
+    items: List[LSEBatchItem] = Field(..., min_length=1, max_length=50)
+    entry_mode: LSEEntryMode = LSEEntryMode.conservative
+    detection_modes: List[LSEDetectionMode] = Field(
+        default_factory=lambda: [
+            LSEDetectionMode.aggressive,
+            LSEDetectionMode.conservative,
+        ]
+    )
+    top_k: int = Field(10, ge=1, le=25, description="Máximo de señales devueltas, ordenadas por score desc.")
+    preview_only: bool = False
+
+
+class LSEBatchSignalRow(BaseModel):
+    symbol: str
+    timeframe: str
+    detection_mode: LSEDetectionMode
+    signal: LSESignal
+
+
+class LSEBatchScanResponse(BaseModel):
+    analyzed_at: str
+    items_in_request: int
+    symbols_processed: int
+    signals: List[LSEBatchSignalRow] = Field(default_factory=list)

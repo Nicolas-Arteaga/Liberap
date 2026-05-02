@@ -24,6 +24,11 @@ export const APP_ROUTES: Routes = [
         loadComponent: () => import('./agent/agent.component').then(c => c.AgentComponent),
       },
       {
+        path: 'agent-audit',
+        loadComponent: () =>
+          import('./agent/agent-trade-audit.component').then(c => c.AgentTradeAuditComponent),
+      },
+      {
         path: 'profile',
         loadComponent: () => import('./profile/profile.component').then(c => c.ProfileComponent),
       },

@@ -282,6 +282,8 @@ public class SimulationMarkPriceWorker : BackgroundService
         ClosedAt = t.ClosedAt,
         TpPrice = t.TpPrice,
         SlPrice = t.SlPrice,
-        TradingSignalId = t.TradingSignalId
+        TradingSignalId = t.TradingSignalId,
+        Exchange = t.Exchange,
+        AgentDecisionJson = t.AgentDecisionJson
     };
 }

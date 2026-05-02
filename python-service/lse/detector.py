@@ -16,7 +16,12 @@ from typing import List, Optional, Tuple
 from datetime import datetime, timezone
 
 from .models import (
-    CandleInput, LSESignal, LSESubScores, LSEState, LSEEntryMode,
+    CandleInput,
+    LSESignal,
+    LSESubScores,
+    LSEState,
+    LSEEntryMode,
+    LSEDetectionMode,
 )
 from .config import LSESymbolConfig, get_config
 from .state_machine import LSEStateMachine
@@ -198,6 +203,45 @@ def _find_support_level(
     return None
 
 
+def _find_support_aggressive(
+    lows: np.ndarray,
+    closes: np.ndarray,
+    cfg: LSESymbolConfig,
+) -> Optional[float]:
+    """
+    Modo aggressive: nivel roto = mínimo de últimos N velas (single tap permitido).
+    Sin equal lows obligatorio.
+    """
+    lb = cfg.lookback_lows
+    if len(lows) < lb:
+        return None
+    return float(np.min(lows[-lb:]))
+
+
+def _effective_aggressive_sweep_thresholds(cfg: LSESymbolConfig) -> Tuple[float, float]:
+    """Wick mínimo enfatizado + volumen más flexible — overrides opcionales por símbolo."""
+    wick = cfg.aggressive_wick_ratio_min
+    if wick is None:
+        wick = max(cfg.wick_ratio_min, 0.35)
+    vol_mult = cfg.aggressive_volume_spike_mult
+    if vol_mult is None:
+        vol_mult = 1.2
+    return float(wick), float(vol_mult)
+
+
+def _weighted_aggressive_score(sub: LSESubScores) -> float:
+    """
+    Pesos aggressive: Compression 15%, Sweep 30%, Reclaim 25%, Volume 15%, HTF 15%.
+    Normaliza cada componente a su techo conservador habitual antes de ponderar.
+    """
+    nc = min(1.0, max(0.0, sub.compression / 20.0))
+    ns = min(1.0, max(0.0, sub.sweep / 25.0))
+    nr = min(1.0, max(0.0, sub.reclaim / 20.0))
+    nv = min(1.0, max(0.0, sub.volume / 20.0))
+    nh = min(1.0, max(0.0, sub.htf_context / 15.0))
+    return round(nc * 15.0 + ns * 30.0 + nr * 25.0 + nv * 15.0 + nh * 15.0, 2)
+
+
 def _detect_sweep(
     opens: np.ndarray,
     highs: np.ndarray,
@@ -207,13 +251,15 @@ def _detect_sweep(
     support_level: float,
     atrs: np.ndarray,
     cfg: LSESymbolConfig,
+    wick_ratio_min: float,
+    volume_spike_mult: float,
 ) -> Tuple[bool, int, float, float, float, float]:
     """
     Busca, en las últimas `sweep_lookback` velas, una que:
       - Baje por debajo del nivel de soporte (sweep)
       - Tenga mecha inferior >= wick_ratio_min * rango_total
       - Cierre POR ENCIMA del nivel roto (reclaim inmediato)
-      - Volumen > promedio(50) * volume_spike_mult
+      - Volumen > promedio(50) * volume_spike_mult (parámetros explícitos por modo)
     Retorna (encontrado, sweep_idx, sweep_low, sweep_high, reclaim_close_sweep, vol_ratio)
     """
     lb = cfg.sweep_lookback
@@ -252,12 +298,12 @@ def _detect_sweep(
         # lower_wick = min(c_open, c_close) - c_low
         lower_wick = min(c_open, c_close) - c_low
         wick_ratio = lower_wick / total_range
-        if wick_ratio < cfg.wick_ratio_min:
+        if wick_ratio < wick_ratio_min:
             continue
 
         # 4. Volumen spike
         vol_ratio = c_vol / avg_vol if avg_vol > 0 else 1.0
-        if vol_ratio < cfg.volume_spike_mult:
+        if vol_ratio < volume_spike_mult:
             continue
 
         # 5. Filtro anomalía (noticias/manipulación)
@@ -386,51 +432,99 @@ def _find_tp2(highs: np.ndarray, entry_price: float) -> float:
 # Main detector
 # ---------------------------------------------------------------------------
 
-def run_lse_detection(
+def _finalize_lse_signal(
     symbol: str,
     timeframe: str,
-    candles_1h: List[CandleInput],
+    sub: LSESubScores,
+    reasoning: List[str],
+    compression_pct: float,
+    highs: np.ndarray,
+    ma7: np.ndarray,
+    ma25: np.ndarray,
+    ma99: np.ndarray,
+    atrs: np.ndarray,
+    sweep_low: float,
+    reclaim_close: float,
+    vol_ratio: float,
+    entry_price: float,
+    entry_mode: LSEEntryMode,
+    detection_mode: LSEDetectionMode,
+    cfg: LSESymbolConfig,
+    sm: LSEStateMachine,
+    total_score: float,
+    preview_only: bool = False,
+) -> Tuple[LSESignal, List[str]]:
+    stop_loss = sweep_low * 0.995
+    tp1 = _find_tp1(highs, entry_price, cfg)
+    tp2 = _find_tp2(highs, entry_price)
+
+    reasoning.append(f"🛡️ SL={stop_loss:.6f} | TP1={tp1:.6f} | TP2={tp2:.6f}")
+
+    risk = entry_price - stop_loss
+    reward = tp1 - entry_price
+    if risk > 0 and reward / risk < 1.5:
+        reasoning.append(f"⚠️ R:R bajo ({reward/risk:.2f}) — señal emitida igual (ejecutar con cautela)")
+
+    if not preview_only:
+        sm.enter_emit_cooldown(symbol, timeframe, cfg.cooldown_candles)
+
+    alert_message = (
+        f"🚨 LSE[{detection_mode.value}] | {symbol} | Score {total_score:.0f}/100 | "
+        f"Entry {entry_price:.6f} | SL {stop_loss:.6f} | TP1 {tp1:.6f}"
+    )
+
+    signal = LSESignal(
+        symbol          = symbol,
+        timeframe       = timeframe,
+        state           = LSEState.triggered,
+        detection_mode  = detection_mode,
+        score           = round(total_score, 2),
+        sub_scores      = sub,
+        entry_price     = entry_price,
+        stop_loss       = round(stop_loss, 8),
+        take_profit_1   = round(tp1, 8),
+        take_profit_2   = round(tp2, 8),
+        sweep_low       = round(sweep_low, 8),
+        reclaim_close   = round(reclaim_close, 8),
+        ma7             = round(float(ma7[-1]), 8),
+        ma25            = round(float(ma25[-1]), 8),
+        ma99            = round(float(ma99[-1]), 8),
+        atr             = round(float(atrs[-1]), 8) if not np.isnan(atrs[-1]) else None,
+        volume_ratio    = round(vol_ratio, 3),
+        compression_pct = compression_pct,
+        reasoning       = reasoning,
+        entry_mode      = entry_mode,
+        detected_at     = datetime.now(timezone.utc).isoformat(),
+        alert_message   = alert_message,
+    )
+
+    logger.info("🔥 LSE SEÑAL EMITIDA [%s]: %s", detection_mode.value, alert_message)
+    return signal, reasoning
+
+
+def _pipeline_conservative(
+    symbol: str,
+    timeframe: str,
     candles_4h: List[CandleInput],
-    entry_mode: LSEEntryMode = LSEEntryMode.conservative,
+    opens: np.ndarray,
+    highs: np.ndarray,
+    lows: np.ndarray,
+    closes: np.ndarray,
+    vols: np.ndarray,
+    ma7: np.ndarray,
+    ma25: np.ndarray,
+    ma99: np.ndarray,
+    atrs: np.ndarray,
+    cfg: LSESymbolConfig,
+    entry_mode: LSEEntryMode,
+    sm: LSEStateMachine,
+    preview_only: bool = False,
 ) -> Tuple[Optional[LSESignal], List[str]]:
-    """
-    Pipeline completo de detección LSE.
-    Retorna (señal | None, diagnostics) — diagnostics describe por qué falló o el camino completo.
-    """
-    cfg = get_config(symbol)
-    sm  = LSEStateMachine.get()
-
-    # Tick de estado (nueva vela procesada)
-    sm.tick(symbol, timeframe)
-
-    # Bloqueo: no emitir si ya estamos triggered o en cooldown
-    if not sm.can_emit(symbol, timeframe):
-        msg = (
-            f"🔒 {symbol}: cooldown LSE activo para este par/timeframe — esperá velas o "
-            f"POST /lse/reset-state/{symbol}?timeframe={timeframe}"
-        )
-        logger.debug(msg)
-        return None, [msg]
-
-    # Mínimo de datos
-    if len(candles_1h) < 120:
-        logger.debug("⚠️ [%s] Insuficientes velas 1H (%d)", symbol, len(candles_1h))
-        return None, [
-            f"⚠️ Insuficientes velas 1H ({len(candles_1h)}); se requieren ≥120 para MA99 estable."
-        ]
-
-    opens, highs, lows, closes, vols = _to_arrays(candles_1h)
-
-    # --- Medias móviles ---
-    ma7  = _ema(closes, 7)
-    ma25 = _ema(closes, 25)
-    ma99 = _ema(closes, 99)
-    atrs = _atr(highs, lows, closes, period=14)
-
+    """Pipeline conservador — igual al comportamiento histórico del LSE."""
     reasoning: List[str] = []
+    reasoning.append(f"📘 detection_mode={LSEDetectionMode.conservative.value}")
     sub = LSESubScores()
 
-    # ── PASO 1: COMPRESIÓN ──────────────────────────────────────────────────
     compressed, comp_score, compression_pct = _detect_compression(ma25, ma99, closes, cfg)
 
     if compressed:
@@ -438,38 +532,34 @@ def run_lse_detection(
         reasoning.append(f"✅ Compresión MA25/MA99 detectada ({compression_pct:.3f}% distancia)")
     else:
         reasoning.append(f"⏳ Sin compresión MA25/MA99 ({compression_pct:.3f}%)")
-        # Sin compresión = sin señal (condición base)
         return None, reasoning
 
-    # ── PASO 2: NIVEL DE SOPORTE ────────────────────────────────────────────
     support_level = _find_support_level(highs, lows, closes, atrs, cfg)
 
     if support_level is None:
         reasoning.append("❌ No se encontró nivel de soporte validado (equal lows)")
         return None, reasoning
 
-    reasoning.append(f"✅ Nivel de soporte: {support_level:.6f}")
+    reasoning.append(f"✅ Nivel de soporte (equal lows): {support_level:.6f}")
 
-    # ── PASO 3: FILTRO ATR ──────────────────────────────────────────────────
     atr_ok, atr_ratio = _atr_filter(atrs, cfg)
     if not atr_ok:
         reasoning.append(f"🚫 ATR caótico ({atr_ratio:.2f}x promedio) — señal descartada")
         return None, reasoning
 
-    # ── PASO 4: SWEEP ───────────────────────────────────────────────────────
     sweep_found, sweep_idx, sweep_low, sweep_high, reclaim_close, vol_ratio = _detect_sweep(
-        opens, highs, lows, closes, vols, support_level, atrs, cfg
+        opens, highs, lows, closes, vols, support_level, atrs, cfg,
+        cfg.wick_ratio_min, cfg.volume_spike_mult,
     )
 
     if not sweep_found or sweep_idx < 0:
         reasoning.append("⏳ Sin sweep detectado todavía")
         return None, reasoning
 
-    sub.sweep  = 25.0  # Sweep detectado = score completo
+    sub.sweep = 25.0
     sub.volume = min(20.0, 20.0 * (vol_ratio / (cfg.volume_spike_mult * 1.5)))
     reasoning.append(f"🎯 Sweep detectado: low={sweep_low:.6f} close={reclaim_close:.6f} vol_ratio={vol_ratio:.2f}x")
 
-    # ── PASO 5: RECLAIM ─────────────────────────────────────────────────────
     reclaimed, entry_price, reclaim_j = _find_reclaim_candle(
         highs, closes, ma7, ma25, support_level, sweep_high, sweep_idx, entry_mode
     )
@@ -481,7 +571,6 @@ def run_lse_detection(
     sub.reclaim = 20.0
     reasoning.append(f"✅ Reclaim confirmado (vela índice {reclaim_j}). Entry price: {entry_price:.6f}")
 
-    # ── PASO 6: CONTEXTO HTF 4H ─────────────────────────────────────────────
     htf_score, htf_reasons = _htf_context_score(candles_4h, cfg)
     sub.htf_context = htf_score
     reasoning.extend(htf_reasons)
@@ -489,11 +578,10 @@ def run_lse_detection(
     if htf_score == 0.0:
         return None, reasoning
 
-    # ── SCORING FINAL ───────────────────────────────────────────────────────
     total_score = sub.total
 
     reasoning.append(
-        f"📊 Score: {total_score:.1f}/100 "
+        f"📊 Score (conservative sum): {total_score:.1f}/100 "
         f"[comp={sub.compression:.1f} sweep={sub.sweep:.1f} "
         f"reclaim={sub.reclaim:.1f} vol={sub.volume:.1f} htf={sub.htf_context:.1f}]"
     )
@@ -502,48 +590,169 @@ def run_lse_detection(
         reasoning.append(f"❌ Score insuficiente ({total_score:.1f} < {cfg.min_score_to_trigger})")
         return None, reasoning
 
-    # ── GESTIÓN DE RIESGO ───────────────────────────────────────────────────
-    stop_loss   = sweep_low * 0.995  # SL debajo del mínimo del sweep
-    tp1         = _find_tp1(highs, entry_price, cfg)
-    tp2         = _find_tp2(highs, entry_price)
-
-    reasoning.append(f"🛡️ SL={stop_loss:.6f} | TP1={tp1:.6f} | TP2={tp2:.6f}")
-
-    # Validación mínima R:R (mínimo 1:1.5)
-    risk   = entry_price - stop_loss
-    reward = tp1 - entry_price
-    if risk > 0 and reward / risk < 1.5:
-        reasoning.append(f"⚠️ R:R bajo ({reward/risk:.2f}) — señal emitida igual (ejecutar con cautela)")
-
-    # ── CONSTRUIR SEÑAL ─────────────────────────────────────────────────────
-    sm.enter_emit_cooldown(symbol, timeframe, cfg.cooldown_candles)
-
-    signal = LSESignal(
-        symbol        = symbol,
-        timeframe     = timeframe,
-        state         = LSEState.triggered,
-        score         = round(total_score, 2),
-        sub_scores    = sub,
-        entry_price   = entry_price,
-        stop_loss     = round(stop_loss, 8),
-        take_profit_1 = round(tp1, 8),
-        take_profit_2 = round(tp2, 8),
-        sweep_low     = round(sweep_low, 8),
-        reclaim_close = round(reclaim_close, 8),
-        ma7           = round(float(ma7[-1]), 8),
-        ma25          = round(float(ma25[-1]), 8),
-        ma99          = round(float(ma99[-1]), 8),
-        atr           = round(float(atrs[-1]), 8) if not np.isnan(atrs[-1]) else None,
-        volume_ratio  = round(vol_ratio, 3),
-        compression_pct = compression_pct,
-        reasoning     = reasoning,
-        entry_mode    = entry_mode,
-        detected_at   = datetime.now(timezone.utc).isoformat(),
-        alert_message = (
-            f"🚨 LSE | {symbol} | Score {total_score:.0f}/100 | "
-            f"Entry {entry_price:.6f} | SL {stop_loss:.6f} | TP1 {tp1:.6f}"
-        ),
+    return _finalize_lse_signal(
+        symbol, timeframe, sub, reasoning, compression_pct,
+        highs, ma7, ma25, ma99, atrs,
+        sweep_low, reclaim_close, vol_ratio,
+        entry_price, entry_mode, LSEDetectionMode.conservative,
+        cfg, sm, total_score, preview_only,
     )
 
-    logger.info("🔥 LSE SEÑAL EMITIDA: %s", signal.alert_message)
-    return signal, reasoning
+
+def _pipeline_aggressive(
+    symbol: str,
+    timeframe: str,
+    candles_4h: List[CandleInput],
+    opens: np.ndarray,
+    highs: np.ndarray,
+    lows: np.ndarray,
+    closes: np.ndarray,
+    vols: np.ndarray,
+    ma7: np.ndarray,
+    ma25: np.ndarray,
+    ma99: np.ndarray,
+    atrs: np.ndarray,
+    cfg: LSESymbolConfig,
+    entry_mode: LSEEntryMode,
+    sm: LSEStateMachine,
+    preview_only: bool = False,
+) -> Tuple[Optional[LSESignal], List[str]]:
+    """Pipeline agresivo — sin equal lows obligatorio; pesos de score distintos."""
+    reasoning: List[str] = []
+    reasoning.append(f"📙 detection_mode={LSEDetectionMode.aggressive.value}")
+    sub = LSESubScores()
+
+    compressed, comp_score, compression_pct = _detect_compression(ma25, ma99, closes, cfg)
+
+    if compressed:
+        sub.compression = comp_score
+        reasoning.append(f"✅ Compresión MA25/MA99 detectada ({compression_pct:.3f}% distancia)")
+    elif cfg.aggressive_compression_optional:
+        sub.compression = 0.0
+        reasoning.append(
+            f"ℹ️ Aggressive: sin compresión MA25/99 ({compression_pct:.3f}%) — siguiendo (compression_optional)"
+        )
+    else:
+        reasoning.append(f"⏳ Sin compresión MA25/MA99 ({compression_pct:.3f}%) — aggressive_compression_optional=false")
+        return None, reasoning
+
+    support_level = _find_support_aggressive(lows, closes, cfg)
+    if support_level is None:
+        reasoning.append("❌ Sin nivel soporte aggressive (lookback insuficiente)")
+        return None, reasoning
+
+    reasoning.append(f"✅ Nivel soporte aggressive (min últimos {cfg.lookback_lows}): {support_level:.6f}")
+
+    atr_ok, atr_ratio = _atr_filter(atrs, cfg)
+    if not atr_ok:
+        reasoning.append(f"🚫 ATR caótico ({atr_ratio:.2f}x promedio) — señal descartada")
+        return None, reasoning
+
+    wick_eff, vol_eff = _effective_aggressive_sweep_thresholds(cfg)
+    reasoning.append(f"⚙️ Sweep aggressive: wick_ratio_min={wick_eff:.2f} volume_spike_mult={vol_eff:.2f}")
+
+    sweep_found, sweep_idx, sweep_low, sweep_high, reclaim_close, vol_ratio = _detect_sweep(
+        opens, highs, lows, closes, vols, support_level, atrs, cfg,
+        wick_eff, vol_eff,
+    )
+
+    if not sweep_found or sweep_idx < 0:
+        reasoning.append("⏳ Sin sweep detectado todavía")
+        return None, reasoning
+
+    sub.sweep = 25.0
+    sub.volume = min(20.0, 20.0 * (vol_ratio / (vol_eff * 1.5)))
+    reasoning.append(f"🎯 Sweep detectado: low={sweep_low:.6f} close={reclaim_close:.6f} vol_ratio={vol_ratio:.2f}x")
+
+    reclaimed, entry_price, reclaim_j = _find_reclaim_candle(
+        highs, closes, ma7, ma25, support_level, sweep_high, sweep_idx, entry_mode
+    )
+
+    if not reclaimed:
+        reasoning.append("⏳ Esperando reclaim confirmado...")
+        return None, reasoning
+
+    sub.reclaim = 20.0
+    reasoning.append(f"✅ Reclaim confirmado (vela índice {reclaim_j}). Entry price: {entry_price:.6f}")
+
+    htf_score, htf_reasons = _htf_context_score(candles_4h, cfg)
+    sub.htf_context = htf_score
+    reasoning.extend(htf_reasons)
+
+    if htf_score == 0.0:
+        return None, reasoning
+
+    total_score = _weighted_aggressive_score(sub)
+    raw_sum = sub.total
+
+    reasoning.append(
+        f"📊 Score (aggressive weighted): {total_score:.1f}/100 | suma raw ref={raw_sum:.1f} "
+        f"[comp={sub.compression:.1f} sweep={sub.sweep:.1f} "
+        f"reclaim={sub.reclaim:.1f} vol={sub.volume:.1f} htf={sub.htf_context:.1f}]"
+    )
+
+    if total_score < cfg.min_score_to_trigger:
+        reasoning.append(f"❌ Score insuficiente ({total_score:.1f} < {cfg.min_score_to_trigger})")
+        return None, reasoning
+
+    return _finalize_lse_signal(
+        symbol, timeframe, sub, reasoning, compression_pct,
+        highs, ma7, ma25, ma99, atrs,
+        sweep_low, reclaim_close, vol_ratio,
+        entry_price, entry_mode, LSEDetectionMode.aggressive,
+        cfg, sm, total_score, preview_only,
+    )
+
+
+def run_lse_detection(
+    symbol: str,
+    timeframe: str,
+    candles_1h: List[CandleInput],
+    candles_4h: List[CandleInput],
+    entry_mode: LSEEntryMode = LSEEntryMode.conservative,
+    detection_mode: LSEDetectionMode = LSEDetectionMode.conservative,
+    preview_only: bool = False,
+) -> Tuple[Optional[LSESignal], List[str]]:
+    """
+    Pipeline completo de detección LSE (conservative sin cambios vs aggressive opt-in).
+    preview_only=True: no tick SM, no gate cooldown, no enter_emit_cooldown (dashboard).
+    """
+    cfg = get_config(symbol)
+    sm = LSEStateMachine.get()
+
+    if not preview_only:
+        sm.tick(symbol, timeframe)
+
+        if not sm.can_emit(symbol, timeframe):
+            msg = (
+                f"🔒 {symbol}: cooldown LSE activo para este par/timeframe — esperá velas o "
+                f"POST /lse/reset-state/{symbol}?timeframe={timeframe}"
+            )
+            logger.debug(msg)
+            return None, [msg]
+
+    if len(candles_1h) < 120:
+        logger.debug("⚠️ [%s] Insuficientes velas TF principal (%d)", symbol, len(candles_1h))
+        return None, [
+            f"⚠️ Insuficientes velas ({len(candles_1h)}); se requieren ≥120 para MA99 estable."
+        ]
+
+    opens, highs, lows, closes, vols = _to_arrays(candles_1h)
+
+    ma7 = _ema(closes, 7)
+    ma25 = _ema(closes, 25)
+    ma99 = _ema(closes, 99)
+    atrs = _atr(highs, lows, closes, period=14)
+
+    if detection_mode == LSEDetectionMode.aggressive:
+        return _pipeline_aggressive(
+            symbol, timeframe, candles_4h,
+            opens, highs, lows, closes, vols, ma7, ma25, ma99, atrs,
+            cfg, entry_mode, sm, preview_only,
+        )
+
+    return _pipeline_conservative(
+        symbol, timeframe, candles_4h,
+        opens, highs, lows, closes, vols, ma7, ma25, ma99, atrs,
+        cfg, entry_mode, sm, preview_only,
+    )

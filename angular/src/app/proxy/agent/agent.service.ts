@@ -9,6 +9,24 @@ export class AgentService {
   apiName = 'Default';
   
 
+  broadcastSignal = (signal: object, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'POST',
+      url: '/api/app/agent/broadcast-signal',
+      body: signal,
+    },
+    { apiName: this.apiName,...config });
+  
+
+  broadcastSignals = (signals: object[], config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'POST',
+      url: '/api/app/agent/broadcast-signals',
+      body: signals,
+    },
+    { apiName: this.apiName,...config });
+  
+
   getAuditSummary = (config?: Partial<Rest.Config>) =>
     this.restService.request<any, object>({
       method: 'GET',

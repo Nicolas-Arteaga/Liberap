@@ -1,5 +1,6 @@
 import { Component, OnInit, OnDestroy, inject, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { IonIcon } from '@ionic/angular/standalone';
 import { AgentService } from '../proxy/agent/agent.service';
 import { AgentSignalrService, AgentLog } from './agent-signalr.service';
@@ -10,7 +11,7 @@ export type SystemState = 'STOPPED' | 'STARTING_SERVER' | 'SERVER_READY' | 'AGEN
 @Component({
   selector: 'app-agent',
   standalone: true,
-  imports: [CommonModule, IonIcon],
+  imports: [CommonModule, IonIcon, RouterLink],
   templateUrl: './agent.component.html',
   styleUrls: ['./agent.component.scss']
 })

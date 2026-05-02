@@ -66,6 +66,7 @@ def log_signal(signal: LSESignal, event: str = "SIGNAL_EMITTED") -> None:
         "atr":            signal.atr,
         "volume_ratio":   signal.volume_ratio,
         "compression_pct": signal.compression_pct,
+        "detection_mode": signal.detection_mode.value if signal.detection_mode else None,
         "entry_mode":     signal.entry_mode.value if signal.entry_mode else None,
         "detected_at":    signal.detected_at,
         "reasoning":      signal.reasoning,

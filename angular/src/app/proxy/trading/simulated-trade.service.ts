@@ -68,6 +68,15 @@ export class SimulatedTradeService {
     { apiName: this.apiName,...config });
   
 
+  resolveBinancePriceOnly = (rawSymbol: string, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, number>({
+      method: 'POST',
+      url: '/api/app/simulated-trade/resolve-binance-price-only',
+      params: { rawSymbol },
+    },
+    { apiName: this.apiName,...config });
+  
+
   updateTpSl = (tradeId: string, input: UpdateTpSlInputDto, config?: Partial<Rest.Config>) =>
     this.restService.request<any, void>({
       method: 'PUT',

@@ -141,6 +141,55 @@ class BinanceFetcher:
             )
         return klines
 
+    def get_klines_for_lse(
+        self,
+        symbol: str,
+        interval: str = "1h",
+        limit: int = 150,
+        min_cache: int = 120,
+    ) -> list:
+        """
+        OHLCV para LSE (1h / 4h). Igual que Nexus: primero SQLite, si falta historial → REST multi-exchange.
+
+        Sin esto, LSE veía siempre lista vacía: el agente llamaba get_klines() que no existía en esta clase.
+        """
+        klines = self._cache.get_klines(symbol, interval, limit)
+        if len(klines) >= min_cache:
+            return klines
+
+        if len(klines) > 0:
+            logger.debug(
+                f"[Fetcher/LSE] {symbol} {interval}: {len(klines)} velas en caché "
+                f"(se piden ≥{min_cache}). Backfill REST."
+            )
+        else:
+            logger.info(
+                f"[Fetcher/LSE] {symbol} {interval}: sin historial en caché. Backfill REST."
+            )
+
+        fetched = self._multi_fetcher.fetch_klines(symbol, interval, limit)
+        if fetched:
+            rest_klines = [{
+                "open_time": k["open_time"],
+                "open":      k["open"],
+                "high":      k["high"],
+                "low":       k["low"],
+                "close":     k["close"],
+                "volume":    k["volume"],
+                "is_final":  True,
+            } for k in fetched]
+            self._cache.bulk_upsert_klines(symbol, interval, rest_klines)
+            logger.info(
+                f"[Fetcher/LSE] {symbol} {interval}: {len(fetched)} velas guardadas vía REST."
+            )
+            return self._cache.get_klines(symbol, interval, limit)
+
+        if klines:
+            logger.debug(
+                f"[Fetcher/LSE] {symbol} {interval}: REST falló; devolviendo {len(klines)} parciales."
+            )
+        return klines
+
     def get_rate_limiter_status(self) -> dict:
         """Exposes rate limiter + circuit breaker status for /health endpoints."""
         logger.debug("[TRACE] Entering get_rate_limiter_status")

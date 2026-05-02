@@ -1,0 +1,298 @@
+<div class="audit-root">
+  <header class="audit-header">
+    <a routerLink="/agent" class="audit-back">← Agente</a>
+    <div>
+      <h1>Auditoría del agente</h1>
+      <p class="audit-sub">
+        Todas las posiciones simuladas (abiertas y cerradas). El detalle Nexus / SCAR / LSE solo aparece cuando el agente guardó
+        <code class="audit-inline-code">AgentDecisionJson</code> al abrir.
+      </p>
+      @if (!loading() && !loadError() && missingSnapshotCount() > 0) {
+        <p class="audit-hint">
+          {{ missingSnapshotCount() }} trade(s) sin snapshot — ves la ejecución en servidor pero no el contexto capturado (revisá logs del host al abrir).
+        </p>
+      }
+    </div>
+    <button type="button" class="audit-refresh" (click)="refresh()" [disabled]="loading()">Actualizar</button>
+  </header>
+
+  @if (loading()) {
+    <div class="audit-state">Cargando…</div>
+  } @else if (loadError()) {
+    <div class="audit-state audit-state--err">{{ loadError() }}</div>
+  } @else if (allRows().length === 0) {
+    <div class="audit-state">
+      No hay trades simulados en tu cuenta todavía.
+    </div>
+  } @else {
+    <div class="audit-layout">
+      <div class="audit-table-card">
+        <table class="audit-table">
+          <thead>
+            <tr>
+              <th>Símbolo</th>
+              <th class="col-audit">Contexto</th>
+              <th>Origen</th>
+              <th>Scores</th>
+              <th>Estado</th>
+              <th>Apertura</th>
+              <th>PnL</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (tr of allRows(); track tr.id) {
+              <tr
+                [class.selected]="selected()?.id === tr.id"
+                [class.row--no-audit]="!hasAuditSnapshot(tr)"
+                (click)="pickRow(tr)"
+              >
+                <td><strong>{{ tr.symbol }}</strong></td>
+                <td class="col-audit">
+                  @if (hasAuditSnapshot(tr)) {
+                    <span class="audit-pill audit-pill--ok">Sí</span>
+                  } @else {
+                    <span class="audit-pill audit-pill--no">No</span>
+                  }
+                </td>
+                <td>{{ signalSource(tr) }}</td>
+                <td>{{ scoreSummary(tr) }}</td>
+                <td>{{ statusLabel(tr.status) }}</td>
+                <td>{{ tr.openedAt | date:'short' }}</td>
+                <td>
+                  @if (tr.realizedPnl != null && tr.status !== TradeStatus.Open) {
+                    <span [class.win]="(tr.realizedPnl ?? 0) >= 0" [class.loss]="(tr.realizedPnl ?? 0) < 0">
+                      {{ tr.realizedPnl | number:'1.2-2' }}
+                    </span>
+                  } @else {
+                    —
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="audit-detail">
+        @if (selected(); as tr) {
+          @let snap = parsedSelected();
+
+          <div class="detail-head">
+            <h2>{{ tr.symbol }}</h2>
+            @if (hasAuditSnapshot(tr)) {
+              <span class="badge">{{ signalSource(tr) }}</span>
+            } @else {
+              <span class="badge badge--muted">Sin snapshot del agente</span>
+            }
+          </div>
+
+          <section class="panel">
+            <h3>Ejecución simulada</h3>
+            <dl class="kv">
+              <dt>Entrada (servidor)</dt><dd>{{ tr.entryPrice | number:'1.4-6' }}</dd>
+              <dt>TP</dt><dd>{{ tr.tpPrice | number:'1.4-6' }}</dd>
+              <dt>SL</dt><dd>{{ tr.slPrice | number:'1.4-6' }}</dd>
+              <dt>Margen / Lev</dt><dd>{{ tr.margin | number:'1.2-2' }} USDT × {{ tr.leverage }}</dd>
+            </dl>
+          </section>
+
+          @if (!hasAuditSnapshot(tr)) {
+            <div class="audit-callout">
+              <strong>No hay decisión del agente guardada</strong> para este trade en base de datos
+              (<code class="audit-inline-code">AgentDecisionJson</code> vacío). Por eso no aparecían antes en auditoría.
+              Causas habituales: posición abierta antes de desplegar el campo en API, fallo de serialización en el agente, o POST sin ese campo.
+              En logs del host buscá el warning
+              <code class="audit-inline-code">sin AgentDecisionJson</code>
+              en el mismo instante de la apertura.
+            </div>
+          } @else if (!snap) {
+            <div class="audit-callout audit-callout--warn">
+              Hay texto en <code class="audit-inline-code">AgentDecisionJson</code> pero no es JSON válido; revisá el bloque “JSON completo” si está disponible.
+            </div>
+          }
+
+          @if (snap) {
+            @if (asRecord(snap.position_sizing); as ps) {
+              <section class="panel">
+                <h3>Tamaño (motor de riesgo)</h3>
+                <div class="stat-grid">
+                  @for (row of positionSizingRows(ps); track row.label) {
+                    <div class="stat-cell">
+                      <span class="stat-cell__label">{{ row.label }}</span>
+                      <span class="stat-cell__value">{{ row.value }}</span>
+                    </div>
+                  }
+                </div>
+              </section>
+            }
+
+            @if (snap.agent_meta) {
+              <section class="panel">
+                <h3>Razonamiento del agente</h3>
+                <p class="reason-text">{{ snap.agent_meta.entry_reason }}</p>
+                <dl class="kv">
+                  <dt>Grupo Nexus</dt><dd>{{ snap.agent_meta.nexus_group }}</dd>
+                  <dt>Tier</dt><dd>{{ snap.agent_meta.tier }}</dd>
+                  <dt>Capturado</dt><dd>{{ snap.captured_at_utc | date:'medium' }}</dd>
+                </dl>
+              </section>
+            }
+
+            @if (snap.candidate) {
+              @let c = snap.candidate;
+              @let audit = asRecord(c['agent_audit_context']);
+
+              <section class="panel panel--nexus">
+                <h3>Nexus-15 · lectura al ejecutar</h3>
+                <dl class="kv">
+                  <dt>Confianza IA</dt><dd>{{ c['nexus_confidence'] }}</dd>
+                  <dt>Dirección</dt><dd>{{ c['nexus_direction'] }}</dd>
+                  <dt>Régimen</dt><dd>{{ c['regime'] }}</dd>
+                  <dt>Rango est. %</dt><dd>{{ c['estimated_range_pct'] }}</dd>
+                  <dt>Confluencia</dt><dd>{{ c['confluence_score'] }}</dd>
+                </dl>
+                @if (audit && asRecord(audit['nexus15']); as nx) {
+                  <h4>Respuesta Nexus (API)</h4>
+                  @if (nexusSummaryItems(nx).length) {
+                    <div class="stat-grid stat-grid--tight">
+                      @for (item of nexusSummaryItems(nx); track item.label) {
+                        <div class="stat-cell">
+                          <span class="stat-cell__label">{{ item.label }}</span>
+                          <span class="stat-cell__value">{{ item.value }}</span>
+                        </div>
+                      }
+                    </div>
+                  }
+                  @if (nexusProbBars(nx).length) {
+                    <h4 class="subsection-title">Probabilidades (modelo)</h4>
+                    <div class="bars">
+                      @for (p of nexusProbBars(nx); track p.label) {
+                        <div class="bar-row">
+                          <span>{{ p.label }}</span>
+                          <div class="bar-track"><div class="bar-fill bar-fill--prob" [style.width.%]="p.val"></div></div>
+                          <span>{{ p.val | number:'1.1-1' }}%</span>
+                        </div>
+                      }
+                    </div>
+                  }
+                  @let nxGs = shouldShowNxGroupScores(c['group_scores'], nx);
+                  @if (nxGs.show && nxGs.source) {
+                    <h4 class="subsection-title">Group scores (API)</h4>
+                    <div class="bars">
+                      @for (g of groupScoreEntries(nxGs.source); track g.key) {
+                        <div class="bar-row">
+                          <span>{{ groupScoreLabel(g.key) }}</span>
+                          <div class="bar-track"><div class="bar-fill" [style.width.%]="g.val"></div></div>
+                          <span>{{ g.val | number:'1.0-0' }}</span>
+                        </div>
+                      }
+                    </div>
+                  }
+                  @if (detectivityCards(nx['detectivity']).length) {
+                    <h4 class="subsection-title">Detectividad por grupo</h4>
+                    <div class="detect-grid">
+                      @for (card of detectivityCards(nx['detectivity']); track card.id) {
+                        <div class="detect-card">
+                          <span class="detect-card__title">{{ card.title }}</span>
+                          <p class="detect-card__body">{{ card.body }}</p>
+                        </div>
+                      }
+                    </div>
+                  }
+                  @if (featureGridRows(nx['features']).length) {
+                    <h4 class="subsection-title">Features técnicos</h4>
+                    <div class="feature-grid">
+                      @for (f of featureGridRows(nx['features']); track f.label) {
+                        <div class="feature-pill">
+                          <span class="feature-pill__k">{{ f.label }}</span>
+                          <span class="feature-pill__v">{{ f.value }}</span>
+                        </div>
+                      }
+                    </div>
+                  }
+                }
+                @if (groupScoreEntries(c['group_scores']).length) {
+                  <h4>Group scores</h4>
+                  <div class="bars">
+                    @for (g of groupScoreEntries(c['group_scores']); track g.key) {
+                      <div class="bar-row">
+                        <span>{{ groupScoreLabel(g.key) }}</span>
+                        <div class="bar-track"><div class="bar-fill" [style.width.%]="g.val"></div></div>
+                        <span>{{ g.val | number:'1.0-0' }}</span>
+                      </div>
+                    }
+                  </div>
+                }
+              </section>
+
+              <section class="panel panel--scar">
+                <h3>SCAR</h3>
+                <p>score_grial en candidato: <strong>{{ c['scar_score'] }}</strong></p>
+                @if (audit && asRecord(audit['scar']); as scar) {
+                  @if (auditRecordRows(scar).length) {
+                    <div class="stat-grid stat-grid--tight">
+                      @for (row of auditRecordRows(scar); track row.label) {
+                        <div class="stat-cell">
+                          <span class="stat-cell__label">{{ row.label }}</span>
+                          <span class="stat-cell__value">{{ row.value }}</span>
+                        </div>
+                      }
+                    </div>
+                  }
+                }
+              </section>
+
+              <section class="panel panel--lse">
+                <h3>Liquidity Engine (LSE)</h3>
+                @if (c['source'] === 'LSE') {
+                  <dl class="kv">
+                    <dt>Score LSE</dt><dd>{{ c['lse_score'] }}</dd>
+                    <dt>Detección</dt><dd>{{ c['lse_detection_mode'] }}</dd>
+                    <dt>Entry modelo</dt><dd>{{ c['lse_entry_price'] }}</dd>
+                    <dt>SL modelo</dt><dd>{{ c['lse_stop_loss'] }}</dd>
+                    <dt>TP1 modelo</dt><dd>{{ c['lse_take_profit_1'] }}</dd>
+                  </dl>
+                  @if (audit && asRecord(audit['lse_signal']); as lseSig) {
+                    <h4>Señal LSE</h4>
+                    <div class="stat-grid stat-grid--tight">
+                      @for (row of auditRecordRows(lseSig); track row.label) {
+                        <div class="stat-cell">
+                          <span class="stat-cell__label">{{ row.label }}</span>
+                          <span class="stat-cell__value">{{ row.value }}</span>
+                        </div>
+                      }
+                    </div>
+                  }
+                } @else {
+                  <p class="audit-muted">Esta entrada no fue disparada por LSE (prioridad Nexus+SCAR).</p>
+                }
+              </section>
+
+              @if (reasonLines(c).length) {
+                <section class="panel">
+                  <h3>Razones de puntuación (confluencia)</h3>
+                  <div class="reason-cards">
+                    @for (r of reasonLines(c); track $index) {
+                      <div class="reason-card">{{ r }}</div>
+                    }
+                  </div>
+                </section>
+              }
+            }
+          }
+
+          @if (hasAuditSnapshot(tr)) {
+            <button type="button" class="audit-toggle-json" (click)="showRawJson.set(!showRawJson())">
+              {{ showRawJson() ? 'Ocultar' : 'Ver' }} JSON completo
+            </button>
+            @if (showRawJson()) {
+              <pre class="audit-json">{{ tr.agentDecisionJson }}</pre>
+            }
+          }
+        } @else {
+          <div class="audit-muted">Seleccioná un trade en la tabla para ver el detalle.</div>
+        }
+      </div>
+    </div>
+  }
+</div>

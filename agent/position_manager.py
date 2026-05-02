@@ -33,7 +33,8 @@ class PositionManager:
             "leverage": position_data["leverage"],
             "tpPrice": position_data.get("tp_price"),
             "slPrice": position_data.get("sl_price"),
-            "tradingSignalId": position_data.get("tradingSignalId")
+            "tradingSignalId": position_data.get("tradingSignalId"),
+            "agentDecisionJson": position_data.get("agent_decision_json"),
         }
         
         try:
