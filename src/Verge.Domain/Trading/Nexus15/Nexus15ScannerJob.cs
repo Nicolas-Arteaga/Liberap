@@ -76,6 +76,7 @@ public class Nexus15ScannerJob : BackgroundService
             .ToList();
 
         var publisher = _redis.GetSubscriber();
+        var db = _redis.GetDatabase();
         int analyzed = 0;
 
         // Semáforo local adicional (respetar el SemaphoreSlim(5,5) de Binance en MarketDataManager)
@@ -96,12 +97,13 @@ public class Nexus15ScannerJob : BackgroundService
                 var result = await pythonSvc.AnalyzeNexus15Async(symbol, candles);
                 if (result == null) return;
 
-                // Publicar en Redis bajo verge:nexus15:{symbol}
+                // Publicar en Redis bajo verge:nexus15:{symbol} y guardar en caché
                 var payload = JsonSerializer.Serialize(result);
                 await publisher.PublishAsync(
                     RedisChannel.Literal($"verge:nexus15:{symbol}"),
                     payload
                 );
+                await db.StringSetAsync($"verge:nexus15:cache:{symbol}", payload, TimeSpan.FromMinutes(16));
 
                 Interlocked.Increment(ref analyzed);
                 _logger.LogInformation(

@@ -113,6 +113,7 @@ public static class TradingModelBuilderExtensions
             b.ToTable("SimulatedTrades");
             b.ConfigureByConvention();
             b.Property(x => x.Symbol).IsRequired().HasMaxLength(20);
+            b.Property(x => x.Exchange).IsRequired().HasMaxLength(32).HasDefaultValue("Binance");
             b.HasIndex(x => x.UserId);
             b.HasIndex(x => x.Symbol);
             b.HasIndex(x => x.Status);

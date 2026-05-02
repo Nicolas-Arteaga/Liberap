@@ -82,7 +82,7 @@
       <app-card-content class="payment-history-card">
         
         <div *ngIf="filteredTrades.length > 0; else noTrades">
-          <div *ngFor="let trade of filteredTrades; let last = last" 
+          <div *ngFor="let trade of paginatedTrades; let last = last" 
                class="payment-item d-flex align-items-start position-relative">
             
             <!-- Contenedor de círculo -->
@@ -139,6 +139,14 @@
             <p class="text-white-50 mb-0">No hay trades para mostrar con estos filtros</p>
           </div>
         </ng-template>
+
+        <app-paginator 
+          *ngIf="filteredTrades.length > 0"
+          [totalItems]="filteredTrades.length"
+          [pageSize]="pageSize"
+          [currentPage]="currentPage"
+          (pageChange)="onPageChange($event)">
+        </app-paginator>
         
       </app-card-content>
     </div>

@@ -30,6 +30,8 @@ public class SimulatedTradeDto : EntityDto<Guid>
     public DateTime OpenedAt { get; set; }
     public DateTime? ClosedAt { get; set; }
     public Guid? TradingSignalId { get; set; }
+    /// <summary>Exchange where the trade was opened (e.g. "Binance"). Used by the worker to avoid cross-exchange price contamination.</summary>
+    public string Exchange { get; set; } = "Binance";
 }
 
 public class OpenTradeInputDto
@@ -41,6 +43,8 @@ public class OpenTradeInputDto
     public decimal? TpPrice { get; set; }
     public decimal? SlPrice { get; set; }
     public Guid? TradingSignalId { get; set; }
+    /// <summary>Exchange to lock this trade's price evaluation to. Defaults to "Binance".</summary>
+    public string Exchange { get; set; } = "Binance";
 }
 
 public class CloseTradeInputDto

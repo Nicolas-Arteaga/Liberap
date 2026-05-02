@@ -403,7 +403,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let trade of activeTrades">
+                <tr *ngFor="let trade of paginatedActiveTrades">
                   <td class="align-middle">
                     <div class="d-flex align-items-center gap-1">
                       <span [class.text-success]="trade.side === 0" [class.text-danger]="trade.side === 1">
@@ -460,6 +460,15 @@
               </tbody>
             </table>
 
+            <app-paginator
+              *ngIf="consoleTab === 'positions' && activeTrades.length > 5"
+              class="px-3 pb-3 d-block"
+              [totalItems]="activeTrades.length"
+              [pageSize]="activePositionsPageSize"
+              [currentPage]="activePositionsPage"
+              (pageChange)="onActivePositionsPageChange($event)">
+            </app-paginator>
+
             <!-- Trade History Table -->
             <table *ngIf="consoleTab === 'history'" class="table table-dark table-sm mb-0 position-table" style="font-size: 10px;">
               <thead>
@@ -475,7 +484,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let trade of tradeHistory">
+                <tr *ngFor="let trade of paginatedTradeHistory">
                   <td class="text-white fw-bold cursor-pointer hover-text-primary" 
                       (click)="selectSymbol(trade.symbol)">
                     {{ trade.symbol }}
@@ -499,6 +508,15 @@
                 </tr>
               </tbody>
             </table>
+
+            <app-paginator
+              *ngIf="consoleTab === 'history' && tradeHistory.length > 10"
+              class="px-3 pb-3 d-block"
+              [totalItems]="tradeHistory.length"
+              [pageSize]="tradeHistoryPageSize"
+              [currentPage]="tradeHistoryPage"
+              (pageChange)="onTradeHistoryPageChange($event)">
+            </app-paginator>
           </div>
         </div>
 

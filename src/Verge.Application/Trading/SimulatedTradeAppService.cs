@@ -52,7 +52,19 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         if (!entryPrice.HasValue)
         {
             Logger.LogWarning("🚫 [Simulation] Skipping trade for {Symbol}: Price not found in any source.", symbol);
-            return null; // Return null so the caller knows the trade wasn't opened
+            return null;
+        }
+
+        // 2.5. DUPLICATE SHIELD: Prevent multiple open positions for the same symbol/user
+        var existingTrade = await _tradeRepo.FirstOrDefaultAsync(t => 
+            t.UserId == userId && 
+            t.Symbol == symbol && 
+            t.Status == TradeStatus.Open);
+
+        if (existingTrade != null)
+        {
+            Logger.LogWarning("🚫 [Simulation] Blocking duplicate trade for {Symbol}. Position already exists for user {UserId}.", symbol, userId);
+            throw new UserFriendlyException($"Ya tienes una posición abierta en {symbol}. Para abrir otra, cierra la anterior primero.");
         }
 
         // 3. Calculate position values
@@ -100,7 +112,8 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
             entryFee: entryFee,
             tpPrice: input.TpPrice,
             slPrice: input.SlPrice,
-            tradingSignalId: input.TradingSignalId);
+            tradingSignalId: input.TradingSignalId,
+            exchange: input.Exchange ?? "Binance");
 
         await _tradeRepo.InsertAsync(trade, autoSave: true);
 
@@ -319,8 +332,53 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         ClosedAt = t.ClosedAt,
         TpPrice = t.TpPrice,
         SlPrice = t.SlPrice,
-        TradingSignalId = t.TradingSignalId
+        TradingSignalId = t.TradingSignalId,
+        Exchange = t.Exchange
     };
+
+    /// <summary>
+    /// Resolves price EXCLUSIVELY from Binance sources (WebSocket cache → Binance Futures REST → Binance Spot REST).
+    /// NEVER falls back to Python multi-exchange or other exchanges.
+    /// Used by CloseTradeAsync to ensure manual closes use the same exchange as the original trade.
+    /// </summary>
+    public async Task<decimal?> ResolveBinancePriceOnlyAsync(string rawSymbol)
+    {
+        var symbol = NormalizeSymbol(rawSymbol);
+
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            // 1) WebSocket in-memory cache (zero REST calls, sub-millisecond)
+            var wsPrice = _marketDataManager.GetWebSocketPrice(symbol);
+            if (wsPrice.HasValue && wsPrice.Value > 0)
+            {
+                Logger.LogInformation("🎯 [BinanceOnly] Price resolved from WebSocket for {Symbol}: {Price}", symbol, wsPrice.Value);
+                return wsPrice.Value;
+            }
+
+            // 2) Binance Futures REST (if WebSocket hasn't warmed up yet)
+            var futures = await TryFetchDirectPriceAsync($"https://fapi.binance.com/fapi/v1/ticker/price?symbol={symbol}");
+            if (futures.HasValue && futures.Value > 0)
+            {
+                Logger.LogInformation("🎯 [BinanceOnly] Price resolved from Binance Futures REST for {Symbol}: {Price}", symbol, futures.Value);
+                return futures.Value;
+            }
+
+            // 3) Binance Spot REST (last resort within Binance ecosystem)
+            var spot = await TryFetchDirectPriceAsync($"https://api.binance.com/api/v3/ticker/price?symbol={symbol}");
+            if (spot.HasValue && spot.Value > 0)
+            {
+                Logger.LogInformation("🎯 [BinanceOnly] Price resolved from Binance Spot REST for {Symbol}: {Price}", symbol, spot.Value);
+                return spot.Value;
+            }
+
+            // If all Binance sources fail: wait and retry. Do NOT try other exchanges.
+            Logger.LogWarning("⏳ [BinanceOnly] No Binance price for {Symbol} on attempt {Attempt}/3. Waiting before retry...", symbol, attempt + 1);
+            if (attempt < 2) await Task.Delay(1500);
+        }
+
+        Logger.LogError("❌ [BinanceOnly] FAILED to get Binance price for {Symbol} after 3 attempts. Trade will NOT be closed to avoid phantom close.", symbol);
+        return null;
+    }
 
     private static string NormalizeSymbol(string rawSymbol)
     {

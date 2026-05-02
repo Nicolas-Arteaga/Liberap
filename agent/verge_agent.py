@@ -415,39 +415,57 @@ class VergeAgent:
                     self.state.remove_position(trade_id)
 
     def _repair_existing_positions(self):
-        """Ensures all backend positions have TP/SL."""
-        logger.info("Verifying TP/SL on active positions...")
+        """Ensures all backend positions have TP/SL and syncs local state."""
+        logger.info("Verifying TP/SL and syncing active positions...")
         active_trades = self.positions.get_active_trades()
+        local_positions = self.state.get_open_positions()
+        local_ids = [p.get("trade_id") for p in local_positions]
 
         for trade in active_trades:
             symbol   = trade["symbol"]
             trade_id = trade["id"]
-            tp       = trade.get("tpPrice")
-            sl       = trade.get("slPrice")
+            
+            # 1. Sync local state if missing
+            if trade_id not in local_ids:
+                logger.info(f"🔄 Syncing missing position {symbol} ({trade_id}) to local state.")
+                # Basic sync - enough for _should_skip and monitoring
+                sync_pos = {
+                    "trade_id": trade_id,
+                    "symbol": symbol,
+                    "opened_at": trade.get("openedAt", datetime.utcnow().isoformat()),
+                    "side": trade["side"],
+                    "entry_price": float(trade["entryPrice"]),
+                    "tp_price": float(trade.get("tpPrice", 0)),
+                    "sl_price": float(trade.get("slPrice", 0)),
+                    "leverage": trade["leverage"],
+                    "margin": float(trade["margin"])
+                }
+                self.state.add_position(sync_pos)
+
+            # 2. Repair TP/SL if missing
+            tp = trade.get("tpPrice")
+            sl = trade.get("slPrice")
 
             if tp is None or sl is None or tp == 0 or sl == 0:
-                logger.info(f"Repairing TP/SL for {symbol} ({trade_id})...")
-                fake_signal = {"side": trade["side"], "estimated_range_pct": 2.0}
-                recalc = self.risk.calculate_position(symbol, fake_signal, available_balance=10000)
-                
-                if recalc:
-                    entry = float(trade["entryPrice"])
-                    range_pct = 0.02
-                    tp_dist = range_pct * config.TP_MULTIPLIER
-                    sl_dist = range_pct * config.SL_MULTIPLIER
+                logger.info(f"🔧 Repairing TP/SL for {symbol} ({trade_id})...")
+                # Using a generic 2% range for repair calculation if missing
+                entry = float(trade["entryPrice"])
+                range_pct = 0.02
+                tp_dist = range_pct * config.TP_MULTIPLIER
+                sl_dist = range_pct * config.SL_MULTIPLIER
 
-                    if trade["side"] == 0:
-                        tp_val = entry * (1 + tp_dist)
-                        sl_val = entry * (1 - sl_dist)
-                    else:
-                        tp_val = entry * (1 - tp_dist)
-                        sl_val = entry * (1 + sl_dist)
+                if trade["side"] == 0: # LONG
+                    tp_val = entry * (1 + tp_dist)
+                    sl_val = entry * (1 - sl_dist)
+                else: # SHORT
+                    tp_val = entry * (1 - tp_dist)
+                    sl_val = entry * (1 + sl_dist)
 
-                    payload = {"tpPrice": round(tp_val, 4), "slPrice": round(sl_val, 4)}
-                    success = self.positions.update_tp_sl(trade_id, payload)
+                payload = {"tpPrice": round(tp_val, 4), "slPrice": round(sl_val, 4)}
+                success = self.positions.update_tp_sl(trade_id, payload)
 
-                    if success:
-                        self.state.update_position_tpsl(trade_id, payload["tpPrice"], payload["slPrice"])
+                if success:
+                    self.state.update_position_tpsl(trade_id, payload["tpPrice"], payload["slPrice"])
 
 
 if __name__ == "__main__":

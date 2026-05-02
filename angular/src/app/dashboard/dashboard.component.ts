@@ -24,6 +24,7 @@ import { AlertsComponent } from '../shared/components/alerts/alerts.component';
 import { AlertService } from '../services/alert.service';
 import { TradingPanelComponent } from 'src/shared/components/trading-panel/trading-panel.component';
 import { TpSlModalComponent } from 'src/shared/components/tpsl-modal/tpsl-modal.component';
+import { PaginatorComponent } from '../shared/components/paginator/paginator.component';
 
 interface TradingSignal {
   id: number;
@@ -57,7 +58,8 @@ interface StageInfo {
     DialogComponent,
     AlertsComponent,
     TradingPanelComponent,
-    TpSlModalComponent
+    TpSlModalComponent,
+    PaginatorComponent
   ],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss']
@@ -188,6 +190,32 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   showTpSlModal = false;
   selectedTradeForModal: SimulatedTradeDto | null = null;
   private simulatedTradeService = inject(SimulatedTradeService);
+
+  // Paginación para posiciones activas
+  activePositionsPage = 1;
+  activePositionsPageSize = 5;
+
+  get paginatedActiveTrades(): SimulatedTradeDto[] {
+    const startIndex = (this.activePositionsPage - 1) * this.activePositionsPageSize;
+    return this.activeTrades.slice(startIndex, startIndex + this.activePositionsPageSize);
+  }
+
+  onActivePositionsPageChange(page: number) {
+    this.activePositionsPage = page;
+  }
+
+  // Paginación para historial de trades
+  tradeHistoryPage = 1;
+  tradeHistoryPageSize = 10;
+
+  get paginatedTradeHistory(): SimulatedTradeDto[] {
+    const startIndex = (this.tradeHistoryPage - 1) * this.tradeHistoryPageSize;
+    return this.tradeHistory.slice(startIndex, startIndex + this.tradeHistoryPageSize);
+  }
+
+  onTradeHistoryPageChange(page: number) {
+    this.tradeHistoryPage = page;
+  }
 
   // Señales activas (reemplazado por logs reales)
   activeSignals: TradingSignal[] = [];

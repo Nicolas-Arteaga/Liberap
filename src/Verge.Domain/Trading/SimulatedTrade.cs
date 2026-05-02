@@ -37,6 +37,14 @@ public class SimulatedTrade : FullAuditedAggregateRoot<Guid>
     
     public Guid? TradingSignalId { get; set; }
 
+    /// <summary>
+    /// Exchange where this trade was opened. Used by the worker to ensure
+    /// price evaluation always uses the same exchange, preventing phantom closes
+    /// caused by cross-exchange price discrepancies.
+    /// Default: "Binance"
+    /// </summary>
+    public string Exchange { get; set; } = "Binance";
+
     protected SimulatedTrade() { }
 
     public SimulatedTrade(
@@ -53,7 +61,8 @@ public class SimulatedTrade : FullAuditedAggregateRoot<Guid>
         decimal entryFee,
         decimal? tpPrice = null,
         decimal? slPrice = null,
-        Guid? tradingSignalId = null) : base(id)
+        Guid? tradingSignalId = null,
+        string exchange = "Binance") : base(id)
     {
         UserId = userId;
         Symbol = symbol;
@@ -69,6 +78,7 @@ public class SimulatedTrade : FullAuditedAggregateRoot<Guid>
         TpPrice = tpPrice;
         SlPrice = slPrice;
         TradingSignalId = tradingSignalId;
+        Exchange = exchange;
         Status = TradeStatus.Open;
         OpenedAt = DateTime.UtcNow;
         UnrealizedPnl = 0;

@@ -29,7 +29,9 @@ public class SimulationMarkPriceWorker : BackgroundService
     private readonly ILogger<SimulationMarkPriceWorker> _logger;
 
     private static DateTime _lastFundingTime = DateTime.UtcNow;
-    private static DateTime _binanceBannedUntil = DateTime.MinValue; // REST ban tracker
+
+    // Tracks consecutive WS misses per symbol to avoid log spam
+    private static readonly Dictionary<string, int> _wsMissCount = new();
 
     public SimulationMarkPriceWorker(
         IServiceProvider serviceProvider,
@@ -72,151 +74,152 @@ public class SimulationMarkPriceWorker : BackgroundService
 
             var openTrades = await tradeRepo.GetListAsync(t => t.Status == TradeStatus.Open);
             
-            // Heartbeat log
-            if (!openTrades.Any())
-            {
-                // _logger.LogInformation("📊 [SimulationWorker] No open trades found to update.");
-                return;
-            }
+            if (!openTrades.Any()) return;
 
             _logger.LogInformation("📊 [SimulationWorker] Updating {Count} open positions...", openTrades.Count);
-            
-            // Screaming debug for the agent to find
-            try { 
-                await File.AppendAllTextAsync("C:\\Users\\Nicolas\\Desktop\\Verge\\Verge\\src\\Verge.HttpApi.Host\\Logs\\heartbeat_debug.txt", 
-                    $"[{DateTime.UtcNow}] Heartbeat: {openTrades.Count} trades. First symbol: {openTrades.First().Symbol}\n"); 
-            } catch { }
 
             bool applyFunding = (DateTime.UtcNow - _lastFundingTime).TotalHours >= 8;
 
-            Dictionary<string, decimal> fallbackPriceMap = null!;
-
             foreach (var trade in openTrades)
             {
-                _logger.LogInformation("🔍 [SimulationWorker] Processing trade {Id} for symbol {Symbol}", trade.Id, trade.Symbol);
                 try
                 {
                     using var uow = uowManager.Begin();
                     
-                    // 🚀 ROBOTIC NORMALIZATION: Ensure 'ALPHA' becomes 'ALPHAUSDT' for cache hits
+                    // Normalize symbol (e.g. 'ALPHA' → 'ALPHAUSDT')
                     var cleanSymbol = trade.Symbol.ToUpper().Replace("/", "").Replace("-", "").Trim();
                     if (!cleanSymbol.EndsWith("USDT") && !cleanSymbol.Contains("USD")) cleanSymbol += "USDT";
 
-                    var price = marketDataManager.GetWebSocketPrice(cleanSymbol);
-                    string source = "WebSocket";
-                    
-                    if (price == null)
-                    {
-                        // Don't hit REST if we know Binance has us banned
-                        if (DateTime.UtcNow < _binanceBannedUntil)
-                        {
-                            _logger.LogWarning("⏳ [SimulationWorker] Binance REST ban active until {Until}. Skipping REST fallback.", _binanceBannedUntil);
-                        }
-                        else if (fallbackPriceMap == null)
-                        {
-                            _logger.LogInformation("[SimulationWorker] WS cache miss, fetching all tickers via REST...");
-                            var tickers = await marketDataManager.GetTickersAsync();
-                            if (!tickers.Any())
-                            {
-                                // Empty = 418 ban. Back off for 10 minutes.
-                                _binanceBannedUntil = DateTime.UtcNow.AddMinutes(10);
-                                _logger.LogWarning("🚫 [SimulationWorker] Binance returned 418/empty. REST cooldown set for 10 min until {Until}.", _binanceBannedUntil);
-                            }
-                            else
-                            {
-                                fallbackPriceMap = tickers.GroupBy(t => t.Symbol).ToDictionary(g => g.Key, g => g.First().LastPrice);
-                            }
-                        }
+                    // ══════════════════════════════════════════════════════════════════
+                    // EXCHANGE-LOCKED PRICE RESOLUTION
+                    // Positions are evaluated ONLY with their origin exchange's price.
+                    // This prevents phantom closes caused by cross-exchange price spikes.
+                    // Strategy: WebSocket cache → retry → skip (NEVER fallback to other exchanges)
+                    // ══════════════════════════════════════════════════════════════════
+                    decimal? price = null;
+                    string priceSource = "none";
 
-                        if (fallbackPriceMap != null && fallbackPriceMap.TryGetValue(cleanSymbol, out var restPrice))
-                        {
-                            price = restPrice;
-                            source = "REST Tickers Fallback";
-                        }
+                    // Primary: WebSocket in-memory cache (zero REST, sub-millisecond)
+                    price = marketDataManager.GetWebSocketPrice(cleanSymbol);
+                    if (price.HasValue && price.Value > 0)
+                    {
+                        priceSource = "WebSocket";
+                        _wsMissCount.Remove(cleanSymbol); // Reset miss counter on success
                     }
-
-                    if (price == null)
+                    else
                     {
-                        _logger.LogWarning("❌ [SimulationWorker] PRICE NOT FOUND for {Symbol} (Cleaned: {Cleaned}) (WS=null, REST=null). Skipping update.", trade.Symbol, cleanSymbol);
-                        continue;
+                        // WS cache miss: retry up to 2 more times with 1s delay
+                        // This covers the case where WS just reconnected and cache is warming up.
+                        // We do NOT fall back to other exchanges — that causes phantom closes.
+                        _wsMissCount.TryGetValue(cleanSymbol, out var misses);
+                        _wsMissCount[cleanSymbol] = misses + 1;
+
+                        for (int retry = 1; retry <= 2 && price == null; retry++)
+                        {
+                            _logger.LogWarning(
+                                "⏳ [SimulationWorker] WS cache miss for {Symbol} (miss #{Miss}). Waiting 1s for WebSocket to populate... (retry {Retry}/2)",
+                                cleanSymbol, _wsMissCount[cleanSymbol], retry);
+                            await Task.Delay(1000);
+                            price = marketDataManager.GetWebSocketPrice(cleanSymbol);
+                            if (price.HasValue && price.Value > 0)
+                            {
+                                priceSource = $"WebSocket (after {retry}s wait)";
+                                _wsMissCount.Remove(cleanSymbol);
+                            }
+                        }
+
+                        if (price == null)
+                        {
+                            // After retries, still no price. SKIP this trade cycle.
+                            // Do not close. Do not use another exchange. Wait for the next worker tick.
+                            _logger.LogWarning(
+                                "⚠️ [SimulationWorker] No Binance WebSocket price for {Symbol} after retries. " +
+                                "SKIPPING this cycle to prevent phantom close. Trade {TradeId} remains OPEN.",
+                                cleanSymbol, trade.Id);
+                            continue;
+                        }
                     }
 
                     var markPrice = price.Value;
-                    _logger.LogInformation("✅ [SimulationWorker] Price resolved for {Symbol}: {Price} (Source: {Source})", trade.Symbol, markPrice, source);
+                    _logger.LogInformation(
+                        "✅ [SimulationWorker] Price for {Symbol}: {Price} (Source: {Source})",
+                        trade.Symbol, markPrice, priceSource);
                     
                     trade.MarkPrice = markPrice;
 
-                    // Check liquidation
+                    // ── Liquidation check ──────────────────────────────────────────
                     if (simulationService.IsLiquidationTriggered(markPrice, trade.LiquidationPrice, trade.Side))
                     {
-                        _logger.LogWarning("💀 [SimulationWorker] LIQUIDATION TRIGGERED for {Id} | {Symbol} at {Price}", trade.Id, trade.Symbol, markPrice);
+                        _logger.LogWarning("💀 [SimulationWorker] LIQUIDATION for {Id} | {Symbol} at {Price}", trade.Id, trade.Symbol, markPrice);
                         trade.Status = TradeStatus.Liquidated;
                         trade.ClosePrice = markPrice;
                         trade.ClosedAt = DateTime.UtcNow;
                         trade.RealizedPnl = -trade.Margin;
+                        trade.UnrealizedPnl = 0;
+                        trade.ROIPercentage = simulationService.CalculateROI(-trade.Margin, trade.Margin); // -100%
 
                         await tradeRepo.UpdateAsync(trade);
                         await uow.CompleteAsync();
-
-                        _logger.LogInformation("📢 [SimulationWorker] SignalR: Sending Liquidation event to user {UserId}", trade.UserId);
                         await _hubContext.Clients.User(trade.UserId.ToString()).SendAsync("ReceiveTradeUpdate", MapToDto(trade));
                         continue;
                     }
 
-                    // Check Take Profit
+                    // ── Take Profit / Stop Loss check ──────────────────────────────
                     bool isClosed = false;
                     string closeReason = "";
+
                     if (trade.TpPrice.HasValue && trade.TpPrice.Value > 0)
                     {
-                        bool tpTriggered = trade.Side == SignalDirection.Long ? markPrice >= trade.TpPrice.Value : markPrice <= trade.TpPrice.Value;
-                        if (tpTriggered)
-                        {
-                            isClosed = true;
-                            closeReason = "Take Profit";
-                        }
+                        bool tpTriggered = trade.Side == SignalDirection.Long
+                            ? markPrice >= trade.TpPrice.Value
+                            : markPrice <= trade.TpPrice.Value;
+                        if (tpTriggered) { isClosed = true; closeReason = "Take Profit"; }
                     }
 
-                    // Check Stop Loss
                     if (!isClosed && trade.SlPrice.HasValue && trade.SlPrice.Value > 0)
                     {
-                        bool slTriggered = trade.Side == SignalDirection.Long ? markPrice <= trade.SlPrice.Value : markPrice >= trade.SlPrice.Value;
-                        if (slTriggered)
-                        {
-                            isClosed = true;
-                            closeReason = "Stop Loss";
-                        }
+                        bool slTriggered = trade.Side == SignalDirection.Long
+                            ? markPrice <= trade.SlPrice.Value
+                            : markPrice >= trade.SlPrice.Value;
+                        if (slTriggered) { isClosed = true; closeReason = "Stop Loss"; }
                     }
 
                     if (isClosed)
                     {
-                        _logger.LogInformation("🎯 [SimulationWorker] {Reason} reached for {Symbol} at {Price}. Closing trade...", closeReason, trade.Symbol, markPrice);
-                        
-                        trade.Status = closeReason == "Take Profit" ? TradeStatus.Win : TradeStatus.Loss;
-                        trade.ClosePrice = markPrice;
-                        trade.ClosedAt = DateTime.UtcNow;
+                        _logger.LogInformation("🎯 [SimulationWorker] {Reason} reached for {Symbol} at {Price}.", closeReason, trade.Symbol, markPrice);
                         
                         var exitFee = simulationService.CalculateExitFee(trade.Amount, markPrice);
                         var pnl = simulationService.CalculateUnrealizedPnl(trade.EntryPrice, markPrice, trade.Size, trade.Side);
-                        trade.RealizedPnl = pnl - exitFee;
-                        trade.ExitFee = exitFee;
+                        var realizedPnl = pnl - exitFee;
 
-                        // Return margin + PnL (net of fees) to user
+                        trade.Status = closeReason == "Take Profit" ? TradeStatus.Win : TradeStatus.Loss;
+                        trade.ClosePrice = markPrice;
+                        trade.ClosedAt = DateTime.UtcNow;
+                        trade.RealizedPnl = realizedPnl;
+                        trade.ExitFee = exitFee;
+                        trade.UnrealizedPnl = 0;
+                        // ✅ FIX: Recalculate final ROI based on realized PnL (was left stale before)
+                        trade.ROIPercentage = simulationService.CalculateROI(realizedPnl, trade.Margin);
+
+                        // Credit margin + net PnL back to user balance
                         var profileToCredit = await profileRepo.FirstOrDefaultAsync(p => p.UserId == trade.UserId);
                         if (profileToCredit != null)
                         {
-                            profileToCredit.VirtualBalance += (trade.Margin + trade.RealizedPnl.Value);
+                            profileToCredit.VirtualBalance += (trade.Margin + realizedPnl);
                             await profileRepo.UpdateAsync(profileToCredit);
                         }
 
                         await tradeRepo.UpdateAsync(trade);
                         await uow.CompleteAsync();
 
-                        _logger.LogInformation("📢 [SimulationWorker] SignalR: Sending {Reason} event to user {UserId}", closeReason, trade.UserId);
+                        _logger.LogInformation(
+                            "📢 [SimulationWorker] SignalR: {Reason} for {Symbol} | PnL: {Pnl} | ROI: {ROI}% → UserId {UserId}",
+                            closeReason, trade.Symbol, realizedPnl, trade.ROIPercentage, trade.UserId);
                         await _hubContext.Clients.User(trade.UserId.ToString()).SendAsync("ReceiveTradeUpdate", MapToDto(trade));
                         continue;
                     }
 
-                    // Update unrealized PnL
+                    // ── Live unrealized PnL update ─────────────────────────────────
                     trade.UnrealizedPnl = simulationService.CalculateUnrealizedPnl(trade.EntryPrice, markPrice, trade.Size, trade.Side);
                     trade.ROIPercentage = simulationService.CalculateROI(trade.UnrealizedPnl, trade.Margin);
 
@@ -230,9 +233,9 @@ public class SimulationMarkPriceWorker : BackgroundService
                     await tradeRepo.UpdateAsync(trade);
                     await uow.CompleteAsync();
 
-                    _logger.LogInformation("📢 [SimulationWorker] SignalR: Sending update for {Symbol} (Price: {Price}, PnL: {PnL}) to user {UserId}", 
-                        trade.Symbol, markPrice, trade.UnrealizedPnl, trade.UserId);
-                        
+                    _logger.LogInformation(
+                        "📢 [SimulationWorker] Update {Symbol} → Price: {Price} | PnL: {PnL} | ROI: {ROI}%",
+                        trade.Symbol, markPrice, trade.UnrealizedPnl, trade.ROIPercentage);
                     await _hubContext.Clients.User(trade.UserId.ToString()).SendAsync("ReceiveTradeUpdate", MapToDto(trade));
                 }
                 catch (Exception ex)

@@ -15,6 +15,7 @@ using Verge.Trading.Integrations;
 using Verge.Trading.DecisionEngine;
 using Volo.Abp.EventBus.Distributed;
 using Verge.Trading.DTOs;
+using Verge.Trading.Nexus15;
 
 namespace Verge.Trading;
 
@@ -148,22 +149,81 @@ public class MarketScannerService : BackgroundService
                 var whaleData = await innerWhaleTracker.GetWhaleActivityAsync(symbol);
                 var instData = await innerInstService.GetInstitutionalDataAsync(symbol);
                 
-                // 🧠 Multi-Agent Consensus
-                int confidence = (int)rsi > 50 ? (int)(rsi - 50) : (int)(50 - rsi);
+                // 🧠 Multi-Agent Consensus (Holistic Evaluation)
+                int baseScore = 0;
                 SignalDirection signal = SignalDirection.Auto;
 
+                // 1. Technicals (RSI) - Max ~25-30 pts
+                int rsiScore = (int)rsi > 50 ? (int)(rsi - 50) : (int)(50 - rsi);
+                baseScore += rsiScore;
+
+                // 2. Regime & Structure - Max ~35 pts
                 if (regime != null)
                 {
-                    confidence += (int)(regime.TrendStrength * 50);
-                    if (regime.BosDetected) confidence += 10;
+                    baseScore += (int)(regime.TrendStrength * 20);
+                    if (regime.BosDetected) baseScore += 10;
+                    if (regime.ChochDetected) baseScore += 5;
                     
                     if (regime.Regime == MarketRegimeType.BullTrend) signal = SignalDirection.Long;
                     else if (regime.Regime == MarketRegimeType.BearTrend) signal = SignalDirection.Short;
                 }
 
-                // Add bonuses
-                if (whaleData.NetFlowScore > 0.6) confidence += 10;
-                if (instData.IsSqueezeDetected || instData.BidAskImbalance > 1.5) confidence += 10;
+                // 3. Whales & Institutional - Max 30 pts
+                if (whaleData.NetFlowScore > 0.6) baseScore += 15;
+                if (instData.IsSqueezeDetected || instData.BidAskImbalance > 1.5) baseScore += 15;
+
+                int confidence = baseScore;
+
+                // 4. Integrate Nexus-15 AI Prediction
+                var db = _redis.GetDatabase();
+                var nexusPayload = await db.StringGetAsync($"verge:nexus15:cache:{symbol}");
+                if (nexusPayload.HasValue)
+                {
+                    try
+                    {
+                        var nexusResult = JsonSerializer.Deserialize<Nexus15ResponseModel>(nexusPayload.ToString());
+                        if (nexusResult != null)
+                        {
+                            // Holistic Weighted Evaluation (60% Technicals/Institutional, 40% Predictive AI)
+                            int holisticScore = (int)((confidence * 0.6) + (nexusResult.AiConfidence * 0.4));
+                            
+                            // Contextual Boost: Harmony between Technical/Institutional and AI
+                            bool isHarmony = (nexusResult.Direction == "BULLISH" && signal == SignalDirection.Long) ||
+                                             (nexusResult.Direction == "BEARISH" && signal == SignalDirection.Short);
+                            
+                            if (isHarmony && nexusResult.AiConfidence >= 40)
+                            {
+                                holisticScore += 10; // Harmony Bonus (Sinergia)
+                            }
+                            
+                            // Contextual Penalty: AI strongly disagrees with Technicals
+                            bool isConflict = (nexusResult.Direction == "BEARISH" && signal == SignalDirection.Long) ||
+                                              (nexusResult.Direction == "BULLISH" && signal == SignalDirection.Short);
+                            
+                            if (isConflict)
+                            {
+                                holisticScore -= 15; // Conflict Penalty
+                                signal = SignalDirection.Auto; // Neutralize direction due to high uncertainty
+                            }
+
+                            // If AI is extremely confident, we let it dominate the decision
+                            if (nexusResult.AiConfidence >= 75)
+                            {
+                                holisticScore = Math.Max(holisticScore, (int)nexusResult.AiConfidence);
+                                if (nexusResult.Direction == "BULLISH") signal = SignalDirection.Long;
+                                else if (nexusResult.Direction == "BEARISH") signal = SignalDirection.Short;
+                            }
+
+                            confidence = holisticScore;
+                            _logger.LogInformation("🧠 Evaluación Holística {symbol}: Base={baseScore}%, Nexus15={aiConf}%, Harmony={isHarmony}, Final={conf}%", symbol, baseScore, nexusResult.AiConfidence, isHarmony, confidence);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to deserialize Nexus-15 payload for {symbol}", symbol);
+                    }
+                }
+
                 confidence = Math.Clamp(confidence, 10, 95);
 
                 var currentPrice = candles.LastOrDefault()?.Close ?? 0;

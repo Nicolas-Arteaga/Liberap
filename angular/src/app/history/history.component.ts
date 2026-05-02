@@ -12,6 +12,7 @@ import { SimulatedTradeService } from '../proxy/trading/simulated-trade.service'
 import { TradingSignalrService } from '../services/trading-signalr.service';
 import { SimulatedTradeDto, SimulationPerformanceDto } from '../proxy/trading/dtos/models';
 import { Subscription } from 'rxjs';
+import { PaginatorComponent } from '../shared/components/paginator/paginator.component';
 
 interface FilterOption {
   value: string;
@@ -36,7 +37,8 @@ interface ChartData {
     PaymentChartComponent,
     GlassButtonComponent,
     IonIcon,
-    LabelComponent
+    LabelComponent,
+    PaginatorComponent
   ],
   templateUrl: './history.component.html'
 })
@@ -58,6 +60,10 @@ export class HistoryComponent {
   // Filtros
   tradeType: string = 'all';
   dateRange: string = 'last30';
+
+  // Paginación
+  currentPage: number = 1;
+  pageSize: number = 10;
 
   tradeOptions: FilterOption[] = [
     { value: 'all', label: 'Todos los trades' },
@@ -85,6 +91,15 @@ export class HistoryComponent {
       if (this.tradeType === 'open' && item.status !== 0) return false; // Open = 0
       return true;
     });
+  }
+
+  get paginatedTrades(): SimulatedTradeDto[] {
+    const startIndex = (this.currentPage - 1) * this.pageSize;
+    return this.filteredTrades.slice(startIndex, startIndex + this.pageSize);
+  }
+
+  onPageChange(page: number) {
+    this.currentPage = page;
   }
 
   // Estadísticas basadas en la lista REAL de trades presentes en el historial
