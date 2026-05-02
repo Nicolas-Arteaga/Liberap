@@ -17,6 +17,8 @@ from nexus15 import router as nexus15_router
 from scar import router as scar_router
 from scar import data_store as scar_db
 from scar import scheduler as scar_scheduler
+from lse.router import router as lse_router
+
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', handlers=[logging.StreamHandler(sys.stdout)])
@@ -41,9 +43,20 @@ except ImportError:
 
 load_dotenv()
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(title="VERGE AI - Phase 2.0 Multi-Style", version="2.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.include_router(nexus15_router)
 app.include_router(scar_router)
+app.include_router(lse_router)
 
 @app.on_event("startup")
 async def _startup():

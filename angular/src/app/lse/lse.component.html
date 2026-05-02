@@ -1,0 +1,389 @@
+<div class="lse-root">
+
+  <!-- ══════════════════════════════════════════════════════════ HEADER -->
+  <header class="lse-header">
+    <div class="lse-header__brand">
+      <div class="lse-header__icon">
+        <svg viewBox="0 0 24 24" fill="none"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </div>
+      <div>
+        <div class="lse-header__title">LIQUIDITY ENGINE <span class="lse-badge">LSE</span> <span class="lse-badge lse-badge--active">ACTIVO</span></div>
+        <div class="lse-header__sub">Wyckoff Spring + Liquidity Sweep Detector</div>
+      </div>
+    </div>
+
+    <div class="lse-header__controls">
+      <div class="lse-ctrl">
+        <span class="lse-ctrl__label">Timeframe</span>
+        <div class="lse-select">
+          <select [value]="selectedTf()" (change)="selectTf(($any($event.target)).value)">
+            <option value="15m">15M</option>
+            <option value="1h">1H</option>
+            <option value="4h">4H</option>
+          </select>
+        </div>
+      </div>
+      <div class="lse-ctrl">
+        <span class="lse-ctrl__label">Modo</span>
+        <div class="lse-select">
+          <select [value]="selectedMode()" (change)="selectedMode.set($any($event.target).value)">
+            <option value="Agresivo">Agresivo</option>
+            <option value="Conservador">Conservador</option>
+          </select>
+        </div>
+      </div>
+      <div class="lse-ctrl">
+        <span class="lse-ctrl__label">Umbral Score</span>
+        <div class="lse-select">
+          <select [value]="scoreThreshold()" (change)="scoreThreshold.set(+($any($event.target)).value)">
+            <option [value]="55">55</option>
+            <option [value]="60">60</option>
+            <option [value]="65">65</option>
+            <option [value]="70">70</option>
+            <option [value]="75">75</option>
+          </select>
+        </div>
+      </div>
+      <button class="lse-btn lse-btn--config">⚙ Configuración</button>
+    </div>
+  </header>
+
+  <!-- ══════════════════════════════════════════════════════ MAIN GRID -->
+  <div class="lse-grid">
+
+    <!-- ═══ COLUMN LEFT ════════════════════════════════════════════════ -->
+    <aside class="lse-col-left">
+
+      <!-- Estado del Patrón -->
+      <div class="lse-card">
+        <div class="lse-card__head">⊙ ESTADO DEL PATRÓN</div>
+        <div class="lse-pattern-steps">
+          @for (step of patternSteps(); track step.id) {
+            <div class="lse-step" [class]="'lse-step--' + step.state">
+              <div class="lse-step__connector" [class.hidden]="step.id === 1"></div>
+              <div class="lse-step__icon">
+                @if (step.state === 'confirmed') { <span>✓</span> }
+                @else if (step.state === 'active') { <span>{{ step.id }}</span> }
+                @else if (step.state === 'waiting') { <span>{{ step.id }}</span> }
+                @else { <span>{{ step.id }}</span> }
+              </div>
+              <div class="lse-step__info">
+                <div class="lse-step__label">{{ step.label }}</div>
+                <div class="lse-step__sub">{{ step.sublabel }}</div>
+              </div>
+              <div class="lse-step__time">{{ step.time }}</div>
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- Cooldown -->
+      <div class="lse-card lse-card--sm">
+        <div class="lse-card__head">⊙ COOLDOWN</div>
+        <div class="lse-cooldown">{{ cooldownMsg() }}</div>
+      </div>
+
+    </aside>
+
+    <!-- ═══ COLUMN CENTER ══════════════════════════════════════════════ -->
+    <main class="lse-col-center">
+
+      <!-- Symbol Bar -->
+      <div class="lse-card lse-symbol-bar">
+        <div class="lse-symbol-bar__left">
+          <div class="lse-symbol-selector" (click)="showSymbolList.set(!showSymbolList())">
+            <span class="lse-symbol-name">{{ selectedSymbol() }}</span>
+            <span class="lse-symbol-caret">▾</span>
+            @if (showSymbolList()) {
+              <div class="lse-symbol-dropdown" (click)="$event.stopPropagation()">
+                <input class="lse-symbol-search" placeholder="Buscar par..."
+                  [value]="symbolSearch()"
+                  (input)="symbolSearch.set($any($event.target).value)" />
+                <div class="lse-symbol-list">
+                  @for (sym of filteredSymbols().slice(0, 80); track sym) {
+                    <div class="lse-symbol-item" (click)="selectSymbol(sym)">{{ sym }}</div>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+          <div class="lse-symbol-meta">
+            <span class="lse-tag">1H</span>
+            <span class="lse-tag">BINANCE</span>
+          </div>
+        </div>
+        <div class="lse-symbol-bar__price">
+          @if (livePrice()) {
+            <span class="lse-price">{{ formatPrice(livePrice(), 4) }}</span>
+            <span class="lse-price-change" [class.pos]="livePriceChange() >= 0" [class.neg]="livePriceChange() < 0">
+              {{ livePriceChange() >= 0 ? '+' : '' }}{{ livePriceChange() }}%
+            </span>
+          }
+        </div>
+        <div class="lse-symbol-bar__ma">
+          <span>MA 7 <strong>{{ formatPrice(lseSignal()?.ma7, 4) }}</strong></span>
+          <span>MA 25 <strong>{{ formatPrice(lseSignal()?.ma25, 4) }}</strong></span>
+          <span>MA 99 <strong>{{ formatPrice(lseSignal()?.ma99, 4) }}</strong></span>
+        </div>
+        <div class="lse-actions-row" style="display: flex; gap: 10px;">
+          <button class="lse-btn lse-btn--scan" (click)="runScan()" [disabled]="isLoading() || isTopLoading()">
+            @if (isLoading()) { <span class="lse-spin"></span> Analizando... }
+            @else { ⚡ Scan LSE }
+          </button>
+          <button class="lse-btn lse-btn--scan" style="background: linear-gradient(90deg, #aa00ff 0%, #ff00aa 100%); border: none;" (click)="runTopScan()" [disabled]="isLoading() || isTopLoading()">
+            @if (isTopLoading()) { <span class="lse-spin"></span> Buscando... }
+            @else { 🏆 Top 5 LSE }
+          </button>
+        </div>
+      </div>
+
+      <!-- Top 5 List (Horizontal Banner) -->
+      @if (topResults().length > 0) {
+        <div class="nx15-top-banner lse-top-override">
+          <div class="tb-title">🏆 TOP 5 LSE</div>
+          <div class="tb-items">
+            @for (tr of topResults(); track tr.symbol) {
+              <div class="tb-item" (click)="selectSymbol(tr.symbol)">
+                <span class="tb-sym">{{ tr.symbol.replace('USDT','') }}</span>
+                <span class="tb-conf" [style.color]="tr.score >= 75 ? '#00ff88' : tr.score >= 65 ? '#ffdd00' : '#ff8888'">
+                   {{ tr.score | number:'1.1-1' }}
+                </span>
+                <span class="tb-dir bullish" style="color: #00ff88;">▲</span>
+              </div>
+            }
+          </div>
+          <div class="tb-clear" (click)="topResults.set([])">⨯</div>
+        </div>
+      }
+
+      <!-- Chart -->
+      <div class="lse-card lse-chart-card">
+        @if (errorMsg()) {
+          <div class="lse-error-overlay">{{ errorMsg() }}</div>
+        }
+        <div class="lse-chart" #chartContainer></div>
+      </div>
+
+    </main>
+
+    <!-- ═══ COLUMN RIGHT ═══════════════════════════════════════════════ -->
+    <aside class="lse-col-right">
+
+      <!-- Score Breakdown -->
+      <div class="lse-card">
+        <div class="lse-card__head">📊 SCORE BREAKDOWN</div>
+        <div class="lse-scores">
+          <div class="lse-score-row">
+            <span class="lse-score-label">Compresión</span>
+            <div class="lse-score-bar"><div class="lse-score-fill" [style.width]="getScoreBarWidth(lseSignal()?.sub_scores?.compression ?? 0, 20)"></div></div>
+            <span class="lse-score-val">{{ lseSignal()?.sub_scores?.compression?.toFixed(0) ?? '--' }}<small>/20</small></span>
+          </div>
+          <div class="lse-score-row">
+            <span class="lse-score-label">Sweep</span>
+            <div class="lse-score-bar"><div class="lse-score-fill lse-score-fill--b" [style.width]="getScoreBarWidth(lseSignal()?.sub_scores?.sweep ?? 0, 25)"></div></div>
+            <span class="lse-score-val">{{ lseSignal()?.sub_scores?.sweep?.toFixed(0) ?? '--' }}<small>/25</small></span>
+          </div>
+          <div class="lse-score-row">
+            <span class="lse-score-label">Reclaim</span>
+            <div class="lse-score-bar"><div class="lse-score-fill" [style.width]="getScoreBarWidth(lseSignal()?.sub_scores?.reclaim ?? 0, 20)"></div></div>
+            <span class="lse-score-val">{{ lseSignal()?.sub_scores?.reclaim?.toFixed(0) ?? '--' }}<small>/20</small></span>
+          </div>
+          <div class="lse-score-row">
+            <span class="lse-score-label">Volumen</span>
+            <div class="lse-score-bar"><div class="lse-score-fill" [style.width]="getScoreBarWidth(lseSignal()?.sub_scores?.volume ?? 0, 20)"></div></div>
+            <span class="lse-score-val">{{ lseSignal()?.sub_scores?.volume?.toFixed(0) ?? '--' }}<small>/20</small></span>
+          </div>
+          <div class="lse-score-row">
+            <span class="lse-score-label">Contexto HTF</span>
+            <div class="lse-score-bar"><div class="lse-score-fill lse-score-fill--c" [style.width]="getScoreBarWidth(lseSignal()?.sub_scores?.htf_context ?? 0, 15)"></div></div>
+            <span class="lse-score-val">{{ lseSignal()?.sub_scores?.htf_context?.toFixed(0) ?? '--' }}<small>/15</small></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filtros Adicionales -->
+      <div class="lse-card">
+        <div class="lse-card__head">🔍 FILTROS ADICIONALES</div>
+        <div class="lse-filters">
+          @let f = filters();
+          <div class="lse-filter-row">
+            <span class="lse-filter-label">{{ f.htf.label }}</span>
+            <span class="lse-filter-check" [class.ok]="f.htf.ok">✓</span>
+            <span class="lse-filter-val" [class.ok]="f.htf.ok">{{ f.htf.value }}</span>
+          </div>
+          <div class="lse-filter-row">
+            <span class="lse-filter-label">{{ f.minor.label }}</span>
+            <span class="lse-filter-check" [class.ok]="f.minor.ok">✓</span>
+            <span class="lse-filter-val" [class.ok]="f.minor.ok">{{ f.minor.value }}</span>
+          </div>
+          <div class="lse-filter-row">
+            <span class="lse-filter-label">{{ f.atr.label }}</span>
+            <span class="lse-filter-val-plain">{{ f.atr.value }}</span>
+            <span class="lse-filter-ok">✓ OK</span>
+          </div>
+          <div class="lse-filter-row">
+            <span class="lse-filter-label">{{ f.anomaly.label }}</span>
+            <span class="lse-filter-check" [class.ok]="f.anomaly.ok">✓</span>
+            <span class="lse-filter-ok">OK</span>
+          </div>
+        </div>
+      </div>
+
+    </aside>
+  </div>
+
+  <!-- ══════════════════════════════════════════ BOTTOM GRID -->
+  <div class="lse-bottom-grid">
+
+    <!-- Setup de Trading -->
+    <div class="lse-card lse-setup-card">
+      <div class="lse-card__head">📈 SETUP DE TRADING (LSE) <span class="lse-badge lse-badge--long">▲ LONG</span></div>
+      <div class="lse-setup-body">
+        <div class="lse-setup-left">
+          <div class="lse-setup-row">
+            <span class="lse-setup-key">Modo de Entrada:</span>
+            <span class="lse-setup-val">{{ selectedMode() === 'Agresivo' ? 'Agresivo (cierre reclaim)' : 'Conservador (ruptura high sweep)' }}</span>
+          </div>
+          <div class="lse-setup-row lse-setup-row--entry">
+            <span class="lse-setup-key">Entrada:</span>
+            <span class="lse-setup-val lse-val--entry">{{ formatPrice(lseSignal()?.entry_price, 4) }}</span>
+          </div>
+          <div class="lse-setup-row lse-setup-row--sl">
+            <span class="lse-setup-key">Stop Loss (bajo sweep):</span>
+            <span class="lse-setup-val lse-val--sl">{{ formatPrice(lseSignal()?.stop_loss, 4) }}</span>
+          </div>
+          @if (riskPct()) {
+            <div class="lse-risk-label">Riesgo: {{ riskPct() }}% ({{ riskPct() }}%)</div>
+          }
+        </div>
+        <div class="lse-setup-right">
+          <div class="lse-tp-block">
+            <div class="lse-tp-label">Take Profit 1 (High Relevante):</div>
+            <div class="lse-tp-val">{{ formatPrice(lseSignal()?.take_profit_1, 4) }}</div>
+            @if (riskReward()) {
+              <div class="lse-rr">RR: {{ riskReward() }}R ({{ tp1Pct() }}%)</div>
+            }
+          </div>
+          <div class="lse-tp-block">
+            <div class="lse-tp-label">Take Profit 2 (Zona Volumen):</div>
+            <div class="lse-tp-val">{{ formatPrice(lseSignal()?.take_profit_2, 4) }}</div>
+            @if (riskRewardTp2()) {
+              <div class="lse-rr">RR: {{ riskRewardTp2() }}R ({{ tp2Pct() }}%)</div>
+            }
+          </div>
+          @if (riskRewardTp2()) {
+            <div class="lse-rr-total">RR Total TP2: <strong>{{ riskRewardTp2() }}R</strong></div>
+          }
+        </div>
+      </div>
+    </div>
+
+    <!-- Niveles Clave -->
+    <div class="lse-card">
+      <div class="lse-card__head">📌 NIVELES CLAVE</div>
+      <div class="lse-levels">
+        <div class="lse-level-row">
+          <span class="lse-level-label">Nivel Roto (Sweep Low)</span>
+          <span class="lse-level-val lse-level-val--red">{{ formatPrice(lseSignal()?.sweep_low, 4) }}</span>
+        </div>
+        <div class="lse-level-row">
+          <span class="lse-level-label">Reclaim Close</span>
+          <span class="lse-level-val lse-level-val--yellow">{{ formatPrice(lseSignal()?.reclaim_close, 4) }}</span>
+        </div>
+        <div class="lse-level-row">
+          <span class="lse-level-label">MA 7</span>
+          <span class="lse-level-val lse-level-val--gold">{{ formatPrice(lseSignal()?.ma7, 4) }}</span>
+        </div>
+        <div class="lse-level-row">
+          <span class="lse-level-label">MA 25</span>
+          <span class="lse-level-val lse-level-val--purple">{{ formatPrice(lseSignal()?.ma25, 4) }}</span>
+        </div>
+        <div class="lse-level-row">
+          <span class="lse-level-label">MA 99</span>
+          <span class="lse-level-val lse-level-val--blue">{{ formatPrice(lseSignal()?.ma99, 4) }}</span>
+        </div>
+        <div class="lse-level-row">
+          <span class="lse-level-label">TP1 — High Relevante</span>
+          <span class="lse-level-val lse-level-val--green">{{ formatPrice(lseSignal()?.take_profit_1, 4) }}</span>
+        </div>
+        <div class="lse-level-row">
+          <span class="lse-level-label">TP2 — Zona Volumen</span>
+          <span class="lse-level-val lse-level-val--green">{{ formatPrice(lseSignal()?.take_profit_2, 4) }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Score Gauge -->
+    <div class="lse-card lse-gauge-card">
+      <div class="lse-card__head">🎯 SCORE LSE</div>
+      <div class="lse-gauge">
+        <svg viewBox="0 0 120 120" class="lse-gauge__svg">
+          <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="10"/>
+          <circle cx="60" cy="60" r="52" fill="none"
+            [attr.stroke]="scoreColor()"
+            stroke-width="10"
+            stroke-linecap="round"
+            [attr.stroke-dasharray]="getScoreDasharray(lseSignal()?.score ?? 0)"
+            stroke-dashoffset="0"
+            transform="rotate(-90 60 60)"
+            style="transition: stroke-dasharray 0.8s ease"/>
+        </svg>
+        <div class="lse-gauge__center">
+          <span class="lse-gauge__num" [style.color]="scoreColor()">{{ lseSignal()?.score?.toFixed(0) ?? '--' }}</span>
+          <span class="lse-gauge__denom">/100</span>
+          <span class="lse-gauge__label">{{ scoreLabel() }}</span>
+        </div>
+      </div>
+      <div class="lse-gauge__threshold">Umbral mínimo: {{ scoreThreshold() }}</div>
+      @if ((lseSignal()?.score ?? 0) >= scoreThreshold()) {
+        <div class="lse-gauge__above">✓ Por encima del umbral</div>
+      } @else {
+        <div class="lse-gauge__below">✗ Bajo el umbral</div>
+      }
+    </div>
+
+    <!-- Historial de Señales -->
+    <div class="lse-card lse-history-card">
+      <div class="lse-card__head">🕓 ÚLTIMAS SEÑALES LSE</div>
+      <table class="lse-table">
+        <thead>
+          <tr><th>Símbolo</th><th>Time</th><th>Score</th><th>Resultado</th></tr>
+        </thead>
+        <tbody>
+          @for (row of signalHistory(); track row.symbol + row.time) {
+            <tr>
+              <td class="lse-t-sym">{{ row.symbol }}</td>
+              <td class="lse-t-time">{{ row.time }}</td>
+              <td class="lse-t-score">{{ row.score }}</td>
+              <td><span class="lse-result-badge" [class]="getResultClass(row.result)">{{ row.result }}</span></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ FOOTER INFO -->
+  <div class="lse-footer-grid">
+    <div class="lse-card">
+      <div class="lse-card__head">📄 DESCRIPCIÓN DEL PATRÓN</div>
+      <p class="lse-description">{{ patternDescription() }}</p>
+    </div>
+    <div class="lse-card">
+      <div class="lse-card__head">⚙ CONFIGURACIÓN ACTUAL DEL SÍMBOLO</div>
+      <div class="lse-config-table">
+        <div class="lse-config-row">
+          <span>compression_threshold</span><span>wick_ratio_min</span>
+          <span>volume_spike_mult</span><span>atr_ratio_max</span>
+          <span>equal_lows_lookback</span><span>cooldown_candles</span>
+        </div>
+        <div class="lse-config-row lse-config-row--vals">
+          <span>Dinámico (ATR)</span><span>0.30</span>
+          <span>1.50</span><span>1.80</span>
+          <span>20</span><span>10</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>

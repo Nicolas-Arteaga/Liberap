@@ -13,6 +13,8 @@ const oAuthConfig = {
 
 export const environment = {
   production: false,
+  /** Motor LSE (FastAPI en docker: map host 8005 → container 8000) */
+  pythonAiUrl: 'http://localhost:8005',
   application: {
     baseUrl,
     name: 'Verge',

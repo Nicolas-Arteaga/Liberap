@@ -68,6 +68,10 @@ export const APP_ROUTES: Routes = [
         loadComponent: () => import('./scar-analytics/scar-analytics.component').then(c => c.ScarAnalyticsComponent),
       },
       {
+        path: 'liquidity-engine',
+        loadComponent: () => import('./lse/lse.component').then(c => c.LseComponent),
+      },
+      {
         path: 'market-radar',
         loadComponent: () => import('./radar/radar.component').then(c => c.RadarComponent),
       },

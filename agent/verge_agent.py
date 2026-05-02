@@ -2,6 +2,7 @@ import time
 import logging
 import sys
 import config
+import requests
 from datetime import datetime
 
 # ---------------------------------------------------------
@@ -25,6 +26,13 @@ from risk_manager import RiskManager
 from position_manager import PositionManager
 from report_engine import ReportEngine
 from circuit_breaker import get_breakers
+
+# LSE: LiquiditySweepEngine — runs BEFORE Nexus-15 to catch sweeps early
+# The LSE Python service endpoint is part of the same python-service container.
+LSE_ENABLED = getattr(config, "LSE_ENABLED", True)
+LSE_MIN_SCORE = getattr(config, "LSE_MIN_SCORE", 65.0)
+LSE_SYMBOLS = getattr(config, "LSE_SYMBOLS", None)  # None = all watchlist; or list of symbols
+LSE_CANDLE_LIMIT_1H = 150  # minimum to give MA99 enough history
 
 # ---------------------------------------------------------
 # Logging Configuration
@@ -103,6 +111,18 @@ class VergeAgent:
         logger.info("[Step 1/6] Checking open positions...")
         self._manage_open_positions()
         logger.info("[Step 1/6] Done.")
+
+        # 2. LSE — LiquiditySweepEngine (priority scan — runs BEFORE Nexus-15)
+        #    Detects Wyckoff Spring + MA compression sweeps.
+        #    If a signal fires here with score >= LSE_MIN_SCORE, trade is executed
+        #    immediately — no need to wait for Nexus-15 confirmation.
+        if LSE_ENABLED:
+            logger.info("[Step 2/6] Running LSE (Liquidity Sweep Engine)...")
+            lse_fired = self._run_lse_scan()
+            if lse_fired:
+                logger.info("[Step 2/6] LSE executed a trade. Skipping Nexus-15 scan this cycle.")
+                return
+            logger.info("[Step 2/6] LSE: no signal this cycle.")
 
         # 2. Check trade limits
         open_count = self.state.get_position_count()
@@ -190,6 +210,139 @@ class VergeAgent:
         )
 
         self._execute_trade(top)
+
+
+    # ─────────────────────────────────────────────────────────
+    # LSE Integration
+    # ─────────────────────────────────────────────────────────
+    def _get_lse_candles(self, symbol: str, timeframe: str = "1h") -> list:
+        """
+        Builds a list of candle dicts from the local KlineCache in 1H format.
+        Falls back to empty list if data is insufficient.
+        """
+        try:
+            # BinanceFetcher stores klines in SQLite — reuse that cache
+            raw = self.fetcher.get_klines(symbol, timeframe="1h", limit=LSE_CANDLE_LIMIT_1H)
+            if not raw or len(raw) < 120:
+                return []
+            # Normalize to LSE CandleInput format (timestamp, open, high, low, close, volume)
+            result = []
+            for k in raw:
+                result.append({
+                    "timestamp": str(k.get("timestamp", k.get("openTime", 0))),
+                    "open":      float(k.get("open",  0)),
+                    "high":      float(k.get("high",  0)),
+                    "low":       float(k.get("low",   0)),
+                    "close":     float(k.get("close", 0)),
+                    "volume":    float(k.get("volume", 0)),
+                })
+            return result
+        except Exception as e:
+            logger.debug("[LSE] Error building candles for %s: %s", symbol, e)
+            return []
+
+    def _run_lse_scan(self) -> bool:
+        """
+        Scans the watchlist (or LSE_SYMBOLS subset) for LSE signals.
+        Returns True if a trade was executed, False otherwise.
+        Runs BEFORE Nexus-15 — this is the early-entry edge.
+        """
+        # Gate checks (same as main loop)
+        open_count = self.state.get_position_count()
+        if open_count >= config.MAX_OPEN_POSITIONS:
+            logger.debug("[LSE] Max positions open — skip LSE scan.")
+            return False
+        if not self.state.can_trade_today():
+            logger.debug("[LSE] Daily trade limit reached — skip LSE scan.")
+            return False
+
+        targets = LSE_SYMBOLS if LSE_SYMBOLS else config.WATCHLIST
+        lse_url = f"{config.PYTHON_SERVICE_URL}/lse/scan"
+        best_signal = None
+        best_score  = 0.0
+
+        for symbol in targets:
+            try:
+                if self._should_skip(symbol):
+                    continue
+
+                candles_1h = self._get_lse_candles(symbol, "1h")
+                if len(candles_1h) < 120:
+                    continue
+
+                candles_4h = self._get_lse_candles(symbol, "4h") if hasattr(self.fetcher, 'get_klines') else []
+
+                payload = {
+                    "symbol":      symbol,
+                    "timeframe":   "1h",
+                    "candles_1h":  candles_1h,
+                    "candles_4h":  candles_4h,
+                    "entry_mode":  "conservative",
+                }
+
+                resp = requests.post(lse_url, json=payload, timeout=10)
+                if resp.status_code != 200:
+                    continue
+
+                data = resp.json()
+                if not data.get("signal_found"):
+                    continue
+
+                sig = data.get("signal", {})
+                score = sig.get("score", 0.0)
+
+                logger.info(
+                    "🎯 [LSE] Signal: %s | Score=%.1f | Entry=%.6f | SL=%.6f | TP1=%.6f",
+                    symbol, score,
+                    sig.get("entry_price", 0),
+                    sig.get("stop_loss", 0),
+                    sig.get("take_profit_1", 0),
+                )
+
+                if score >= LSE_MIN_SCORE and score > best_score:
+                    best_score  = score
+                    best_signal = {"symbol": symbol, "signal": sig}
+
+            except requests.exceptions.Timeout:
+                logger.debug("[LSE] Timeout for %s", symbol)
+            except Exception as e:
+                logger.debug("[LSE] Error scanning %s: %s", symbol, e)
+
+        if best_signal is None:
+            return False
+
+        # Translate LSE signal → trade candidate (same format as Nexus-15 candidates)
+        sig    = best_signal["signal"]
+        symbol = best_signal["symbol"]
+
+        candidate = {
+            "symbol":           symbol,
+            "confluence_score": sig.get("score", 0.0),
+            "trade_direction":  "BULLISH",  # LSE detecta springs alcistas únicamente
+            "side":             0,           # 0 = LONG
+            "scar_score":       0,
+            "nexus_confidence": 0,
+            "nexus_direction":  "BULLISH",
+            "regime":           "LSE_SPRING",
+            "volume_explosion": True,
+            "group_scores":     {},
+            "rsi":              50,
+            "estimated_range_pct": abs(
+                (sig.get("take_profit_1", 0) - sig.get("entry_price", 1)) /
+                max(sig.get("entry_price", 1), 1e-10) * 100
+            ),
+            "reasons": sig.get("reasoning", []),
+            # LSE-specific overrides for risk manager
+            "lse_entry_price":   sig.get("entry_price"),
+            "lse_stop_loss":     sig.get("stop_loss"),
+            "lse_take_profit_1": sig.get("take_profit_1"),
+            "lse_score":         sig.get("score"),
+            "source":            "LSE",
+        }
+
+        logger.info("🚨 [LSE] Executing trade on %s | Score=%.1f", symbol, best_score)
+        self._execute_trade(candidate)
+        return True
 
 
 

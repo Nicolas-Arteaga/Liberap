@@ -13,6 +13,7 @@ const oAuthConfig = {
 
 export const environment = {
   production: true,
+  pythonAiUrl: 'http://localhost:8005',
   application: {
     baseUrl,
     name: 'Verge',
