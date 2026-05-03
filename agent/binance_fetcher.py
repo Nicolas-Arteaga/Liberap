@@ -62,16 +62,17 @@ class BinanceFetcher:
         if price > 0:
             return price
 
-        # 2. Last kline close from cache
-        klines = self._cache.get_klines(symbol, "15m", limit=1)
-        if klines:
-            return float(klines[-1]["close"])
-
-        # 3. Multi-source REST fallback
+        # 2. Multi-source REST fallback
         logger.info(f"[Fetcher] Cache miss for {symbol} price. Trying multi-source REST...")
         fetched = self._multi_fetcher.fetch_klines(symbol, "15m", limit=1)
         if fetched:
             return float(fetched[-1]["close"])
+
+        # 3. Last kline close from cache (Fallback only if REST fails to avoid stale prices)
+        logger.warning(f"[Fetcher] REST failed for {symbol}. Falling back to potentially stale cache kline.")
+        klines = self._cache.get_klines(symbol, "15m", limit=1)
+        if klines:
+            return float(klines[-1]["close"])
 
         logger.warning(f"[Fetcher] No price available for {symbol} from any source.")
         return 0.0

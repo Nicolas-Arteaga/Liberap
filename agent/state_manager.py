@@ -1,5 +1,6 @@
 import json
 import os
+import time
 import config
 import logging
 from datetime import datetime
@@ -111,3 +112,99 @@ class StateManager:
                 break
         if updated:
             self._save_json(self.positions_file, positions)
+
+    # --- LSE symbol cooldown (evita re-entrar al mismo par en N velas) ---
+
+    def _cooldown_path(self) -> str:
+        return getattr(config, "LSE_SYMBOL_COOLDOWN_FILE", os.path.join(config.DATA_DIR, "lse_symbol_cooldown.json"))
+
+    def _load_cooldown_map(self) -> dict:
+        path = self._cooldown_path()
+        if not os.path.isfile(path):
+            return {}
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+            return data if isinstance(data, dict) else {}
+        except Exception as e:
+            logger.warning("Cooldown map read error: %s", e)
+            return {}
+
+    def _save_cooldown_map(self, data: dict):
+        try:
+            with open(self._cooldown_path(), "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+        except Exception as e:
+            logger.warning("Cooldown map save error: %s", e)
+
+    def is_lse_symbol_cooldown_active(self, symbol: str) -> bool:
+        data = self._load_cooldown_map()
+        until = float(data.get(symbol, 0) or 0)
+        now = time.time()
+        if until <= 0 or now >= until:
+            if symbol in data:
+                del data[symbol]
+                self._save_cooldown_map(data)
+            return False
+        return True
+
+    def register_lse_symbol_cooldown(self, symbol: str, timeframe: str):
+        n = int(getattr(config, "LSE_SYMBOL_COOLDOWN_CANDLES", 0))
+        if n <= 0:
+            return
+        sec = float(config.timeframe_to_seconds(timeframe))
+        until = time.time() + n * sec
+        data = self._load_cooldown_map()
+        data[symbol] = until
+        self._save_cooldown_map(data)
+        logger.info("LSE cooldown %s until %.0f (%s velas %s)", symbol, until, n, timeframe)
+
+    # --- Kill-switch: racha de pérdidas → pausa LSE ---
+
+    def _loss_streak_path(self) -> str:
+        return getattr(config, "AGENT_LOSS_STREAK_FILE", os.path.join(config.DATA_DIR, "agent_loss_streak.json"))
+
+    def _load_loss_streak(self) -> dict:
+        path = self._loss_streak_path()
+        if not os.path.isfile(path):
+            return {"consecutive_losses": 0, "lse_paused_until": 0.0}
+        try:
+            with open(path, encoding="utf-8") as f:
+                d = json.load(f)
+            if not isinstance(d, dict):
+                return {"consecutive_losses": 0, "lse_paused_until": 0.0}
+            d.setdefault("consecutive_losses", 0)
+            d.setdefault("lse_paused_until", 0.0)
+            return d
+        except Exception as e:
+            logger.warning("Loss streak read error: %s", e)
+            return {"consecutive_losses": 0, "lse_paused_until": 0.0}
+
+    def _save_loss_streak(self, d: dict):
+        try:
+            with open(self._loss_streak_path(), "w", encoding="utf-8") as f:
+                json.dump(d, f, indent=2)
+        except Exception as e:
+            logger.warning("Loss streak save error: %s", e)
+
+    def is_lse_kill_switch_active(self) -> bool:
+        d = self._load_loss_streak()
+        return time.time() < float(d.get("lse_paused_until", 0) or 0)
+
+    def record_closed_trade_outcome(self, is_loss: bool):
+        d = self._load_loss_streak()
+        if is_loss:
+            d["consecutive_losses"] = int(d.get("consecutive_losses", 0)) + 1
+            thr = int(getattr(config, "AGENT_KILL_SWITCH_CONSECUTIVE_LOSSES", 3))
+            if d["consecutive_losses"] >= thr:
+                pause_m = float(getattr(config, "AGENT_KILL_SWITCH_PAUSE_MINUTES", 120))
+                d["lse_paused_until"] = time.time() + pause_m * 60.0
+                d["consecutive_losses"] = 0
+                logger.warning(
+                    "[KILL] Pausa LSE %.0f min tras %s pérdidas consecutivas",
+                    pause_m,
+                    thr,
+                )
+        else:
+            d["consecutive_losses"] = 0
+        self._save_loss_streak(d)

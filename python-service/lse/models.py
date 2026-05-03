@@ -73,6 +73,7 @@ class LSESignal(BaseModel):
     take_profit_1: Optional[float] = None
     take_profit_2: Optional[float] = None
     sweep_low: Optional[float] = None
+    sweep_high: Optional[float] = None
     reclaim_close: Optional[float] = None
     ma7: Optional[float] = None
     ma25: Optional[float] = None

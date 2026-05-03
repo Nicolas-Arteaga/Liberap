@@ -1,4 +1,5 @@
 import csv
+import json
 import os
 import config
 import logging
@@ -77,12 +78,37 @@ class ReportEngine:
                 ])
                 
             logger.info(f" Trade log saved to CSV for {symbol}. PnL: ${pnl_usd:.2f}")
+
+            tid = local_pos_data.get("trade_id")
+            self.append_trade_metric_event(
+                {
+                    "phase": "close",
+                    "trade_id": str(tid) if tid else None,
+                    "symbol": symbol,
+                    "result": status_str,
+                    "pnl_usd": round(pnl_usd, 4),
+                    "duration_h": duration_h,
+                }
+            )
             
             # Send Telegram if enabled
             self._send_telegram(f" *Trade Closed*: {symbol}\nStatus: {status_str}\nPnL: ${pnl_usd:.2f}\nDuration: {duration_h}h")
             
         except Exception as e:
             logger.error(f"Failed to log trade to CSV: {e}")
+
+    def append_trade_metric_event(self, row: dict):
+        """JSONL append-only para trade_analytics (open/close)."""
+        path = getattr(config, "TRADE_METRICS_JSONL", None)
+        if not path:
+            return
+        try:
+            line = dict(row)
+            line["ts_utc"] = datetime.utcnow().isoformat() + "Z"
+            with open(path, mode="a", encoding="utf-8") as f:
+                f.write(json.dumps(line, ensure_ascii=False) + "\n")
+        except Exception as e:
+            logger.warning("append_trade_metric_event failed: %s", e)
 
     def log_trade_opened(self, pos_data: dict):
         """Send telegram notification when trade is opened."""

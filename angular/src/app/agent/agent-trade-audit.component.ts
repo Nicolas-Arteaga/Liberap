@@ -393,4 +393,101 @@ export class AgentTradeAuditComponent implements OnInit {
         value: this.auditIsNested(rec[k]) ? this.safeJson(rec[k]) : this.formatScalarForDisplay(rec[k]),
       }));
   }
+
+  downloadAll(): void {
+    let out = '';
+    
+    for (const tr of this.allRows()) {
+      const pnlStr = (tr.realizedPnl != null && tr.status !== TradeStatus.Open) 
+        ? tr.realizedPnl.toLocaleString('es-AR', { maximumFractionDigits: 2 }) 
+        : '—';
+      
+      const openedStr = tr.openedAt ? new Date(tr.openedAt).toLocaleString('es-AR') : '—';
+      const hasAudit = this.hasAuditSnapshot(tr) ? 'Sí' : 'No';
+      
+      out += `${tr.symbol}\t${hasAudit}\t${this.signalSource(tr)}\t${this.scoreSummary(tr)}\t${this.statusLabel(tr.status)}\t${openedStr}\t${pnlStr}\n`;
+      out += `${tr.symbol}\n`;
+      out += `${this.signalSource(tr)}\n`;
+      out += `Ejecución simulada\n`;
+      out += `Entrada (servidor)\n${tr.entryPrice}\n`;
+      out += `TP\n${tr.tpPrice}\n`;
+      out += `SL\n${tr.slPrice}\n`;
+      out += `Margen / Lev\n${tr.margin} USDT × ${tr.leverage}\n`;
+      
+      const snap = this.parseSnapshot(tr);
+      if (snap) {
+        const ps = this.asRecord(snap.position_sizing);
+        if (ps) {
+          out += `Tamaño (motor de riesgo)\n`;
+          for (const row of this.positionSizingRows(ps)) {
+            out += `${row.label}\n${row.value}\n`;
+          }
+        }
+        
+        if (snap.agent_meta) {
+          out += `Razonamiento del agente\n${snap.agent_meta.entry_reason || ''}\n\n`;
+          out += `Grupo Nexus\n${snap.agent_meta.nexus_group || ''}\n`;
+          out += `Tier\n${snap.agent_meta.tier || ''}\n`;
+          out += `Capturado\n${snap.captured_at_utc ? new Date(snap.captured_at_utc).toLocaleString('es-AR') : ''}\n`;
+        }
+        
+        const c = snap.candidate;
+        if (c) {
+          out += `Nexus-15 · lectura al ejecutar\n`;
+          out += `Confianza IA\n${c['nexus_confidence'] ?? ''}\n`;
+          out += `Dirección\n${c['nexus_direction'] ?? ''}\n`;
+          out += `Régimen\n${c['regime'] ?? ''}\n`;
+          out += `Rango est. %\n${c['estimated_range_pct'] ?? ''}\n`;
+          out += `Confluencia\n${c['confluence_score'] ?? ''}\n`;
+          
+          const audit = this.asRecord(c['agent_audit_context']);
+          if (audit) {
+            const nx = this.asRecord(audit['nexus15']);
+            if (nx) {
+              out += `Respuesta Nexus (API)\n`;
+              for (const item of this.nexusSummaryItems(nx)) {
+                out += `${item.label}\n${item.value}\n`;
+              }
+            }
+          }
+          
+          out += `SCAR\nscore_grial en candidato: ${c['scar_score'] ?? ''}\n\n`;
+          
+          if (c['source'] === 'LSE') {
+            out += `Liquidity Engine (LSE)\n`;
+            out += `Score LSE\n${c['lse_score'] ?? ''}\n`;
+            out += `Detección\n${c['lse_detection_mode'] ?? ''}\n`;
+            out += `Entry modelo\n${c['lse_entry_price'] ?? ''}\n`;
+            out += `SL modelo\n${c['lse_stop_loss'] ?? ''}\n`;
+            out += `TP1 modelo\n${c['lse_take_profit_1'] ?? ''}\n`;
+            
+            if (audit) {
+              const lseSig = this.asRecord(audit['lse_signal']);
+              if (lseSig) {
+                out += `Señal LSE\n`;
+                for (const row of this.auditRecordRows(lseSig)) {
+                  out += `${row.label}\n${row.value}\n`;
+                }
+              }
+            }
+          }
+          
+          if (this.reasonLines(c).length > 0) {
+             out += `Reasoning\n`;
+             out += JSON.stringify(this.reasonLines(c)) + '\n';
+          }
+        }
+      }
+      
+      out += `\n--------------------------------------------------\n\n`;
+    }
+    
+    const blob = new Blob([out], { type: 'text/plain;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `agent_audit_history_${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  }
 }

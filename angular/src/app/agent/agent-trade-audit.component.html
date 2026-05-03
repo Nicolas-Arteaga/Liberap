@@ -13,7 +13,10 @@
         </p>
       }
     </div>
-    <button type="button" class="audit-refresh" (click)="refresh()" [disabled]="loading()">Actualizar</button>
+    <div class="audit-header-actions" style="display: flex; gap: 10px;">
+      <button type="button" class="audit-refresh" (click)="refresh()" [disabled]="loading()">Actualizar</button>
+      <button type="button" class="audit-refresh" (click)="downloadAll()" [disabled]="loading() || allRows().length === 0">Descargar Todo</button>
+    </div>
   </header>
 
   @if (loading()) {

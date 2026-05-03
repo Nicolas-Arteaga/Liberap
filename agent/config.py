@@ -40,6 +40,38 @@ CLIENT_SECRET = os.getenv("CLIENT_SECRET", "")
 # 3. Risk & Capital Management
 VIRTUAL_CAPITAL_BASE = 10000.0
 RISK_PER_TRADE_PCT = 0.015
+# LSE / sizing por riesgo respecto al stop estructural (no margen fijo % equity)
+EQUITY_RISK_PCT_FOR_STOP = float(os.getenv("EQUITY_RISK_PCT_FOR_STOP", "0.01"))
+MIN_RR_DEFAULT = float(os.getenv("MIN_RR_DEFAULT", "1.5"))
+MIN_RR_NEXUS = float(os.getenv("MIN_RR_NEXUS", str(MIN_RR_DEFAULT)))
+MIN_RR_AGGRESSIVE_LSE = float(os.getenv("MIN_RR_AGGRESSIVE_LSE", "2.0"))
+MIN_STOP_ATR_MULT = float(os.getenv("MIN_STOP_ATR_MULT", "0.5"))
+MIN_STOP_PCT_OF_PRICE = float(os.getenv("MIN_STOP_PCT_OF_PRICE", "0.002"))
+MAX_ENTRY_SLIPPAGE_PCT = float(os.getenv("MAX_ENTRY_SLIPPAGE_PCT", "0.002"))
+MAX_MARGIN_PER_TRADE_USD = float(os.getenv("MAX_MARGIN_PER_TRADE_USD", "150"))
+MAX_NOTIONAL_PER_TRADE_USD = float(os.getenv("MAX_NOTIONAL_PER_TRADE_USD", "50000"))
+TICK_SIZE_MIN_RELATIVE_OF_PRICE = float(os.getenv("TICK_SIZE_MIN_RELATIVE_OF_PRICE", "1e-7"))
+TICK_SIZE_MIN_ABSOLUTE = float(os.getenv("TICK_SIZE_MIN_ABSOLUTE", "1e-10"))
+LSE_BLOCK_REASONING_SUBSTRING = os.getenv("LSE_BLOCK_REASONING_SUBSTRING", "R:R bajo")
+LSE_FOLLOW_THROUGH_ENABLED = os.getenv("LSE_FOLLOW_THROUGH_ENABLED", "true").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+LSE_FOLLOW_THROUGH_CANDLES = int(os.getenv("LSE_FOLLOW_THROUGH_CANDLES", "2"))
+# Mínimo recorrido absoluto hasta TP2 (evita RR “válido” pero setup microscópico)
+MIN_TP_DISTANCE_ATR_MULT = float(os.getenv("MIN_TP_DISTANCE_ATR_MULT", "0.8"))
+MIN_TP_DISTANCE_PCT_OF_PRICE = float(os.getenv("MIN_TP_DISTANCE_PCT_OF_PRICE", "0.003"))
+# Cooldown por símbolo tras trade LSE (0 = desactivado). Duración ≈ N × duración de vela del TF.
+LSE_SYMBOL_COOLDOWN_CANDLES = int(os.getenv("LSE_SYMBOL_COOLDOWN_CANDLES", "5"))
+# Tras N pérdidas seguidas (cualquier cierre que no sea TP), pausa nuevas entradas LSE.
+AGENT_KILL_SWITCH_CONSECUTIVE_LOSSES = int(os.getenv("AGENT_KILL_SWITCH_CONSECUTIVE_LOSSES", "3"))
+AGENT_KILL_SWITCH_PAUSE_MINUTES = float(os.getenv("AGENT_KILL_SWITCH_PAUSE_MINUTES", "120"))
+# Cuántos candidatos rankeados probar en serie hasta ejecutar uno válido (fallback).
+AGENT_MAX_CANDIDATES_PER_CYCLE = int(os.getenv("AGENT_MAX_CANDIDATES_PER_CYCLE", "10"))
+# Si > 0: solo los ranks 1..N pueden ejecutar candidatos no-LSE (evita rank 9 Nexus "por descarte").
+AGENT_MAX_RANK_FOR_NEXUS_FALLBACK = int(os.getenv("AGENT_MAX_RANK_FOR_NEXUS_FALLBACK", "0"))
+
 MAX_OPEN_POSITIONS = 3
 MAX_TRADES_PER_DAY = 100
 MAX_POSITION_DURATION_HOURS = 48
@@ -59,9 +91,109 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 POSITIONS_FILE    = os.path.join(DATA_DIR, "positions.json")
 DAILY_STATS_FILE  = os.path.join(DATA_DIR, "daily_stats.json")
 TRADES_LOG_FILE   = os.path.join(DATA_DIR, "trades.csv")
+TRADE_METRICS_JSONL = os.path.join(DATA_DIR, "trade_metrics.jsonl")
+LSE_SYMBOL_COOLDOWN_FILE = os.path.join(DATA_DIR, "lse_symbol_cooldown.json")
+AGENT_LOSS_STREAK_FILE = os.path.join(DATA_DIR, "agent_loss_streak.json")
+AUTO_TUNER_OVERRIDES_FILE = os.path.join(DATA_DIR, "auto_tuner_overrides.json")
+AUTO_TUNER_RECOMMENDATIONS_FILE = os.path.join(DATA_DIR, "auto_tuner_recommendations.json")
 WATCHLIST_CACHE   = os.path.join(DATA_DIR, "watchlist_cache.json")
 
+
+def timeframe_to_seconds(tf: str) -> float:
+    """Duración aproximada de una vela (para cooldown por N velas)."""
+    s = (tf or "1h").strip().lower()
+    sec = {
+        "1m": 60.0,
+        "3m": 180.0,
+        "5m": 300.0,
+        "15m": 900.0,
+        "30m": 1800.0,
+        "1h": 3600.0,
+        "2h": 7200.0,
+        "4h": 14400.0,
+        "1d": 86400.0,
+    }
+    return float(sec.get(s, 3600.0))
+
 os.makedirs(DATA_DIR, exist_ok=True)
+
+
+def _merge_auto_tuner_overrides() -> None:
+    """
+    Aplica agent/data/auto_tuner_overrides.json si existe (generado por auto_tuner.py --apply).
+    Solo claves permitidas; requiere sample_size >= min_trades en el JSON.
+    """
+    global MIN_RR_DEFAULT, MIN_RR_NEXUS, MIN_RR_AGGRESSIVE_LSE
+    global MIN_TP_DISTANCE_ATR_MULT, MIN_TP_DISTANCE_PCT_OF_PRICE
+    global MIN_STOP_ATR_MULT, MIN_STOP_PCT_OF_PRICE, MAX_ENTRY_SLIPPAGE_PCT
+    global AGENT_MAX_RANK_FOR_NEXUS_FALLBACK
+
+    path = AUTO_TUNER_OVERRIDES_FILE
+    if not os.path.isfile(path):
+        return
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:
+        print(f"[Config] auto_tuner_overrides read failed: {e}")
+        return
+
+    min_need = int(data.get("min_trades_required", 30))
+    n = int(data.get("sample_size", 0))
+    if n < min_need:
+        print(
+            f"[Config] auto_tuner overrides ignorados: sample_size={n} < {min_need}"
+        )
+        return
+
+    o = data.get("overrides") or {}
+    if not isinstance(o, dict) or not o:
+        return
+
+    allowed = {
+        "MIN_RR_DEFAULT": float,
+        "MIN_RR_NEXUS": float,
+        "MIN_RR_AGGRESSIVE_LSE": float,
+        "MIN_TP_DISTANCE_ATR_MULT": float,
+        "MIN_TP_DISTANCE_PCT_OF_PRICE": float,
+        "MIN_STOP_ATR_MULT": float,
+        "MIN_STOP_PCT_OF_PRICE": float,
+        "MAX_ENTRY_SLIPPAGE_PCT": float,
+        "AGENT_MAX_RANK_FOR_NEXUS_FALLBACK": int,
+    }
+    applied = []
+    for key, caster in allowed.items():
+        if key not in o:
+            continue
+        try:
+            val = caster(o[key])
+        except (TypeError, ValueError):
+            continue
+        if key == "MIN_RR_DEFAULT":
+            MIN_RR_DEFAULT = val
+        elif key == "MIN_RR_NEXUS":
+            MIN_RR_NEXUS = val
+        elif key == "MIN_RR_AGGRESSIVE_LSE":
+            MIN_RR_AGGRESSIVE_LSE = val
+        elif key == "MIN_TP_DISTANCE_ATR_MULT":
+            MIN_TP_DISTANCE_ATR_MULT = val
+        elif key == "MIN_TP_DISTANCE_PCT_OF_PRICE":
+            MIN_TP_DISTANCE_PCT_OF_PRICE = val
+        elif key == "MIN_STOP_ATR_MULT":
+            MIN_STOP_ATR_MULT = val
+        elif key == "MIN_STOP_PCT_OF_PRICE":
+            MIN_STOP_PCT_OF_PRICE = val
+        elif key == "MAX_ENTRY_SLIPPAGE_PCT":
+            MAX_ENTRY_SLIPPAGE_PCT = val
+        elif key == "AGENT_MAX_RANK_FOR_NEXUS_FALLBACK":
+            AGENT_MAX_RANK_FOR_NEXUS_FALLBACK = val
+        applied.append(f"{key}={val}")
+
+    if applied:
+        print(f"[Config] Auto-tuner overrides activos ({data.get('generated_at_utc', '?')}): {', '.join(applied)}")
+
+
+_merge_auto_tuner_overrides()
 
 # 6. Agent Loop Interval
 LOOP_INTERVAL_SECONDS = 300

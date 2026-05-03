@@ -444,6 +444,7 @@ def _finalize_lse_signal(
     ma99: np.ndarray,
     atrs: np.ndarray,
     sweep_low: float,
+    sweep_high: float,
     reclaim_close: float,
     vol_ratio: float,
     entry_price: float,
@@ -485,6 +486,7 @@ def _finalize_lse_signal(
         take_profit_1   = round(tp1, 8),
         take_profit_2   = round(tp2, 8),
         sweep_low       = round(sweep_low, 8),
+        sweep_high      = round(sweep_high, 8),
         reclaim_close   = round(reclaim_close, 8),
         ma7             = round(float(ma7[-1]), 8),
         ma25            = round(float(ma25[-1]), 8),
@@ -593,7 +595,7 @@ def _pipeline_conservative(
     return _finalize_lse_signal(
         symbol, timeframe, sub, reasoning, compression_pct,
         highs, ma7, ma25, ma99, atrs,
-        sweep_low, reclaim_close, vol_ratio,
+        sweep_low, sweep_high, reclaim_close, vol_ratio,
         entry_price, entry_mode, LSEDetectionMode.conservative,
         cfg, sm, total_score, preview_only,
     )
@@ -698,7 +700,7 @@ def _pipeline_aggressive(
     return _finalize_lse_signal(
         symbol, timeframe, sub, reasoning, compression_pct,
         highs, ma7, ma25, ma99, atrs,
-        sweep_low, reclaim_close, vol_ratio,
+        sweep_low, sweep_high, reclaim_close, vol_ratio,
         entry_price, entry_mode, LSEDetectionMode.aggressive,
         cfg, sm, total_score, preview_only,
     )

@@ -1,11 +1,12 @@
 import time
 import logging
+from typing import Optional
 import sys
 import json
 import copy
 import config
 import requests
-from datetime import datetime
+from datetime import datetime, timezone
 
 # ---------------------------------------------------------
 # Fix Unicode en Windows (cp1252 no soporta emojis en consola)
@@ -27,6 +28,7 @@ from signal_engine import SignalEngine
 from risk_manager import RiskManager
 from position_manager import PositionManager
 from report_engine import ReportEngine
+from setup_validator import validate_pre_trade
 from circuit_breaker import get_breakers
 
 # LSE: LiquiditySweepEngine — runs BEFORE Nexus-15 to catch sweeps early
@@ -126,6 +128,8 @@ class VergeAgent:
         entry_reason: str,
         nexus_group: str,
         tier: str,
+        setup_metrics: Optional[dict] = None,
+        setup_skip: Optional[str] = None,
     ) -> str:
         snap = {
             "schema_version": 1,
@@ -134,6 +138,8 @@ class VergeAgent:
                 "entry_reason": entry_reason,
                 "nexus_group": nexus_group,
                 "tier": tier,
+                "setup_validation": setup_skip or "ok",
+                "setup_metrics": self._json_safe_for_audit(copy.deepcopy(setup_metrics or {})),
             },
             "candidate": self._json_safe_for_audit(copy.deepcopy(candidate)),
             "position_sizing": self._json_safe_for_audit(copy.deepcopy(pos_details)),
@@ -294,14 +300,22 @@ class VergeAgent:
             logger.info("No candidates met the minimum confluence score.")
             return
 
-        # 6. Sort by score and execute best
-        candidates.sort(key=lambda x: x["confluence_score"], reverse=True)
-        top = candidates[0]
-        logger.info(
-            f"🎯 TOP CANDIDATE: {top['symbol']} | Score={top['confluence_score']} | "
-            f"Dir={top['trade_direction']} | Nexus={top['nexus_confidence']}% | SCAR={top['scar_score']}"
-        )
+        if self.state.is_lse_kill_switch_active():
+            n0 = len(candidates)
+            candidates = [c for c in candidates if c.get("source") != "LSE"]
+            logger.info(
+                "[KILL] Candidatos LSE filtrados (pausa por racha): %s → %s",
+                n0,
+                len(candidates),
+            )
+            if not candidates:
+                logger.info("Sin candidatos tras pausa LSE por pérdidas consecutivas.")
+                return
 
+        # 6. Rankear y probar candidatos en orden (fallback si el #1 no pasa validación)
+        candidates.sort(key=lambda x: x["confluence_score"], reverse=True)
+
+        batch_ok = True
         if LSE_ENABLED and LSE_REQUIRE_SCAN_BEFORE_ENTRY:
             sp = int(lse_meta.get("symbols_processed") or 0)
             queued = int(lse_meta.get("items_queued") or 0)
@@ -309,21 +323,67 @@ class VergeAgent:
             called = bool(lse_meta.get("batch_called"))
             min_symbols_ok = sp >= LSE_MIN_SYMBOLS_PROCESSED_GATE
             full_scan_ok = (not LSE_REQUIRE_ALL_QUEUED_PROCESSED) or (queued > 0 and sp >= queued)
-            if not (called and ok and min_symbols_ok and full_scan_ok):
+            batch_ok = bool(called and ok and min_symbols_ok and full_scan_ok)
+            if not batch_ok:
                 logger.warning(
-                    "[GATE] Entrada cancelada: LSE no completó un scan válido en este ciclo "
-                    "(batch_called=%s, http_ok=%s, symbols_processed=%s, queued=%s, min_required=%s, full_scan_required=%s). "
-                    "Sin LSE completo no se opera.",
+                    "[GATE] LSE batch incompleto — candidatos LSE no elegibles este ciclo "
+                    "(batch_called=%s, http_ok=%s, symbols_processed=%s, queued=%s). "
+                    "Nexus/SCAR siguen disponibles.",
                     called,
                     ok,
                     sp,
                     queued,
-                    LSE_MIN_SYMBOLS_PROCESSED_GATE,
-                    LSE_REQUIRE_ALL_QUEUED_PROCESSED,
                 )
-                return
 
-        self._execute_trade(top)
+        max_try = int(getattr(config, "AGENT_MAX_CANDIDATES_PER_CYCLE", 10))
+        ranked = candidates[:max_try]
+        executed = False
+
+        for idx, cand in enumerate(ranked):
+            sym = cand.get("symbol", "")
+            src = cand.get("source") or "Nexus"
+            rank_no = idx + 1
+
+            if cand.get("source") == "LSE":
+                if not batch_ok:
+                    logger.info("[SKIP] rank=%s/%s %s LSE (batch_gate)", rank_no, len(ranked), sym)
+                    continue
+                if self.state.is_lse_symbol_cooldown_active(sym):
+                    logger.info("[SKIP] rank=%s/%s %s lse_symbol_cooldown", rank_no, len(ranked), sym)
+                    continue
+
+            max_nexus_rank = int(getattr(config, "AGENT_MAX_RANK_FOR_NEXUS_FALLBACK", 0))
+            if max_nexus_rank > 0 and cand.get("source") != "LSE" and rank_no > max_nexus_rank:
+                logger.info(
+                    "[SKIP] rank=%s/%s %s nexus_fallback_rank_limit (max_non_lse_rank=%s)",
+                    rank_no,
+                    len(ranked),
+                    sym,
+                    max_nexus_rank,
+                )
+                continue
+
+            logger.info(
+                "🎯 TRY rank=%s/%s %s | source=%s | Score=%s | Dir=%s | Nexus=%s%% | SCAR=%s",
+                rank_no,
+                len(ranked),
+                sym,
+                src,
+                cand.get("confluence_score"),
+                cand.get("trade_direction"),
+                cand.get("nexus_confidence"),
+                cand.get("scar_score"),
+            )
+
+            if self._execute_trade(cand):
+                executed = True
+                break
+
+        if not executed:
+            logger.info(
+                "Sin ejecución este ciclo (se probaron hasta %s candidatos del ranking).",
+                len(ranked),
+            )
 
 
     # ─────────────────────────────────────────────────────────
@@ -367,7 +427,7 @@ class VergeAgent:
             for k in (
                 "score", "state", "timeframe", "detection_mode", "entry_mode",
                 "entry_price", "stop_loss", "take_profit_1", "take_profit_2",
-                "sweep_low", "reclaim_close", "sub_scores", "reasoning",
+                "sweep_low", "sweep_high", "reclaim_close", "sub_scores", "reasoning",
                 "volume_ratio", "compression_pct", "ma7", "ma25", "ma99", "atr",
             )
         }
@@ -391,6 +451,12 @@ class VergeAgent:
             "lse_entry_price":   sig.get("entry_price"),
             "lse_stop_loss":     sig.get("stop_loss"),
             "lse_take_profit_1": sig.get("take_profit_1"),
+            "lse_take_profit_2": sig.get("take_profit_2"),
+            "lse_reclaim_close": sig.get("reclaim_close"),
+            "lse_atr":           sig.get("atr"),
+            "lse_ma99":          sig.get("ma99"),
+            "lse_timeframe":     sig.get("timeframe") or "1h",
+            "lse_sweep_high":    sig.get("sweep_high"),
             "lse_score":         sig.get("score"),
             "lse_detection_mode": dm_used,
             "source":            "LSE",
@@ -813,23 +879,158 @@ class VergeAgent:
         if symbol in config.WATCHLIST_TIER3: return "T3"
         return "N/A"
 
-    def _execute_trade(self, candidate: dict):
+    @staticmethod
+    def _timeframe_to_ms(tf: str) -> int:
+        s = (tf or "1h").strip().lower()
+        table = {
+            "1m": 60_000,
+            "3m": 180_000,
+            "5m": 300_000,
+            "15m": 900_000,
+            "30m": 1_800_000,
+            "1h": 3_600_000,
+            "2h": 7_200_000,
+            "4h": 14_400_000,
+            "1d": 86_400_000,
+        }
+        return table.get(s, 3_600_000)
+
+    def _lse_follow_through_exit_reason(self, pos: dict) -> Optional[str]:
+        """
+        - fake_break_reclaim: hubo ruptura de sweep_high y dos velas seguidas cierran debajo del reclaim.
+        - no_follow_through: en las primeras N velas post-apertura no se rompe sweep_high.
+        """
+        if not getattr(config, "LSE_FOLLOW_THROUGH_ENABLED", True):
+            return None
+        if pos.get("source") != "LSE" or int(pos.get("side", 0)) != 0:
+            return None
+        sh = pos.get("lse_sweep_high")
+        if sh is None:
+            return None
+        try:
+            sweep_high = float(sh)
+        except (TypeError, ValueError):
+            return None
+
+        reclaim_raw = pos.get("lse_reclaim_close")
+        reclaim_f: Optional[float] = None
+        if reclaim_raw is not None:
+            try:
+                reclaim_f = float(reclaim_raw)
+            except (TypeError, ValueError):
+                reclaim_f = None
+
+        tf = pos.get("lse_timeframe") or "1h"
+        need = max(1, int(getattr(config, "LSE_FOLLOW_THROUGH_CANDLES", 2)))
+        sym = pos["symbol"]
+        opened_raw = pos.get("opened_at", "")
+        try:
+            if opened_raw.endswith("Z"):
+                opened_dt = datetime.fromisoformat(opened_raw.replace("Z", "+00:00"))
+            else:
+                opened_dt = datetime.fromisoformat(opened_raw)
+        except Exception:
+            return None
+        opened_ms = opened_dt.timestamp() * 1000
+        tf_ms = self._timeframe_to_ms(tf)
+
+        klines = self.fetcher.get_klines_for_lse(sym, tf, limit=max(need + 8, 20))
+        if len(klines) < 2:
+            return None
+
+        now_ms = time.time() * 1000
+        eligible: list = []
+        for k in klines[:-1]:
+            o = int(k["open_time"])
+            close_ts = o + tf_ms
+            if close_ts > opened_ms and close_ts <= now_ms:
+                eligible.append(k)
+        eligible.sort(key=lambda x: int(x["open_time"]))
+
+        if reclaim_f is not None and len(eligible) >= 3:
+            for i, k in enumerate(eligible):
+                if float(k["high"]) < sweep_high:
+                    continue
+                if i + 2 < len(eligible):
+                    c1 = float(eligible[i + 1]["close"])
+                    c2 = float(eligible[i + 2]["close"])
+                    if c1 < reclaim_f and c2 < reclaim_f:
+                        logger.info(
+                            "[EXIT] fake_break_reclaim %s closes=%s,%s reclaim=%s",
+                            sym,
+                            c1,
+                            c2,
+                            reclaim_f,
+                        )
+                        return "fake_break_reclaim"
+                break
+
+        if len(eligible) < need:
+            return None
+
+        window = eligible[:need]
+        max_h = max(float(k["high"]) for k in window)
+        if max_h < sweep_high:
+            logger.info(
+                "[EXIT] no_follow_through %s max_high=%s sweep_high=%s (first %s candles)",
+                sym,
+                max_h,
+                sweep_high,
+                need,
+            )
+            return "no_follow_through"
+        return None
+
+    def _execute_trade(self, candidate: dict) -> bool:
         symbol = candidate["symbol"]
         balance = self.positions.get_virtual_balance()
+        setup_metrics: dict = {}
+
+        market_px = self.fetcher.get_current_price(symbol)
+        if market_px <= 0:
+            logger.warning("[SKIP] %s invalid market price for setup validation", symbol)
+            return False
+
+        ok, code, setup_metrics = validate_pre_trade(candidate, market_px)
+        if not ok:
+            logger.info("[SKIP] %s %s", code, setup_metrics)
+            return False
+
+        setup_skip = "ok"
+
         pos_details = self.risk.calculate_position(symbol, candidate, available_balance=balance)
 
         if not pos_details:
-            return
-        
-        # Generate Entry Reason
+            return False
+
+        if setup_metrics:
+            sz = pos_details.get("lse_sizing") or pos_details.get("nexus_sizing") or {}
+            if sz:
+                setup_metrics = {**setup_metrics, **sz}
+        if candidate.get("source") == "LSE":
+            m99 = candidate.get("lse_ma99")
+            epx = candidate.get("lse_entry_price")
+            if m99 is not None and epx is not None:
+                try:
+                    m99f = float(m99)
+                    epf = float(epx)
+                    if m99f > 0:
+                        setup_metrics["distance_to_ma99_pct"] = round((epf - m99f) / m99f * 100, 4)
+                except (TypeError, ValueError):
+                    pass
+
         scar_score = candidate.get("scar_score", 0)
         nexus_conf = candidate.get("nexus_confidence", 0)
-        direction = candidate.get("trade_direction", "UNKNOWN")
         confluence = candidate.get("confluence_score", 0)
 
         nexus_group = "Momentum Burst" if nexus_conf > 80 else ("Trend Following" if nexus_conf > 60 else "Mean Reversion")
 
         reason_parts = []
+        if candidate.get("source") == "LSE":
+            reason_parts.append(
+                f"LSE spring [{candidate.get('lse_detection_mode', '')}] "
+                f"score={candidate.get('lse_score', 0)} RR≈{setup_metrics.get('rr', 'n/a')}."
+            )
         if nexus_conf > 0:
             reason_parts.append(f"Señal '{nexus_group}' en marco de 15m (Nexus: {nexus_conf}%).")
         if scar_score >= 4:
@@ -840,7 +1041,13 @@ class VergeAgent:
         entry_reason = " ".join(reason_parts) if reason_parts else "Señal de momentum validada por el motor de riesgo."
 
         audit_json = self._build_agent_decision_snapshot(
-            candidate, pos_details, entry_reason, nexus_group, self._get_tier_for_symbol(symbol),
+            candidate,
+            pos_details,
+            entry_reason,
+            nexus_group,
+            self._get_tier_for_symbol(symbol),
+            setup_metrics=setup_metrics if setup_metrics else None,
+            setup_skip=setup_skip,
         )
         pos_details["agent_decision_json"] = audit_json
 
@@ -853,7 +1060,7 @@ class VergeAgent:
             local_pos = {
                 "trade_id": trade_id,
                 "symbol": symbol,
-                "opened_at": datetime.utcnow().isoformat(),
+                "opened_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                 "entry_reason": entry_reason,
                 "nexus_group": nexus_group,
                 "tier": self._get_tier_for_symbol(symbol),
@@ -862,7 +1069,25 @@ class VergeAgent:
             }
             self.state.add_position(local_pos)
             self.state.record_trade_action(symbol)
+            if candidate.get("source") == "LSE":
+                self.state.register_lse_symbol_cooldown(symbol, candidate.get("lse_timeframe") or "1h")
             self.report.log_trade_opened(local_pos)
+            self.report.append_trade_metric_event(
+                {
+                    "phase": "open",
+                    "trade_id": str(trade_id) if trade_id else None,
+                    "symbol": symbol,
+                    "source": candidate.get("source"),
+                    **setup_metrics,
+                    "entry_price_exec": pos_details.get("entry_price"),
+                    "tp_price": pos_details.get("tp_price"),
+                    "sl_price": pos_details.get("sl_price"),
+                    "margin": pos_details.get("margin"),
+                }
+            )
+            return True
+
+        return False
 
     # ─────────────────────────────────────────────────────────
     # Position management
@@ -892,7 +1117,10 @@ class VergeAgent:
             should_close = False
             close_reason = ""
 
-            if side == 0:  # LONG
+            ft_exit = self._lse_follow_through_exit_reason(pos)
+            if ft_exit:
+                should_close, close_reason = True, ft_exit
+            elif side == 0:  # LONG
                 if current_price >= tp:
                     should_close, close_reason = True, "Take Profit reached"
                 elif current_price <= sl:
@@ -903,7 +1131,10 @@ class VergeAgent:
                 elif current_price >= sl:
                     should_close, close_reason = True, "Stop Loss reached"
 
-            opened_at = datetime.fromisoformat(pos["opened_at"])
+            opened_at_str = pos["opened_at"].replace("Z", "+00:00")
+            opened_at = datetime.fromisoformat(opened_at_str)
+            if opened_at.tzinfo is not None:
+                opened_at = opened_at.replace(tzinfo=None)
             hours_open = (datetime.utcnow() - opened_at).total_seconds() / 3600.0
             if hours_open >= config.MAX_POSITION_DURATION_HOURS:
                 should_close, close_reason = True, "Max duration exceeded"
@@ -927,6 +1158,8 @@ class VergeAgent:
                         "realizedPnl": realized_pnl,
                         "status": 1 if "Take Profit" in close_reason else 2,
                     }
+                    is_loss = "Take Profit" not in close_reason
+                    self.state.record_closed_trade_outcome(is_loss)
                     self.report.log_trade_closed(pos, fake_data)
                     self.state.remove_position(trade_id)
 

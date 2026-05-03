@@ -59,6 +59,7 @@ def log_signal(signal: LSESignal, event: str = "SIGNAL_EMITTED") -> None:
         "take_profit_1":  signal.take_profit_1,
         "take_profit_2":  signal.take_profit_2,
         "sweep_low":      signal.sweep_low,
+        "sweep_high":     signal.sweep_high,
         "reclaim_close":  signal.reclaim_close,
         "ma7":            signal.ma7,
         "ma25":           signal.ma25,
