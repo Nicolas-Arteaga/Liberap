@@ -204,7 +204,9 @@ export class HistoryComponent {
   }
 
   formatCurrency(amount: number): string {
-    return `$${Math.abs(amount).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const sign = amount < 0 ? '-' : (amount > 0 ? '+' : '');
+    const absoluteAmount = Math.abs(amount);
+    return `${sign}$${absoluteAmount.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 
   getTradeStatusClass(status: number) {

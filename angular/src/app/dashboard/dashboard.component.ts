@@ -1,5 +1,5 @@
 import { Component, AfterViewInit, OnDestroy, inject, OnInit, ViewChild, ElementRef } from '@angular/core';
-import { Subject, interval, takeUntil, filter } from 'rxjs';
+import { Subject, interval, takeUntil, filter, timeout } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -190,7 +190,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   showTpSlModal = false;
   selectedTradeForModal: SimulatedTradeDto | null = null;
   private simulatedTradeService = inject(SimulatedTradeService);
-  private destroy$ = new Subject<void>();
 
   // Paginación para posiciones activas
   activePositionsPage = 1;
@@ -1634,9 +1633,5 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       seen.add(key);
       return true;
     });
-  }
-  ngOnDestroy() {
-    this.destroy$.next();
-    this.destroy$.complete();
   }
 }

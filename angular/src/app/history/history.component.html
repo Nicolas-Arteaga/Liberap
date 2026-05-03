@@ -24,7 +24,9 @@
       <div class="row mb-4">
         <div class="col-6 ps-5">  
           <p class="text-white-50 small mb-1">Ganancia Total</p>
-          <p class="text-success fw-bold fs-2">+{{ formatCurrency(totalProfit) }}</p>
+          <p class="fw-bold fs-2" [class.text-success]="totalProfit >= 0" [class.text-danger]="totalProfit < 0">
+            {{ formatCurrency(totalProfit) }}
+          </p>
         </div>
         <div class="col-6 pe-5 text-end">  
           <p class="text-white-50 small mb-1">Win Rate</p>
@@ -121,7 +123,7 @@
               
               <div class="text-end">
                 <p [class]="getProfitColor(getProfitValue(trade))" class="mb-0 fw-bold">
-                  {{ getProfitValue(trade) > 0 ? '+' : '' }}{{ formatCurrency(getProfitValue(trade)) }}
+                  {{ formatCurrency(getProfitValue(trade)) }}
                 </p>
                 <div class="d-flex align-items-center justify-content-end gap-1">
                   <span class="payment-date text-white-50">{{ formatDate(trade.closedAt || trade.openedAt) }}</span>
