@@ -1,5 +1,5 @@
 import { Component, AfterViewInit, OnDestroy, inject, OnInit, ViewChild, ElementRef } from '@angular/core';
-import { Subject, takeUntil, timeout, filter } from 'rxjs';
+import { Subject, interval, takeUntil, filter } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -183,13 +183,14 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   searchTerm: string = '';
   showSymbolSelector: boolean = false;
 
-  // Simulation Simulation
+  // Simulation
   activeTrades: SimulatedTradeDto[] = [];
   tradeHistory: SimulatedTradeDto[] = [];
   consoleTab: 'positions' | 'orders' | 'history' = 'positions';
   showTpSlModal = false;
   selectedTradeForModal: SimulatedTradeDto | null = null;
   private simulatedTradeService = inject(SimulatedTradeService);
+  private destroy$ = new Subject<void>();
 
   // Paginación para posiciones activas
   activePositionsPage = 1;
@@ -292,6 +293,16 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loadTickers();
     this.loadActiveTrades();
     this.loadTradeHistory();
+
+    // 🔄 Polling fallback: refresh active trade PnL every 5 seconds
+    // This covers cases where SignalR updates are missed (tab in background, reconnect lag, etc.)
+    interval(5000)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        if (this.activeTrades.length > 0) {
+          this.loadActiveTrades();
+        }
+      });
 
     // Leer parámetro de símbolo desde URL (para navegación desde Historial)
     this.route.queryParams.pipe(takeUntil(this.destroy$)).subscribe(params => {
@@ -1623,5 +1634,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       seen.add(key);
       return true;
     });
+  }
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

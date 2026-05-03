@@ -84,7 +84,7 @@ MIN_CONFLUENCE_SCORE = 35.0
 
 # 5. Take Profit / Stop Loss
 TP_MULTIPLIER = 1.5
-SL_MULTIPLIER = 0.8
+SL_MULTIPLIER = 0.4
 
 # Paths
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")

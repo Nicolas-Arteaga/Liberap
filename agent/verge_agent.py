@@ -210,11 +210,7 @@ class VergeAgent:
             else:
                 logger.info("[Step 2/6] LSE: no signal this cycle.")
 
-        # 2. Check trade limits
-        open_count = self.state.get_position_count()
-        if open_count >= config.MAX_OPEN_POSITIONS:
-            logger.info(f"Max open positions ({open_count}/{config.MAX_OPEN_POSITIONS}). Skipping new signals.")
-            return
+        # 2. Check daily limits (max open positions is now handled at execution time for upgrades)
 
         if not self.state.can_trade_today():
             logger.info("Max daily trades reached. Skipping new signals.")
@@ -586,10 +582,7 @@ class VergeAgent:
             "reason": None,
         }
 
-        open_count = self.state.get_position_count()
-        if open_count >= config.MAX_OPEN_POSITIONS:
-            logger.debug("[LSE] Max positions open — skip LSE scan.")
-            return None, {**empty, "reason": "max_positions"}
+        # open_count early return removed to allow LSE candidates to trigger an upgrade
 
         if not self.state.can_trade_today():
             logger.debug("[LSE] Daily trade limit reached — skip LSE scan.")
@@ -981,6 +974,49 @@ class VergeAgent:
             return "no_follow_through"
         return None
 
+    def _close_worst_position(self) -> bool:
+        """Encuentra la peor posicion abierta (peor PnL) y la cierra para liberar cupo."""
+        open_positions = self.state.get_open_positions()
+        if not open_positions:
+            return False
+
+        worst_pos = None
+        worst_pnl = float('inf')
+
+        for pos in open_positions:
+            symbol = pos["symbol"]
+            entry_price = float(pos.get("entry_price", 0))
+            side = int(pos.get("side", 0))
+
+            current_price = self.fetcher.get_current_price(symbol)
+            if current_price <= 0 or entry_price <= 0:
+                continue
+
+            if side == 0:  # LONG
+                pnl_pct = (current_price - entry_price) / entry_price
+            else:  # SHORT
+                pnl_pct = (entry_price - current_price) / entry_price
+
+            if pnl_pct < worst_pnl:
+                worst_pnl = pnl_pct
+                worst_pos = pos
+
+        if worst_pos:
+            logger.info(f"UPGRADE: Cerrando la peor posicion ({worst_pos['symbol']}) con PnL: {worst_pnl*100:.2f}% para liberar cupo.")
+            success = self.positions.close_trade(worst_pos["trade_id"])
+            if success:
+                # Fake data para el log del cerrado (simplificado)
+                realized_pnl = worst_pos["margin"] * worst_pnl * worst_pos["leverage"]
+                self.state.record_closed_trade_outcome(is_loss=True)
+                self.report.log_trade_closed(worst_pos, {
+                    "closePrice": current_price,
+                    "realizedPnl": realized_pnl,
+                    "status": 2
+                })
+                self.state.remove_position(worst_pos["trade_id"])
+                return True
+        return False
+
     def _execute_trade(self, candidate: dict) -> bool:
         symbol = candidate["symbol"]
         balance = self.positions.get_virtual_balance()
@@ -1050,6 +1086,19 @@ class VergeAgent:
             setup_skip=setup_skip,
         )
         pos_details["agent_decision_json"] = audit_json
+
+        open_count = self.state.get_position_count()
+        if open_count >= config.MAX_OPEN_POSITIONS:
+            min_upgrade_score = float(getattr(config, "MIN_UPGRADE_SCORE", 80.0))
+            if confluence >= min_upgrade_score:
+                logger.info(f"Cupos llenos, pero candidato excelente (Score: {confluence:.1f} >= {min_upgrade_score}). Intentando Upgrade.")
+                closed_worst = self._close_worst_position()
+                if not closed_worst:
+                    logger.info("No se pudo cerrar la peor posicion. Upgrade abortado.")
+                    return False
+            else:
+                logger.info(f"[LIMIT] Max positions open y candidato (Score: {confluence:.1f}) no supera {min_upgrade_score} para Upgrade.")
+                return False
 
         logger.info(f"Opening {candidate['trade_direction']} on {symbol}. Margin: {pos_details['margin']}")
         trade_result = self.positions.open_trade(pos_details)

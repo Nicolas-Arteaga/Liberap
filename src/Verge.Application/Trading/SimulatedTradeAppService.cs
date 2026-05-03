@@ -55,7 +55,7 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
             return null;
         }
 
-        // 2.5. DUPLICATE SHIELD: Prevent multiple open positions for the same symbol/user
+        // 2.5. SMART POSITION MANAGEMENT: If position exists, ADD to it (Average Price) instead of blocking
         var existingTrade = await _tradeRepo.FirstOrDefaultAsync(t => 
             t.UserId == userId && 
             t.Symbol == symbol && 
@@ -63,8 +63,71 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
 
         if (existingTrade != null)
         {
-            Logger.LogWarning("🚫 [Simulation] Blocking duplicate trade for {Symbol}. Position already exists for user {UserId}.", symbol, userId);
-            throw new UserFriendlyException($"Ya tienes una posición abierta en {symbol}. Para abrir otra, cierra la anterior primero.");
+            if (existingTrade.Side == input.Side)
+            {
+                Logger.LogInformation("➕ [Simulation] Increasing existing position for {Symbol} (User: {UserId}). Averaging entry price...", symbol, userId);
+
+                // Calculate new cost
+                var marginToAdd = input.Amount;
+                var exposureToAdd = marginToAdd * input.Leverage;
+                var entryFeeToAdd = _simulationService.CalculateEntryFee(exposureToAdd);
+                var totalCostToAdd = marginToAdd + entryFeeToAdd;
+
+                // Validate balance
+                var profileForUpdate = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId)
+                    ?? throw new UserFriendlyException("Trader profile not found.");
+
+                if (profileForUpdate.VirtualBalance < totalCostToAdd)
+                {
+                     Logger.LogWarning("⚠️ [Simulation] Insufficient balance to increase {Symbol}. Skipping.", symbol);
+                     return null; // Return null instead of throwing to avoid blocking the agent
+                }
+
+                // Calculate new size and weighted entry price
+                var sizeToAdd = _simulationService.CalculatePositionSize(exposureToAdd, entryPrice.Value);
+                
+                var oldNotional = existingTrade.Size * existingTrade.EntryPrice;
+                var addedNotional = sizeToAdd * entryPrice.Value;
+                
+                var newTotalSize = existingTrade.Size + sizeToAdd;
+                var newEntryPrice = (oldNotional + addedNotional) / newTotalSize;
+
+                // Deduct balance
+                profileForUpdate.VirtualBalance -= totalCostToAdd;
+                await _profileRepo.UpdateAsync(profileForUpdate, autoSave: true);
+
+                // Update existing trade properties
+                existingTrade.EntryPrice = newEntryPrice;
+                existingTrade.Size = newTotalSize;
+                existingTrade.Margin += marginToAdd;
+                existingTrade.Amount += exposureToAdd;
+                existingTrade.EntryFee += entryFeeToAdd;
+                existingTrade.Leverage = input.Leverage; 
+                
+                existingTrade.LiquidationPrice = _simulationService.CalculateLiquidationPrice(newEntryPrice, existingTrade.Leverage, existingTrade.Side);
+
+                if (input.TpPrice.HasValue && input.TpPrice.Value > 0) existingTrade.TpPrice = input.TpPrice;
+                if (input.SlPrice.HasValue && input.SlPrice.Value > 0) existingTrade.SlPrice = input.SlPrice;
+
+                await _tradeRepo.UpdateAsync(existingTrade, autoSave: true);
+                
+                var updatedDto = MapToDto(existingTrade);
+                await _hubContext.Clients.User(userId.ToString()).SendAsync("ReceiveTradeUpdate", updatedDto);
+
+                Logger.LogInformation("✅ [Simulation] Position updated for {Symbol}: New Entry {Price}, New Size {Size}", 
+                    symbol, newEntryPrice, newTotalSize);
+
+                return updatedDto;
+            }
+            else 
+            {
+                // POSITION FLIP: If side is different, automatically CLOSE the old one first.
+                Logger.LogInformation("🔄 [Simulation] Position Flip detected for {Symbol}. Closing {OldSide} to open {NewSide}.", 
+                    symbol, existingTrade.Side, input.Side);
+                
+                await CloseTradeAsync(existingTrade.Id);
+                // After closing, we continue to the normal 'Open' logic below
+            }
         }
 
         // 3. Calculate position values

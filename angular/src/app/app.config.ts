@@ -12,6 +12,11 @@ import { provideAbpCore, withOptions } from '@abp/ng.core';
 import { provideAbpOAuth } from '@abp/ng.oauth';
 import { provideSettingManagementConfig } from '@abp/ng.setting-management/config';
 import { provideAccountConfig } from '@abp/ng.account/config';
+import { OAuthStorage } from 'angular-oauth2-oidc';
+
+export function storageFactory(): OAuthStorage {
+  return localStorage;
+}
 import { provideIdentityConfig } from '@abp/ng.identity/config';
 import { provideTenantManagementConfig } from '@abp/ng.tenant-management/config';
 import { provideFeatureManagementConfig } from '@abp/ng.feature-management';
@@ -250,6 +255,7 @@ export const appConfig: ApplicationConfig = {
     ),
 
     provideAbpOAuth(), // Re-habilitado para silenciar advertencia de ABP
+    { provide: OAuthStorage, useFactory: storageFactory },
     provideSettingManagementConfig(),
     provideAccountConfig(),
     provideIdentityConfig(),

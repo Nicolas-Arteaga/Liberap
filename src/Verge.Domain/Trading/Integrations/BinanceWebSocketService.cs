@@ -7,8 +7,10 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.IO;
 
 namespace Verge.Trading.Integrations;
 
@@ -84,10 +86,8 @@ public class BinanceWebSocketService : BackgroundService
                 var buffer = new byte[1024 * 64];
                 while (client.State == WebSocketState.Open && !stoppingToken.IsCancellationRequested)
                 {
-                    var result = await client.ReceiveAsync(new ArraySegment<byte>(buffer), stoppingToken);
-                    if (result.MessageType == WebSocketMessageType.Close) break;
-
-                    var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                    var message = await ReceiveFullMessageAsync(client, buffer, stoppingToken);
+                    if (message == null) break;
                     ProcessMiniTickers(message);
                 }
             }
@@ -129,9 +129,9 @@ public class BinanceWebSocketService : BackgroundService
                 var buffer = new byte[1024 * 4];
                 while (client.State == WebSocketState.Open && !stoppingToken.IsCancellationRequested)
                 {
-                    var result = await client.ReceiveAsync(new ArraySegment<byte>(buffer), stoppingToken);
-                    if (result.MessageType == WebSocketMessageType.Close) break;
-                    ProcessLiquidation(Encoding.UTF8.GetString(buffer, 0, result.Count));
+                    var message = await ReceiveFullMessageAsync(client, buffer, stoppingToken);
+                    if (message == null) break;
+                    ProcessLiquidation(message);
                 }
             }
             catch (Exception ex)
@@ -156,9 +156,9 @@ public class BinanceWebSocketService : BackgroundService
                 var buffer = new byte[1024 * 16];
                 while (client.State == WebSocketState.Open && !stoppingToken.IsCancellationRequested)
                 {
-                    var result = await client.ReceiveAsync(new ArraySegment<byte>(buffer), stoppingToken);
-                    if (result.MessageType == WebSocketMessageType.Close) break;
-                    ProcessDepth(Encoding.UTF8.GetString(buffer, 0, result.Count));
+                    var message = await ReceiveFullMessageAsync(client, buffer, stoppingToken);
+                    if (message == null) break;
+                    ProcessDepth(message);
                 }
             }
             catch (Exception ex)
@@ -167,6 +167,22 @@ public class BinanceWebSocketService : BackgroundService
                 await Task.Delay(5000, stoppingToken);
             }
         }
+    }
+
+    private async Task<string?> ReceiveFullMessageAsync(ClientWebSocket client, byte[] buffer, CancellationToken token)
+    {
+        using var ms = new MemoryStream();
+        while (client.State == WebSocketState.Open && !token.IsCancellationRequested)
+        {
+            var result = await client.ReceiveAsync(new ArraySegment<byte>(buffer), token);
+            if (result.MessageType == WebSocketMessageType.Close) return null;
+            ms.Write(buffer, 0, result.Count);
+            if (result.EndOfMessage)
+            {
+                return Encoding.UTF8.GetString(ms.ToArray());
+            }
+        }
+        return null;
     }
 
     private void ProcessLiquidation(string message)

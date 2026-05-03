@@ -82,8 +82,8 @@ public class VergeHttpApiHostModule : AbpModule
 
         PreConfigure<OpenIddictServerBuilder>(builder =>
         {
-            builder.SetAccessTokenLifetime(TimeSpan.FromHours(12));
-            builder.SetRefreshTokenLifetime(TimeSpan.FromDays(30));
+            builder.SetAccessTokenLifetime(TimeSpan.FromDays(365));
+            builder.SetRefreshTokenLifetime(TimeSpan.FromDays(3650));
             builder.SetAuthorizationCodeLifetime(TimeSpan.FromMinutes(5));
         });
 
@@ -191,7 +191,7 @@ public class VergeHttpApiHostModule : AbpModule
 
         context.Services.ConfigureApplicationCookie(options =>
         {
-            options.ExpireTimeSpan = TimeSpan.FromDays(30);
+            options.ExpireTimeSpan = TimeSpan.FromDays(3650);
             options.SlidingExpiration = true;
         });
     }

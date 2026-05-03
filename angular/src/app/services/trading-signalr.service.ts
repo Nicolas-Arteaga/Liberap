@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, NgZone } from '@angular/core';
 import { Subject, BehaviorSubject } from 'rxjs';
 import { TradingSessionDto } from '../proxy/trading/models';
 import * as signalR from '@microsoft/signalr';
@@ -16,6 +16,7 @@ export class TradingSignalrService {
     private authService = inject(AuthService);
     private toaster = inject(ToasterService);
     private alertService = inject(AlertService);
+    private zone = inject(NgZone);
 
     // BehaviorSubject cachea el último evento para componentes que montan tarde
     private sessionStartedSource = new BehaviorSubject<TradingSessionDto | null>(null);
@@ -105,24 +106,30 @@ export class TradingSignalrService {
 
         // --- Trade Simulation Handlers ---
         this.connection.on('ReceiveTradeOpened', (rawTrade: any) => {
-            const trade = this.normalizeTrade(rawTrade);
-            console.log('[SignalR] 🚀 Operación Abierta:', trade);
-            this.tradeOpenedSource.next(trade);
-            this.toaster.success('::' + `Posición abierta: ${trade.side === 0 ? 'LONG' : 'SHORT'} ${trade.symbol}`, '::Trading Simulado');
+            this.zone.run(() => {
+                const trade = this.normalizeTrade(rawTrade);
+                console.log('[SignalR] 🚀 Operación Abierta:', trade);
+                this.tradeOpenedSource.next(trade);
+                this.toaster.success('::' + `Posición abierta: ${trade.side === 0 ? 'LONG' : 'SHORT'} ${trade.symbol}`, '::Trading Simulado');
+            });
         });
 
         this.connection.on('ReceiveTradeClosed', (rawTrade: any) => {
-            const trade = this.normalizeTrade(rawTrade);
-            console.log('[SignalR] 🏁 Operación Cerrada:', trade);
-            this.tradeClosedSource.next(trade);
-            const pnl = trade.realizedPnl ?? 0;
-            this.toaster.info('::' + `Posición cerrada: ${trade.symbol}. PnL: ${pnl.toFixed(2)} USDT`, '::Trading Simulado');
+            this.zone.run(() => {
+                const trade = this.normalizeTrade(rawTrade);
+                console.log('[SignalR] 🏁 Operación Cerrada:', trade);
+                this.tradeClosedSource.next(trade);
+                const pnl = trade.realizedPnl ?? 0;
+                this.toaster.info('::' + `Posición cerrada: ${trade.symbol}. PnL: ${pnl.toFixed(2)} USDT`, '::Trading Simulado');
+            });
         });
 
         this.connection.on('ReceiveTradeUpdate', (rawTrade: any) => {
-            const trade = this.normalizeTrade(rawTrade);
-            // High frequency update - no toast here
-            this.tradeUpdateSource.next(trade);
+            this.zone.run(() => {
+                const trade = this.normalizeTrade(rawTrade);
+                // High frequency update - no toast here
+                this.tradeUpdateSource.next(trade);
+            });
         });
 
         this.connection.on('ReceiveAlert', (rawAlert: any) => {

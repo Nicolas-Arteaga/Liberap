@@ -83,7 +83,14 @@ export class LoginComponent implements OnInit {
     this.authService.login(loginRequest).subscribe({
       next: (response) => {
         console.log('✅ Login completado con éxito.');
-        this.router.navigateByUrl(this.returnUrl);
+        setTimeout(() => {
+          this.router.navigateByUrl(this.returnUrl).then(success => {
+            if (!success) {
+              console.warn('⚠️ Falló la navegación por Angular Router. Forzando recarga de página...');
+              window.location.href = this.returnUrl;
+            }
+          });
+        }, 100);
       },
       error: (error) => {
         console.error('❌ Error en login:', error);

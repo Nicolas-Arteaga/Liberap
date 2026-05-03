@@ -130,11 +130,32 @@ public class SimulationMarkPriceWorker : BackgroundService
 
                         if (price == null)
                         {
-                            // After retries, still no price. SKIP this trade cycle.
-                            // Do not close. Do not use another exchange. Wait for the next worker tick.
+                            // WS cache miss after retries. Fallback to REST (MarketDataManager.GetTickersAsync)
+                            // to ensure PnL updates even if WebSocket is lagging or missing symbols.
+                            _logger.LogInformation("📡 [SimulationWorker] WS miss for {Symbol}. Falling back to REST Tickers...", cleanSymbol);
+                            try
+                            {
+                                var tickers = await marketDataManager.GetTickersAsync();
+                                var ticker = tickers.FirstOrDefault(t => t.Symbol == cleanSymbol);
+                                if (ticker != null && ticker.LastPrice > 0)
+                                {
+                                    price = ticker.LastPrice;
+                                    priceSource = "REST (Fallback)";
+                                    _logger.LogInformation("✅ [SimulationWorker] Price for {Symbol} found via REST: {Price}", cleanSymbol, price);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogWarning("❌ [SimulationWorker] REST fallback failed for {Symbol}: {Message}", cleanSymbol, ex.Message);
+                            }
+                        }
+
+                        if (price == null)
+                        {
+                            // After retries and REST fallback, still no price. SKIP this trade cycle.
                             _logger.LogWarning(
-                                "⚠️ [SimulationWorker] No Binance WebSocket price for {Symbol} after retries. " +
-                                "SKIPPING this cycle to prevent phantom close. Trade {TradeId} remains OPEN.",
+                                "⚠️ [SimulationWorker] No price found for {Symbol} (WS + REST failed). " +
+                                "SKIPPING this cycle. Trade {TradeId} remains OPEN.",
                                 cleanSymbol, trade.Id);
                             continue;
                         }
