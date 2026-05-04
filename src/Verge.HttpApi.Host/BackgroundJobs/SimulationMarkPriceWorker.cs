@@ -209,9 +209,16 @@ public class SimulationMarkPriceWorker : BackgroundService
                     {
                         _logger.LogInformation("🎯 [SimulationWorker] {Reason} reached for {Symbol} at {Price}.", closeReason, trade.Symbol, markPrice);
                         
-                        var exitFee = simulationService.CalculateExitFee(trade.Amount, markPrice);
+                        var exitFee = simulationService.CalculateExitFee(trade.Size, markPrice);
                         var pnl = simulationService.CalculateUnrealizedPnl(trade.EntryPrice, markPrice, trade.Size, trade.Side);
-                        var realizedPnl = pnl - exitFee;
+                        
+                        // True NET PnL
+                        var realizedPnl = pnl - trade.EntryFee - exitFee - trade.TotalFundingPaid;
+
+                        // Log FEES
+                        var totalFee = trade.EntryFee + exitFee;
+                        _logger.LogInformation("[FEE] Entry={EntryFee:N4} | Exit={ExitFee:N4} | Total={TotalFee:N4} | Notional={Notional:N4}", 
+                            trade.EntryFee, exitFee, totalFee, trade.Amount);
 
                         trade.Status = closeReason == "Take Profit" ? TradeStatus.Win : TradeStatus.Loss;
                         trade.ClosePrice = markPrice;
@@ -222,11 +229,11 @@ public class SimulationMarkPriceWorker : BackgroundService
                         // ✅ FIX: Recalculate final ROI based on realized PnL (was left stale before)
                         trade.ROIPercentage = simulationService.CalculateROI(realizedPnl, trade.Margin);
 
-                        // Credit margin + net PnL back to user balance
+                        // Credit margin + entry fee + net PnL back to user balance
                         var profileToCredit = await profileRepo.FirstOrDefaultAsync(p => p.UserId == trade.UserId);
                         if (profileToCredit != null)
                         {
-                            profileToCredit.VirtualBalance += (trade.Margin + realizedPnl);
+                            profileToCredit.VirtualBalance += (trade.Margin + trade.EntryFee + realizedPnl);
                             await profileRepo.UpdateAsync(profileToCredit);
                         }
 

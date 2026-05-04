@@ -22,7 +22,7 @@ class SignalEngine:
         """
         url = f"{self.base_url}/scar/alerts"
         try:
-            response = requests.get(url, params={"threshold": config.MIN_SCAR_SCORE}, timeout=5)
+            response = requests.get(url, params={"threshold": 0}, timeout=5)
             if response.status_code == 200:
                 alerts = response.json()
                 # Return dictionary for O(1) lookups: { "BTCUSDT": scar_data }

@@ -8,6 +8,7 @@ import { TradeStatus } from '../proxy/trading/trade-status.enum';
 
 export interface AgentDecisionSnapshot {
   schema_version?: number;
+  agent_version?: string;
   captured_at_utc?: string;
   agent_meta?: {
     entry_reason?: string;
@@ -104,6 +105,12 @@ export class AgentTradeAuditComponent implements OnInit {
     const snap = this.parseSnapshot(trade);
     const src = snap?.candidate?.['source'];
     return typeof src === 'string' ? src : 'Nexus+SCAR';
+  }
+
+  agentVersion(trade: SimulatedTradeDto): string {
+    if (!this.hasAuditSnapshot(trade)) return 'v1.0';
+    const snap = this.parseSnapshot(trade);
+    return snap?.agent_version || 'v1.0';
   }
 
   scoreSummary(trade: SimulatedTradeDto): string {

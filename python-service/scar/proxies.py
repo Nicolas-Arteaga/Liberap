@@ -32,6 +32,8 @@ MARKET_WS_URL = "http://127.0.0.1:8001"
 # Core helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
+_session = requests.Session()
+
 def _get(url: str, params: dict = None, timeout: int = 8) -> Optional[dict]:
     """Single GET with graceful error handling. Returns None on any failure."""
     try:

@@ -147,6 +147,19 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         var size = _simulationService.CalculatePositionSize(exposureValue, entryPrice.Value);
         var liquidationPrice = _simulationService.CalculateLiquidationPrice(entryPrice.Value, input.Leverage, input.Side);
 
+        if (input.TpPrice.HasValue)
+        {
+            var expectedProfit = Math.Abs(input.TpPrice.Value - entryPrice.Value) * size;
+            var exitFeeEst = _simulationService.CalculateExitFee(size, input.TpPrice.Value);
+            var expectedTotalFee = entryFee + exitFeeEst;
+
+            if (expectedProfit <= expectedTotalFee * 1.2m)
+            {
+                Logger.LogWarning("⚠️ [Simulation] SKIP('no_edge_after_fees'): {Symbol} expected profit {ExpectedProfit:N4} is too small compared to total fees {ExpectedTotalFee:N4}.", symbol, expectedProfit, expectedTotalFee);
+                return null;
+            }
+        }
+
         // 6. Deduct balance with Retry logic for Concurrency
         profile.VirtualBalance -= totalCost;
         
@@ -227,6 +240,9 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
             exitFee: exitFee,
             totalFundingPaid: trade.TotalFundingPaid);
 
+        Logger.LogInformation("[FEE] Entry={EntryFee:N4} | Exit={ExitFee:N4} | Total={TotalFee:N4} | Notional={Notional:N4}", 
+            trade.EntryFee, exitFee, trade.EntryFee + exitFee, trade.Amount);
+
         // 3. Update trade record
         trade.Status = realizedPnl >= 0 ? TradeStatus.Win : TradeStatus.Loss;
         trade.ClosePrice = closePrice;
@@ -238,18 +254,18 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
 
         await _tradeRepo.UpdateAsync(trade, autoSave: false);
 
-        // 4. Return margin + realized PnL to user balance
+        // 4. Return margin + entryFee + realizedPnl to user balance
         var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
         if (profile != null)
         {
-            profile.VirtualBalance += trade.Margin + realizedPnl;
+            profile.VirtualBalance += trade.Margin + trade.EntryFee + realizedPnl;
             try {
                 await _profileRepo.UpdateAsync(profile, autoSave: true);
             } catch (Volo.Abp.Data.AbpDbConcurrencyException) {
                 Logger.LogWarning("🔄 [Simulation] Concurrency conflict closing trade for {UserId}. Retrying...", userId);
                 profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
                 if (profile != null) {
-                    profile.VirtualBalance += trade.Margin + realizedPnl;
+                    profile.VirtualBalance += trade.Margin + trade.EntryFee + realizedPnl;
                     await _profileRepo.UpdateAsync(profile, autoSave: true);
                 }
             }

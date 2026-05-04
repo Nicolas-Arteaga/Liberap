@@ -34,6 +34,7 @@
           <thead>
             <tr>
               <th>Símbolo</th>
+              <th>Versión</th>
               <th class="col-audit">Contexto</th>
               <th>Origen</th>
               <th>Scores</th>
@@ -50,6 +51,7 @@
                 (click)="pickRow(tr)"
               >
                 <td><strong>{{ tr.symbol }}</strong></td>
+                <td><span class="badge" [class.badge--info]="agentVersion(tr) !== 'v1.0'" [class.badge--muted]="agentVersion(tr) === 'v1.0'">{{ agentVersion(tr) }}</span></td>
                 <td class="col-audit">
                   @if (hasAuditSnapshot(tr)) {
                     <span class="audit-pill audit-pill--ok">Sí</span>
@@ -82,6 +84,7 @@
 
           <div class="detail-head">
             <h2>{{ tr.symbol }}</h2>
+            <span class="badge" [class.badge--info]="agentVersion(tr) !== 'v1.0'" [class.badge--muted]="agentVersion(tr) === 'v1.0'">{{ agentVersion(tr) }}</span>
             @if (hasAuditSnapshot(tr)) {
               <span class="badge">{{ signalSource(tr) }}</span>
             } @else {
