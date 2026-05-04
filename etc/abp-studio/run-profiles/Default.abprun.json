@@ -15,7 +15,7 @@
       "type": "cli",
       "workingDirectory": "../../../angular",
       "startCommand": "./start.ps1",
-      "launchUrl": "http://localhost:4200",
+      "launchUrl": "http://localhost:4300",
       "kubernetesService": ".*-angular$",
       "execution": {
         "order": 2

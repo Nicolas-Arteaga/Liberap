@@ -114,9 +114,9 @@
                   </span>
                   <span class="text-white-50 text-xs">•</span>
                   <span class="text-white-50 text-xs">{{ trade.leverage }}x</span>
-                  <span class="text-white-50 text-xs ms-2 opacity-50">
-                    (${{ trade.entryPrice | number:'1.2-2' }} → 
-                    {{ trade.closePrice ? '$' + (trade.closePrice | number:'1.2-2') : 'OPEN' }})
+                  <span class="text-white-50 text-xs ms-2 opacity-75">
+                    (In: ${{ trade.entryPrice | number:'1.2-5' }} → 
+                    Out: {{ trade.closePrice ? '$' + (trade.closePrice | number:'1.2-5') : 'OPEN' }})
                   </span>
                 </div>
               </div>
@@ -125,9 +125,11 @@
                 <p [class]="getProfitColor(getProfitValue(trade))" class="mb-0 fw-bold">
                   {{ formatCurrency(getProfitValue(trade)) }}
                 </p>
-                <div class="d-flex align-items-center justify-content-end gap-1">
-                  <span class="payment-date text-white-50">{{ formatDate(trade.closedAt || trade.openedAt) }}</span>
-                  <span class="text-white-50 text-xs">•</span>
+                <div class="d-flex align-items-center justify-content-end gap-1 flex-wrap">
+                  <span class="payment-date text-white-50 text-xs">In: {{ formatDate(trade.openedAt) }}</span>
+                  <span *ngIf="trade.closedAt" class="text-white-50 text-xs">→</span>
+                  <span *ngIf="trade.closedAt" class="payment-date text-white-50 text-xs">Out: {{ formatDate(trade.closedAt) }}</span>
+                  <span class="text-white-50 text-xs ms-1">•</span>
                   <span class="text-white-50 text-xs">{{ formatCurrency(trade.amount) }}</span>
                 </div>
               </div>

@@ -148,7 +148,12 @@ export class HistoryComponent {
 
   loadData() {
     this.simulatedTradeService.getRecentTrades(50).subscribe(trades => {
-      this.realTrades = trades;
+      // Ordenar por fecha de cierre (o apertura si sigue abierto) de más reciente a más antiguo
+      this.realTrades = trades.sort((a, b) => {
+        const dateA = new Date(a.closedAt || a.openedAt || '').getTime();
+        const dateB = new Date(b.closedAt || b.openedAt || '').getTime();
+        return dateB - dateA;
+      });
       
       // Calcular curva de equidad real basada en los trades del historial
       const startBalance = 10000;

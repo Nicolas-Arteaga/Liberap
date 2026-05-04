@@ -331,7 +331,7 @@ public class VergeHttpApiHostModule : AbpModule
             options.AddDefaultPolicy(builder =>
             {
                 builder
-                    .WithOrigins("http://localhost:4200", "https://localhost:4200")
+                    .WithOrigins("http://localhost:4300", "https://localhost:4300")
                     .WithAbpExposedHeaders()
                     .SetIsOriginAllowedToAllowWildcardSubdomains()
                     .AllowAnyHeader()
@@ -342,7 +342,7 @@ public class VergeHttpApiHostModule : AbpModule
             options.AddPolicy("SignalRCors", builder =>
             {
                 builder
-                    .WithOrigins("http://localhost:4200", "https://localhost:4200")
+                    .WithOrigins("http://localhost:4300", "https://localhost:4300")
                     .AllowAnyHeader()
                     .AllowAnyMethod()
                     .AllowCredentials();

@@ -14,7 +14,7 @@ El sistema corre de forma híbrida (procesos locales + contenedores Docker).
 | Componente | Tecnología | Ubicación / Puerto | Función |
 | :--- | :--- | :--- | :--- |
 | **Backend API** | .NET 10 (ABP Framework) | `localhost:44396` | Orquestador central, Auth, CRUD de bots y Proxies. |
-| **Frontend UI** | Angular | `localhost:4200` | Dashboard de control y visualización de señales. |
+| **Frontend UI** | Angular | `localhost:4300` | Dashboard de control y visualización de señales. |
 | **Trading Engine** | Freqtrade (Docker) | `127.0.0.1:8080` | Ejecución de trades reales/paper. |
 | **AI Service** | FastAPI / Python (Docker) | `localhost:8000` | Análisis de RSI, MACD, Regímenes y predicciones. |
 | **Base de Datos** | PostgreSQL 16 | **Puerto: 5433** | Persistencia de tenencia y configuración de bots. |
