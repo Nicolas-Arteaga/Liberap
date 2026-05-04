@@ -133,6 +133,8 @@ class VergeAgent:
     ) -> str:
         snap = {
             "schema_version": 1,
+            "agent_version": "risk_v2.0",
+            "experiment": "post_sl_fix_may_2026",
             "captured_at_utc": datetime.utcnow().isoformat() + "Z",
             "agent_meta": {
                 "entry_reason": entry_reason,
@@ -155,6 +157,7 @@ class VergeAgent:
 
     def run(self):
         logger.info(f"Agent started. Loop interval: {config.LOOP_INTERVAL_SECONDS}s.")
+        logger.info("[CONFIG] Agent Version: risk_v2.0 (segregated metrics ON)")
 
         if not self.auth.get_token():
             logger.error("FATAL: Could not authenticate with ABP Backend. Stopping.")

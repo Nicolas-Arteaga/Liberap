@@ -105,6 +105,8 @@ class ReportEngine:
         try:
             line = dict(row)
             line["ts_utc"] = datetime.utcnow().isoformat() + "Z"
+            line["agent_version"] = "risk_v2.0"
+            line["experiment"] = "post_sl_fix_may_2026"
             with open(path, mode="a", encoding="utf-8") as f:
                 f.write(json.dumps(line, ensure_ascii=False) + "\n")
         except Exception as e:

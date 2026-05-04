@@ -123,27 +123,59 @@ class RiskManager:
 
         range_pct = signal_data.get("estimated_range_pct", 2.0) / 100.0
 
-        tp_distance = range_pct * config.TP_MULTIPLIER
-        sl_distance = range_pct * config.SL_MULTIPLIER
+        # 1. Definir SL estructural base (setup)
+        sl_distance_pct = range_pct * float(getattr(config, "SL_MULTIPLIER", 1.0))
+
+        # Obtener ATR desde features
+        audit_context = signal_data.get("agent_audit_context", {})
+        nexus_features = audit_context.get("nexus15", {}).get("features", {})
+        try:
+            atr_percent = float(nexus_features.get("atr_percent", 1.0))
+        except (TypeError, ValueError):
+            atr_percent = 1.0
+
+        # Normalizar ATR
+        atr_pct = atr_percent / 100.0 if atr_percent > 1 else atr_percent
+
+        # 2. Aplicar piso ATR
+        min_sl_pct = max(atr_pct * 1.5, 0.005)
+        if sl_distance_pct < min_sl_pct:
+            sl_distance_pct = min_sl_pct
+
+        sl_distance_price = cp * sl_distance_pct
+
+        # Limitar RR en Trend Following
+        rr_target = float(getattr(config, "TP_MULTIPLIER", 2.0))
+        nexus_conf = signal_data.get("nexus_confidence", 0)
+        setup_type = "Momentum Burst" if nexus_conf > 80 else ("Trend Following" if nexus_conf > 60 else "Mean Reversion")
+
+        if setup_type == "Trend Following":
+            rr_target = min(rr_target, 2.5)
+
+        tp_distance_price = sl_distance_price * rr_target
 
         side = int(signal_data.get("side", 0))
 
         if side == 0:
-            tp_price = cp * (1 + tp_distance)
-            sl_price = cp * (1 - sl_distance)
+            tp_price = cp + tp_distance_price
+            sl_price = cp - sl_distance_price
             stop_distance = cp - sl_price
         else:
-            tp_price = cp * (1 - tp_distance)
-            sl_price = cp * (1 + sl_distance)
+            tp_price = cp - tp_distance_price
+            sl_price = cp + sl_distance_price
             stop_distance = sl_price - cp
 
         if stop_distance <= 0:
             logger.error("Nexus stop_distance invalid side=%s cp=%s sl=%s", side, cp, sl_price)
             return None
 
+        # 3. Calcular risk_usd constante
         risk_usd = balance * float(getattr(config, "EQUITY_RISK_PCT_FOR_STOP", 0.01))
+        
+        # 4. Calcular qty final
         qty = risk_usd / stop_distance
 
+        # 5. Aplicar caps
         lev = int(getattr(config, "DEFAULT_LEVERAGE", 1))
         notional = qty * cp
         margin = notional / max(lev, 1)
@@ -157,6 +189,18 @@ class RiskManager:
             margin *= scale
             qty *= scale
             notional = max_no
+
+        # Validación post-caps
+        real_risk_usd = qty * stop_distance
+        sl_pct = stop_distance / cp
+        atr_ratio = sl_pct / atr_pct if atr_pct > 0 else 0
+
+        logger.info(
+            f"[RISK] ATR={atr_pct:.4f} | SL%={sl_pct:.4f} "
+            f"| RR={rr_target:.2f} | Qty={qty:.4f} | RiskUSD={risk_usd:.2f}"
+        )
+        logger.info(f"[RISK_FINAL] Intended={risk_usd:.2f} | Real={real_risk_usd:.2f}")
+        logger.info(f"[RISK_CHECK] SL/ATR ratio={atr_ratio:.2f}")
 
         return {
             "symbol": symbol,

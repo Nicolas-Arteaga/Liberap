@@ -52,6 +52,8 @@ def merged_closed_trades(
     merged = pair_open_close(events)
     rows: List[Dict[str, Any]] = []
     for tid, row in merged.items():
+        if row.get("agent_version") != "risk_v2.0":
+            continue
         res = str(row.get("result") or "").upper()
         if res not in ("WIN", "LOSS"):
             continue

@@ -15,7 +15,7 @@ from typing import Any, Dict, Iterable, List, Tuple
 import config
 
 
-def load_jsonl(path: str) -> List[Dict[str, Any]]:
+def load_jsonl(path: str, version: str | None = None) -> List[Dict[str, Any]]:
     if not os.path.isfile(path):
         return []
     rows: List[Dict[str, Any]] = []
@@ -25,7 +25,10 @@ def load_jsonl(path: str) -> List[Dict[str, Any]]:
             if not line:
                 continue
             try:
-                rows.append(json.loads(line))
+                parsed = json.loads(line)
+                if version and parsed.get("agent_version") != version:
+                    continue
+                rows.append(parsed)
             except json.JSONDecodeError:
                 continue
     return rows
@@ -176,11 +179,11 @@ def winrate_by_ma99_distance_bucket(merged: Dict[str, Dict[str, Any]]) -> List[T
     return lines
 
 
-def print_report(path: str | None = None) -> None:
+def print_report(path: str | None = None, version: str | None = None) -> None:
     p = path or getattr(config, "TRADE_METRICS_JSONL", "")
-    events = load_jsonl(p)
+    events = load_jsonl(p, version=version)
     merged = pair_open_close(events)
-    print(f"=== trade_analytics ({p}) ===")
+    print(f"=== trade_analytics ({p}) [Version: {version or 'ALL'}] ===")
     print(f"Pares open+close: {len(merged)}\n")
     for _, line in winrate_by_rr_bucket(merged):
         print(line)
@@ -200,5 +203,10 @@ if __name__ == "__main__":
         default=None,
         help="Ruta al JSONL (default: config.TRADE_METRICS_JSONL)",
     )
+    ap.add_argument(
+        "--version",
+        default=None,
+        help="Filtrar por versión de agente (ej. risk_v2.0)",
+    )
     args = ap.parse_args()
-    print_report(args.jsonl)
+    print_report(args.jsonl, args.version)
