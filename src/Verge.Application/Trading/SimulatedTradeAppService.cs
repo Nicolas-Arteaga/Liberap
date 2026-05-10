@@ -507,6 +507,16 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
             var spot = await TryFetchDirectPriceAsync($"https://api.binance.com/api/v3/ticker/price?symbol={symbol}");
             if (spot.HasValue && spot.Value > 0) return spot.Value;
 
+            // 5) Dynamic Multi-Exchange Fallbacks (Bybit, OKX)
+            // Bybit V5
+            var bybit = await TryFetchDirectPriceAsync($"https://api.bybit.com/v5/market/tickers?category=linear&symbol={symbol}");
+            if (bybit.HasValue && bybit.Value > 0) return bybit.Value;
+
+            // OKX V5 (Requires instId format)
+            var okxSymbol = symbol.Replace("USDT", "-USDT-SWAP");
+            var okx = await TryFetchDirectPriceAsync($"https://www.okx.com/api/v5/market/ticker?instId={okxSymbol}");
+            if (okx.HasValue && okx.Value > 0) return okx.Value;
+
             if (i < 2) await Task.Delay(500);
         }
 
@@ -523,13 +533,35 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
 
             var content = await response.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(content);
-            
-            string priceStr = null;
-            if (doc.RootElement.TryGetProperty("price", out var pNode)) priceStr = pNode.GetString();
-            else if (doc.RootElement.TryGetProperty("close", out var cNode)) 
+            var root = doc.RootElement;
+
+            // Helper to get price from a node
+            string GetPrice(JsonElement node)
             {
-                if (cNode.ValueKind == JsonValueKind.Number) return cNode.GetDecimal();
-                priceStr = cNode.GetString();
+                if (node.TryGetProperty("lastPrice", out var lp)) return lp.GetString();
+                if (node.TryGetProperty("last", out var l)) return l.GetString();
+                if (node.TryGetProperty("price", out var p)) return p.GetString();
+                if (node.TryGetProperty("close", out var c)) 
+                {
+                    if (c.ValueKind == JsonValueKind.Number) return c.GetDecimal().ToString(CultureInfo.InvariantCulture);
+                    return c.GetString();
+                }
+                return null;
+            }
+
+            string priceStr = GetPrice(root);
+
+            // Handle nested structures (OKX uses "data", Bybit uses "result.list")
+            if (priceStr == null)
+            {
+                if (root.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array && data.GetArrayLength() > 0)
+                {
+                    priceStr = GetPrice(data[0]);
+                }
+                else if (root.TryGetProperty("result", out var result) && result.TryGetProperty("list", out var list) && list.ValueKind == JsonValueKind.Array && list.GetArrayLength() > 0)
+                {
+                    priceStr = GetPrice(list[0]);
+                }
             }
 
             if (decimal.TryParse(priceStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var value) && value > 0)

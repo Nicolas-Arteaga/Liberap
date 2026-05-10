@@ -410,9 +410,10 @@ export class AgentTradeAuditComponent implements OnInit {
         : '—';
       
       const openedStr = tr.openedAt ? new Date(tr.openedAt).toLocaleString('es-AR') : '—';
+      const closedStr = tr.closedAt ? new Date(tr.closedAt).toLocaleString('es-AR') : '—';
       const hasAudit = this.hasAuditSnapshot(tr) ? 'Sí' : 'No';
       
-      out += `${tr.symbol}\t${hasAudit}\t${this.signalSource(tr)}\t${this.scoreSummary(tr)}\t${this.statusLabel(tr.status)}\t${openedStr}\t${pnlStr}\n`;
+      out += `${tr.symbol}\t${hasAudit}\t${this.signalSource(tr)}\t${this.scoreSummary(tr)}\t${this.statusLabel(tr.status)}\t${openedStr}\t${closedStr}\t${pnlStr}\n`;
       out += `${tr.symbol}\n`;
       out += `${this.signalSource(tr)}\n`;
       out += `Ejecución simulada\n`;
@@ -494,6 +495,50 @@ export class AgentTradeAuditComponent implements OnInit {
     const a = document.createElement('a');
     a.href = url;
     a.download = `agent_audit_history_${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  }
+
+  downloadCsv(): void {
+    // Semicolon is better for Excel in Spanish locales, and we add BOM for UTF-8 characters
+    let out = '\uFEFF'; 
+    out += 'Symbol;Apertura;Cierre;Source;NexusConf;Confluence;LSE_Score;SCAR;Estado;RealizedPnL;Margin;Leverage;EntryReason\n';
+    
+    for (const tr of this.allRows()) {
+      const pnlStr = (tr.realizedPnl != null && tr.status !== TradeStatus.Open) ? tr.realizedPnl.toFixed(2).replace('.', ',') : '';
+      const openedStr = tr.openedAt ? new Date(tr.openedAt).toLocaleString('es-AR') : '';
+      const closedStr = tr.closedAt ? new Date(tr.closedAt).toLocaleString('es-AR') : '';
+      
+      const snap = this.parseSnapshot(tr);
+      let nxConf = '';
+      let conf = '';
+      let lseScore = '';
+      let scar = '';
+      let reason = '';
+      let src = this.signalSource(tr);
+      
+      if (snap) {
+         if (snap.agent_meta) {
+           reason = `"${(snap.agent_meta.entry_reason || '').replace(/"/g, '""')}"`;
+         }
+         if (snap.candidate) {
+           const c = snap.candidate;
+           nxConf = String(c['nexus_confidence'] ?? '').replace('.', ',');
+           conf = String(c['confluence_score'] ?? '').replace('.', ',');
+           lseScore = String(c['lse_score'] ?? '').replace('.', ',');
+           scar = String(c['scar_score'] ?? '').replace('.', ',');
+         }
+      }
+      
+      // We use ; as separator for Spanish Excel
+      out += `${tr.symbol};${openedStr};${closedStr};${src};${nxConf};${conf};${lseScore};${scar};${this.statusLabel(tr.status)};${pnlStr};${tr.margin};${tr.leverage};${reason}\n`;
+    }
+    
+    const blob = new Blob([out], { type: 'text/csv;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `agent_audit_history_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
   }

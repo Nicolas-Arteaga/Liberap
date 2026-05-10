@@ -78,6 +78,17 @@ public class SimulationMarkPriceWorker : BackgroundService
 
             _logger.LogInformation("📊 [SimulationWorker] Updating {Count} open positions...", openTrades.Count);
 
+            // Pre-fetch all tickers once per cycle to avoid redundant REST calls in the loop
+            List<SymbolTickerModel> allTickers = null;
+            try
+            {
+                allTickers = await marketDataManager.GetTickersAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("⚠️ [SimulationWorker] Failed to pre-fetch tickers: {Message}", ex.Message);
+            }
+
             bool applyFunding = (DateTime.UtcNow - _lastFundingTime).TotalHours >= 8;
 
             foreach (var trade in openTrades)
@@ -90,73 +101,48 @@ public class SimulationMarkPriceWorker : BackgroundService
                     var cleanSymbol = trade.Symbol.ToUpper().Replace("/", "").Replace("-", "").Trim();
                     if (!cleanSymbol.EndsWith("USDT") && !cleanSymbol.Contains("USD")) cleanSymbol += "USDT";
 
-                    // ══════════════════════════════════════════════════════════════════
-                    // EXCHANGE-LOCKED PRICE RESOLUTION
-                    // Positions are evaluated ONLY with their origin exchange's price.
-                    // This prevents phantom closes caused by cross-exchange price spikes.
-                    // Strategy: WebSocket cache → retry → skip (NEVER fallback to other exchanges)
-                    // ══════════════════════════════════════════════════════════════════
                     decimal? price = null;
                     string priceSource = "none";
 
-                    // Primary: WebSocket in-memory cache (zero REST, sub-millisecond)
+                    // 1) Primary: WebSocket in-memory cache (fastest)
                     price = marketDataManager.GetWebSocketPrice(cleanSymbol);
                     if (price.HasValue && price.Value > 0)
                     {
                         priceSource = "WebSocket";
-                        _wsMissCount.Remove(cleanSymbol); // Reset miss counter on success
+                        _wsMissCount.Remove(cleanSymbol);
                     }
                     else
                     {
-                        // WS cache miss: retry up to 2 more times with 1s delay
-                        // This covers the case where WS just reconnected and cache is warming up.
-                        // We do NOT fall back to other exchanges — that causes phantom closes.
-                        _wsMissCount.TryGetValue(cleanSymbol, out var misses);
-                        _wsMissCount[cleanSymbol] = misses + 1;
-
-                        for (int retry = 1; retry <= 2 && price == null; retry++)
+                        // 2) Secondary: Try to find in the pre-fetched ticker list
+                        var ticker = allTickers?.FirstOrDefault(t => t.Symbol == cleanSymbol);
+                        if (ticker != null && ticker.LastPrice > 0)
                         {
-                            _logger.LogWarning(
-                                "⏳ [SimulationWorker] WS cache miss for {Symbol} (miss #{Miss}). Waiting 1s for WebSocket to populate... (retry {Retry}/2)",
-                                cleanSymbol, _wsMissCount[cleanSymbol], retry);
-                            await Task.Delay(1000);
-                            price = marketDataManager.GetWebSocketPrice(cleanSymbol);
-                            if (price.HasValue && price.Value > 0)
-                            {
-                                priceSource = $"WebSocket (after {retry}s wait)";
-                                _wsMissCount.Remove(cleanSymbol);
-                            }
+                            price = ticker.LastPrice;
+                            priceSource = "REST (Pre-fetched)";
                         }
 
                         if (price == null)
                         {
-                            // WS cache miss after retries. Fallback to REST (MarketDataManager.GetTickersAsync)
-                            // to ensure PnL updates even if WebSocket is lagging or missing symbols.
-                            _logger.LogInformation("📡 [SimulationWorker] WS miss for {Symbol}. Falling back to REST Tickers...", cleanSymbol);
-                            try
+                            // 3) Tertiary: Wait and retry WS (covers reconnection edge cases)
+                            _wsMissCount.TryGetValue(cleanSymbol, out var misses);
+                            _wsMissCount[cleanSymbol] = misses + 1;
+
+                            for (int retry = 1; retry <= 2 && price == null; retry++)
                             {
-                                var tickers = await marketDataManager.GetTickersAsync();
-                                var ticker = tickers.FirstOrDefault(t => t.Symbol == cleanSymbol);
-                                if (ticker != null && ticker.LastPrice > 0)
+                                await Task.Delay(1000);
+                                price = marketDataManager.GetWebSocketPrice(cleanSymbol);
+                                if (price.HasValue && price.Value > 0)
                                 {
-                                    price = ticker.LastPrice;
-                                    priceSource = "REST (Fallback)";
-                                    _logger.LogInformation("✅ [SimulationWorker] Price for {Symbol} found via REST: {Price}", cleanSymbol, price);
+                                    priceSource = $"WebSocket (Retry {retry})";
+                                    _wsMissCount.Remove(cleanSymbol);
                                 }
                             }
-                            catch (Exception ex)
-                            {
-                                _logger.LogWarning("❌ [SimulationWorker] REST fallback failed for {Symbol}: {Message}", cleanSymbol, ex.Message);
-                            }
                         }
 
                         if (price == null)
                         {
-                            // After retries and REST fallback, still no price. SKIP this trade cycle.
-                            _logger.LogWarning(
-                                "⚠️ [SimulationWorker] No price found for {Symbol} (WS + REST failed). " +
-                                "SKIPPING this cycle. Trade {TradeId} remains OPEN.",
-                                cleanSymbol, trade.Id);
+                            // Last resort: SKIP this trade cycle
+                            _logger.LogWarning("⚠️ [SimulationWorker] No price for {Symbol}. Skipping.", cleanSymbol);
                             continue;
                         }
                     }

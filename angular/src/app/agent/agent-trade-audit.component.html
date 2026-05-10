@@ -16,6 +16,7 @@
     <div class="audit-header-actions" style="display: flex; gap: 10px;">
       <button type="button" class="audit-refresh" (click)="refresh()" [disabled]="loading()">Actualizar</button>
       <button type="button" class="audit-refresh" (click)="downloadAll()" [disabled]="loading() || allRows().length === 0">Descargar Todo</button>
+      <button type="button" class="audit-refresh" (click)="downloadCsv()" [disabled]="loading() || allRows().length === 0">Descargar CSV</button>
     </div>
   </header>
 
@@ -40,6 +41,7 @@
               <th>Scores</th>
               <th>Estado</th>
               <th>Apertura</th>
+              <th>Cierre</th>
               <th>PnL</th>
             </tr>
           </thead>
@@ -63,6 +65,7 @@
                 <td>{{ scoreSummary(tr) }}</td>
                 <td>{{ statusLabel(tr.status) }}</td>
                 <td>{{ tr.openedAt | date:'short' }}</td>
+                <td>{{ tr.closedAt ? (tr.closedAt | date:'short') : '—' }}</td>
                 <td>
                   @if (tr.realizedPnl != null && tr.status !== TradeStatus.Open) {
                     <span [class.win]="(tr.realizedPnl ?? 0) >= 0" [class.loss]="(tr.realizedPnl ?? 0) < 0">
@@ -96,6 +99,7 @@
             <h3>Ejecución simulada</h3>
             <dl class="kv">
               <dt>Entrada (servidor)</dt><dd>{{ tr.entryPrice | number:'1.4-6' }}</dd>
+              <dt>Cierre (servidor)</dt><dd>{{ tr.closedAt ? (tr.closedAt | date:'medium') : '—' }}</dd>
               <dt>TP</dt><dd>{{ tr.tpPrice | number:'1.4-6' }}</dd>
               <dt>SL</dt><dd>{{ tr.slPrice | number:'1.4-6' }}</dd>
               <dt>Margen / Lev</dt><dd>{{ tr.margin | number:'1.2-2' }} USDT × {{ tr.leverage }}</dd>

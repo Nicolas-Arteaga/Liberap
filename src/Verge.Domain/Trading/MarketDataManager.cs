@@ -327,6 +327,8 @@ public class MarketDataManager : DomainService
 
     public async Task<List<SymbolTickerModel>> GetTickersAsync()
     {
+        var result = new Dictionary<string, SymbolTickerModel>(StringComparer.OrdinalIgnoreCase);
+
         // 1. Try Python Multi-Exchange Tickers (Primary)
         try
         {
@@ -335,92 +337,131 @@ public class MarketDataManager : DomainService
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
-                var doc = JsonDocument.Parse(content);
-                var root = doc.RootElement;
-                if (root.ValueKind == JsonValueKind.Array)
+                var pythonTickers = JsonSerializer.Deserialize<List<SymbolTickerModel>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (pythonTickers != null)
                 {
-                    var result = new List<SymbolTickerModel>();
-                    foreach (var x in root.EnumerateArray())
+                    foreach (var t in pythonTickers)
                     {
-                        string symbol = "";
-                        if (x.TryGetProperty("symbol", out var sym) || x.TryGetProperty("Symbol", out sym))
-                            symbol = sym.GetString() ?? "";
-
-                        if (string.IsNullOrEmpty(symbol)) continue;
-
-                        decimal lastPrice = 0, priceChange = 0, pct = 0, vol = 0, high = 0, low = 0;
-
-                        if (x.TryGetProperty("lastPrice", out var lp) || x.TryGetProperty("last_price", out lp) || x.TryGetProperty("LastPrice", out lp)) lastPrice = ParseDecimal(lp);
-                        if (x.TryGetProperty("priceChange", out var pc) || x.TryGetProperty("price_change", out pc) || x.TryGetProperty("PriceChange", out pc)) priceChange = ParseDecimal(pc);
-                        if (x.TryGetProperty("priceChangePercent", out var pcp) || x.TryGetProperty("price_change_percent", out pcp) || x.TryGetProperty("PriceChangePercent", out pcp)) pct = ParseDecimal(pcp);
-                        
-                        // Volume is usually quoteVolume in Binance
-                        if (x.TryGetProperty("quoteVolume", out var qv) || x.TryGetProperty("quote_volume", out qv) || x.TryGetProperty("QuoteVolume", out qv)) vol = ParseDecimal(qv);
-                        else if (x.TryGetProperty("volume", out var v) || x.TryGetProperty("Volume", out v)) vol = ParseDecimal(v);
-
-                        if (x.TryGetProperty("highPrice", out var hp) || x.TryGetProperty("high_price", out hp) || x.TryGetProperty("HighPrice", out hp)) high = ParseDecimal(hp);
-                        if (x.TryGetProperty("lowPrice", out var lowp) || x.TryGetProperty("low_price", out lowp) || x.TryGetProperty("LowPrice", out lowp)) low = ParseDecimal(lowp);
-
-                        result.Add(new SymbolTickerModel
+                        if (!string.IsNullOrEmpty(t.Symbol))
                         {
-                            Symbol = symbol,
-                            LastPrice = lastPrice,
-                            PriceChange = priceChange,
-                            PriceChangePercent = pct,
-                            Volume = vol,
-                            HighPrice = high,
-                            LowPrice = low
-                        });
+                            result[t.Symbol] = t;
+                        }
                     }
-                    if (result.Any()) return result;
                 }
             }
-        } catch (Exception ex) {
-            Logger.LogWarning($"⚠️ [MarketData] Failed parsing Python tickers: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"⚠️ Error fetching tickers from Python: {ex.Message}");
         }
 
-        // Fallback to Binance (original logic)
+        // 2. Try Binance Futures REST (Authoritative source)
         await _tickerGate.WaitAsync();
         try
         {
             var client = _httpClientFactory.CreateClient();
-            var url = $"{FuturesBaseUrl}/fapi/v1/ticker/24hr";
-            var response = await client.GetAsync(url);
+            client.Timeout = TimeSpan.FromSeconds(8);
+            var response = await client.GetAsync($"{FuturesBaseUrl}/fapi/v1/ticker/24hr");
             
-            if (!response.IsSuccessStatusCode) 
+            if (response.IsSuccessStatusCode)
             {
-                // Ultimate fallback: if Binance is banned, try to synthesize from Python's cache
-                return await GetTickersFromPythonAsync();
+                var content = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(content);
+                foreach (var element in doc.RootElement.EnumerateArray())
+                {
+                    var symbol = element.GetProperty("symbol").GetString();
+                    if (symbol == null || !symbol.EndsWith("USDT")) continue;
+
+                    result[symbol] = new SymbolTickerModel
+                    {
+                        Symbol = symbol,
+                        LastPrice = ParseDecimal(element.GetProperty("lastPrice")),
+                        PriceChangePercent = ParseDecimal(element.GetProperty("priceChangePercent")),
+                        Volume = ParseDecimal(element.GetProperty("quoteVolume")),
+                        HighPrice = ParseDecimal(element.GetProperty("highPrice")),
+                        LowPrice = ParseDecimal(element.GetProperty("lowPrice"))
+                    };
+                }
             }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"⚠️ Error fetching tickers from Binance: {ex.Message}");
+        }
+        finally { _tickerGate.Release(); }
+
+        // 3. Fallbacks if Binance/Python failed to provide enough data
+        if (result.Count < 20)
+        {
+            try
+            {
+                var alts = await FetchTickersFromBybitAsync();
+                if (!alts.Any()) alts = await FetchTickersFromOkxAsync();
+                foreach (var t in alts)
+                {
+                    if (!result.ContainsKey(t.Symbol)) result[t.Symbol] = t;
+                }
+            }
+            catch { }
+        }
+
+        return result.Values.ToList();
+    }
+
+    private async Task<List<SymbolTickerModel>> FetchTickersFromBybitAsync()
+    {
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            var response = await client.GetAsync("https://api.bybit.com/v5/market/tickers?category=linear");
+            if (!response.IsSuccessStatusCode) return new List<SymbolTickerModel>();
 
             var content = await response.Content.ReadAsStringAsync();
-            var tickers = JsonSerializer.Deserialize<List<JsonElement>>(content);
-
-            if (tickers == null) return new List<SymbolTickerModel>();
-
-            return tickers
+            using var doc = JsonDocument.Parse(content);
+            var list = doc.RootElement.GetProperty("result").GetProperty("list");
+            
+            return list.EnumerateArray()
                 .Where(x => x.GetProperty("symbol").GetString()!.EndsWith("USDT"))
                 .Select(x => new SymbolTickerModel
                 {
                     Symbol = x.GetProperty("symbol").GetString()!,
                     LastPrice = ParseDecimal(x.GetProperty("lastPrice")),
-                    PriceChange = ParseDecimal(x.GetProperty("priceChange")),
-                    PriceChangePercent = ParseDecimal(x.GetProperty("priceChangePercent")),
-                    Volume = ParseDecimal(x.GetProperty("quoteVolume")),
-                    HighPrice = ParseDecimal(x.GetProperty("highPrice")),
-                    LowPrice = ParseDecimal(x.GetProperty("lowPrice"))
-                })
-                .ToList();
+                    PriceChangePercent = ParseDecimal(x.GetProperty("price24hPcnt")) * 100, // Bybit is decimal, we want %
+                    Volume = ParseDecimal(x.GetProperty("turnover24h")),
+                    HighPrice = ParseDecimal(x.GetProperty("highPrice24h")),
+                    LowPrice = ParseDecimal(x.GetProperty("lowPrice24h"))
+                }).ToList();
         }
-        catch (Exception ex)
+        catch { return new List<SymbolTickerModel>(); }
+    }
+
+    private async Task<List<SymbolTickerModel>> FetchTickersFromOkxAsync()
+    {
+        try
         {
-            Logger.LogError($"💥 Error al obtener tickers: {ex.Message}");
-            return new List<SymbolTickerModel>();
+            var client = _httpClientFactory.CreateClient();
+            var response = await client.GetAsync("https://www.okx.com/api/v5/market/tickers?instType=SWAP");
+            if (!response.IsSuccessStatusCode) return new List<SymbolTickerModel>();
+
+            var content = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(content);
+            var data = doc.RootElement.GetProperty("data");
+
+            return data.EnumerateArray()
+                .Where(x => x.GetProperty("instId").GetString()!.EndsWith("-USDT-SWAP"))
+                .Select(x => new SymbolTickerModel
+                {
+                    Symbol = x.GetProperty("instId").GetString()!.Replace("-USDT-SWAP", "USDT"),
+                    LastPrice = ParseDecimal(x.GetProperty("last")),
+                    PriceChangePercent = ParseDecimal(x.GetProperty("last")) != 0 
+                        ? (ParseDecimal(x.GetProperty("last")) - ParseDecimal(x.GetProperty("open24h"))) / ParseDecimal(x.GetProperty("open24h")) * 100 
+                        : 0,
+                    Volume = ParseDecimal(x.GetProperty("volCcy24h")),
+                    HighPrice = ParseDecimal(x.GetProperty("high24h")),
+                    LowPrice = ParseDecimal(x.GetProperty("low24h"))
+                }).ToList();
         }
-        finally
-        {
-            _tickerGate.Release();
-        }
+        catch { return new List<SymbolTickerModel>(); }
     }
     
     private async Task<List<MarketCandleModel>> FetchKlinesFromPythonAsync(string symbol, string interval, int limit)

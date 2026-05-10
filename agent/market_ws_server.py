@@ -299,9 +299,11 @@ class CandleHandler(BaseHTTPRequestHandler):
         if path.startswith("/market/ticker/"):
             symbol = path.split("/market/ticker/")[-1].upper()
             ticker = cache.get_ticker(symbol)
-            if ticker:
+            if ticker and ticker.get("is_fresh"):
                 ticker["has_history"] = cache.has_history(symbol, "15m", 25)
                 self._json(200, ticker)
+            elif ticker:
+                self._json(404, {"error": f"Data for {symbol} is stale ({ticker['age_s']}s old)"})
             else:
                 self._json(404, {"error": f"No ticker for {symbol}"})
             return

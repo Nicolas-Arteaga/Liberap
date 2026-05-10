@@ -146,13 +146,31 @@ class KlineCache:
                           high: float, low: float, volume: float,
                           source: str = "binance"):
         """
-        Update the live price for a symbol.
-        'source' tracks which exchange provided this price (binance/bybit/okx/bitget).
-        The source is only updated when the new data arrives, preserving the last
-        known source even when the primary exchange is temporarily offline.
+        Update the live price for a symbol with source-priority logic.
+        Priority: binance (1) > bybit (2) > okx (3) > bitget (4).
+        A lower priority source cannot overwrite a higher priority one unless it is stale (> 10s).
         """
+        priorities = {"binance": 1, "bybit": 2, "okx": 3, "bitget": 4, "pyth": 5}
+        new_prio = priorities.get(source.lower(), 99)
+        
         change_pct = ((close - open_) / open_ * 100) if open_ > 0 else 0.0
+        now = int(time.time())
+        
         conn = self._conn()
+        
+        # 1. Fetch current source and age
+        row = conn.execute("SELECT source, updated_at FROM live_prices WHERE symbol = ?", (symbol,)).fetchone()
+        
+        if row:
+            old_source = row["source"]
+            old_prio = priorities.get(old_source.lower(), 99)
+            age = now - row["updated_at"]
+            
+            # If current source is better and not stale, ignore this update
+            if old_prio < new_prio and age < 10:
+                return
+
+        # 2. Perform the update
         conn.execute("""
             INSERT INTO live_prices (symbol, close, open, high, low, volume, change_pct, source, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -165,7 +183,7 @@ class KlineCache:
                 change_pct = excluded.change_pct,
                 source     = excluded.source,
                 updated_at = excluded.updated_at
-        """, (symbol, close, open_, high, low, volume, round(change_pct, 4), source, int(time.time())))
+        """, (symbol, close, open_, high, low, volume, round(change_pct, 4), source, now))
         conn.commit()
 
     def bulk_upsert_klines(self, symbol: str, interval: str, klines: list):
@@ -268,7 +286,12 @@ class KlineCache:
     def get_all_tickers(self) -> list:
         """Returns all live tickers in a format compatible with .NET SymbolTickerModel."""
         conn = self._conn()
-        rows = conn.execute("SELECT * FROM live_prices").fetchall()
+        # Only return fresh tickers (< 90s old)
+        now = time.time()
+        rows = conn.execute(
+            "SELECT * FROM live_prices WHERE updated_at >= ?", 
+            (int(now - LIVE_PRICE_MAX_AGE_S),)
+        ).fetchall()
         
         tickers = []
         for r in rows:
