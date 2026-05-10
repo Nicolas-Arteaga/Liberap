@@ -65,26 +65,35 @@ MIN_TP_DISTANCE_PCT_OF_PRICE = float(os.getenv("MIN_TP_DISTANCE_PCT_OF_PRICE", "
 # Cooldown por símbolo tras trade LSE (0 = desactivado). Duración ≈ N × duración de vela del TF.
 LSE_SYMBOL_COOLDOWN_CANDLES = int(os.getenv("LSE_SYMBOL_COOLDOWN_CANDLES", "5"))
 # Tras N pérdidas seguidas (cualquier cierre que no sea TP), pausa nuevas entradas LSE.
-AGENT_KILL_SWITCH_CONSECUTIVE_LOSSES = int(os.getenv("AGENT_KILL_SWITCH_CONSECUTIVE_LOSSES", "3"))
+AGENT_KILL_SWITCH_CONSECUTIVE_LOSSES = int(os.getenv("AGENT_KILL_SWITCH_CONSECUTIVE_LOSSES", "4"))
 AGENT_KILL_SWITCH_PAUSE_MINUTES = float(os.getenv("AGENT_KILL_SWITCH_PAUSE_MINUTES", "120"))
 # Cuántos candidatos rankeados probar en serie hasta ejecutar uno válido (fallback).
 AGENT_MAX_CANDIDATES_PER_CYCLE = int(os.getenv("AGENT_MAX_CANDIDATES_PER_CYCLE", "10"))
 # Si > 0: solo los ranks 1..N pueden ejecutar candidatos no-LSE (evita rank 9 Nexus "por descarte").
 AGENT_MAX_RANK_FOR_NEXUS_FALLBACK = int(os.getenv("AGENT_MAX_RANK_FOR_NEXUS_FALLBACK", "0"))
 
-MAX_OPEN_POSITIONS = 3
+MAX_OPEN_POSITIONS = 2              # scalping: máx 2 simultáneas (antes 3)
 MAX_TRADES_PER_DAY = 100
 MAX_POSITION_DURATION_HOURS = 48
+# Zombie timeout para scalping 15m: si el trade lleva más de N velas abierto con PnL negativo, se cierra.
+# 8 velas de 15m = 2 horas. Si en 2h no se movió, el setup ya expiró.
+MAX_TRADE_DURATION_CANDLES = int(os.getenv("MAX_TRADE_DURATION_CANDLES", "8"))
 DEFAULT_LEVERAGE = 1
 
 # 4. Intelligence Thresholds
-MIN_NEXUS_CONFIDENCE = 70.0
+MIN_NEXUS_CONFIDENCE = 75.0          # antes 70 — menos trades, más certeza en 15m
 MIN_SCAR_SCORE = 4
-MIN_CONFLUENCE_SCORE = 35.0
+MIN_CONFLUENCE_SCORE = 45.0          # antes 35 — elimina señales de ruido
 
-# 5. Take Profit / Stop Loss
-TP_MULTIPLIER = 1.5
-SL_MULTIPLIER = 0.4
+# 5. Take Profit / Stop Loss — Fat Tail Strategy (asimétrica)
+# SL amplio: 0.8× el rango estimado para que el ruido de 15m no active el stop.
+# TP agresivo: 3.0× deja correr al 15% de trades ganadores hasta su potencial real.
+TP_MULTIPLIER = 3.0                  # antes 1.5 — captura el movimiento completo
+SL_MULTIPLIER = 0.8                  # antes 0.4 — el doble de espacio, evita ser sacado por ruido
+# Topes máximos de multiplicador TP por tipo de setup Nexus.
+# TF puede correr hasta 3× el SL. MR tiene menos recorrido histórico, cap más conservador.
+TP_MULT_TREND_FOLLOWING_MAX = float(os.getenv("TP_MULT_TREND_FOLLOWING_MAX", "3.0"))
+TP_MULT_MEAN_REVERSION_MAX = float(os.getenv("TP_MULT_MEAN_REVERSION_MAX", "2.0"))
 
 # Paths
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")

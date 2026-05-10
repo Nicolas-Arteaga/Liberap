@@ -133,7 +133,7 @@ class VergeAgent:
     ) -> str:
         snap = {
             "schema_version": 1,
-            "agent_version": "risk_v2.0",
+            "agent_version": "risk_v3.0",
             "experiment": "post_sl_fix_may_2026",
             "captured_at_utc": datetime.utcnow().isoformat() + "Z",
             "agent_meta": {
@@ -157,7 +157,7 @@ class VergeAgent:
 
     def run(self):
         logger.info(f"Agent started. Loop interval: {config.LOOP_INTERVAL_SECONDS}s.")
-        logger.info("[CONFIG] Agent Version: risk_v2.0 (segregated metrics ON)")
+        logger.info("[CONFIG] Agent Version: risk_v3.0 (segregated metrics ON)")
 
         if not self.auth.get_token():
             logger.error("FATAL: Could not authenticate with ABP Backend. Stopping.")
@@ -1032,7 +1032,7 @@ class VergeAgent:
 
         ok, code, setup_metrics = validate_pre_trade(candidate, market_px)
         if not ok:
-            logger.info("[SKIP] %s %s", code, setup_metrics)
+            logger.info("[SKIP] %s — %s | metrics=%s", code, symbol, setup_metrics)
             return False
 
         setup_skip = "ok"
@@ -1188,6 +1188,34 @@ class VergeAgent:
             if opened_at.tzinfo is not None:
                 opened_at = opened_at.replace(tzinfo=None)
             hours_open = (datetime.utcnow() - opened_at).total_seconds() / 3600.0
+
+            # ── Zombie timeout: más de MAX_TRADE_DURATION_CANDLES velas de 15m con PnL negativo ──
+            if not should_close:
+                max_candles = int(getattr(config, "MAX_TRADE_DURATION_CANDLES", 16))
+                candle_seconds = 900  # 15m en segundos
+                seconds_open = (datetime.utcnow() - opened_at).total_seconds()
+                candles_open = seconds_open / candle_seconds
+
+                if candles_open >= max_candles:
+                    entry_price = float(pos.get("entry_price", 0))
+                    if entry_price > 0:
+                        if side == 0:  # LONG
+                            pnl_pct = (current_price - entry_price) / entry_price
+                        else:  # SHORT
+                            pnl_pct = (entry_price - current_price) / entry_price
+
+                        if pnl_pct < 0:
+                            logger.info(
+                                "[EXIT] zombie_timeout %s | candles_open=%.1f | max=%d | PnL=%.2f%% | Cerrando.",
+                                symbol, candles_open, max_candles, pnl_pct * 100,
+                            )
+                            should_close, close_reason = True, "zombie_timeout"
+                        else:
+                            logger.info(
+                                "[EXIT] zombie_timeout omitido %s | candles_open=%.1f | PnL=%.2f%% (positivo, se deja correr)",
+                                symbol, candles_open, pnl_pct * 100,
+                            )
+
             if hours_open >= config.MAX_POSITION_DURATION_HOURS:
                 should_close, close_reason = True, "Max duration exceeded"
 

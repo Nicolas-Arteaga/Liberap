@@ -179,6 +179,45 @@ def validate_nexus_confluence_setup(
     if cp <= 0:
         return False, "invalid_price", metrics
 
+    # ── Bloqueos duros para señales Nexus ─────────────────────────────────
+    # Extraer features del contexto de auditoría Nexus-15
+    audit_ctx = candidate.get("agent_audit_context", {})
+    nexus15_ctx = audit_ctx.get("nexus15", {})
+    nexus_features = nexus15_ctx.get("features", {}) if isinstance(nexus15_ctx, dict) else {}
+
+    nexus_recommendation = str(nexus15_ctx.get("recommendation", "") if isinstance(nexus15_ctx, dict) else "").strip()
+    rsi_14 = float(nexus_features.get("rsi_14", 50) or 50)
+    upthrust_detected = bool(nexus_features.get("upthrust_detected", False))
+    candle_body_ratio = float(nexus_features.get("candle_body_ratio", 1.0) or 1.0)
+    volume_ratio_20 = float(nexus_features.get("volume_ratio_20", 1.0) or 1.0)
+    volume_surge_bullish = bool(nexus_features.get("volume_surge_bullish", False))
+
+    if nexus_recommendation.lower() == "wait":
+        logger.info("[SKIP] nexus_says_wait — %s | Nexus recomienda Wait", candidate.get("symbol"))
+        return False, "nexus_says_wait", metrics
+
+    if rsi_14 > 72 and upthrust_detected:
+        logger.info(
+            "[SKIP] exhaustion_at_top — %s | RSI=%.1f upthrust=True",
+            candidate.get("symbol"), rsi_14,
+        )
+        return False, "exhaustion_at_top", metrics
+
+    if candle_body_ratio < 0.1:
+        logger.info(
+            "[SKIP] no_body_no_trade — %s | candle_body_ratio=%.3f (vela puro mecho)",
+            candidate.get("symbol"), candle_body_ratio,
+        )
+        return False, "no_body_no_trade", metrics
+
+    if volume_ratio_20 < 1.3 and not volume_surge_bullish:
+        logger.info(
+            "[SKIP] no_volume_confirmation — %s | volume_ratio_20=%.2f surge=False",
+            candidate.get("symbol"), volume_ratio_20,
+        )
+        return False, "no_volume_confirmation", metrics
+    # ── Fin bloqueos duros ────────────────────────────────────────────────
+
     range_pct = float(candidate.get("estimated_range_pct", 2.0) or 2.0) / 100.0
     tp_dist = range_pct * config.TP_MULTIPLIER
     sl_dist = range_pct * config.SL_MULTIPLIER

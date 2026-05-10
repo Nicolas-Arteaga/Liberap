@@ -144,13 +144,26 @@ class RiskManager:
 
         sl_distance_price = cp * sl_distance_pct
 
-        # Limitar RR en Trend Following
+        # Limitar RR según setup_type (caps hard por tipo de señal)
         rr_target = float(getattr(config, "TP_MULTIPLIER", 2.0))
         nexus_conf = signal_data.get("nexus_confidence", 0)
         setup_type = "Momentum Burst" if nexus_conf > 80 else ("Trend Following" if nexus_conf > 60 else "Mean Reversion")
 
+        tp_mult_tf_max = float(getattr(config, "TP_MULT_TREND_FOLLOWING_MAX", 2.5))
+        tp_mult_mr_max = float(getattr(config, "TP_MULT_MEAN_REVERSION_MAX", 1.8))
+
         if setup_type == "Trend Following":
-            rr_target = min(rr_target, 2.5)
+            rr_target = min(rr_target, tp_mult_tf_max)
+        elif setup_type == "Mean Reversion":
+            rr_target = min(rr_target, tp_mult_mr_max)
+        # Momentum Burst: sin cap adicional (ya limitado por config.TP_MULTIPLIER)
+
+        logger.info(
+            "[RISK] setup_type=%s | rr_cap=%.2f | rr_effective=%.2f",
+            setup_type,
+            tp_mult_tf_max if setup_type == "Trend Following" else (tp_mult_mr_max if setup_type == "Mean Reversion" else rr_target),
+            rr_target,
+        )
 
         tp_distance_price = sl_distance_price * rr_target
 
@@ -201,6 +214,28 @@ class RiskManager:
         )
         logger.info(f"[RISK_FINAL] Intended={risk_usd:.2f} | Real={real_risk_usd:.2f}")
         logger.info(f"[RISK_CHECK] SL/ATR ratio={atr_ratio:.2f}")
+
+        # ── Validación hard: niveles inválidos → bloquear trade ──
+        if sl_price <= 0:
+            logger.error(
+                "[RISK_ERROR] sl_price inválido (<=0) para %s | sl_price=%s entry=%s — trade bloqueado",
+                symbol, sl_price, cp,
+            )
+            return None
+
+        if side == 0 and tp_price > cp * 3:
+            logger.error(
+                "[RISK_ERROR] tp_price absurdo para LONG %s | tp=%s entry=%s (>300%%) — trade bloqueado",
+                symbol, tp_price, cp,
+            )
+            return None
+
+        if side == 1 and tp_price <= 0:
+            logger.error(
+                "[RISK_ERROR] tp_price inválido (<=0) para SHORT %s | tp=%s entry=%s — trade bloqueado",
+                symbol, tp_price, cp,
+            )
+            return None
 
         return {
             "symbol": symbol,
