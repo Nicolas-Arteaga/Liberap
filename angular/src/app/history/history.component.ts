@@ -60,6 +60,7 @@ export class HistoryComponent {
   // Filtros
   tradeType: string = 'all';
   dateRange: string = 'last30';
+  versionFilter: string = 'all';
 
   // Paginación
   currentPage: number = 1;
@@ -81,16 +82,58 @@ export class HistoryComponent {
     { value: 'custom', label: 'Personalizado' }
   ];
 
-// Duplicate removed
+  versionOptions: FilterOption[] = [
+    { value: 'all', label: 'Todas las versiones' },
+    { value: 'risk_v4.0', label: 'Versión 4.0 (Nueva)' },
+    { value: 'risk_v3.0', label: 'Versión 3.0' },
+    { value: 'risk_v2.0', label: 'Versión 2.0' },
+    { value: 'v1.0', label: 'Versión 1.0 (Sin Contexto)' }
+  ];
+
+  // Helper para extraer versión
+  getTradeVersion(trade: SimulatedTradeDto): string {
+    const raw = trade.agentDecisionJson;
+    if (!raw || typeof raw !== 'string' || raw.trim().length < 3) return 'v1.0';
+    try {
+      const snap = JSON.parse(raw);
+      return snap.agent_version || 'v1.0';
+    } catch {
+      return 'v1.0';
+    }
+  }
 
   // Historial filtrado
   get filteredTrades(): SimulatedTradeDto[] {
+    const now = new Date().getTime();
+    
     return this.realTrades.filter(item => {
-      if (this.tradeType === 'win' && item.status !== 1) return false; // Win = 1
-      if (this.tradeType === 'loss' && item.status !== 2) return false; // Loss = 2
-      if (this.tradeType === 'open' && item.status !== 0) return false; // Open = 0
+      // 1. Filtro por Estado
+      if (this.tradeType === 'win' && item.status !== 1) return false;
+      if (this.tradeType === 'loss' && item.status !== 2 && item.status !== 6) return false;
+      if (this.tradeType === 'open' && item.status !== 0) return false;
+
+      // 2. Filtro por Fecha
+      if (this.dateRange !== 'all') {
+        const itemDate = new Date(item.closedAt || item.openedAt || '').getTime();
+        const diffDays = (now - itemDate) / (1000 * 60 * 60 * 24);
+        
+        if (this.dateRange === 'last7' && diffDays > 7) return false;
+        if (this.dateRange === 'last30' && diffDays > 30) return false;
+        if (this.dateRange === 'last90' && diffDays > 90) return false;
+      }
+
+      // 3. Filtro por Versión
+      if (this.versionFilter !== 'all') {
+        const v = this.getTradeVersion(item);
+        if (v !== this.versionFilter) return false;
+      }
+
       return true;
     });
+  }
+
+  resetPage() {
+    this.currentPage = 1;
   }
 
   get paginatedTrades(): SimulatedTradeDto[] {
@@ -102,24 +145,24 @@ export class HistoryComponent {
     this.currentPage = page;
   }
 
-  // Estadísticas basadas en la lista REAL de trades presentes en el historial
+  // Estadísticas basadas en la lista FILTRADA de trades
   get totalProfit(): number {
-    return this.realTrades.reduce((acc, t) => acc + (t.realizedPnl || 0), 0);
+    return this.filteredTrades.reduce((acc, t) => acc + (t.realizedPnl || 0), 0);
   }
 
   get winRate(): number {
-    const closed = this.realTrades.filter(t => t.status === 1 || t.status === 2 || t.status === 6);
+    const closed = this.filteredTrades.filter(t => t.status === 1 || t.status === 2 || t.status === 6);
     if (closed.length === 0) return 0;
     const wins = closed.filter(t => t.status === 1).length;
     return Math.round((wins / closed.length) * 100);
   }
 
   get totalTrades(): number {
-    return this.realTrades.length;
+    return this.filteredTrades.length;
   }
 
   get averageProfit(): number {
-    const closed = this.realTrades.filter(t => t.status === 1 || t.status === 2 || t.status === 6);
+    const closed = this.filteredTrades.filter(t => t.status === 1 || t.status === 2 || t.status === 6);
     if (closed.length === 0) return 0;
     return this.totalProfit / closed.length;
   }
@@ -147,7 +190,7 @@ export class HistoryComponent {
   }
 
   loadData() {
-    this.simulatedTradeService.getRecentTrades(50).subscribe(trades => {
+    this.simulatedTradeService.getRecentTrades(1000).subscribe(trades => {
       // Ordenar por fecha de cierre (o apertura si sigue abierto) de más reciente a más antiguo
       this.realTrades = trades.sort((a, b) => {
         const dateA = new Date(a.closedAt || a.openedAt || '').getTime();

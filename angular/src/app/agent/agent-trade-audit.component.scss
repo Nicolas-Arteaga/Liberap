@@ -91,6 +91,51 @@
   }
 }
 
+.version-stats-container {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.version-stat-card {
+  background: rgba(8, 12, 17, 0.9);
+  border: 1px solid rgba(0, 243, 255, 0.2);
+  border-radius: 6px;
+  padding: 1rem;
+  min-width: 150px;
+  flex: 1;
+
+  h3 {
+    margin: 0 0 0.5rem;
+    font-size: 0.9rem;
+    color: #00f3ff;
+  }
+
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.25rem;
+    font-size: 0.75rem;
+
+    span {
+      color: #94a3b8;
+    }
+
+    strong {
+      color: #e2e8f0;
+    }
+
+    strong.win {
+      color: #34d399;
+    }
+
+    strong.loss {
+      color: #fb7185;
+    }
+  }
+}
+
 .audit-table-card {
   background: rgba(8, 12, 17, 0.9);
   border: 1px solid rgba(0, 243, 255, 0.12);

@@ -60,6 +60,7 @@
           placeholder="🔍 buscar par..."
           [ngModel]="symbolSearch()"
           (ngModelChange)="onSymbolSearch($event)"
+          (keyup.enter)="onSearchEnter()"
           autocomplete="off"
           spellcheck="false"
         />
@@ -69,6 +70,7 @@
           (ngModelChange)="onSymbolChange($event)"
           size="1"
         >
+          <option [value]="selectedSymbol()" hidden>{{ selectedSymbol() }}</option>
           <option *ngFor="let s of filteredSymbols()" [value]="s">{{ s }}</option>
         </select>
       </div>

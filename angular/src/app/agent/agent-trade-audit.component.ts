@@ -19,6 +19,14 @@ export interface AgentDecisionSnapshot {
   position_sizing?: Record<string, unknown>;
 }
 
+export interface VersionStats {
+  version: string;
+  count: number;
+  wins: number;
+  losses: number;
+  totalPnl: number;
+}
+
 @Component({
   selector: 'app-agent-trade-audit',
   standalone: true,
@@ -43,6 +51,22 @@ export class AgentTradeAuditComponent implements OnInit {
   missingSnapshotCount = computed(
     () => this.allRows().filter(t => !this.hasAuditSnapshot(t)).length,
   );
+
+  versionStats = computed(() => {
+    const stats = new Map<string, VersionStats>();
+    for (const t of this.allRows()) {
+      const v = this.agentVersion(t);
+      if (!stats.has(v)) {
+        stats.set(v, { version: v, count: 0, wins: 0, losses: 0, totalPnl: 0 });
+      }
+      const s = stats.get(v)!;
+      s.count++;
+      if (t.status === TradeStatus.Win) s.wins++;
+      if (t.status === TradeStatus.Loss) s.losses++;
+      if (t.realizedPnl) s.totalPnl += t.realizedPnl;
+    }
+    return Array.from(stats.values()).sort((a, b) => b.version.localeCompare(a.version));
+  });
 
   ngOnInit(): void {
     this.refresh();

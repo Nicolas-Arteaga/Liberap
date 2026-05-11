@@ -57,21 +57,32 @@
     </app-card-content>
 
     <!-- Filtros -->
-    <div class="row g-3">
-      <div class="col-6">
-        <app-label class="text-white-50 small mb-3 mt-3 d-block">Filtrar por</app-label>
+    <div class="row g-3 mb-4">
+      <div class="col-12 col-md-4">
+        <app-label class="text-white-50 small mb-3 mt-3 d-block">Filtrar por Tipo</app-label>
         <app-select
           [options]="tradeOptions"
           placeholder="Tipo de trade"
-          [(value)]="tradeType">
+          [(value)]="tradeType"
+          (valueChange)="resetPage()">
         </app-select>
       </div>
-      <div class="col-6">
+      <div class="col-12 col-md-4">
         <app-label class="text-white-50 small mb-3 mt-3 d-block">Periodo</app-label>
         <app-select
           [options]="dateOptions"
           placeholder="Seleccionar periodo"
-          [(value)]="dateRange">
+          [(value)]="dateRange"
+          (valueChange)="resetPage()">
+        </app-select>
+      </div>
+      <div class="col-12 col-md-4">
+        <app-label class="text-white-50 small mb-3 mt-3 d-block">Versión de Riesgo</app-label>
+        <app-select
+          [options]="versionOptions"
+          placeholder="Seleccionar versión"
+          [(value)]="versionFilter"
+          (valueChange)="resetPage()">
         </app-select>
       </div>
     </div>

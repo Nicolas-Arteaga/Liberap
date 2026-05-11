@@ -76,8 +76,14 @@ class RiskManager:
         margin = notional / max(lev, 1)
 
         cap_m = float(getattr(config, "MAX_MARGIN_PER_TRADE_USD", 500))
-        margin = min(margin, cap_m, balance * 0.99)
+        if margin > cap_m:
+            scale = cap_m / margin
+            margin = cap_m
+            qty *= scale
+            notional *= scale
 
+        margin = min(margin, balance * 0.99)
+        
         max_no = float(getattr(config, "MAX_NOTIONAL_PER_TRADE_USD", 50000))
         if notional > max_no:
             scale = max_no / notional
@@ -134,8 +140,10 @@ class RiskManager:
         except (TypeError, ValueError):
             atr_percent = 1.0
 
-        # Normalizar ATR
-        atr_pct = atr_percent / 100.0 if atr_percent > 1 else atr_percent
+        # Normalizar ATR — atr_percent es siempre un porcentaje (ej. 0.51 = 0.51%), siempre dividir por 100
+        atr_pct = atr_percent / 100.0
+        # Clampear a rango razonable: mínimo 0.1%, máximo 5%
+        atr_pct = max(0.001, min(atr_pct, 0.05))
 
         # 2. Aplicar piso ATR
         min_sl_pct = max(atr_pct * 1.5, 0.005)
@@ -193,8 +201,14 @@ class RiskManager:
         notional = qty * cp
         margin = notional / max(lev, 1)
 
-        cap_m = float(getattr(config, "MAX_MARGIN_PER_TRADE_USD", 500))
-        margin = min(margin, cap_m, balance * 0.99)
+        cap_m = float(getattr(config, "MAX_MARGIN_PER_TRADE_USD", 150.0))
+        if margin > cap_m:
+            scale = cap_m / margin
+            margin = cap_m
+            qty *= scale
+            notional *= scale
+
+        margin = min(margin, balance * 0.99)
 
         max_no = float(getattr(config, "MAX_NOTIONAL_PER_TRADE_USD", 50000))
         if notional > max_no:

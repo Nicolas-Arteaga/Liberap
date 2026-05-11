@@ -14,6 +14,8 @@ using Microsoft.AspNetCore.Mvc;
 using System.Net.Http;
 using System.Text.Json;
 using System.Globalization;
+using Volo.Abp.Data;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Verge.Trading;
 
@@ -24,6 +26,7 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
     private readonly MarketDataManager _marketDataManager;
     private readonly TradingSimulationService _simulationService;
     private readonly IHubContext<TradingHub> _hubContext;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly HttpClient _priceClient = new() { Timeout = TimeSpan.FromSeconds(3) };
 
     public SimulatedTradeAppService(
@@ -31,13 +34,15 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         IRepository<TraderProfile, Guid> profileRepo,
         MarketDataManager marketDataManager,
         TradingSimulationService simulationService,
-        IHubContext<TradingHub> hubContext)
+        IHubContext<TradingHub> hubContext,
+        IServiceScopeFactory scopeFactory)
     {
         _tradeRepo = tradeRepo;
         _profileRepo = profileRepo;
         _marketDataManager = marketDataManager;
         _simulationService = simulationService;
         _hubContext = hubContext;
+        _scopeFactory = scopeFactory;
     }
 
     public async Task<SimulatedTradeDto> OpenTradeAsync(OpenTradeInputDto input)
@@ -53,6 +58,34 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         {
             Logger.LogWarning("🚫 [Simulation] Skipping trade for {Symbol}: Price not found in any source.", symbol);
             return null;
+        }
+
+        // 2.2 Validate SL/TP logic against live entry price to prevent immediate ghost trades due to price desync
+        if (input.Side == SignalDirection.Long)
+        {
+            if (input.SlPrice.HasValue && input.SlPrice.Value >= entryPrice.Value)
+            {
+                Logger.LogWarning("🚫 [Simulation] Rejecting LONG for {Symbol}: requested SL ({Sl}) is >= live Entry ({Entry}).", symbol, input.SlPrice.Value, entryPrice.Value);
+                return null;
+            }
+            if (input.TpPrice.HasValue && input.TpPrice.Value <= entryPrice.Value)
+            {
+                Logger.LogWarning("🚫 [Simulation] Rejecting LONG for {Symbol}: requested TP ({Tp}) is <= live Entry ({Entry}).", symbol, input.TpPrice.Value, entryPrice.Value);
+                return null;
+            }
+        }
+        else // Short
+        {
+            if (input.SlPrice.HasValue && input.SlPrice.Value <= entryPrice.Value)
+            {
+                Logger.LogWarning("🚫 [Simulation] Rejecting SHORT for {Symbol}: requested SL ({Sl}) is <= live Entry ({Entry}).", symbol, input.SlPrice.Value, entryPrice.Value);
+                return null;
+            }
+            if (input.TpPrice.HasValue && input.TpPrice.Value >= entryPrice.Value)
+            {
+                Logger.LogWarning("🚫 [Simulation] Rejecting SHORT for {Symbol}: requested TP ({Tp}) is >= live Entry ({Entry}).", symbol, input.TpPrice.Value, entryPrice.Value);
+                return null;
+            }
         }
 
         // 2.5. SMART POSITION MANAGEMENT: If position exists, ADD to it (Average Price) instead of blocking
@@ -92,9 +125,8 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
                 var newTotalSize = existingTrade.Size + sizeToAdd;
                 var newEntryPrice = (oldNotional + addedNotional) / newTotalSize;
 
-                // Deduct balance
-                profileForUpdate.VirtualBalance -= totalCostToAdd;
-                await _profileRepo.UpdateAsync(profileForUpdate, autoSave: true);
+                // Deduct balance safely
+                await DeductVirtualBalanceAsync(userId, totalCostToAdd);
 
                 // Update existing trade properties
                 existingTrade.EntryPrice = newEntryPrice;
@@ -136,13 +168,6 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         var entryFee = _simulationService.CalculateEntryFee(exposureValue);
         var totalCost = margin + entryFee;
 
-        // 4. Validate virtual balance (Loading here to minimize concurrency window)
-        var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId)
-            ?? throw new UserFriendlyException("Trader profile not found.");
-
-        if (profile.VirtualBalance < totalCost)
-            throw new UserFriendlyException($"Insufficient virtual balance. Required: {totalCost:N2} USDT, Available: {profile.VirtualBalance:N2} USDT.");
-
         // 5. Calculate position size (quantity) and liquidation price
         var size = _simulationService.CalculatePositionSize(exposureValue, entryPrice.Value);
         var liquidationPrice = _simulationService.CalculateLiquidationPrice(entryPrice.Value, input.Leverage, input.Side);
@@ -160,20 +185,26 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
             }
         }
 
-        // 6. Deduct balance with Retry logic for Concurrency
-        profile.VirtualBalance -= totalCost;
-        
-        try {
-            await _profileRepo.UpdateAsync(profile, autoSave: true);
-        } catch (Volo.Abp.Data.AbpDbConcurrencyException) {
-            Logger.LogWarning("🔄 [Simulation] Concurrency conflict for profile {UserId}. Retrying...", userId);
-            profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
-            if (profile!.VirtualBalance < totalCost) throw new UserFriendlyException("Insufficient balance after retry.");
-            profile.VirtualBalance -= totalCost;
-            await _profileRepo.UpdateAsync(profile, autoSave: true);
+        // 6. Anti-slippage guard: reject if SL/TP levels are already crossed at entry price
+        if (input.SlPrice.HasValue && input.SlPrice.Value > 0)
+        {
+            bool slAlreadyCrossed = input.Side == SignalDirection.Long
+                ? entryPrice.Value <= input.SlPrice.Value   // Long: entry should be ABOVE SL
+                : entryPrice.Value >= input.SlPrice.Value;  // Short: entry should be BELOW SL
+
+            if (slAlreadyCrossed)
+            {
+                Logger.LogWarning(
+                    "⛔ [Simulation] SKIP('sl_already_crossed'): {Symbol} {Side} | Entry={Entry} SL={Sl} — el SL ya está cruzado por el precio de entrada. Trade rechazado.",
+                    symbol, input.Side, entryPrice.Value, input.SlPrice.Value);
+                return null;
+            }
         }
 
-        // 7. Create trade record
+        // 7. Deduct balance safely using global lock to avoid Concurrency issues
+        await DeductVirtualBalanceAsync(userId, totalCost);
+
+        // 8. Create trade record
         var trade = new SimulatedTrade(
             id: GuidGenerator.Create(),
             userId: userId,
@@ -214,72 +245,88 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
     public async Task<SimulatedTradeDto> CloseTradeAsync(Guid tradeId)
     {
         var userId = CurrentUser.Id!.Value;
-        var trade = await _tradeRepo.GetAsync(tradeId);
-
-        if (trade.UserId != userId)
-            throw new UserFriendlyException("You don't have permission to close this trade.");
-
-        if (trade.Status != TradeStatus.Open)
+        
+        // 1. Resolve current price FIRST (outside the DB lock/retry to keep it fast)
+        // Fetch trade symbol once for price resolution (using a one-off scope to avoid tracking)
+        string symbol;
+        using (var scope = _scopeFactory.CreateScope())
         {
-            Logger.LogWarning("⚠️ [Simulation] Attempted to close a trade that is already {Status}: {TradeId}", trade.Status, tradeId);
-            return MapToDto(trade); // Devuelve el trade como esta (probablemente ya cerrado por stop loss/take profit/liquidacion)
+            var tRepo = scope.ServiceProvider.GetRequiredService<IRepository<SimulatedTrade, Guid>>();
+            var t = await tRepo.GetAsync(tradeId);
+            symbol = t.Symbol;
         }
+        
+        var closePrice = await ResolveCurrentPriceAsync(symbol)
+            ?? throw new UserFriendlyException($"Could not fetch current price for {symbol}.");
 
-        // 1. Get current mark price (Try fast WebSocket cache first)
-        var closePrice = await ResolveCurrentPriceAsync(trade.Symbol)
-            ?? throw new UserFriendlyException($"Could not fetch current price for {trade.Symbol}.");
+        SimulatedTradeDto resultDto = null;
+        int maxRetries = 5;
 
-        // 2. Calculate exit fee and realized PnL
-        var exitFee = _simulationService.CalculateExitFee(trade.Size, closePrice);
-        var realizedPnl = _simulationService.CalculateRealizedPnl(
-            entryPrice: trade.EntryPrice,
-            closePrice: closePrice,
-            size: trade.Size,
-            side: trade.Side,
-            entryFee: trade.EntryFee,
-            exitFee: exitFee,
-            totalFundingPaid: trade.TotalFundingPaid);
-
-        Logger.LogInformation("[FEE] Entry={EntryFee:N4} | Exit={ExitFee:N4} | Total={TotalFee:N4} | Notional={Notional:N4}", 
-            trade.EntryFee, exitFee, trade.EntryFee + exitFee, trade.Amount);
-
-        // 3. Update trade record
-        trade.Status = realizedPnl >= 0 ? TradeStatus.Win : TradeStatus.Loss;
-        trade.ClosePrice = closePrice;
-        trade.RealizedPnl = realizedPnl;
-        trade.ExitFee = exitFee;
-        trade.ClosedAt = DateTime.UtcNow;
-        trade.UnrealizedPnl = 0;
-        trade.ROIPercentage = 0;
-
-        await _tradeRepo.UpdateAsync(trade, autoSave: false);
-
-        // 4. Return margin + entryFee + realizedPnl to user balance
-        var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
-        if (profile != null)
+        for (int i = 0; i < maxRetries; i++)
         {
-            profile.VirtualBalance += trade.Margin + trade.EntryFee + realizedPnl;
-            try {
-                await _profileRepo.UpdateAsync(profile, autoSave: true);
-            } catch (Volo.Abp.Data.AbpDbConcurrencyException) {
-                Logger.LogWarning("🔄 [Simulation] Concurrency conflict closing trade for {UserId}. Retrying...", userId);
-                profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
-                if (profile != null) {
-                    profile.VirtualBalance += trade.Margin + trade.EntryFee + realizedPnl;
-                    await _profileRepo.UpdateAsync(profile, autoSave: true);
+            try
+            {
+                using (var scope = _scopeFactory.CreateScope())
+                {
+                    var tRepo = scope.ServiceProvider.GetRequiredService<IRepository<SimulatedTrade, Guid>>();
+                    var trade = await tRepo.GetAsync(tradeId);
+
+                    if (trade.UserId != userId)
+                        throw new UserFriendlyException("You don't have permission to close this trade.");
+
+                    if (trade.Status != TradeStatus.Open)
+                    {
+                        Logger.LogWarning("⚠️ [Simulation] Trade {TradeId} already closed.", tradeId);
+                        return MapToDto(trade);
+                    }
+
+                    // 2. Calculate exit fee and realized PnL with the fetched trade data
+                    var exitFee = _simulationService.CalculateExitFee(trade.Size, closePrice);
+                    var realizedPnl = _simulationService.CalculateRealizedPnl(
+                        entryPrice: trade.EntryPrice,
+                        closePrice: closePrice,
+                        size: trade.Size,
+                        side: trade.Side,
+                        entryFee: trade.EntryFee,
+                        exitFee: exitFee,
+                        totalFundingPaid: trade.TotalFundingPaid);
+
+                    // 3. Update trade record
+                    trade.Status = realizedPnl >= 0 ? TradeStatus.Win : TradeStatus.Loss;
+                    trade.ClosePrice = closePrice;
+                    trade.RealizedPnl = realizedPnl;
+                    trade.ExitFee = exitFee;
+                    trade.ClosedAt = DateTime.UtcNow;
+                    trade.UnrealizedPnl = 0;
+                    trade.ROIPercentage = 0;
+
+                    await tRepo.UpdateAsync(trade, autoSave: true);
+                    
+                    // 4. Return margin + entryFee + realizedPnl to user balance
+                    await CreditVirtualBalanceAsync(userId, trade.Margin + trade.EntryFee + realizedPnl);
+
+                    resultDto = MapToDto(trade);
+                    
+                    Logger.LogInformation("✅ [Simulation] Trade closed in fresh scope: {Symbol} @ {Price} | PnL: {Pnl}",
+                        trade.Symbol, closePrice, realizedPnl);
+                    
+                    break; // Success!
                 }
+            }
+            catch (AbpDbConcurrencyException)
+            {
+                if (i == maxRetries - 1) throw;
+                Logger.LogWarning("[Simulation] Concurrency retry {0}/5 for closing trade {1}", i + 1, tradeId);
+                await Task.Delay(200);
             }
         }
 
-        var dto = MapToDto(trade);
+        if (resultDto != null)
+        {
+            await _hubContext.Clients.User(userId.ToString()).SendAsync("ReceiveTradeClosed", resultDto);
+        }
 
-        // 5. Broadcast closed trade
-        await _hubContext.Clients.User(userId.ToString()).SendAsync("ReceiveTradeClosed", dto);
-
-        Logger.LogInformation("✅ [Simulation] Trade closed: {Symbol} @ {Price} | PnL: {Pnl} USDT",
-            trade.Symbol, closePrice, realizedPnl);
-
-        return dto;
+        return resultDto;
     }
 
     public async Task<List<SimulatedTradeDto>> GetActiveTradesAsync()
@@ -571,5 +618,76 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         }
         catch { }
         return null;
+    }
+
+    private async Task DeductVirtualBalanceAsync(Guid userId, decimal amount)
+    {
+        int maxRetries = 5;
+        for (int i = 0; i < maxRetries; i++)
+        {
+            await TradingSimulationService.ProfileLock.WaitAsync();
+            try
+            {
+                // Usamos un nuevo scope para garantizar que leemos la versión más fresca de la DB
+                // y no una cacheada en el Unit of Work actual.
+                using (var scope = _scopeFactory.CreateScope())
+                {
+                    var repo = scope.ServiceProvider.GetRequiredService<IRepository<TraderProfile, Guid>>();
+                    var profile = await repo.FirstOrDefaultAsync(p => p.UserId == userId);
+                    if (profile != null)
+                    {
+                        if (profile.VirtualBalance < amount)
+                            throw new UserFriendlyException($"Insufficient virtual balance. Required: {amount:N2} USDT, Available: {profile.VirtualBalance:N2} USDT.");
+
+                        profile.VirtualBalance -= amount;
+                        await repo.UpdateAsync(profile, autoSave: true);
+                    }
+                }
+                return;
+            }
+            catch (AbpDbConcurrencyException)
+            {
+                if (i == maxRetries - 1) throw;
+                Logger.LogWarning("[Simulation] Concurrency exception in DeductVirtualBalance. Retrying {0}/{1}...", i + 1, maxRetries);
+                await Task.Delay(200);
+            }
+            finally
+            {
+                TradingSimulationService.ProfileLock.Release();
+            }
+        }
+    }
+
+    private async Task CreditVirtualBalanceAsync(Guid userId, decimal amount)
+    {
+        int maxRetries = 5;
+        for (int i = 0; i < maxRetries; i++)
+        {
+            await TradingSimulationService.ProfileLock.WaitAsync();
+            try
+            {
+                using (var scope = _scopeFactory.CreateScope())
+                {
+                    var repo = scope.ServiceProvider.GetRequiredService<IRepository<TraderProfile, Guid>>();
+                    var profile = await repo.FirstOrDefaultAsync(p => p.UserId == userId);
+                    if (profile != null)
+                    {
+                        profile.VirtualBalance += amount;
+                        await repo.UpdateAsync(profile, autoSave: true);
+                    }
+                }
+                return;
+            }
+            catch (AbpDbConcurrencyException)
+            {
+                if (i == maxRetries - 1) throw;
+                Logger.LogWarning("[Simulation] Concurrency exception in CreditVirtualBalance. Retrying {0}/{1}...", i + 1, maxRetries);
+                await Task.Delay(200);
+            }
+            finally
+            {
+                TradingSimulationService.ProfileLock.Release();
+            }
+        }
     }
 }

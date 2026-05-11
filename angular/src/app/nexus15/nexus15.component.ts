@@ -248,7 +248,42 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
     this.symbolSearch.set(q);
   }
 
+  onSearchEnter() {
+    const q = this.symbolSearch().toUpperCase().trim();
+    if (!q) return;
+    
+    const filtered = this.filteredSymbols();
+    
+    // If it perfectly matches something in the list or is the only option, use that
+    if (this.availableSymbols().includes(q)) {
+      this.onSymbolChange(q);
+      return;
+    }
+    
+    if (filtered.length === 1) {
+      this.onSymbolChange(filtered[0]);
+      return;
+    }
+
+    // If it's not in our list but they pressed enter anyway, try to fetch it directly
+    // Binance might have added it recently or it's a new pair.
+    if (q.endsWith('USDT') || q.length >= 5) {
+       this.onSymbolChange(q);
+    }
+  }
+
   runOnDemand() {
+    const q = this.symbolSearch().toUpperCase().trim();
+    if (q && (q.endsWith('USDT') || q.length >= 5 || this.availableSymbols().includes(q))) {
+      this.onSymbolChange(q);
+      // Small timeout to let onSymbolChange clear state before we fetch the new AI data
+      setTimeout(() => this.executeOnDemand(), 50);
+      return;
+    }
+    this.executeOnDemand();
+  }
+
+  private executeOnDemand() {
     this.isLoading.set(true);
     this.errorMsg.set(null);
     this.pushTerminal(`> MANUAL SCAN: ${this.selectedSymbol()}`);
@@ -272,7 +307,6 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
         this.errorMsg.set(`AI model sin datos para ${this.selectedSymbol()} — chart activo igual.`);
         this.pushTerminal(`⚠ NEXUS-15: sin modelo para ${this.selectedSymbol()} (${msg})`);
         this.pushTerminal(`  → Chart Binance disponible. Seleccioná un par mayor para IA.`);
-        // Chart already has real Binance data, no need to reload candles
       }
     });
   }
@@ -514,6 +548,24 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
       this.pushTerminal(`✓ ${candles.length} CANDLES [${binanceSym}] @ ${this.livePrice()?.toFixed(4) ?? '?'}`);
     };
 
+    let spotSym = binanceSym;
+    let multiplier = 1;
+    const match = binanceSym.match(/^(10000|1000|100)(.+)$/);
+    if (match) {
+        multiplier = parseInt(match[1], 10);
+        spotSym = match[2];
+        const spotUrl = `https://api.binance.com/api/v3/klines?symbol=${spotSym}&interval=${interval}&limit=${limit}`;
+        this.pushTerminal(`  → SPOT Force (${spotSym} x${multiplier})...`);
+        fetch(spotUrl).then(r => r.json()).then((raw: any[]) => {
+            const { candles, volumes } = parseKlines(raw);
+            candles.forEach(c => {
+                c.open *= multiplier; c.high *= multiplier; c.low *= multiplier; c.close *= multiplier;
+            });
+            apply(candles, volumes);
+        }).catch(e => console.error('Binance Spot Error:', e));
+        return;
+    }
+
     // Try Futures API first
     const futuresUrl = `https://fapi.binance.com/fapi/v1/klines?symbol=${binanceSym}&interval=${interval}&limit=${limit}`;
     fetch(futuresUrl)
@@ -530,7 +582,7 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
         console.error('Binance Futures Error:', e);
         // Fallback: Spot API
         const spotUrl = `https://api.binance.com/api/v3/klines?symbol=${binanceSym}&interval=${interval}&limit=${limit}`;
-        this.pushTerminal(`  → Futures n/d para ${binanceSym}, probando SPOT...`);
+        this.pushTerminal(`  → Futures n/d, probando SPOT...`);
         fetch(spotUrl)
           .then(r => {
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -543,9 +595,48 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
           })
           .catch((e2) => {
             console.error('Binance Spot Error:', e2);
-            this.pushTerminal(`⚠ ${binanceSym} no encontrado en Binance — DEMO MODE`);
-            this.errorMsg.set(`${binanceSym} no disponible en Binance. Mostrando datos demo.`);
-            this.loadFallbackDemo();
+            this.pushTerminal(`  → Binance n/d para ${binanceSym}, probando BYBIT...`);
+            
+            const bybitIntervals: any = { '1m': '1', '3m': '3', '5m': '5', '15m': '15', '30m': '30', '1h': '60', '2h': '120', '4h': '240', '1d': 'D', '1w': 'W', '1M': 'M' };
+            const bbInterval = bybitIntervals[interval] || '15';
+            const bybitUrl = `https://api.bybit.com/v5/market/kline?category=linear&symbol=${binanceSym}&interval=${bbInterval}&limit=${limit}`;
+            
+            fetch(bybitUrl)
+              .then(r => {
+                 if (!r.ok) throw new Error(`Bybit HTTP ${r.status}`);
+                 return r.json();
+              })
+              .then(bbData => {
+                 if (bbData.retCode !== 0 || !bbData.result || !bbData.result.list || bbData.result.list.length === 0) {
+                    throw new Error('Bybit no data');
+                 }
+                 const rawList = bbData.result.list.reverse();
+                 const parseBybit = (raw: any[]) => {
+                    const candles: CandlestickData[] = [];
+                    const volumes: any[]             = [];
+                    for (const k of raw) {
+                      let t = Math.floor(parseInt(k[0], 10) / 1000) as any;
+                      const o   = parseFloat(k[1]);
+                      const h   = parseFloat(k[2]);
+                      const l   = parseFloat(k[3]);
+                      const c   = parseFloat(k[4]);
+                      const vol = parseFloat(k[5]);
+                      candles.push({ time: t, open: o, high: h, low: l, close: c });
+                      volumes.push({ time: t, value: vol,
+                        color: c >= o ? 'rgba(0,255,136,0.45)' : 'rgba(255,68,102,0.45)' });
+                    }
+                    return { candles, volumes };
+                 };
+                 const { candles, volumes } = parseBybit(rawList);
+                 apply(candles, volumes);
+                 this.pushTerminal(`✓ BYBIT FEED SECURED FOR ${binanceSym}`);
+              })
+              .catch(e3 => {
+                console.error('Bybit Error:', e3);
+                this.pushTerminal(`⚠ ${binanceSym} no encontrado en exchanges públicos — DEMO MODE`);
+                this.errorMsg.set(`${binanceSym} no disponible en Binance/Bybit. (¿IP bloqueada?). Mostrando datos demo.`);
+                this.loadFallbackDemo();
+              });
           });
       });
   }

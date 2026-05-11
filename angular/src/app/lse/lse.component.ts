@@ -513,6 +513,18 @@ export class LseComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private loadCandles(symbol: string, interval?: string, limit = 500) {
     const iv = interval ?? this.binanceInterval();
+    
+    let spotSym = symbol;
+    let multiplier = 1;
+    const match = symbol.match(/^(10000|1000|100)(.+)$/);
+    if (match) {
+        multiplier = parseInt(match[1], 10);
+        spotSym = match[2];
+        const spotUrl = `https://api.binance.com/api/v3/klines?symbol=${spotSym}&interval=${iv}&limit=${limit}`;
+        fetch(spotUrl).then(r => r.json()).then((raw: any[]) => this.applyCandles(symbol, raw, multiplier)).catch(e => console.error(e));
+        return;
+    }
+
     const futuresUrl = `https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${iv}&limit=${limit}`;
     fetch(futuresUrl)
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
@@ -524,7 +536,7 @@ export class LseComponent implements OnInit, AfterViewInit, OnDestroy {
       .catch(e => console.error('[LSE] Candle fetch error:', e));
   }
 
-  private applyCandles(symbol: string, raw: any[]) {
+  private applyCandles(symbol: string, raw: any[], multiplier = 1) {
     if (!Array.isArray(raw) || raw.length === 0 || symbol !== this.selectedSymbol()) return;
     const candles: CandlestickData[] = [];
     const volumes: any[] = [];
@@ -533,7 +545,11 @@ export class LseComponent implements OnInit, AfterViewInit, OnDestroy {
 
     for (const k of raw) {
       const t = Math.floor(k[0] / 1000) as any;
-      const o = +k[1], h = +k[2], l = +k[3], c = +k[4], v = +k[5];
+      const o = (+k[1]) * multiplier;
+      const h = (+k[2]) * multiplier;
+      const l = (+k[3]) * multiplier;
+      const c = (+k[4]) * multiplier;
+      const v = +k[5];
       candles.push({ time: t, open: o, high: h, low: l, close: c });
       volumes.push({ time: t, value: v, color: c >= o ? 'rgba(0,255,136,0.4)' : 'rgba(255,68,102,0.4)' });
       closes.push(c);
@@ -599,10 +615,36 @@ export class LseComponent implements OnInit, AfterViewInit, OnDestroy {
     const sym = this.selectedSymbol();
     const iv = this.binanceInterval();
     try {
-      const [rPrimary, r4h] = await Promise.all([
-        fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${sym}&interval=${iv}&limit=500`).then(r => r.json()),
-        fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${sym}&interval=4h&limit=200`).then(r => r.json()),
-      ]);
+      let rPrimary, r4h;
+
+      let spotSym = sym;
+      let multiplier = 1;
+      const match = sym.match(/^(10000|1000|100)(.+)$/);
+      if (match) {
+          multiplier = parseInt(match[1], 10);
+          spotSym = match[2];
+          [rPrimary, r4h] = await Promise.all([
+            fetch(`https://api.binance.com/api/v3/klines?symbol=${spotSym}&interval=${iv}&limit=500`).then(r => r.json()),
+            fetch(`https://api.binance.com/api/v3/klines?symbol=${spotSym}&interval=4h&limit=200`).then(r => r.json()),
+          ]);
+          const convertMult = (raw: any[]) => (Array.isArray(raw) ? raw : []).map(k => ({
+            timestamp: String(k[0]), open: (+k[1])*multiplier, high: (+k[2])*multiplier, low: (+k[3])*multiplier, close: (+k[4])*multiplier, volume: +k[5],
+          }));
+          return { candles1h: convertMult(rPrimary), candles4h: convertMult(r4h) };
+      }
+
+      try {
+        [rPrimary, r4h] = await Promise.all([
+          fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${sym}&interval=${iv}&limit=500`).then(r => r.ok ? r.json() : Promise.reject()),
+          fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${sym}&interval=4h&limit=200`).then(r => r.ok ? r.json() : Promise.reject()),
+        ]);
+      } catch (e) {
+        [rPrimary, r4h] = await Promise.all([
+          fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=${iv}&limit=500`).then(r => r.json()),
+          fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=4h&limit=200`).then(r => r.json()),
+        ]);
+      }
+
       const convert = (raw: any[]) => (Array.isArray(raw) ? raw : []).map(k => ({
         timestamp: String(k[0]), open: +k[1], high: +k[2], low: +k[3], close: +k[4], volume: +k[5],
       }));

@@ -15,7 +15,7 @@ GROUP_WEIGHTS = {
     "g6": 0.15,
 }
 
-STRONG_SIGNAL_THRESHOLD = 75.0
+STRONG_SIGNAL_THRESHOLD = 65.0
 
 
 class Nexus15Analyzer:

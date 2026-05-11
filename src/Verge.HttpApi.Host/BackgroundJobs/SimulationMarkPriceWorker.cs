@@ -57,7 +57,7 @@ public class SimulationMarkPriceWorker : BackgroundService
                 _logger.LogError(ex, "❌ [SimulationWorker] Error in mark price update cycle.");
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+            await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
         }
     }
 
@@ -215,12 +215,36 @@ public class SimulationMarkPriceWorker : BackgroundService
                         // ✅ FIX: Recalculate final ROI based on realized PnL (was left stale before)
                         trade.ROIPercentage = simulationService.CalculateROI(realizedPnl, trade.Margin);
 
-                        // Credit margin + entry fee + net PnL back to user balance
-                        var profileToCredit = await profileRepo.FirstOrDefaultAsync(p => p.UserId == trade.UserId);
-                        if (profileToCredit != null)
+                        // Credit margin + entry fee + net PnL back to user balance safely
+                        int balanceRetries = 5;
+                        bool balanceUpdated = false;
+                        for (int br = 0; br < balanceRetries && !balanceUpdated; br++)
                         {
-                            profileToCredit.VirtualBalance += (trade.Margin + trade.EntryFee + realizedPnl);
-                            await profileRepo.UpdateAsync(profileToCredit);
+                            await TradingSimulationService.ProfileLock.WaitAsync();
+                            try
+                            {
+                                using (var balanceScope = _serviceProvider.CreateScope())
+                                {
+                                    var bProfileRepo = balanceScope.ServiceProvider.GetRequiredService<IRepository<TraderProfile, Guid>>();
+                                    var profileToCredit = await bProfileRepo.FirstOrDefaultAsync(p => p.UserId == trade.UserId);
+                                    if (profileToCredit != null)
+                                    {
+                                        profileToCredit.VirtualBalance += (trade.Margin + trade.EntryFee + realizedPnl);
+                                        await bProfileRepo.UpdateAsync(profileToCredit, autoSave: true);
+                                        balanceUpdated = true;
+                                    }
+                                }
+                            }
+                            catch (Volo.Abp.Data.AbpDbConcurrencyException)
+                            {
+                                if (br == balanceRetries - 1) throw;
+                                _logger.LogWarning("[SimulationWorker] Concurrency exception crediting balance for {UserId}. Retry {0}/5", trade.UserId, br + 1);
+                                await Task.Delay(200);
+                            }
+                            finally
+                            {
+                                TradingSimulationService.ProfileLock.Release();
+                            }
                         }
 
                         await tradeRepo.UpdateAsync(trade);

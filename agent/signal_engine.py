@@ -90,9 +90,16 @@ class SignalEngine:
         group_scores      = nexus_data.get("group_scores",           {})    if nexus_data else {}
         features          = nexus_data.get("features",               {})    if nexus_data else {}
         est_range         = nexus_data.get("estimated_range_percent", 2.0)  if nexus_data else 2.0
+        # ── Timestamps para VETO #4 (stale_nexus_signal) ────────────────
+        # scored_at: momento exacto en que calculate_confluence corre para este símbolo.
+        # price_at_signal: last_close de la última vela en el kline — precio que vio Nexus.
+        import time as _time
+        scored_at_ts     = _time.time()
+        last_close_kline = float(features.get("last_close", 0) or 0)
 
         # ── SCAR ────────────────────────────────────────────────
         scar_score = scar_data.get("score_grial", 0) if scar_data else 0
+
 
         # 1. Nexus AI Confidence → max 40 pts
         nexus_pts = nexus_confidence * 0.4
@@ -199,5 +206,9 @@ class SignalEngine:
             "rsi":               rsi,
             "estimated_range_pct": est_range,
             "reasons":           reasons,
+            # VETO #4 staleness data — inyectado en el momento del cálculo
+            "scored_at":         scored_at_ts,
+            "scored_at_age_s":   0.0,  # se actualiza en verge_agent al ejecutar
+            "price_at_signal":   last_close_kline,
         }
 

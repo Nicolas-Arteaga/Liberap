@@ -5,6 +5,7 @@ Devuelve métricas para auditoría / trade_analytics.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any, Dict, Tuple
 
 import config
@@ -191,31 +192,121 @@ def validate_nexus_confluence_setup(
     candle_body_ratio = float(nexus_features.get("candle_body_ratio", 1.0) or 1.0)
     volume_ratio_20 = float(nexus_features.get("volume_ratio_20", 1.0) or 1.0)
     volume_surge_bullish = bool(nexus_features.get("volume_surge_bullish", False))
+    explosion_bearish = bool(nexus_features.get("explosion_bearish", False))
+    explosion_bullish = bool(nexus_features.get("explosion_bullish", False))
+    consecutive_bull_bars = int(nexus_features.get("consecutive_bull_bars", 0) or 0)
+    upper_wick_ratio = float(nexus_features.get("upper_wick_ratio", 0) or 0)
+    macd_hist = float(nexus_features.get("macd_histogram", 0) or 0)
+    ma7 = float(nexus_features.get("ma7", 0) or 0)
 
-    if nexus_recommendation.lower() == "wait":
-        logger.info("[SKIP] nexus_says_wait — %s | Nexus recomienda Wait", candidate.get("symbol"))
-        return False, "nexus_says_wait", metrics
+    # ── VETO #1: Pump exhaustion — bearish vol explosion, RSI overbought, no bullish explosion
+    # Exactamente lo que pasó en WALUSDT: el volumen explotó pero era VENDEDOR (smart money
+    # saliéndose del pump). Entrar LONG en ese momento es comprar la punta de la vela.
+    if side == 0 and explosion_bearish and not explosion_bullish and rsi_14 > 68:
+        logger.info(
+            "[VETO] pump_exhaust_long — %s | explosion_bearish=True explosion_bullish=False RSI=%.1f",
+            candidate.get("symbol"), rsi_14,
+        )
+        return False, "pump_exhaust_long", metrics
 
-    if rsi_14 > 72 and upthrust_detected:
+    # ── VETO #2: Bearish explosion + zero bull momentum + RSI > 65
+    # Sin velas alcistas consecutivas + volumen bajista + RSI elevado = el movimiento ya terminó.
+    if side == 0 and explosion_bearish and consecutive_bull_bars == 0 and rsi_14 > 65:
+        logger.info(
+            "[VETO] no_momentum_bearish_vol — %s | explosion_bearish=True consecutive_bull_bars=0 RSI=%.1f",
+            candidate.get("symbol"), rsi_14,
+        )
+        return False, "no_momentum_bearish_vol", metrics
+
+    if rsi_14 > 78 and upthrust_detected:
         logger.info(
             "[SKIP] exhaustion_at_top — %s | RSI=%.1f upthrust=True",
             candidate.get("symbol"), rsi_14,
         )
         return False, "exhaustion_at_top", metrics
 
-    if candle_body_ratio < 0.1:
+    # ── VETO #5: Bearish Rejection at Top ──────────────────────────────
+    # Evita entrar en LONG cuando hay señales claras de rechazo bajista en el techo:
+    # Upthrust o Mecho largo + MACD negativo + RSI elevado.
+    if side == 0:  # Solo para LONGs
+        if (upthrust_detected or upper_wick_ratio > 0.35) and macd_hist < 0 and rsi_14 > 65:
+            logger.info(
+                "[VETO] bearish_rejection_at_top — %s | upthrust=%s wick=%.2f macd=%.4f RSI=%.1f",
+                candidate.get("symbol"), upthrust_detected, upper_wick_ratio, macd_hist, rsi_14
+            )
+            return False, "bearish_rejection_at_top", metrics
+
+    # ── VETO #6: RSI Extreme Exhaustion ────────────────────────────────
+    # Si el RSI está en territorio extremo, el movimiento ya ocurrió.
+    # RSI > 85 en LONG = sobrecompra severa, corrección inminente (caso BUSDT 87.7).
+    # RSI < 15 en SHORT = sobreventa severa, rebote inminente.
+    # Sin condiciones extra — el RSI extremo solo es suficiente para bloquear.
+    if side == 0 and rsi_14 > 85:
+        logger.info(
+            "[VETO] rsi_extreme_exhaustion — %s | RSI=%.1f (LONG bloqueado, sobrecompra extrema)",
+            candidate.get("symbol"), rsi_14,
+        )
+        return False, "rsi_extreme_exhaustion", metrics
+
+    if side == 1 and rsi_14 < 15:
+        logger.info(
+            "[VETO] rsi_extreme_exhaustion — %s | RSI=%.1f (SHORT bloqueado, sobreventa extrema)",
+            candidate.get("symbol"), rsi_14,
+        )
+        return False, "rsi_extreme_exhaustion", metrics
+
+    if candle_body_ratio < 0.05:
         logger.info(
             "[SKIP] no_body_no_trade — %s | candle_body_ratio=%.3f (vela puro mecho)",
             candidate.get("symbol"), candle_body_ratio,
         )
         return False, "no_body_no_trade", metrics
 
-    if volume_ratio_20 < 1.3 and not volume_surge_bullish:
+    # Volume check only blocks when volume is very weak AND no surge at all
+    if volume_ratio_20 < 0.8 and not volume_surge_bullish:
         logger.info(
             "[SKIP] no_volume_confirmation — %s | volume_ratio_20=%.2f surge=False",
             candidate.get("symbol"), volume_ratio_20,
         )
         return False, "no_volume_confirmation", metrics
+    # ── VETO #3: Post-Pump/Dump Distance from MA7 ────────────────────────
+    # Si el precio ya se alejó >3.5% de la MA7, el movimiento ya ocurrió.
+    # Entrar LONG cuando el precio está >3.5% sobre MA7 = comprar el techo.
+    # Entrar SHORT cuando el precio está >3.5% bajo MA7 = vender el piso.
+    post_pump_threshold = float(getattr(config, "POST_PUMP_MA7_DISTANCE_PCT", 0.035))
+    if ma7 > 0:
+        ma7_distance = (cp - ma7) / ma7  # positivo = precio sobre MA7
+        if side == 0 and ma7_distance > post_pump_threshold:
+            logger.info(
+                "[VETO] post_pump_exhaustion — %s | cp=%.6f MA7=%.6f dist=+%.2f%% (límite=%.1f%%) — LONG después del pump",
+                candidate.get("symbol"), cp, ma7, ma7_distance * 100, post_pump_threshold * 100,
+            )
+            return False, "post_pump_exhaustion", metrics
+        if side == 1 and ma7_distance < -post_pump_threshold:
+            logger.info(
+                "[VETO] post_pump_exhaustion — %s | cp=%.6f MA7=%.6f dist=%.2f%% (límite=%.1f%%) — SHORT después del dump",
+                candidate.get("symbol"), cp, ma7, ma7_distance * 100, post_pump_threshold * 100,
+            )
+            return False, "post_pump_exhaustion", metrics
+
+    # ── VETO #4: Signal Staleness (Nexus) ────────────────────────────────
+    # Condión: AND entre edad y drift de precio.
+    # Solo rechaza si AMBAS se cumplen: la señal es vieja Y el precio se movió.
+    # Si el mercado está quieto, aunque la señal sea vieja, puede seguir válida.
+    signal_age_s = float(candidate.get("scored_at_age_s", 0) or 0)
+    price_at_signal = float(candidate.get("price_at_signal", 0) or 0)
+    max_nexus_age = float(getattr(config, "MAX_NEXUS_SIGNAL_AGE_SECONDS", 120.0))
+    max_drift_pct = float(getattr(config, "NEXUS_MAX_PRICE_DRIFT_PCT", 0.025))
+
+    if signal_age_s > max_nexus_age and price_at_signal > 0:
+        price_drift = abs(cp - price_at_signal) / price_at_signal
+        if price_drift > max_drift_pct:
+            logger.info(
+                "[VETO] stale_nexus_signal — %s | age=%.0fs (máx=%.0fs) drift=%.2f%% (máx=%.1f%%) — señal expirada con precio movido",
+                candidate.get("symbol"), signal_age_s, max_nexus_age, price_drift * 100, max_drift_pct * 100,
+            )
+            return False, "stale_nexus_signal", metrics
+
     # ── Fin bloqueos duros ────────────────────────────────────────────────
 
     range_pct = float(candidate.get("estimated_range_pct", 2.0) or 2.0) / 100.0

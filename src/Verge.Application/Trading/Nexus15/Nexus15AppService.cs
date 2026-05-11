@@ -139,16 +139,22 @@ public class Nexus15AppService : ApplicationService, INexus15AppService
         }
     }
 
-    /// <summary>Analiza el mercado top y recopila las mejores opciones.</summary>
+    /// <summary>
+    /// Analiza el mercado top usando la misma watchlist de 200 símbolos del agente,
+    /// ordenada por cambio de precio absoluto (los más volátiles primero).
+    /// Esto asegura que el Top 5 de la UI coincide con lo que el agente realmente ve.
+    /// </summary>
     public async Task<List<Nexus15ResultDto>> AnalyzeTopAvailableAsync(int topN = 5)
     {
-        _logger.LogInformation("🚀 [Nexus15] Initiating Top 20 Market Massive Scan... targeting top {Top}", topN);
-        
+        _logger.LogInformation("🚀 [Nexus15] Initiating Top Market Scan (agent watchlist)... targeting top {Top}", topN);
+
+        // Use ALL tickers from multi-exchange, no arbitrary volume cap, sorted by price movement.
+        // This mirrors the agent's own scanning universe (200 symbols by volatility).
         var tickers = await _marketData.GetTickersAsync();
         var topSymbols = tickers
-            .Where(t => t.Volume > 1_000_000m)
+            .Where(t => t.Volume > 500_000m && t.Symbol.EndsWith("USDT"))
             .OrderByDescending(t => Math.Abs(t.PriceChangePercent))
-            .Take(40)
+            .Take(80)   // Scan 80 to ensure we fill top 5 with strong directional signals
             .Select(t => t.Symbol)
             .ToList();
 

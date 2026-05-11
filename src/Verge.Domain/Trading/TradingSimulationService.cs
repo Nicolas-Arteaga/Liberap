@@ -13,6 +13,8 @@ public class TradingSimulationService : DomainService
     private const decimal MaintenanceMarginRate = 0.005m;  // 0.5% (MMR)
     private const decimal FundingRate = 0.0001m;       // Simulated 0.01% every 8h
 
+    public static readonly System.Threading.SemaphoreSlim ProfileLock = new System.Threading.SemaphoreSlim(1, 1);
+
     /// <summary>
     /// Calculates initial margin (collateral required to open the position).
     /// InitialMargin = Amount / Leverage

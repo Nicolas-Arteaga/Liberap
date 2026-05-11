@@ -147,6 +147,18 @@ public class MarketDataManager : DomainService
                 return JsonSerializer.Deserialize<List<MarketCandleModel>>((string)cached!)!;
             }
 
+            // 0. Force SPOT for prefixed coins (better liquidity and avoids barcode charts)
+            if (cleanSymbol.StartsWith("10000") || cleanSymbol.StartsWith("1000") || cleanSymbol.StartsWith("100"))
+            {
+                var spotResult = await FetchKlinesAsync(cleanSymbol, binanceInterval, limit, endTime, futures: false);
+                if (spotResult.Count >= 5)
+                {
+                    var spotTtl = binanceInterval switch { "1m" => 30, "5m" => 120, _ => 300 };
+                    await _redis.StringSetAsync(cacheKey, JsonSerializer.Serialize(spotResult), TimeSpan.FromSeconds(spotTtl));
+                    return spotResult;
+                }
+            }
+
             // 1. PRIMARY SOURCE: Local Python Multi-Exchange Service (Bypasses Binance Ban)
             var pythonCandles = await FetchKlinesFromPythonAsync(cleanSymbol, binanceInterval, limit);
             if (pythonCandles != null && pythonCandles.Count >= 5)
@@ -159,6 +171,12 @@ public class MarketDataManager : DomainService
             if (result.Count < 5)
             {
                 result = await FetchKlinesAsync(cleanSymbol, binanceInterval, limit, endTime, futures: false);
+            }
+
+            // 3. SECONDARY FALLBACK: Bybit REST
+            if (result.Count < 5)
+            {
+                result = await FetchKlinesFromBybitRESTAsync(cleanSymbol, binanceInterval, limit, endTime);
             }
 
             if (result.Count > 0)
@@ -190,7 +208,17 @@ public class MarketDataManager : DomainService
                 ? $"{FuturesBaseUrl}/fapi/v1/klines"
                 : $"{BinanceBaseUrl}/api/v3/klines";
 
-            var url = $"{baseEndpoint}?symbol={cleanSymbol}&interval={binanceInterval}&limit={limit}";
+            var symbolToFetch = cleanSymbol;
+            decimal multiplier = 1m;
+
+            if (!futures)
+            {
+                if (cleanSymbol.StartsWith("10000")) { symbolToFetch = cleanSymbol.Substring(5); multiplier = 10000m; }
+                else if (cleanSymbol.StartsWith("1000")) { symbolToFetch = cleanSymbol.Substring(4); multiplier = 1000m; }
+                else if (cleanSymbol.StartsWith("100")) { symbolToFetch = cleanSymbol.Substring(3); multiplier = 100m; }
+            }
+
+            var url = $"{baseEndpoint}?symbol={symbolToFetch}&interval={binanceInterval}&limit={limit}";
             if (endTime.HasValue) url += $"&endTime={endTime.Value}";
 
             Logger.LogInformation($"📡 Fetching Klines ({(futures ? "Futures" : "Spot")}): {url}");
@@ -214,10 +242,10 @@ public class MarketDataManager : DomainService
                     result.Add(new MarketCandleModel
                     {
                         Timestamp = raw[0].GetInt64(),
-                        Open = ParseDecimal(raw[1]),
-                        High = ParseDecimal(raw[2]),
-                        Low = ParseDecimal(raw[3]),
-                        Close = ParseDecimal(raw[4]),
+                        Open = ParseDecimal(raw[1]) * multiplier,
+                        High = ParseDecimal(raw[2]) * multiplier,
+                        Low = ParseDecimal(raw[3]) * multiplier,
+                        Close = ParseDecimal(raw[4]) * multiplier,
                         Volume = ParseDecimal(raw[5])
                     });
                 }
@@ -228,6 +256,56 @@ public class MarketDataManager : DomainService
         finally
         {
             _binanceGate.Release();
+        }
+    }
+
+    private async Task<List<MarketCandleModel>> FetchKlinesFromBybitRESTAsync(string cleanSymbol, string binanceInterval, int limit, long? endTime)
+    {
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            var bbInterval = binanceInterval switch
+            {
+                "1m" => "1", "3m" => "3", "5m" => "5", "15m" => "15",
+                "30m" => "30", "1h" => "60", "2h" => "120", "4h" => "240",
+                "1d" => "D", "1w" => "W", "1M" => "M", _ => "15"
+            };
+
+            var url = $"https://api.bybit.com/v5/market/kline?category=linear&symbol={cleanSymbol}&interval={bbInterval}&limit={limit}";
+            if (endTime.HasValue) url += $"&end={endTime.Value}";
+
+            Logger.LogInformation($"📡 Fetching Klines (Bybit): {url}");
+            var response = await client.GetAsync(url);
+            if (!response.IsSuccessStatusCode) return new List<MarketCandleModel>();
+
+            var content = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(content);
+            var root = doc.RootElement;
+            
+            if (root.GetProperty("retCode").GetInt32() != 0) return new List<MarketCandleModel>();
+            
+            var list = root.GetProperty("result").GetProperty("list").EnumerateArray().ToList();
+            list.Reverse(); // Bybit returns newest first
+
+            var result = new List<MarketCandleModel>();
+            foreach (var item in list)
+            {
+                result.Add(new MarketCandleModel
+                {
+                    Timestamp = long.Parse(item[0].GetString()!),
+                    Open = decimal.Parse(item[1].GetString()!, System.Globalization.CultureInfo.InvariantCulture),
+                    High = decimal.Parse(item[2].GetString()!, System.Globalization.CultureInfo.InvariantCulture),
+                    Low = decimal.Parse(item[3].GetString()!, System.Globalization.CultureInfo.InvariantCulture),
+                    Close = decimal.Parse(item[4].GetString()!, System.Globalization.CultureInfo.InvariantCulture),
+                    Volume = decimal.Parse(item[5].GetString()!, System.Globalization.CultureInfo.InvariantCulture)
+                });
+            }
+            return result;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"⚠️ Error fetching klines from Bybit: {ex.Message}");
+            return new List<MarketCandleModel>();
         }
     }
 

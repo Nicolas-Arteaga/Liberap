@@ -29,6 +29,17 @@
       No hay trades simulados en tu cuenta todavía.
     </div>
   } @else {
+    <div class="version-stats-container">
+      @for (vs of versionStats(); track vs.version) {
+        <div class="version-stat-card">
+          <h3>{{ vs.version }}</h3>
+          <div class="stat-row"><span>Trades:</span> <strong>{{ vs.count }}</strong></div>
+          <div class="stat-row"><span>Win Rate:</span> <strong>{{ vs.count > 0 ? ((vs.wins / ((vs.wins + vs.losses) || 1)) * 100).toFixed(1) : 0 }}%</strong></div>
+          <div class="stat-row"><span>PnL:</span> <strong [class.win]="vs.totalPnl >= 0" [class.loss]="vs.totalPnl < 0">{{ vs.totalPnl | number:'1.2-2' }} USDT</strong></div>
+        </div>
+      }
+    </div>
+
     <div class="audit-layout">
       <div class="audit-table-card">
         <table class="audit-table">

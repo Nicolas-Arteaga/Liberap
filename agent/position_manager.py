@@ -118,7 +118,7 @@ class PositionManager:
         except Exception as e:
             logger.error(f"Error fetching active trades: {e}")
             
-        return []
+        return None
         
     def get_virtual_balance(self) -> float:
         """

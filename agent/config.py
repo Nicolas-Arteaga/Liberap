@@ -10,6 +10,16 @@ import time
 PYTHON_SERVICE_URL = os.getenv("PYTHON_SERVICE_URL", "http://localhost:8005")
 ABP_BACKEND_URL = os.getenv("ABP_BACKEND_URL", "https://localhost:44396")
 
+# Redis Signal Bridge — sincroniza el agente con las señales en tiempo real del backend C#.
+# El backend publica en 'verge:superscore' cada vez que detecta un score >= 40 en CUALQUIER símbolo.
+# El agente escucha ese canal y puede operar TRUTHUSDT, SHIBUSDT, o cualquier token que explote,
+# aunque no esté en el watchlist hardcodeado.
+# REDIS_URL: apuntar al mismo Redis que usa docker-compose (servicio 'redis')
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+# Score mínimo del backend C# para que el bridge inyecte el símbolo como candidato.
+# Default: mismo que MIN_CONFLUENCE_SCORE para consistencia.
+BRIDGE_MIN_SCORE = float(os.getenv("BRIDGE_MIN_SCORE", "45.0"))
+
 # LiquiditySweepEngine (python-service /lse/scan y /lse/scan-batch)
 LSE_ENABLED = os.getenv("LSE_ENABLED", "true").lower() in ("1", "true", "yes")
 LSE_MIN_SCORE = float(os.getenv("LSE_MIN_SCORE", "65"))
@@ -72,7 +82,9 @@ AGENT_MAX_CANDIDATES_PER_CYCLE = int(os.getenv("AGENT_MAX_CANDIDATES_PER_CYCLE",
 # Si > 0: solo los ranks 1..N pueden ejecutar candidatos no-LSE (evita rank 9 Nexus "por descarte").
 AGENT_MAX_RANK_FOR_NEXUS_FALLBACK = int(os.getenv("AGENT_MAX_RANK_FOR_NEXUS_FALLBACK", "0"))
 
-MAX_OPEN_POSITIONS = 2              # scalping: máx 2 simultáneas (antes 3)
+MAX_OPEN_POSITIONS = 3              # 3 posiciones simultáneas para scalping
+MIN_ENTRY_NEXUS  = float(os.getenv("MIN_ENTRY_NEXUS",  "70.0"))  # Nexus mínimo para abrir slot libre
+MIN_UPGRADE_NEXUS = float(os.getenv("MIN_UPGRADE_NEXUS", "80.0"))  # Nexus mínimo para reemplazar la peor posición
 MAX_TRADES_PER_DAY = 100
 MAX_POSITION_DURATION_HOURS = 48
 # Zombie timeout para scalping 15m: si el trade lleva más de N velas abierto con PnL negativo, se cierra.
@@ -83,7 +95,7 @@ DEFAULT_LEVERAGE = 1
 # 4. Intelligence Thresholds
 MIN_NEXUS_CONFIDENCE = 75.0          # antes 70 — menos trades, más certeza en 15m
 MIN_SCAR_SCORE = 4
-MIN_CONFLUENCE_SCORE = 45.0          # antes 35 — elimina señales de ruido
+MIN_CONFLUENCE_SCORE = 50.0          # antes 45 — datos risk_v3: <50 = 15% WR, subido empiricamente
 
 # 5. Take Profit / Stop Loss — Fat Tail Strategy (asimétrica)
 # SL amplio: 0.8× el rango estimado para que el ruido de 15m no active el stop.

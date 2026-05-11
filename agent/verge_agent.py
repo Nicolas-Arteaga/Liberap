@@ -30,6 +30,7 @@ from position_manager import PositionManager
 from report_engine import ReportEngine
 from setup_validator import validate_pre_trade
 from circuit_breaker import get_breakers
+from redis_signal_bridge import RedisSignalBridge
 
 # LSE: LiquiditySweepEngine — runs BEFORE Nexus-15 to catch sweeps early
 # The LSE Python service endpoint is part of the same python-service container.
@@ -85,6 +86,19 @@ class VergeAgent:
 
         self._tier3_index = 0
 
+        # ── Redis Signal Bridge ──────────────────────────────────────────
+        # Escucha el canal verge:superscore publicado por el backend C#.
+        # Cuando el backend detecta TRUTHUSDT al 75%, el agente lo recibe
+        # en tiempo real y lo inyecta como candidato sin importar el watchlist.
+        _redis_url = getattr(config, "REDIS_URL", "redis://localhost:6379/0")
+        self._bridge = RedisSignalBridge(redis_url=_redis_url)
+        bridge_ok = self._bridge.start()
+        if not bridge_ok:
+            logger.warning(
+                "[BRIDGE] Redis Signal Bridge no disponible. "
+                "El agente opera normalmente pero sin señales en tiempo real del backend C#."
+            )
+
         logger.info(
             f"Watchlist: T1={len(config.WATCHLIST_TIER1)} | "
             f"T2={len(config.WATCHLIST_TIER2)} | "
@@ -133,7 +147,7 @@ class VergeAgent:
     ) -> str:
         snap = {
             "schema_version": 1,
-            "agent_version": "risk_v3.0",
+            "agent_version": "risk_v5",
             "experiment": "post_sl_fix_may_2026",
             "captured_at_utc": datetime.utcnow().isoformat() + "Z",
             "agent_meta": {
@@ -157,7 +171,7 @@ class VergeAgent:
 
     def run(self):
         logger.info(f"Agent started. Loop interval: {config.LOOP_INTERVAL_SECONDS}s.")
-        logger.info("[CONFIG] Agent Version: risk_v3.0 (segregated metrics ON)")
+        logger.info("[CONFIG] Agent Version: risk_v4.0 (segregated metrics ON)")
 
         if not self.auth.get_token():
             logger.error("FATAL: Could not authenticate with ABP Backend. Stopping.")
@@ -293,6 +307,137 @@ class VergeAgent:
                 "[Step 5/6] Added LSE candidate into final ranking: %s | Score=%.1f",
                 lse_candidate.get("symbol"),
                 float(lse_candidate.get("confluence_score", 0.0)),
+            )
+
+        # ── Redis Signal Bridge: inyectar señales calientes con validación en tiempo real ──
+        # Antes de inyectar cualquier señal del backend C#, el agente verifica que siga vigente:
+        #   1. Edad: descarta señales más viejas que BRIDGE_MAX_AGE_SECONDS
+        #   2. Precio: si el precio se movió > BRIDGE_MAX_PRICE_MOVE_PCT desde el signal → SKIP (llegamos tarde)
+        #   3. Nexus-15 fresco: llama Nexus-15 on-demand sobre el símbolo y valida que la dirección coincida
+        #   4. Solo si pasa todo → se inyecta al ranking
+        self._bridge.purge_expired()
+        bridge_min_score  = float(getattr(config, "BRIDGE_MIN_SCORE", config.MIN_CONFLUENCE_SCORE))
+        bridge_max_age    = float(getattr(config, "BRIDGE_MAX_AGE_SECONDS", 480.0))   # 8 min default
+        bridge_max_move   = float(getattr(config, "BRIDGE_MAX_PRICE_MOVE_PCT", 0.025)) # 2.5% default
+        hot_signals = self._bridge.get_hot_signals(
+            min_score=bridge_min_score,
+            max_age_seconds=bridge_max_age,
+        )
+        existing_syms = {c.get("symbol") for c in candidates}
+        injected = 0
+
+        for sig in hot_signals:
+            sym          = sig["symbol"]
+            bridge_score = sig["score"]
+            sig_age_s    = time.time() - sig.get("received_at", 0)
+
+            if self._should_skip(sym):
+                continue
+
+            if sym in existing_syms:
+                # Símbolo que el watchlist ya encontró: solo boost de score, sin re-validar
+                for c in candidates:
+                    if c.get("symbol") == sym:
+                        old = c.get("confluence_score", 0)
+                        c["confluence_score"] = max(old, bridge_score)
+                        c["bridge_boosted"] = True
+                continue
+
+            # ── Validación 1: Precio actual vs precio al momento del signal ──────
+            # Si el mercado ya se movió > bridge_max_move desde que llegó la señal,
+            # significa que el movimiento ya ocurrió y entrar ahora es perseguir el precio.
+            current_px = self.fetcher.get_current_price(sym)
+            if current_px and current_px > 0:
+                sig_price = float(sig.get("price", 0) or 0)
+                if sig_price > 0:
+                    move_pct = abs(current_px - sig_price) / sig_price
+                    if move_pct > bridge_max_move:
+                        logger.info(
+                            "[BRIDGE] SKIP %s — precio ya se movió %.2f%% desde el signal "
+                            "(límite=%.1f%%, age=%.0fs). Llegamos tarde.",
+                            sym, move_pct * 100, bridge_max_move * 100, sig_age_s,
+                        )
+                        continue
+
+            # ── Validación 2: Nexus-15 fresco — confirma dirección en tiempo real ──
+            # Llama al python-service Nexus-15 sobre el símbolo AHORA, no con el caché.
+            # Si Nexus-15 dice WAIT o dirección opuesta, la señal del bridge ya expiró.
+            try:
+                nexus_fresh = self.signals.get_nexus15_prediction(sym)
+            except Exception as ex:
+                logger.warning("[BRIDGE] No se pudo obtener Nexus-15 para %s: %s — descartando.", sym, ex)
+                continue
+
+            if not nexus_fresh:
+                logger.info(
+                    "[BRIDGE] SKIP %s — Nexus-15 sin datos frescos (age=%.0fs).", sym, sig_age_s
+                )
+                continue
+
+            nexus_dir   = str(nexus_fresh.get("prediction", "")).upper()   # BULLISH/BEARISH/NEUTRAL
+            nexus_conf  = float(nexus_fresh.get("ai_confidence", 0))
+            nexus_reco  = str(nexus_fresh.get("features", {}).get("nexus_recommendation", "")).lower()
+            bridge_dir  = sig.get("direction", "").upper()
+
+            # Si Nexus-15 recomienda esperar → señal caducada
+            if nexus_reco in ("wait", "hold"):
+                logger.info(
+                    "[BRIDGE] SKIP %s — Nexus-15 fresco recomienda '%s' (bridge_dir=%s, age=%.0fs).",
+                    sym, nexus_reco, bridge_dir, sig_age_s,
+                )
+                continue
+
+            # Mapa de dirección normalizado
+            bull_dirs = {"BULLISH", "LONG", "LONG "}
+            bear_dirs = {"BEARISH", "SHORT"}
+            bridge_is_bull = bridge_dir in bull_dirs
+            nexus_is_bull  = nexus_dir in bull_dirs
+            nexus_is_bear  = nexus_dir in bear_dirs
+
+            direction_conflict = (bridge_is_bull and nexus_is_bear) or (not bridge_is_bull and nexus_is_bull)
+            if direction_conflict:
+                logger.info(
+                    "[BRIDGE] SKIP %s — Nexus-15 contradice dirección bridge "
+                    "(bridge=%s nexus=%s conf=%.0f%% age=%.0fs).",
+                    sym, bridge_dir, nexus_dir, nexus_conf, sig_age_s,
+                )
+                continue
+
+            # ── Todo OK: señal vigente y confirmada ─────────────────────────────
+            # Score final = promedio ponderado bridge (40%) + Nexus-15 fresco (60%)
+            final_score = bridge_score * 0.40 + nexus_conf * 0.60
+            direction_map = {"LONG": 0, "BULLISH": 0, "SHORT": 1, "BEARISH": 1}
+            side = direction_map.get(bridge_dir, 0)
+
+            bridge_cand = {
+                "symbol":           sym,
+                "confluence_score": final_score,
+                "nexus_confidence": nexus_conf,
+                "trade_direction":  bridge_dir,
+                "side":             side,
+                "source":           "redis_bridge",
+                "bridge_regime":    sig.get("regime", "Unknown"),
+                "bridge_score_raw": bridge_score,
+                "bridge_age_s":     round(sig_age_s, 1),
+                "agent_audit_context": {
+                    "nexus15": self._json_safe_for_audit(nexus_fresh),
+                    "scar":    {},
+                    "bridge":  sig,
+                },
+            }
+            candidates.append(bridge_cand)
+            existing_syms.add(sym)
+            injected += 1
+            logger.info(
+                "[BRIDGE] ✅ VALIDADO %s | BridgeScore=%.0f | Nexus15=%.0f%% | "
+                "FinalScore=%.1f | Dir=%s | Age=%.0fs",
+                sym, bridge_score, nexus_conf, final_score, bridge_dir, sig_age_s,
+            )
+
+        if injected > 0:
+            logger.info(
+                "[BRIDGE] %d símbolo(s) inyectados y validados desde backend C# "
+                "(bridge_stats=%s)", injected, self._bridge.stats()
             )
 
         if not candidates:
@@ -1030,6 +1175,11 @@ class VergeAgent:
             logger.warning("[SKIP] %s invalid market price for setup validation", symbol)
             return False
 
+        # Update staleness metric for VETO #4
+        if candidate.get("scored_at"):
+            import time
+            candidate["scored_at_age_s"] = time.time() - candidate["scored_at"]
+
         ok, code, setup_metrics = validate_pre_trade(candidate, market_px)
         if not ok:
             logger.info("[SKIP] %s — %s | metrics=%s", code, symbol, setup_metrics)
@@ -1090,17 +1240,53 @@ class VergeAgent:
         )
         pos_details["agent_decision_json"] = audit_json
 
-        open_count = self.state.get_position_count()
+        # nexus_confidence es el % real de Nexus-15 (0 para candidatos LSE que no usan Nexus)
+        nexus_conf_pct = float(candidate.get("nexus_confidence", 0))
+        is_lse = candidate.get("source") == "LSE"
+
+        # Sync con el backend para evitar desincronización de límite de posiciones
+        active_trades = self.positions.get_active_trades()
+        if active_trades is None:
+            logger.error("[LIMIT] No se pudo conectar al backend para verificar posiciones activas. Abortando trade.")
+            return False
+
+        open_count = len(active_trades)
         if open_count >= config.MAX_OPEN_POSITIONS:
-            min_upgrade_score = float(getattr(config, "MIN_UPGRADE_SCORE", 80.0))
-            if confluence >= min_upgrade_score:
-                logger.info(f"Cupos llenos, pero candidato excelente (Score: {confluence:.1f} >= {min_upgrade_score}). Intentando Upgrade.")
+            if is_lse:
+                # LSE nunca tiene nexus_confidence — usa confluence_score con umbral LSE_MIN_SCORE
+                lse_upgrade_threshold = float(getattr(config, "LSE_MIN_SCORE", 65.0))
+                can_upgrade = confluence >= lse_upgrade_threshold
+                gate_desc = f"LSE Score={confluence:.1f} vs umbral={lse_upgrade_threshold}"
+            else:
+                # Nexus / SCAR / Bridge — usar nexus_confidence real
+                min_upgrade_nexus = float(getattr(config, "MIN_UPGRADE_NEXUS", 80.0))
+                can_upgrade = nexus_conf_pct >= min_upgrade_nexus
+                gate_desc = f"Nexus={nexus_conf_pct:.1f}% vs umbral={min_upgrade_nexus}%"
+
+            if can_upgrade:
+                logger.info(
+                    f"Cupos llenos, candidato élite ({gate_desc}). Reemplazando peor posición..."
+                )
                 closed_worst = self._close_worst_position()
                 if not closed_worst:
-                    logger.info("No se pudo cerrar la peor posicion. Upgrade abortado.")
+                    logger.info("No se pudo cerrar la peor posición. Upgrade abortado.")
                     return False
             else:
-                logger.info(f"[LIMIT] Max positions open y candidato (Score: {confluence:.1f}) no supera {min_upgrade_score} para Upgrade.")
+                logger.info(
+                    f"[LIMIT] Slots llenos. {gate_desc} — no alcanza para reemplazar posición existente."
+                )
+                return False
+
+        # Slot libre: mínimo de calidad según fuente
+        if is_lse:
+            # LSE ya fue filtrado por LSE_MIN_SCORE antes de llegar acá — siempre OK
+            pass
+        else:
+            min_entry_nexus = float(getattr(config, "MIN_ENTRY_NEXUS", 70.0))
+            if nexus_conf_pct < min_entry_nexus:
+                logger.info(
+                    f"[SKIP] Nexus={nexus_conf_pct:.1f}% < {min_entry_nexus}% mínimo para slot libre."
+                )
                 return False
 
         logger.info(f"Opening {candidate['trade_direction']} on {symbol}. Margin: {pos_details['margin']}")
@@ -1247,6 +1433,10 @@ class VergeAgent:
         """Ensures all backend positions have TP/SL and syncs local state."""
         logger.info("Verifying TP/SL and syncing active positions...")
         active_trades = self.positions.get_active_trades()
+        if active_trades is None:
+            logger.error("Failed to fetch active trades from backend during repair. Skipping.")
+            return
+
         local_positions = self.state.get_open_positions()
         local_ids = [p.get("trade_id") for p in local_positions]
 
@@ -1298,5 +1488,41 @@ class VergeAgent:
 
 
 if __name__ == "__main__":
-    agent = VergeAgent()
-    agent.run()
+    import os
+    import sys
+    
+    # Singleton Guard: evita que el agente corra duplicado
+    LOCK_FILE = os.path.join(config.DATA_DIR, "agent.lock")
+    
+    if os.path.exists(LOCK_FILE):
+        try:
+            # Intentamos borrarlo. Si falla, es porque otra instancia lo tiene abierto.
+            os.remove(LOCK_FILE)
+        except Exception:
+            print("\n❌ [FATAL] El agente ya está corriendo en otra ventana o proceso.")
+            print("❌ Por favor, cerrá las otras ventanas de consola antes de abrir una nueva.\n")
+            sys.exit(1)
+
+    try:
+        # Creamos el lock file
+        with open(LOCK_FILE, "w") as f:
+            f.write(str(os.getpid()))
+        
+        # Registrar limpieza al salir
+        import atexit
+        def cleanup():
+            if os.path.exists(LOCK_FILE):
+                try: os.remove(LOCK_FILE)
+                except: pass
+        atexit.register(cleanup)
+
+        agent = VergeAgent()
+        agent.run()
+    except KeyboardInterrupt:
+        print("\nDeteniendo agente...")
+    except Exception as e:
+        print(f"Error crítico: {e}")
+    finally:
+        if os.path.exists(LOCK_FILE):
+            try: os.remove(LOCK_FILE)
+            except: pass
