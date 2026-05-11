@@ -1,0 +1,131 @@
+.strategies-container {
+  padding: 1rem;
+  max-width: 1200px;
+  margin: 0 auto;
+
+  .dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+
+    .title-section {
+      h1 {
+        margin: 0;
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: white;
+      }
+      .subtitle {
+        margin: 0.25rem 0 0;
+        font-size: 0.9rem;
+        color: rgba(255,255,255,0.5);
+      }
+    }
+  }
+
+  .comparison-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 1rem;
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    margin-bottom: 2rem;
+    border: 1px solid rgba(255,255,255,0.08);
+
+    .bar-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.25rem;
+
+      .label {
+        font-size: 0.75rem;
+        color: rgba(255,255,255,0.4);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .value {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: white;
+
+        &.positive, &.success { color: #00C47D; }
+        &.negative { color: #FF4D4D; }
+        &.warning { color: #FFB000; }
+      }
+    }
+
+    .bar-divider {
+      width: 1px;
+      height: 30px;
+      background: rgba(255,255,255,0.1);
+    }
+  }
+
+  .profiles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+    padding-bottom: 5rem;
+  }
+
+  .empty-state {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 5rem 2rem;
+    text-align: center;
+    background: rgba(255,255,255,0.02);
+    border: 2px dashed rgba(255,255,255,0.1);
+    border-radius: 24px;
+
+    ion-icon {
+      font-size: 4rem;
+      color: rgba(255,255,255,0.1);
+      margin-bottom: 1.5rem;
+    }
+
+    h3 {
+      color: white;
+      margin: 0 0 0.5rem;
+    }
+
+    p {
+      color: rgba(255,255,255,0.4);
+      margin-bottom: 2rem;
+      max-width: 300px;
+    }
+  }
+
+  .loader-box {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 5rem;
+    color: rgba(255,255,255,0.5);
+  }
+}
+
+@media (max-width: 768px) {
+  .profiles-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    
+    app-glass-button {
+      width: 100%;
+    }
+  }
+
+  .comparison-bar {
+    display: none;
+  }
+}

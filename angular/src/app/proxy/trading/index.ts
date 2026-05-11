@@ -17,6 +17,7 @@ export * from './risk-tolerance.enum';
 export * from './signal-confidence.enum';
 export * from './signal-direction.enum';
 export * from './simulated-trade.service';
+export * from './strategy-profile.service';
 export * from './trade-status.enum';
 export * from './trading-level.enum';
 export * from './trading-stage.enum';

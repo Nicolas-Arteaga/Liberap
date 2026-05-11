@@ -19,6 +19,7 @@ public class VergeApplicationAutoMapperProfile : Profile
         CreateMap<AnalysisLog, AnalysisLogDto>();
         CreateMap<SimulatedTrade, SimulatedTradeDto>();
         CreateMap<AlertHistory, AlertHistoryDto>();
+        CreateMap<StrategyProfile, StrategyProfileDto>();
         
         CreateMap<CreateUpdateTradingStrategyDto, TradingStrategy>();
         CreateMap<CreateUpdateTradingAlertDto, TradingAlert>();

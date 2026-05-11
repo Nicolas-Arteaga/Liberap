@@ -20,6 +20,13 @@ function configureRoutes(routesService: RoutesService) {
         order: 1,
         layout: eLayoutType.application,
       },
+      {
+        path: 'strategies',
+        name: 'Estrategias',
+        iconClass: 'fas fa-flask',
+        order: 2,
+        layout: eLayoutType.application,
+      },
     ]);
   };
 }

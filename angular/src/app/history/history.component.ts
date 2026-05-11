@@ -1,6 +1,7 @@
 import { Component, Input, Output, EventEmitter, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { CardContentComponent } from 'src/shared/components/card-content/card-content.component';
 import { SelectComponent } from 'src/shared/components/select/select.component';
 import { PaymentChartComponent } from 'src/shared/components/payment-chart/payment-chart.component';
@@ -13,6 +14,8 @@ import { TradingSignalrService } from '../services/trading-signalr.service';
 import { SimulatedTradeDto, SimulationPerformanceDto } from '../proxy/trading/dtos/models';
 import { Subscription } from 'rxjs';
 import { PaginatorComponent } from '../shared/components/paginator/paginator.component';
+import { StrategyProfileService } from '../strategies/services/strategy-profile.service';
+import { StrategyProfileDto } from '../proxy/trading/dtos/models';
 
 interface FilterOption {
   value: string;
@@ -38,9 +41,11 @@ interface ChartData {
     GlassButtonComponent,
     IonIcon,
     LabelComponent,
-    PaginatorComponent
+    PaginatorComponent,
+    FormsModule
   ],
-  templateUrl: './history.component.html'
+  templateUrl: './history.component.html',
+  styleUrls: ['./history.component.scss']
 })
 export class HistoryComponent {
   @Input() onBack?: () => void;
@@ -49,6 +54,7 @@ export class HistoryComponent {
   private iconService = inject(IconService);
   private simulatedTradeService = inject(SimulatedTradeService);
   private signalrService = inject(TradingSignalrService);
+  private strategyService = inject(StrategyProfileService);
   // Datos del gráfico de performance
   chartData: ChartData[] = [];
   private subs = new Subscription();
@@ -61,6 +67,8 @@ export class HistoryComponent {
   tradeType: string = 'all';
   dateRange: string = 'last30';
   versionFilter: string = 'all';
+  strategyFilter: string = 'all';
+  strategies: StrategyProfileDto[] = [];
 
   // Paginación
   currentPage: number = 1;
@@ -126,6 +134,11 @@ export class HistoryComponent {
       if (this.versionFilter !== 'all') {
         const v = this.getTradeVersion(item);
         if (v !== this.versionFilter) return false;
+      }
+
+      // 4. Filtro por Estrategia
+      if (this.strategyFilter !== 'all') {
+        if (item.strategyProfileId !== this.strategyFilter) return false;
       }
 
       return true;
@@ -222,6 +235,10 @@ export class HistoryComponent {
 
     this.simulatedTradeService.getPerformanceStats().subscribe(stats => {
       this.performanceStats = stats;
+    });
+
+    this.strategyService.getAll().subscribe(data => {
+      this.strategies = data;
     });
   }
 
@@ -323,6 +340,20 @@ export class HistoryComponent {
       return `Hoy ${date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`;
     }
     return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  }
+
+  getStrategy(id?: string): StrategyProfileDto | undefined {
+    return this.strategies.find(s => s.id === id);
+  }
+
+  getStrategyLabel(id?: string): string {
+    if (!id) return 'Legacy';
+    return this.getStrategy(id)?.name || 'Unknown';
+  }
+
+  getStrategyColor(id?: string): string {
+    if (!id) return 'rgba(255,255,255,0.4)';
+    return this.getStrategy(id)?.color || '#00C47D';
   }
 }
 

@@ -1,0 +1,49 @@
+<app-card-content class="strategy-card">
+  <div class="card-header">
+    <div class="identity">
+      <div class="color-indicator" [style.background-color]="profile.color || '#00C47D'"></div>
+      <div class="name-box">
+        <h3>{{ profile.name }}</h3>
+        <p class="description">{{ profile.description || 'Sin descripción' }}</p>
+      </div>
+    </div>
+    <div class="status-box">
+      <span class="status-badge" [class.active]="profile.isActive">
+        {{ profile.isActive ? 'Activo' : 'Inactivo' }}
+      </span>
+      <app-toggle [value]="profile.isActive" (valueChange)="onToggle()"></app-toggle>
+    </div>
+  </div>
+
+  <div class="metrics-grid">
+    <div class="metric-item">
+      <span class="label">Win Rate</span>
+      <span class="value">{{ (profile.winRate || 0) | number:'1.1-1' }}%</span>
+    </div>
+    <div class="metric-item">
+      <span class="label">Trades</span>
+      <span class="value">{{ profile.totalTrades || 0 }}</span>
+    </div>
+    <div class="metric-item">
+      <span class="label">Net PnL</span>
+      <span class="value" [class.positive]="(profile.netPnL || 0) > 0" [class.negative]="(profile.netPnL || 0) < 0">
+        {{ (profile.netPnL || 0) | number:'1.2-2' }}%
+      </span>
+    </div>
+    <div class="metric-item">
+      <span class="label">Avg RR</span>
+      <span class="value">{{ (profile.avgRR || 0) | number:'1.2-2' }}</span>
+    </div>
+  </div>
+
+  <div class="card-footer">
+    <div class="main-actions">
+      <app-glass-button icon="stats-chart-outline" label="Rendimiento" (click)="viewPerformance.emit(profile.id)"></app-glass-button>
+      <app-glass-button icon="create-outline" label="Editar" (click)="edit.emit(profile.id)"></app-glass-button>
+    </div>
+    <div class="secondary-actions">
+      <app-glass-button icon="copy-outline" (click)="duplicate.emit(profile.id)"></app-glass-button>
+      <app-glass-button icon="trash-outline" variant="danger" (click)="delete.emit(profile.id)"></app-glass-button>
+    </div>
+  </div>
+</app-card-content>

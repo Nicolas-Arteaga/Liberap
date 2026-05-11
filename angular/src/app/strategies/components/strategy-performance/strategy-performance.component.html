@@ -1,0 +1,50 @@
+<div class="performance-container">
+  <header class="perf-header">
+    <div class="back-nav" (click)="goBack()">
+      <ion-icon name="arrow-back-outline"></ion-icon>
+      <span>Estrategias</span>
+    </div>
+    <h1>Rendimiento del Perfil</h1>
+    <app-glass-button icon="download-outline" label="Exportar CSV"></app-glass-button>
+  </header>
+
+  <div class="summary-cards" *ngIf="performance">
+    <app-card-content class="stat-card">
+      <span class="label">Win Rate</span>
+      <span class="value success">{{ performance.winRate }}%</span>
+    </app-card-content>
+    <app-card-content class="stat-card">
+      <span class="label">Total PnL</span>
+      <span class="value" [class.success]="performance.netPnL > 0">{{ performance.netPnL }}%</span>
+    </app-card-content>
+    <app-card-content class="stat-card">
+      <span class="label">Avg RR</span>
+      <span class="value">{{ performance.avgRR }}</span>
+    </app-card-content>
+    <app-card-content class="stat-card">
+      <span class="label">Trades</span>
+      <span class="value">{{ performance.totalTrades }}</span>
+    </app-card-content>
+  </div>
+
+  <div class="charts-row">
+    <app-card-content class="chart-box main-chart">
+      <h3>Curva de Equity (USDT)</h3>
+      <div class="chart-placeholder">
+        <p>Gráfico de Equity Curve pendiente de integración</p>
+      </div>
+    </app-card-content>
+    
+    <app-card-content class="chart-box secondary-chart">
+      <h3>Top Símbolos</h3>
+      <div class="symbol-list" *ngIf="performance">
+        <div class="symbol-item" *ngFor="let s of performance.topSymbols">
+          <span class="sym">{{ s.symbol }}</span>
+          <span class="pnl" [class.success]="s.pnl > 0" [class.danger]="s.pnl < 0">
+            {{ s.pnl > 0 ? '+' : '' }}{{ s.pnl }} USDT
+          </span>
+        </div>
+      </div>
+    </app-card-content>
+  </div>
+</div>

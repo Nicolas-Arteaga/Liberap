@@ -83,8 +83,10 @@ class VergeAgent:
         self.risk      = RiskManager(self.fetcher)
         self.positions = PositionManager(self.auth)
         self.report    = ReportEngine()
+        self.active_profiles = []
 
         self._tier3_index = 0
+        self._last_profile_sync = 0
 
         # ── Redis Signal Bridge ──────────────────────────────────────────
         # Escucha el canal verge:superscore publicado por el backend C#.
@@ -105,6 +107,7 @@ class VergeAgent:
             f"T3={len(config.WATCHLIST_TIER3)} | "
             f"Total={len(config.WATCHLIST)}"
         )
+        self.active_profiles = []
 
     @staticmethod
     def _json_safe_for_audit(obj, depth: int = 0):
@@ -205,8 +208,26 @@ class VergeAgent:
         else:
             logger.warning("[MultiExchange] ALL exchange sources unavailable — running on cache only.")
 
-        # 1. Monitor open positions (always runs, uses cached live prices)
-        logger.info("[Step 1/6] Checking open positions...")
+        # 1. Sync profiles and monitor open positions
+        logger.info("[Step 1/6] Syncing strategy profiles and checking positions...")
+        self.active_profiles = self.positions.get_strategy_profiles()
+        if not self.active_profiles:
+            logger.info("No active strategy profiles found in DB. Using legacy config-based profile.")
+            # Create a virtual legacy profile to maintain backward compatibility
+            self.active_profiles = [{
+                "id": None,
+                "name": "Legacy Config Profile",
+                "minConfluenceScore": config.MIN_CONFLUENCE_SCORE,
+                "minNexusConfidence": getattr(config, "MIN_ENTRY_NEXUS", 70.0),
+                "tpMultiplier": getattr(config, "TP_MULTIPLIER", 2.0),
+                "slMultiplier": getattr(config, "SL_MULTIPLIER", 1.0),
+                "marginPerTrade": getattr(config, "MAX_MARGIN_PER_TRADE_USD", 150),
+                "maxOpenPositions": config.MAX_OPEN_POSITIONS,
+                "isActive": True
+            }]
+        else:
+            logger.info(f"Loaded {len(self.active_profiles)} active strategy profiles: {[p['name'] for p in self.active_profiles]}")
+
         self._manage_open_positions()
         logger.info("[Step 1/6] Done.")
 
@@ -440,94 +461,82 @@ class VergeAgent:
                 "(bridge_stats=%s)", injected, self._bridge.stats()
             )
 
-        if not candidates:
-            logger.info("No candidates met the minimum confluence score.")
-            return
-
         if self.state.is_lse_kill_switch_active():
-            n0 = len(candidates)
+            logger.info("[KILL] LSE Kill switch active. Filtering LSE candidates.")
             candidates = [c for c in candidates if c.get("source") != "LSE"]
-            logger.info(
-                "[KILL] Candidatos LSE filtrados (pausa por racha): %s → %s",
-                n0,
-                len(candidates),
-            )
-            if not candidates:
-                logger.info("Sin candidatos tras pausa LSE por pérdidas consecutivas.")
-                return
 
-        # 6. Rankear y probar candidatos en orden (fallback si el #1 no pasa validación)
-        candidates.sort(key=lambda x: x["confluence_score"], reverse=True)
+        # 6. For EACH active profile: rank and execute candidates
+        active_trades = self.positions.get_active_trades() or []
+        
+        for profile in self.active_profiles:
+            p_name = profile.get("name", "Unknown")
+            p_id = profile.get("id")
+            logger.info(f"--- Strategy Execution: {p_name} ---")
 
-        batch_ok = True
-        if LSE_ENABLED and LSE_REQUIRE_SCAN_BEFORE_ENTRY:
-            sp = int(lse_meta.get("symbols_processed") or 0)
-            queued = int(lse_meta.get("items_queued") or 0)
-            ok = bool(lse_meta.get("batch_http_ok"))
-            called = bool(lse_meta.get("batch_called"))
-            min_symbols_ok = sp >= LSE_MIN_SYMBOLS_PROCESSED_GATE
-            full_scan_ok = (not LSE_REQUIRE_ALL_QUEUED_PROCESSED) or (queued > 0 and sp >= queued)
-            batch_ok = bool(called and ok and min_symbols_ok and full_scan_ok)
-            if not batch_ok:
-                logger.warning(
-                    "[GATE] LSE batch incompleto — candidatos LSE no elegibles este ciclo "
-                    "(batch_called=%s, http_ok=%s, symbols_processed=%s, queued=%s). "
-                    "Nexus/SCAR siguen disponibles.",
-                    called,
-                    ok,
-                    sp,
-                    queued,
-                )
+            # Filter candidates for THIS profile
+            p_candidates = []
+            min_score = float(profile.get("minConfluenceScore", config.MIN_CONFLUENCE_SCORE))
+            min_nexus = float(profile.get("minNexusConfidence", 70.0))
 
-        max_try = int(getattr(config, "AGENT_MAX_CANDIDATES_PER_CYCLE", 10))
-        ranked = candidates[:max_try]
-        executed = False
+            batch_ok = True
+            if LSE_ENABLED and LSE_REQUIRE_SCAN_BEFORE_ENTRY:
+                sp = int(lse_meta.get("symbols_processed") or 0)
+                queued = int(lse_meta.get("items_queued") or 0)
+                ok = bool(lse_meta.get("batch_http_ok"))
+                called = bool(lse_meta.get("batch_called"))
+                min_symbols_ok = sp >= LSE_MIN_SYMBOLS_PROCESSED_GATE
+                full_scan_ok = (not LSE_REQUIRE_ALL_QUEUED_PROCESSED) or (queued > 0 and sp >= queued)
+                batch_ok = bool(called and ok and min_symbols_ok and full_scan_ok)
 
-        for idx, cand in enumerate(ranked):
-            sym = cand.get("symbol", "")
-            src = cand.get("source") or "Nexus"
-            rank_no = idx + 1
+            for c in candidates:
+                if c.get("source") == "LSE":
+                    if not batch_ok: continue
+                    if self.state.is_lse_symbol_cooldown_active(c.get("symbol")): continue
 
-            if cand.get("source") == "LSE":
-                if not batch_ok:
-                    logger.info("[SKIP] rank=%s/%s %s LSE (batch_gate)", rank_no, len(ranked), sym)
+                if c.get("confluence_score", 0) < min_score:
                     continue
-                if self.state.is_lse_symbol_cooldown_active(sym):
-                    logger.info("[SKIP] rank=%s/%s %s lse_symbol_cooldown", rank_no, len(ranked), sym)
+                if c.get("source") != "LSE" and c.get("nexus_confidence", 0) < min_nexus:
                     continue
+                
+                # Check if sources are allowed
+                allowed = profile.get("allowedSources")
+                if allowed and c.get("source") not in allowed:
+                    continue
+                
+                # Profile side filters
+                allow_long = profile.get("allowLong", True)
+                allow_short = profile.get("allowShort", True)
+                side = int(c.get("side", 0))
+                if side == 0 and not allow_long: continue
+                if side == 1 and not allow_short: continue
 
-            max_nexus_rank = int(getattr(config, "AGENT_MAX_RANK_FOR_NEXUS_FALLBACK", 0))
-            if max_nexus_rank > 0 and cand.get("source") != "LSE" and rank_no > max_nexus_rank:
-                logger.info(
-                    "[SKIP] rank=%s/%s %s nexus_fallback_rank_limit (max_non_lse_rank=%s)",
-                    rank_no,
-                    len(ranked),
-                    sym,
-                    max_nexus_rank,
-                )
+                p_candidates.append(c)
+
+            if not p_candidates:
+                logger.info(f"No candidates pass profile {p_name}")
                 continue
 
-            logger.info(
-                "🎯 TRY rank=%s/%s %s | source=%s | Score=%s | Dir=%s | Nexus=%s%% | SCAR=%s",
-                rank_no,
-                len(ranked),
-                sym,
-                src,
-                cand.get("confluence_score"),
-                cand.get("trade_direction"),
-                cand.get("nexus_confidence"),
-                cand.get("scar_score"),
-            )
+            p_candidates.sort(key=lambda x: x["confluence_score"], reverse=True)
+            
+            # Check slot availability for this profile
+            p_max_pos = int(profile.get("maxOpenPositions", config.MAX_OPEN_POSITIONS))
+            p_active_count = len([t for t in active_trades if t.get("strategyProfileId") == p_id])
+            
+            if p_active_count >= p_max_pos:
+                logger.info(f"[LIMIT] Profile {p_name} is full ({p_active_count}/{p_max_pos}). Skipping new trades.")
+                continue
 
-            if self._execute_trade(cand):
-                executed = True
-                break
-
-        if not executed:
-            logger.info(
-                "Sin ejecución este ciclo (se probaron hasta %s candidatos del ranking).",
-                len(ranked),
-            )
+            # Try to execute top candidate
+            max_try = 3
+            p_ranked = p_candidates[:max_try]
+            
+            for idx, cand in enumerate(p_ranked):
+                sym = cand.get("symbol", "")
+                if self._execute_trade(cand, profile=profile):
+                    logger.info(f"✅ Trade executed for profile {p_name} on {sym}")
+                    # Update active_trades list for next profile in same cycle
+                    active_trades = self.positions.get_active_trades() or []
+                    break
 
 
     # ─────────────────────────────────────────────────────────
@@ -1165,7 +1174,7 @@ class VergeAgent:
                 return True
         return False
 
-    def _execute_trade(self, candidate: dict) -> bool:
+    def _execute_trade(self, candidate: dict, profile: dict = None) -> bool:
         symbol = candidate["symbol"]
         balance = self.positions.get_virtual_balance()
         setup_metrics: dict = {}
@@ -1180,17 +1189,21 @@ class VergeAgent:
             import time
             candidate["scored_at_age_s"] = time.time() - candidate["scored_at"]
 
-        ok, code, setup_metrics = validate_pre_trade(candidate, market_px)
+        ok, code, setup_metrics = validate_pre_trade(candidate, market_px, profile=profile)
         if not ok:
-            logger.info("[SKIP] %s — %s | metrics=%s", code, symbol, setup_metrics)
+            logger.info("[SKIP] %s — %s | profile=%s | metrics=%s", code, symbol, profile.get("name") if profile else "Legacy", setup_metrics)
             return False
 
         setup_skip = "ok"
 
-        pos_details = self.risk.calculate_position(symbol, candidate, available_balance=balance)
+        pos_details = self.risk.calculate_position(symbol, candidate, available_balance=balance, profile=profile)
 
         if not pos_details:
             return False
+        
+        # Tag with strategy ID
+        if profile and profile.get("id"):
+            pos_details["strategy_profile_id"] = profile["id"]
 
         if setup_metrics:
             sz = pos_details.get("lse_sizing") or pos_details.get("nexus_sizing") or {}
@@ -1377,7 +1390,15 @@ class VergeAgent:
 
             # ── Zombie timeout: más de MAX_TRADE_DURATION_CANDLES velas de 15m con PnL negativo ──
             if not should_close:
-                max_candles = int(getattr(config, "MAX_TRADE_DURATION_CANDLES", 16))
+                # Buscar profile correspondiente
+                p_id = pos.get("strategy_profile_id")
+                profile = next((p for p in self.active_profiles if p.get("id") == p_id), None)
+                
+                if profile:
+                    max_candles = int(profile.get("maxTradeDurationCandles", 16))
+                else:
+                    max_candles = int(getattr(config, "MAX_TRADE_DURATION_CANDLES", 16))
+
                 candle_seconds = 900  # 15m en segundos
                 seconds_open = (datetime.utcnow() - opened_at).total_seconds()
                 candles_open = seconds_open / candle_seconds

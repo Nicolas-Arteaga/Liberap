@@ -34,7 +34,7 @@
 
     <!-- Botón principal -->
     <div class="mt-2">
-      <app-glass-button class="w-full" [routerLink]="hasActiveStrategies ? '/dashboard' : '/configure'">
+      <app-glass-button class="w-full" [routerLink]="hasActiveStrategies ? '/dashboard' : '/strategies'">
         <span *ngIf="!hasActiveStrategies">🚀 Configurar Mi Primera Estrategia</span>
         <span *ngIf="hasActiveStrategies">Super Grafico</span>
       </app-glass-button>
@@ -70,7 +70,7 @@
       </app-card-icon>
 
       <app-card-icon icon="settings-outline" variant="stacked" [useCardContentBg]="true"
-        routerLink="/configure-strategy">
+        (click)="navigateToStrategies()" class="cursor-pointer">
         <p class="text-white text-sm">Estrategia</p>
       </app-card-icon>
     </div>

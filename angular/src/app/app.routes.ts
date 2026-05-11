@@ -42,9 +42,24 @@ export const APP_ROUTES: Routes = [
           .then(c => c.DashboardAdvancedComponent),
       },
       {
-        path: 'configure-strategy',
-        loadComponent: () => import('./configure-strategy/configure-strategy.component')
-          .then(c => c.ConfigureStrategyComponent),
+        path: 'strategies',
+        loadComponent: () => import('./strategies/components/strategies-dashboard/strategies-dashboard.component')
+          .then(c => c.StrategiesDashboardComponent),
+      },
+      {
+        path: 'strategies/new',
+        loadComponent: () => import('./strategies/components/strategy-editor/strategy-editor.component')
+          .then(c => c.StrategyEditorComponent),
+      },
+      {
+        path: 'strategies/edit/:id',
+        loadComponent: () => import('./strategies/components/strategy-editor/strategy-editor.component')
+          .then(c => c.StrategyEditorComponent),
+      },
+      {
+        path: 'strategies/performance/:id',
+        loadComponent: () => import('./strategies/components/strategy-performance/strategy-performance.component')
+          .then(c => c.StrategyPerformanceComponent),
       },
       {
         path: 'history',
@@ -103,6 +118,6 @@ export const APP_ROUTES: Routes = [
   },
   {
     path: '**',
-    redirectTo: '/login'
+    redirectTo: '/'
   }
 ];

@@ -35,6 +35,7 @@ class PositionManager:
             "slPrice": position_data.get("sl_price"),
             "tradingSignalId": position_data.get("tradingSignalId"),
             "agentDecisionJson": position_data.get("agent_decision_json"),
+            "strategyProfileId": position_data.get("strategy_profile_id"),
         }
         
         try:
@@ -183,3 +184,22 @@ class PositionManager:
             for s in signals:
                 ok = self.broadcast_signal(s) and ok
             return ok
+
+    def get_strategy_profiles(self) -> list:
+        """
+        Retrieves all active strategy profiles for the current user.
+        """
+        headers = self.auth_manager.get_auth_headers()
+        if not headers:
+            return []
+
+        url = f"{self.base_url}/api/app/strategy-profile"
+        try:
+            response = requests.get(url, headers=headers, verify=False, timeout=30)
+            if response.status_code == 200:
+                profiles = response.json()
+                return [p for p in profiles if p.get("isActive")]
+        except Exception as e:
+            logger.error(f"Error fetching strategy profiles: {e}")
+            
+        return []

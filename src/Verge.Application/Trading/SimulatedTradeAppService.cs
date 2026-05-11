@@ -229,6 +229,9 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
                 "⚠️ [Simulation] OpenTrade for {Symbol} sin AgentDecisionJson — la pantalla de auditoría no podrá mostrar el contexto Nexus/SCAR/LSE para este trade.",
                 symbol);
 
+        if (input.StrategyProfileId.HasValue)
+            trade.StrategyProfileId = input.StrategyProfileId;
+
         await _tradeRepo.InsertAsync(trade, autoSave: true);
 
         var dto = MapToDto(trade);

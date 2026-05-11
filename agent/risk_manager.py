@@ -20,19 +20,21 @@ class RiskManager:
         symbol: str,
         signal_data: dict,
         available_balance: float = None,
+        profile: dict = None,
     ) -> Optional[Dict[str, Any]]:
         balance = available_balance if available_balance is not None else config.VIRTUAL_CAPITAL_BASE
 
         if signal_data.get("source") == "LSE":
-            return self._calculate_position_lse(symbol, signal_data, balance)
+            return self._calculate_position_lse(symbol, signal_data, balance, profile)
 
-        return self._calculate_position_nexus_style(symbol, signal_data, balance)
+        return self._calculate_position_nexus_style(symbol, signal_data, balance, profile)
 
     def _calculate_position_lse(
         self,
         symbol: str,
         signal_data: dict,
         balance: float,
+        profile: dict = None,
     ) -> Optional[Dict[str, Any]]:
         entry_signal = signal_data.get("lse_entry_price")
         sl_s = signal_data.get("lse_stop_loss")
@@ -75,7 +77,11 @@ class RiskManager:
         notional = qty * cp
         margin = notional / max(lev, 1)
 
-        cap_m = float(getattr(config, "MAX_MARGIN_PER_TRADE_USD", 500))
+        if profile:
+            cap_m = float(profile.get("marginPerTrade", 150))
+        else:
+            cap_m = float(getattr(config, "MAX_MARGIN_PER_TRADE_USD", 500))
+
         if margin > cap_m:
             scale = cap_m / margin
             margin = cap_m
@@ -117,43 +123,43 @@ class RiskManager:
         symbol: str,
         signal_data: dict,
         balance: float,
+        profile: dict = None,
     ) -> Optional[Dict[str, Any]]:
-        cp = self.fetcher.get_current_price(symbol)
-        if cp <= 0:
-            logger.error(
-                "Cannot calculate position for %s, invalid entry price: %s",
-                symbol,
-                cp,
-            )
+        current_price = self.fetcher.get_current_price(symbol)
+        if current_price <= 0:
+            logger.error("Cannot calculate position for %s, invalid entry price", symbol)
             return None
 
-        range_pct = signal_data.get("estimated_range_pct", 2.0) / 100.0
+        cp = float(current_price)
 
-        # 1. Definir SL estructural base (setup)
-        sl_distance_pct = range_pct * float(getattr(config, "SL_MULTIPLIER", 1.0))
+        # 1. Distancia SL basada en volatilidad (atr o estimated_range)
+        atr_signal = signal_data.get("atr_signal")
+        est_range = signal_data.get("estimated_range_pct")
 
-        # Obtener ATR desde features
-        audit_context = signal_data.get("agent_audit_context", {})
-        nexus_features = audit_context.get("nexus15", {}).get("features", {})
-        try:
-            atr_percent = float(nexus_features.get("atr_percent", 1.0))
-        except (TypeError, ValueError):
-            atr_percent = 1.0
+        if profile:
+            sl_mult = float(profile.get("slMultiplier", 0.8))
+        else:
+            sl_mult = float(getattr(config, "SL_MULTIPLIER", 0.8))
 
-        # Normalizar ATR — atr_percent es siempre un porcentaje (ej. 0.51 = 0.51%), siempre dividir por 100
-        atr_pct = atr_percent / 100.0
-        # Clampear a rango razonable: mínimo 0.1%, máximo 5%
-        atr_pct = max(0.001, min(atr_pct, 0.05))
+        if atr_signal and float(atr_signal) > 0:
+            sl_distance_price = float(atr_signal) * sl_mult
+            sl_distance_pct = sl_distance_price / cp
+        elif est_range and float(est_range) > 0:
+            sl_distance_pct = float(est_range) * sl_mult
+        else:
+            sl_distance_pct = 0.015 * sl_mult
 
-        # 2. Aplicar piso ATR
-        min_sl_pct = max(atr_pct * 1.5, 0.005)
+        min_sl_pct = float(getattr(config, "MIN_STOP_PCT_OF_PRICE", 0.002))
         if sl_distance_pct < min_sl_pct:
             sl_distance_pct = min_sl_pct
 
         sl_distance_price = cp * sl_distance_pct
 
         # Limitar RR según setup_type (caps hard por tipo de señal)
-        rr_target = float(getattr(config, "TP_MULTIPLIER", 2.0))
+        if profile:
+            rr_target = float(profile.get("tpMultiplier", 3.0))
+        else:
+            rr_target = float(getattr(config, "TP_MULTIPLIER", 2.0))
         nexus_conf = signal_data.get("nexus_confidence", 0)
         setup_type = "Momentum Burst" if nexus_conf > 80 else ("Trend Following" if nexus_conf > 60 else "Mean Reversion")
 
@@ -201,7 +207,10 @@ class RiskManager:
         notional = qty * cp
         margin = notional / max(lev, 1)
 
-        cap_m = float(getattr(config, "MAX_MARGIN_PER_TRADE_USD", 150.0))
+        if profile:
+            cap_m = float(profile.get("marginPerTrade", 150))
+        else:
+            cap_m = float(getattr(config, "MAX_MARGIN_PER_TRADE_USD", 500))
         if margin > cap_m:
             scale = cap_m / margin
             margin = cap_m
@@ -216,6 +225,10 @@ class RiskManager:
             margin *= scale
             qty *= scale
             notional = max_no
+
+        # Metadata para logs
+        atr_pct = (float(atr_signal) / cp) if (atr_signal and float(atr_signal) > 0) else 0
+        range_pct = sl_distance_pct
 
         # Validación post-caps
         real_risk_usd = qty * stop_distance

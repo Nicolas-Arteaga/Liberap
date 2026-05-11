@@ -51,6 +51,12 @@ public class SimulatedTrade : FullAuditedAggregateRoot<Guid>
     /// </summary>
     public string? AgentDecisionJson { get; set; }
 
+    /// <summary>
+    /// Links this trade to the StrategyProfile that generated it.
+    /// Null for trades opened before multi-strategy was implemented.
+    /// </summary>
+    public Guid? StrategyProfileId { get; set; }
+
     protected SimulatedTrade() { }
 
     public SimulatedTrade(

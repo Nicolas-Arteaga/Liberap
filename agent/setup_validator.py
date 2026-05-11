@@ -36,9 +36,21 @@ def lse_reasoning_blocks_trade(candidate: dict) -> bool:
     return False
 
 
+def validate_pre_trade(
+    candidate: dict, current_price: float, profile: dict = None
+) -> Tuple[bool, str, Dict[str, Any]]:
+    """
+    Validación principal. 
+    Si se pasa 'profile', usa sus umbrales. Si no, usa config.py (Legacy).
+    """
+    if candidate.get("source") == "LSE":
+        return validate_lse_setup(candidate, current_price, profile)
+
+    return validate_nexus_confluence_setup(candidate, current_price, profile)
+
+
 def validate_lse_setup(
-    candidate: dict,
-    current_price: float,
+    candidate: dict, current_price: float, profile: dict = None
 ) -> Tuple[bool, str, Dict[str, Any]]:
     """Reglas duras LSE (spring LONG side 0 en producción actual)."""
     metrics: Dict[str, Any] = {}
@@ -91,13 +103,17 @@ def validate_lse_setup(
         metrics["risk_abs"] = risk_w
         metrics["reward_abs"] = reward_w
 
-        min_rr = float(getattr(config, "MIN_RR_DEFAULT", 1.5))
-        dm = str(candidate.get("lse_detection_mode") or "").lower()
-        if dm == "aggressive":
-            min_rr = float(getattr(config, "MIN_RR_AGGRESSIVE_LSE", 2.0))
+        # Usar umbral del profile si existe
+        if profile:
+            min_rr = float(profile.get("minRR", 1.5))
+        else:
+            min_rr = float(getattr(config, "MIN_RR_DEFAULT", 1.5))
+            dm = str(candidate.get("lse_detection_mode") or "").lower()
+            if dm == "aggressive":
+                min_rr = float(getattr(config, "MIN_RR_AGGRESSIVE_LSE", 2.0))
 
         if rr < min_rr:
-            logger.info("[SKIP] low_rr rr=%s min_rr=%s mode=%s", rr, min_rr, dm)
+            logger.info("[SKIP] low_rr rr=%s min_rr=%s", rr, min_rr)
             return False, "low_rr", metrics
 
         atr_f = float(atr) if atr is not None else 0.0
@@ -162,8 +178,7 @@ def validate_lse_setup(
 
 
 def validate_nexus_confluence_setup(
-    candidate: dict,
-    current_price: float,
+    candidate: dict, current_price: float, profile: dict = None
 ) -> Tuple[bool, str, Dict[str, Any]]:
     """
     Mismas ideas operativas que LSE: RR mínimo, TP/stop no microscópicos vs precio.
@@ -184,14 +199,13 @@ def validate_nexus_confluence_setup(
     # Extraer features del contexto de auditoría Nexus-15
     audit_ctx = candidate.get("agent_audit_context", {})
     nexus15_ctx = audit_ctx.get("nexus15", {})
-    nexus_features = nexus15_ctx.get("features", {}) if isinstance(nexus15_ctx, dict) else {}
+    nexus_features = (
+        nexus15_ctx.get("features", {}) if isinstance(nexus15_ctx, dict) else {}
+    )
 
-    nexus_recommendation = str(nexus15_ctx.get("recommendation", "") if isinstance(nexus15_ctx, dict) else "").strip()
     rsi_14 = float(nexus_features.get("rsi_14", 50) or 50)
     upthrust_detected = bool(nexus_features.get("upthrust_detected", False))
     candle_body_ratio = float(nexus_features.get("candle_body_ratio", 1.0) or 1.0)
-    volume_ratio_20 = float(nexus_features.get("volume_ratio_20", 1.0) or 1.0)
-    volume_surge_bullish = bool(nexus_features.get("volume_surge_bullish", False))
     explosion_bearish = bool(nexus_features.get("explosion_bearish", False))
     explosion_bullish = bool(nexus_features.get("explosion_bullish", False))
     consecutive_bull_bars = int(nexus_features.get("consecutive_bull_bars", 0) or 0)
@@ -199,67 +213,40 @@ def validate_nexus_confluence_setup(
     macd_hist = float(nexus_features.get("macd_histogram", 0) or 0)
     ma7 = float(nexus_features.get("ma7", 0) or 0)
 
-    # ── VETO #1: Pump exhaustion — bearish vol explosion, RSI overbought, no bullish explosion
-    # Exactamente lo que pasó en WALUSDT: el volumen explotó pero era VENDEDOR (smart money
-    # saliéndose del pump). Entrar LONG en ese momento es comprar la punta de la vela.
+    # ── VETO #1: Pump exhaustion
     if side == 0 and explosion_bearish and not explosion_bullish and rsi_14 > 68:
-        logger.info(
-            "[VETO] pump_exhaust_long — %s | explosion_bearish=True explosion_bullish=False RSI=%.1f",
-            candidate.get("symbol"), rsi_14,
-        )
         return False, "pump_exhaust_long", metrics
 
-    # ── VETO #2: Bearish explosion + zero bull momentum + RSI > 65
-    # Sin velas alcistas consecutivas + volumen bajista + RSI elevado = el movimiento ya terminó.
-    if side == 0 and explosion_bearish and consecutive_bull_bars == 0 and rsi_14 > 65:
-        logger.info(
-            "[VETO] no_momentum_bearish_vol — %s | explosion_bearish=True consecutive_bull_bars=0 RSI=%.1f",
-            candidate.get("symbol"), rsi_14,
-        )
-        return False, "no_momentum_bearish_vol", metrics
+    # ── VETO #6: RSI Extreme Exhaustion (Parametrizado por Profile) ──────
+    if profile:
+        max_rsi_long = float(profile.get("maxRsiLong", 85.0))
+        min_rsi_short = float(profile.get("minRsiShort", 15.0))
+    else:
+        max_rsi_long = 85.0
+        min_rsi_short = 15.0
 
-    if rsi_14 > 78 and upthrust_detected:
-        logger.info(
-            "[SKIP] exhaustion_at_top — %s | RSI=%.1f upthrust=True",
-            candidate.get("symbol"), rsi_14,
-        )
-        return False, "exhaustion_at_top", metrics
+    if side == 0 and rsi_14 > max_rsi_long:
+        logger.info("[VETO] rsi_extreme — %s | RSI=%.1f > limit=%.1f", candidate.get("symbol"), rsi_14, max_rsi_long)
+        return False, "rsi_extreme_exhaustion", metrics
+
+    if side == 1 and rsi_14 < min_rsi_short:
+        logger.info("[VETO] rsi_extreme — %s | RSI=%.1f < limit=%.1f", candidate.get("symbol"), rsi_14, min_rsi_short)
+        return False, "rsi_extreme_exhaustion", metrics
+
+    # ── VETO #7: MA7 Distance (Parametrizado por Profile) ────────────────
+    if profile and ma7 > 0:
+        max_dist_pct = float(profile.get("maxMa7DistancePct", 3.5))
+        dist_pct = abs(cp - ma7) / ma7 * 100
+        if dist_pct > max_dist_pct:
+            logger.info("[VETO] ma7_distance — %s | dist=%.2f%% > limit=%.2f%%", candidate.get("symbol"), dist_pct, max_dist_pct)
+            return False, "ma7_distance_overextended", metrics
 
     # ── VETO #5: Bearish Rejection at Top ──────────────────────────────
-    # Evita entrar en LONG cuando hay señales claras de rechazo bajista en el techo:
-    # Upthrust o Mecho largo + MACD negativo + RSI elevado.
-    if side == 0:  # Solo para LONGs
+    if side == 0:
         if (upthrust_detected or upper_wick_ratio > 0.35) and macd_hist < 0 and rsi_14 > 65:
-            logger.info(
-                "[VETO] bearish_rejection_at_top — %s | upthrust=%s wick=%.2f macd=%.4f RSI=%.1f",
-                candidate.get("symbol"), upthrust_detected, upper_wick_ratio, macd_hist, rsi_14
-            )
             return False, "bearish_rejection_at_top", metrics
 
-    # ── VETO #6: RSI Extreme Exhaustion ────────────────────────────────
-    # Si el RSI está en territorio extremo, el movimiento ya ocurrió.
-    # RSI > 85 en LONG = sobrecompra severa, corrección inminente (caso BUSDT 87.7).
-    # RSI < 15 en SHORT = sobreventa severa, rebote inminente.
-    # Sin condiciones extra — el RSI extremo solo es suficiente para bloquear.
-    if side == 0 and rsi_14 > 85:
-        logger.info(
-            "[VETO] rsi_extreme_exhaustion — %s | RSI=%.1f (LONG bloqueado, sobrecompra extrema)",
-            candidate.get("symbol"), rsi_14,
-        )
-        return False, "rsi_extreme_exhaustion", metrics
-
-    if side == 1 and rsi_14 < 15:
-        logger.info(
-            "[VETO] rsi_extreme_exhaustion — %s | RSI=%.1f (SHORT bloqueado, sobreventa extrema)",
-            candidate.get("symbol"), rsi_14,
-        )
-        return False, "rsi_extreme_exhaustion", metrics
-
     if candle_body_ratio < 0.05:
-        logger.info(
-            "[SKIP] no_body_no_trade — %s | candle_body_ratio=%.3f (vela puro mecho)",
-            candidate.get("symbol"), candle_body_ratio,
-        )
         return False, "no_body_no_trade", metrics
 
     # Volume check only blocks when volume is very weak AND no surge at all

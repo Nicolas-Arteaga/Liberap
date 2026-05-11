@@ -1,0 +1,222 @@
+.editor-container {
+  padding: 1rem;
+  max-width: 800px;
+  margin: 0 auto;
+  opacity: 1;
+  transition: opacity 0.3s;
+
+  &.loading {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
+  .editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+
+    .back-nav {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: rgba(255,255,255,0.5);
+      cursor: pointer;
+      transition: color 0.2s;
+
+      &:hover { color: white; }
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: white;
+    }
+
+    .actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+  }
+
+  .tab-nav {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding-bottom: 0.5rem;
+
+    .tab-item {
+      color: rgba(255,255,255,0.4);
+      font-weight: 500;
+      cursor: pointer;
+      padding: 0.5rem 0;
+      position: relative;
+      transition: color 0.2s;
+
+      &.active {
+        color: #00C47D;
+        &::after {
+          content: '';
+          position: absolute;
+          bottom: -0.5rem;
+          left: 0;
+          right: 0;
+          height: 2px;
+          background: #00C47D;
+          box-shadow: 0 0 10px rgba(0, 196, 125, 0.5);
+        }
+      }
+
+      &.disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+      }
+
+      &:hover:not(.disabled) { color: white; }
+    }
+  }
+
+  .form-group {
+    margin-bottom: 1.5rem;
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.6);
+      margin-bottom: 0.5rem;
+    }
+
+    .label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+
+      .value-badge {
+        background: rgba(0, 196, 125, 0.15);
+        color: #00C47D;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: 0.8rem;
+      }
+    }
+
+    input[type="text"], 
+    input[type="number"],
+    textarea {
+      width: 100%;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 0.75rem;
+      color: white;
+      outline: none;
+      transition: border-color 0.2s;
+
+      &:focus { border-color: #00C47D; }
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: #00C47D;
+    }
+
+    .help-text {
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.3);
+      margin-top: 0.5rem;
+    }
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+
+  .toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255,255,255,0.03);
+    padding: 1rem;
+    border-radius: 8px;
+  }
+
+  .checkbox-group {
+    display: flex;
+    gap: 1.5rem;
+    
+    .cb-container {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      color: white;
+      font-size: 0.9rem;
+      
+      input { accent-color: #00C47D; }
+    }
+  }
+
+  .color-picker {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    
+    input[type="color"] {
+      border: none;
+      width: 32px;
+      height: 32px;
+      background: none;
+      cursor: pointer;
+    }
+    
+    .color-hex {
+      font-family: monospace;
+      color: rgba(255,255,255,0.5);
+    }
+  }
+
+  .veto-info {
+    margin-top: 2rem;
+    padding: 1rem;
+    background: rgba(255,176,0,0.05);
+    border-radius: 12px;
+    border: 1px solid rgba(255,176,0,0.1);
+
+    h4 {
+      margin: 0 0 1rem;
+      font-size: 0.9rem;
+      color: #FFB000;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .veto-item {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.5);
+
+      ion-icon { color: #FFB000; font-size: 1.1rem; }
+      strong { color: rgba(255,255,255,0.8); }
+
+      &:last-child { margin-bottom: 0; }
+    }
+  }
+
+  .editor-footer {
+    display: flex;
+    align-items: center;
+    margin-top: 3rem;
+    padding: 1.5rem 0;
+    border-top: 1px solid rgba(255,255,255,0.05);
+
+    .spacer { flex: 1; }
+  }
+}

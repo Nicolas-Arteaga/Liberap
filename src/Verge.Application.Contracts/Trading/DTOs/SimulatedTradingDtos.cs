@@ -35,6 +35,9 @@ public class SimulatedTradeDto : EntityDto<Guid>
 
     /// <summary>Serialized decision context when the trade was opened by the agent.</summary>
     public string? AgentDecisionJson { get; set; }
+
+    /// <summary>Which strategy profile generated this trade. Null for legacy trades.</summary>
+    public Guid? StrategyProfileId { get; set; }
 }
 
 public class OpenTradeInputDto
@@ -51,6 +54,9 @@ public class OpenTradeInputDto
 
     /// <summary>Optional audit blob from the Verge Python agent (Nexus / SCAR / LSE context).</summary>
     public string? AgentDecisionJson { get; set; }
+
+    /// <summary>Which strategy profile triggered this trade. Used to group results per strategy.</summary>
+    public Guid? StrategyProfileId { get; set; }
 }
 
 public class CloseTradeInputDto

@@ -1,0 +1,53 @@
+<div class="strategies-container">
+  <header class="dashboard-header">
+    <div class="title-section">
+      <h1>Estrategias de Trading</h1>
+      <p class="subtitle">{{ activeProfilesCount }} estrategias activas de {{ profiles.length }} configuradas</p>
+    </div>
+    <app-glass-button icon="add-outline" label="Nueva Estrategia" variant="solid" (click)="onNewStrategy()"></app-glass-button>
+  </header>
+
+  <div class="comparison-bar" *ngIf="profiles.length >= 2">
+    <div class="bar-item">
+      <span class="label">Portfolio PnL</span>
+      <span class="value" [class.positive]="totalNetPnL > 0" [class.negative]="totalNetPnL < 0">
+        {{ totalNetPnL | number:'1.2-2' }}%
+      </span>
+    </div>
+    <div class="bar-divider"></div>
+    <div class="bar-item">
+      <span class="label">Mejor Estrategia</span>
+      <span class="value success">Scalping LSE</span>
+    </div>
+    <div class="bar-divider"></div>
+    <div class="bar-item">
+      <span class="label">Riesgo Total</span>
+      <span class="value warning">Moderado</span>
+    </div>
+  </div>
+
+  <div class="profiles-grid">
+    <div *ngIf="isLoading" class="loader-box">
+      <p>Cargando perfiles...</p>
+    </div>
+
+    <ng-container *ngIf="!isLoading">
+      <app-strategy-card 
+        *ngFor="let profile of profiles" 
+        [profile]="profile"
+        (edit)="onEdit($event)"
+        (duplicate)="onDuplicate($event)"
+        (delete)="onDelete($event)"
+        (toggle)="onToggle($event)"
+        (viewPerformance)="onViewPerformance($event)">
+      </app-strategy-card>
+
+      <div class="empty-state" *ngIf="profiles.length === 0">
+        <ion-icon name="flask-outline"></ion-icon>
+        <h3>No tienes perfiles configurados</h3>
+        <p>Crea tu primera estrategia para empezar a automatizar tus operaciones.</p>
+        <app-glass-button icon="add-outline" label="Crear Perfil" (click)="onNewStrategy()"></app-glass-button>
+      </div>
+    </ng-container>
+  </div>
+</div>

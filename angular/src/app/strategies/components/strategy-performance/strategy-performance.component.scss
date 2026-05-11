@@ -1,0 +1,111 @@
+.performance-container {
+  padding: 1rem;
+  max-width: 1200px;
+  margin: 0 auto;
+
+  .perf-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+
+    .back-nav {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: rgba(255,255,255,0.5);
+      cursor: pointer;
+      &:hover { color: white; }
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: white;
+    }
+  }
+
+  .summary-cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 2rem;
+
+    .stat-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1.5rem;
+
+      .label {
+        font-size: 0.8rem;
+        color: rgba(255,255,255,0.4);
+        margin-bottom: 0.5rem;
+        text-transform: uppercase;
+      }
+
+      .value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: white;
+
+        &.success { color: #00C47D; }
+        &.danger { color: #FF4D4D; }
+      }
+    }
+  }
+
+  .charts-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1.5rem;
+
+    .chart-box {
+      padding: 1.5rem;
+      
+      h3 {
+        margin: 0 0 1.5rem;
+        font-size: 1rem;
+        color: white;
+      }
+
+      .chart-placeholder {
+        height: 300px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255,255,255,0.02);
+        border: 1px dashed rgba(255,255,255,0.1);
+        border-radius: 12px;
+        color: rgba(255,255,255,0.2);
+      }
+    }
+
+    .symbol-list {
+      .symbol-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        
+        .sym { font-weight: 600; color: white; }
+        .pnl {
+          &.success { color: #00C47D; }
+          &.danger { color: #FF4D4D; }
+        }
+
+        &:last-child { border-bottom: none; }
+      }
+    }
+  }
+}
+
+@media (max-width: 992px) {
+  .summary-cards {
+    grid-template-columns: 1fr 1fr;
+  }
+  .charts-row {
+    grid-template-columns: 1fr;
+  }
+}

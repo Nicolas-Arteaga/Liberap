@@ -144,5 +144,16 @@ public static class TradingModelBuilderExtensions
             b.Property(x => x.ActualPnlPct).HasColumnType("decimal(18,8)");
         });
 
+        builder.Entity<StrategyProfile>(b =>
+        {
+            b.ToTable("StrategyProfiles");
+            b.ConfigureByConvention();
+            b.Property(x => x.Name).IsRequired().HasMaxLength(128);
+            b.Property(x => x.AllowedSources).IsRequired().HasMaxLength(128);
+            b.Property(x => x.MarginPerTrade).HasColumnType("decimal(18,2)");
+            b.HasIndex(x => x.UserId);
+            b.HasIndex(x => x.IsActive);
+        });
+
     }
 }

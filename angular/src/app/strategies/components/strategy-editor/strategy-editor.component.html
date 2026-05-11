@@ -1,0 +1,183 @@
+<div class="editor-container" [class.loading]="isLoading">
+  <header class="editor-header">
+    <div class="back-nav" (click)="cancel()">
+      <ion-icon name="arrow-back-outline"></ion-icon>
+      <span>Volver</span>
+    </div>
+    <h1>{{ id ? 'Editar Estrategia' : 'Nueva Estrategia' }}</h1>
+    <div class="actions">
+      <app-glass-button label="Cancelar" (click)="cancel()"></app-glass-button>
+      <app-glass-button [label]="id ? 'Guardar Cambios' : 'Crear Perfil'" variant="solid" (click)="save()"></app-glass-button>
+    </div>
+  </header>
+
+  <nav class="tab-nav">
+    <div class="tab-item" [class.active]="activeTab === 'identity'" (click)="activeTab = 'identity'">Identidad</div>
+    <div class="tab-item" [class.active]="activeTab === 'filters'" (click)="activeTab = 'filters'">Filtros</div>
+    <div class="tab-item" [class.active]="activeTab === 'risk'" (click)="activeTab = 'risk'">Riesgo</div>
+    <div class="tab-item" [class.active]="activeTab === 'advanced'" (click)="activeTab = 'advanced'">Avanzado</div>
+    <div class="tab-item disabled">Backsim</div>
+  </nav>
+
+  <div class="tab-content">
+    <!-- Tab 1: Identidad -->
+    <div class="tab-pane" *ngIf="activeTab === 'identity'">
+      <app-card-content>
+        <div class="form-group">
+          <label>Nombre del Perfil</label>
+          <input type="text" [(ngModel)]="model.name" placeholder="Ej: Scalping Agresivo LSE">
+        </div>
+        <div class="form-group">
+          <label>Descripción</label>
+          <textarea [(ngModel)]="model.description" rows="3" placeholder="Explica brevemente la lógica de esta estrategia..."></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Color Identificador</label>
+            <div class="color-picker">
+              <input type="color" [(ngModel)]="model.color">
+              <span class="color-hex">{{ model.color }}</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Estado Inicial</label>
+            <div class="toggle-row">
+              <span>{{ model.isActive ? 'Activo' : 'Inactivo' }}</span>
+              <app-toggle [(value)]="model.isActive"></app-toggle>
+            </div>
+          </div>
+        </div>
+      </app-card-content>
+    </div>
+
+    <!-- Tab 2: Filtros de Entrada -->
+    <div class="tab-pane" *ngIf="activeTab === 'filters'">
+      <app-card-content>
+        <div class="section-title">Parámetros de Entrada</div>
+        
+        <div class="form-group">
+          <div class="label-row">
+            <label>Confluencia Mínima</label>
+            <span class="value-badge">{{ model.minConfluenceScore }}</span>
+          </div>
+          <input type="range" [(ngModel)]="model.minConfluenceScore" min="0" max="100">
+          <p class="help-text">Puntaje total mínimo requerido sumando todos los indicadores activos.</p>
+        </div>
+
+        <div class="form-group">
+          <div class="label-row">
+            <label>Nexus Mínimo %</label>
+            <span class="value-badge">{{ model.minNexusConfidence }}%</span>
+          </div>
+          <input type="range" [(ngModel)]="model.minNexusConfidence" min="0" max="100">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>RSI Máx (Long)</label>
+            <input type="number" [(ngModel)]="model.maxRsiLong" min="50" max="100">
+          </div>
+          <div class="form-group">
+            <label>RSI Mín (Short)</label>
+            <input type="number" [(ngModel)]="model.minRsiShort" min="0" max="50">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Fuentes Permitidas</label>
+          <div class="checkbox-group">
+            <label class="cb-container">
+              <input type="checkbox" [checked]="isSourceAllowed('Nexus')" (change)="toggleSource('Nexus')">
+              <span class="cb-label">Nexus</span>
+            </label>
+            <label class="cb-container">
+              <input type="checkbox" [checked]="isSourceAllowed('LSE')" (change)="toggleSource('LSE')">
+              <span class="cb-label">LSE</span>
+            </label>
+            <label class="cb-container">
+              <input type="checkbox" [checked]="isSourceAllowed('Bridge')" (change)="toggleSource('Bridge')">
+              <span class="cb-label">Bridge Redis</span>
+            </label>
+          </div>
+        </div>
+      </app-card-content>
+    </div>
+
+    <!-- Tab 3: Gestión de Riesgo -->
+    <div class="tab-pane" *ngIf="activeTab === 'risk'">
+      <app-card-content>
+        <div class="form-group">
+          <label>Margen por Operación (USDT)</label>
+          <input type="number" [(ngModel)]="model.marginPerTrade">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <div class="label-row">
+              <label>Mult. Take Profit</label>
+              <span class="value-badge">x{{ model.tpMultiplier }}</span>
+            </div>
+            <input type="range" [(ngModel)]="model.tpMultiplier" min="1" max="5" step="0.1">
+          </div>
+          <div class="form-group">
+            <div class="label-row">
+              <label>Mult. Stop Loss</label>
+              <span class="value-badge">x{{ model.slMultiplier }}</span>
+            </div>
+            <input type="range" [(ngModel)]="model.slMultiplier" min="0.2" max="2" step="0.1">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>RR Mínimo Requerido</label>
+            <input type="number" [(ngModel)]="model.minRR" step="0.1">
+          </div>
+          <div class="form-group">
+            <label>Posiciones Máximas</label>
+            <input type="number" [(ngModel)]="model.maxOpenPositions" min="1" max="10">
+          </div>
+        </div>
+      </app-card-content>
+    </div>
+
+    <!-- Tab 4: Avanzado -->
+    <div class="tab-pane" *ngIf="activeTab === 'advanced'">
+      <app-card-content>
+        <div class="form-group">
+          <label>Tiempo Máx en Posición (Velas 15m)</label>
+          <input type="number" [(ngModel)]="model.maxTradeDurationCandles">
+          <p class="help-text">Equivale a {{ model.maxTradeDurationCandles * 15 }} minutos.</p>
+        </div>
+
+        <div class="form-group">
+          <div class="toggle-row">
+            <div class="label-box">
+              <label>VETO RSI Extremo</label>
+              <p class="help-text">Bloquea trades si RSI > 85 o < 15 independientemente de otros filtros.</p>
+            </div>
+            <app-toggle [(value)]="model.extremeRsiVeto"></app-toggle>
+          </div>
+        </div>
+
+        <div class="veto-info">
+          <h4>VETOs Globales Activos</h4>
+          <div class="veto-item">
+            <ion-icon name="shield-checkmark-outline"></ion-icon>
+            <span><strong>Late Entry:</strong> No entra si el precio ya se alejó > 0.3% del punto ideal.</span>
+          </div>
+          <div class="veto-item">
+            <ion-icon name="shield-checkmark-outline"></ion-icon>
+            <span><strong>Liquidity Gate:</strong> Solo opera si hay suficiente profundidad en el orderbook.</span>
+          </div>
+        </div>
+      </app-card-content>
+    </div>
+  </div>
+
+  <footer class="editor-footer">
+    <app-glass-button label="Restablecer Defaults" (click)="resetToDefaults()"></app-glass-button>
+    <div class="spacer"></div>
+    <app-glass-button label="Guardar Estrategia" variant="solid" (click)="save()"></app-glass-button>
+  </footer>
+</div>

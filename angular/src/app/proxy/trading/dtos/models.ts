@@ -30,6 +30,32 @@ export interface AlertHistoryDto extends FullAuditedEntityDto<string> {
   tierDisplayName?: string;
 }
 
+export interface CreateUpdateStrategyProfileDto {
+  name?: string;
+  description?: string;
+  color?: string;
+  isActive: boolean;
+  minConfluenceScore: number;
+  minNexusConfidence: number;
+  maxRsiLong: number;
+  minRsiShort: number;
+  maxMa7DistancePct: number;
+  macdRequired?: string;
+  allowedSources?: string;
+  allowLong: boolean;
+  allowShort: boolean;
+  marginPerTrade: number;
+  tpMultiplier: number;
+  slMultiplier: number;
+  minRR: number;
+  maxOpenPositions: number;
+  maxTradeDurationCandles: number;
+  activeHoursStart?: string;
+  activeHoursEnd?: string;
+  enabledDays?: string[];
+  extremeRsiVeto: boolean;
+}
+
 export interface EnhancedAnalysisDto {
   rsi: number;
   sentiment: SentimentAnalysisDto;
@@ -52,6 +78,7 @@ export interface OpenTradeInputDto {
   tradingSignalId?: string;
   exchange?: string;
   agentDecisionJson?: string;
+  strategyProfileId?: string;
 }
 
 export interface SentimentAnalysisDto {
@@ -109,6 +136,7 @@ export interface SimulatedTradeDto extends EntityDto<string> {
   tradingSignalId?: string;
   exchange?: string;
   agentDecisionJson?: string;
+  strategyProfileId?: string;
 }
 
 export interface SimulationPerformanceDto {
@@ -117,6 +145,37 @@ export interface SimulationPerformanceDto {
   totalTrades: number;
   avgPerTrade: number;
   equityCurve: EquityPointDto[];
+}
+
+export interface StrategyProfileDto extends EntityDto<string> {
+  userId?: string;
+  name?: string;
+  description?: string;
+  color?: string;
+  isActive: boolean;
+  minConfluenceScore: number;
+  minNexusConfidence: number;
+  maxRsiLong: number;
+  minRsiShort: number;
+  maxMa7DistancePct: number;
+  macdRequired?: string;
+  allowedSources?: string;
+  allowLong: boolean;
+  allowShort: boolean;
+  marginPerTrade: number;
+  tpMultiplier: number;
+  slMultiplier: number;
+  minRR: number;
+  maxOpenPositions: number;
+  maxTradeDurationCandles: number;
+  activeHoursStart?: string;
+  activeHoursEnd?: string;
+  enabledDays?: string[];
+  extremeRsiVeto: boolean;
+  winRate?: number;
+  totalTrades?: number;
+  netPnL?: number;
+  avgRR?: number;
 }
 
 export interface TargetZoneDto {
