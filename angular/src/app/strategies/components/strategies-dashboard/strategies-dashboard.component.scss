@@ -1,131 +1,570 @@
-.strategies-container {
-  padding: 1rem;
-  max-width: 1200px;
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+$bg-deep:    #0b0d11;
+$bg-dark:    #111318;
+$bg-card:    #161a21;
+$border:     rgba(255,255,255,0.07);
+$text:       #f0f2f5;
+$muted:      rgba(255,255,255,0.45);
+$dim:        rgba(255,255,255,0.22);
+$accent:     #00C47D;
+$danger:     #FF4D4D;
+$warning:    #FFB000;
+
+.strategies-shell {
+  min-height: 100vh;
+  background: $bg-deep;
+  font-family: 'Inter', sans-serif;
+  color: $text;
+  padding: 2rem 2.5rem;
+  max-width: 1300px;
   margin: 0 auto;
+}
 
-  .dashboard-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 2rem;
+// ── Page Header ─────────────────────────────────────────────
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2rem;
 
-    .title-section {
-      h1 {
-        margin: 0;
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: white;
-      }
-      .subtitle {
-        margin: 0.25rem 0 0;
-        font-size: 0.9rem;
-        color: rgba(255,255,255,0.5);
-      }
-    }
-  }
-
-  .comparison-bar {
+  .header-left {
     display: flex;
     align-items: center;
-    justify-content: space-around;
-    padding: 1rem;
-    background: rgba(255,255,255,0.05);
-    backdrop-filter: blur(10px);
-    border-radius: 16px;
-    margin-bottom: 2rem;
-    border: 1px solid rgba(255,255,255,0.08);
-
-    .bar-item {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.25rem;
-
-      .label {
-        font-size: 0.75rem;
-        color: rgba(255,255,255,0.4);
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-      }
-
-      .value {
-        font-size: 1.1rem;
-        font-weight: 700;
-        color: white;
-
-        &.positive, &.success { color: #00C47D; }
-        &.negative { color: #FF4D4D; }
-        &.warning { color: #FFB000; }
-      }
-    }
-
-    .bar-divider {
-      width: 1px;
-      height: 30px;
-      background: rgba(255,255,255,0.1);
-    }
+    gap: 1rem;
   }
 
-  .profiles-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: 1.5rem;
-    padding-bottom: 5rem;
-  }
-
-  .empty-state {
-    grid-column: 1 / -1;
+  .page-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: rgba(0,196,125,0.12);
+    border: 1px solid rgba(0,196,125,0.25);
     display: flex;
-    flex-direction: column;
     align-items: center;
-    padding: 5rem 2rem;
-    text-align: center;
-    background: rgba(255,255,255,0.02);
-    border: 2px dashed rgba(255,255,255,0.1);
-    border-radius: 24px;
-
-    ion-icon {
-      font-size: 4rem;
-      color: rgba(255,255,255,0.1);
-      margin-bottom: 1.5rem;
-    }
-
-    h3 {
-      color: white;
-      margin: 0 0 0.5rem;
-    }
-
-    p {
-      color: rgba(255,255,255,0.4);
-      margin-bottom: 2rem;
-      max-width: 300px;
-    }
+    justify-content: center;
+    flex-shrink: 0;
+    ion-icon { font-size: 1.6rem; color: $accent; }
   }
 
-  .loader-box {
-    grid-column: 1 / -1;
-    text-align: center;
-    padding: 5rem;
-    color: rgba(255,255,255,0.5);
+  h1 {
+    margin: 0 0 0.2rem;
+    font-size: 1.5rem;
+    font-weight: 800;
+  }
+
+  .page-subtitle {
+    margin: 0;
+    font-size: 0.82rem;
+    color: $muted;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .dot-active {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: $accent;
+    box-shadow: 0 0 6px $accent;
+  }
+
+  .dot-sep { color: $dim; }
+}
+
+.new-strategy-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: $accent;
+  border: none;
+  border-radius: 10px;
+  color: #000;
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-family: inherit;
+  padding: 0.65rem 1.4rem;
+  cursor: pointer;
+  transition: all 0.25s;
+  box-shadow: 0 4px 20px rgba(0,196,125,0.3);
+
+  ion-icon { font-size: 1.1rem; }
+
+  &:hover {
+    background: #1ad98a;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 28px rgba(0,196,125,0.45);
   }
 }
 
-@media (max-width: 768px) {
-  .profiles-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .dashboard-header {
+// ── Stats Bar ────────────────────────────────────────────────
+.stats-bar {
+  display: flex;
+  align-items: center;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid $border;
+  border-radius: 14px;
+  padding: 1rem 2rem;
+  margin-bottom: 2rem;
+  backdrop-filter: blur(8px);
+
+  .stat-item {
+    display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-    
-    app-glass-button {
-      width: 100%;
-    }
+    align-items: center;
+    flex: 1;
+    gap: 0.25rem;
   }
 
-  .comparison-bar {
-    display: none;
+  .stat-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: $dim;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
+
+  .stat-value {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: $text;
+
+    &.positive { color: $accent; }
+    &.negative { color: $danger; }
+  }
+
+  .stat-divider {
+    width: 1px;
+    height: 36px;
+    background: rgba(255,255,255,0.07);
+    margin: 0 1rem;
+  }
+}
+
+// ── Loading ──────────────────────────────────────────────────
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 6rem 2rem;
+  color: $muted;
+  font-size: 0.9rem;
+
+  .loading-ring {
+    width: 36px;
+    height: 36px;
+    border: 3px solid rgba(255,255,255,0.1);
+    border-top-color: $accent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+// ── Grid ─────────────────────────────────────────────────────
+.profiles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 1.25rem;
+}
+
+// ── Strategy Card ────────────────────────────────────────────
+.strategy-card {
+  position: relative;
+  background: $bg-card;
+  border: 1px solid $border;
+  border-radius: 18px;
+  overflow: hidden;
+  transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s;
+
+  &:hover {
+    transform: translateY(-3px);
+    border-color: rgba(255,255,255,0.14);
+    box-shadow: 0 16px 40px rgba(0,0,0,0.35);
+  }
+
+  .card-bar {
+    height: 4px;
+    width: 100%;
+  }
+
+  .card-glow {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 200px;
+    height: 200px;
+    pointer-events: none;
+  }
+
+  &.standard-card { border-color: rgba(139,92,246,0.15); }
+}
+
+// ── Card Header ──────────────────────────────────────────────
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1.1rem 1.25rem 0.75rem;
+
+  .card-identity {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .card-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 5px;
+  }
+
+  .card-name {
+    margin: 0 0 0.25rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: $text;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .card-desc {
+    margin: 0;
+    font-size: 0.75rem;
+    color: $muted;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .header-right-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+}
+
+// ── Status Pill ──────────────────────────────────────────────
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.06);
+  color: $muted;
+  white-space: nowrap;
+
+  &.running {
+    background: rgba(0,196,125,0.12);
+    color: $accent;
+  }
+
+  .status-dot-ani {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: $accent;
+    box-shadow: 0 0 6px $accent;
+    animation: pulse-dot 1.5s ease-in-out infinite;
+  }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.7); }
+}
+
+// ── Card Metrics ─────────────────────────────────────────────
+.card-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  border-top: 1px solid $border;
+  border-bottom: 1px solid $border;
+
+  .metric {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.75rem 0.4rem;
+    border-right: 1px solid $border;
+
+    &:last-child { border-right: none; }
+
+    .m-label {
+      font-size: 0.55rem;
+      font-weight: 600;
+      color: $dim;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 0.2rem;
+    }
+
+    .m-val {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: $text;
+
+      &.positive { color: $accent; }
+      &.negative { color: $danger; }
+    }
+  }
+}
+
+// ── Card Params ──────────────────────────────────────────────
+.card-params {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.75rem 1.25rem;
+
+  .param-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.7rem;
+    color: $muted;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid $border;
+    border-radius: 6px;
+    padding: 3px 8px;
+    ion-icon { font-size: 0.8rem; color: $dim; }
+  }
+}
+
+// ── Card Tags ────────────────────────────────────────────────
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.75rem 1.25rem;
+
+  .tag {
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: rgba(59,130,246,0.1);
+    color: #93c5fd;
+    border: 1px solid rgba(59,130,246,0.2);
+
+    &.locked {
+      background: rgba(255,255,255,0.04);
+      color: $dim;
+      border-color: $border;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      ion-icon { font-size: 0.7rem; }
+    }
+  }
+}
+
+// ── Card Footer ──────────────────────────────────────────────
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1.25rem;
+  border-top: 1px solid $border;
+  background: rgba(255,255,255,0.02);
+
+  .footer-left { display: flex; gap: 0.5rem; }
+  .footer-right { display: flex; gap: 0.35rem; }
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid $border;
+  border-radius: 8px;
+  color: $muted;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 0.4rem 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  ion-icon { font-size: 0.9rem; }
+
+  &:hover { background: rgba(255,255,255,0.08); color: $text; border-color: rgba(255,255,255,0.15); }
+
+  &.primary {
+    background: rgba(0,196,125,0.1);
+    border-color: rgba(0,196,125,0.25);
+    color: $accent;
+    &:hover { background: rgba(0,196,125,0.18); }
+  }
+}
+
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid $border;
+  border-radius: 8px;
+  color: $muted;
+  cursor: pointer;
+  transition: all 0.2s;
+  ion-icon { font-size: 0.95rem; }
+
+  &:hover { background: rgba(255,255,255,0.08); color: $text; border-color: rgba(255,255,255,0.15); }
+  &.danger:hover { background: rgba(255,77,77,0.1); color: $danger; border-color: rgba(255,77,77,0.25); }
+}
+
+// ── Mini Toggle ──────────────────────────────────────────────
+.mini-toggle-wrap { cursor: pointer; }
+
+.mini-toggle {
+  width: 38px;
+  height: 22px;
+  border-radius: 11px;
+  background: rgba(255,255,255,0.12);
+  position: relative;
+  transition: background 0.3s;
+
+  .mt-dot {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: white;
+    transition: transform 0.3s;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  }
+
+  &.on {
+    background: $accent;
+    .mt-dot { transform: translateX(16px); }
+  }
+}
+
+// ── Add Card ─────────────────────────────────────────────────
+.add-card {
+  border: 2px dashed rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.01);
+  cursor: pointer;
+  min-height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    border-color: rgba(0,196,125,0.35);
+    background: rgba(0,196,125,0.04);
+    transform: translateY(-3px);
+
+    .add-icon {
+      background: rgba(0,196,125,0.2);
+      border-color: rgba(0,196,125,0.4);
+      color: $accent;
+    }
+
+    h3 { color: $accent; }
+  }
+
+  .add-inner {
+    text-align: center;
+    padding: 2rem;
+  }
+
+  .add-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: 2px dashed rgba(255,255,255,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+    transition: all 0.25s;
+    color: $muted;
+    ion-icon { font-size: 1.5rem; }
+  }
+
+  h3 {
+    margin: 0 0 0.5rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: $muted;
+    transition: color 0.25s;
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.78rem;
+    color: $dim;
+    line-height: 1.5;
+    max-width: 220px;
+    margin: 0 auto;
+  }
+}
+
+// ── Empty State ──────────────────────────────────────────────
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 7rem 2rem;
+
+  .empty-icon {
+    width: 72px;
+    height: 72px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid $border;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+    ion-icon { font-size: 2rem; color: $dim; }
+  }
+
+  h2 {
+    margin: 0 0 0.5rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+  }
+
+  p {
+    margin: 0 0 2rem;
+    color: $muted;
+    font-size: 0.875rem;
+    max-width: 360px;
+    line-height: 1.5;
+  }
+}
+
+// ── Responsive ───────────────────────────────────────────────
+@media (max-width: 768px) {
+  .strategies-shell { padding: 1rem; }
+  .profiles-grid { grid-template-columns: 1fr; }
+  .stats-bar { display: none; }
+  .page-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
+  .new-strategy-btn { width: 100%; justify-content: center; }
 }

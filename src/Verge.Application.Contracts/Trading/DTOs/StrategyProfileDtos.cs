@@ -20,7 +20,7 @@ public class StrategyProfileDto : EntityDto<Guid>
     public float MaxRsiLong { get; set; }
     public float MinRsiShort { get; set; }
     public float MaxMa7DistancePct { get; set; }
-    public string MacdRequired { get; set; }
+    public bool? RequireMacdPositive { get; set; }
     public string AllowedSources { get; set; } = "LSE,Nexus,Bridge";
     public bool AllowLong { get; set; }
     public bool AllowShort { get; set; }
@@ -59,7 +59,7 @@ public class CreateUpdateStrategyProfileDto
     public float MaxRsiLong { get; set; } = 80f;
     public float MinRsiShort { get; set; } = 20f;
     public float MaxMa7DistancePct { get; set; } = 3.5f;
-    public string MacdRequired { get; set; } = "none";
+    public bool? RequireMacdPositive { get; set; }
     public string AllowedSources { get; set; } = "LSE,Nexus,Bridge";
     public bool AllowLong { get; set; } = true;
     public bool AllowShort { get; set; } = true;

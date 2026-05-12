@@ -95,7 +95,8 @@ DEFAULT_LEVERAGE = 1
 # 4. Intelligence Thresholds
 MIN_NEXUS_CONFIDENCE = 75.0          # antes 70 — menos trades, más certeza en 15m
 MIN_SCAR_SCORE = 4
-MIN_CONFLUENCE_SCORE = 50.0          # antes 45 — datos risk_v3: <50 = 15% WR, subido empiricamente
+MIN_CONFLUENCE_SCORE = 55.0          # antes 50 — prod 24h: conf 50-55 = 14-22% WR; conf 55+ = 43% WR
+MIN_ESTIMATED_RANGE_PCT = float(os.getenv("MIN_ESTIMATED_RANGE_PCT", "3.0"))  # prod: rango <3% = WR negativo; >3.5% = 100% WR (+38 USDT)
 
 # 5. Take Profit / Stop Loss — Fat Tail Strategy (asimétrica)
 # SL amplio: 0.8× el rango estimado para que el ruido de 15m no active el stop.

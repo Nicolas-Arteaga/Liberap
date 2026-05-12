@@ -36,19 +36,6 @@ def lse_reasoning_blocks_trade(candidate: dict) -> bool:
     return False
 
 
-def validate_pre_trade(
-    candidate: dict, current_price: float, profile: dict = None
-) -> Tuple[bool, str, Dict[str, Any]]:
-    """
-    Validación principal. 
-    Si se pasa 'profile', usa sus umbrales. Si no, usa config.py (Legacy).
-    """
-    if candidate.get("source") == "LSE":
-        return validate_lse_setup(candidate, current_price, profile)
-
-    return validate_nexus_confluence_setup(candidate, current_price, profile)
-
-
 def validate_lse_setup(
     candidate: dict, current_price: float, profile: dict = None
 ) -> Tuple[bool, str, Dict[str, Any]]:
@@ -212,6 +199,8 @@ def validate_nexus_confluence_setup(
     upper_wick_ratio = float(nexus_features.get("upper_wick_ratio", 0) or 0)
     macd_hist = float(nexus_features.get("macd_histogram", 0) or 0)
     ma7 = float(nexus_features.get("ma7", 0) or 0)
+    volume_ratio_20 = float(nexus_features.get("volume_ratio_20", 1.0) or 1.0)
+    volume_surge_bullish = bool(nexus_features.get("volume_surge_bullish", False))
 
     # ── VETO #1: Pump exhaustion
     if side == 0 and explosion_bearish and not explosion_bullish and rsi_14 > 68:
@@ -240,6 +229,20 @@ def validate_nexus_confluence_setup(
         if dist_pct > max_dist_pct:
             logger.info("[VETO] ma7_distance — %s | dist=%.2f%% > limit=%.2f%%", candidate.get("symbol"), dist_pct, max_dist_pct)
             return False, "ma7_distance_overextended", metrics
+
+    # ── VETO #8: Ranging sin volumen = trampa ──────────────────────────────
+    # Prod 24h: Ranging + sin vol_expl = 0% WR, -7 USDT neto — dinero regalado.
+    # Solo pasa si volume_ratio_20 >= 2.0 (doble del promedio confirma movimiento).
+    bridge_regime = str(candidate.get("bridge_regime", "")).lower()
+    nexus_regime = str(nexus15_ctx.get("regime", "")).lower() if isinstance(nexus15_ctx, dict) else ""
+    regime = bridge_regime or nexus_regime
+
+    if "ranging" in regime and not volume_surge_bullish and volume_ratio_20 < 2.0:
+        logger.info(
+            "[VETO] ranging_no_momentum — %s | regime=%s vol_ratio=%.2f surge=False",
+            candidate.get("symbol"), regime, volume_ratio_20
+        )
+        return False, "ranging_no_momentum", metrics
 
     # ── VETO #5: Bearish Rejection at Top ──────────────────────────────
     if side == 0:
@@ -293,6 +296,19 @@ def validate_nexus_confluence_setup(
                 candidate.get("symbol"), signal_age_s, max_nexus_age, price_drift * 100, max_drift_pct * 100,
             )
             return False, "stale_nexus_signal", metrics
+
+    # ── VETO #9: Rango estimado demasiado pequeño ─────────────────────────────
+    # Prod 24h: rango <3% = WR neto negativo en todos los buckets.
+    #           rango >3.5% = 100% WR, +38 USDT (los 3 trades ganaron todos).
+    # Un rango <3% en 15m no tiene recorrido suficiente para cubrir el riesgo.
+    estimated_range_pct = float(candidate.get("estimated_range_pct", 0) or 0)
+    MIN_RANGE_PCT = float(getattr(config, "MIN_ESTIMATED_RANGE_PCT", 3.0))
+    if estimated_range_pct < MIN_RANGE_PCT:
+        logger.info(
+            "[VETO] range_too_small — %s | range=%.2f%% < min=%.1f%%",
+            candidate.get("symbol"), estimated_range_pct, MIN_RANGE_PCT
+        )
+        return False, "range_too_small", metrics
 
     # ── Fin bloqueos duros ────────────────────────────────────────────────
 
@@ -350,12 +366,15 @@ def validate_nexus_confluence_setup(
 
 
 def validate_pre_trade(
-    candidate: dict,
-    current_price: float,
+    candidate: dict, current_price: float, profile: dict = None
 ) -> Tuple[bool, str, Dict[str, Any]]:
-    """Punto único de entrada: LSE (con bloqueo reasoning) o Nexus/SCAR."""
+    """
+    Punto único de entrada: LSE (con bloqueo reasoning) o Nexus/SCAR.
+    Si se pasa 'profile', usa sus umbrales. Si no, usa config.py (Legacy).
+    """
     if candidate.get("source") == "LSE":
         if lse_reasoning_blocks_trade(candidate):
             return False, "lse_warning_block", {}
-        return validate_lse_setup(candidate, current_price)
-    return validate_nexus_confluence_setup(candidate, current_price)
+        return validate_lse_setup(candidate, current_price, profile)
+
+    return validate_nexus_confluence_setup(candidate, current_price, profile)

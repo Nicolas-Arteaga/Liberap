@@ -210,23 +210,25 @@ class VergeAgent:
 
         # 1. Sync profiles and monitor open positions
         logger.info("[Step 1/6] Syncing strategy profiles and checking positions...")
-        self.active_profiles = self.positions.get_strategy_profiles()
-        if not self.active_profiles:
-            logger.info("No active strategy profiles found in DB. Using legacy config-based profile.")
-            # Create a virtual legacy profile to maintain backward compatibility
-            self.active_profiles = [{
-                "id": None,
-                "name": "Legacy Config Profile",
-                "minConfluenceScore": config.MIN_CONFLUENCE_SCORE,
-                "minNexusConfidence": getattr(config, "MIN_ENTRY_NEXUS", 70.0),
-                "tpMultiplier": getattr(config, "TP_MULTIPLIER", 2.0),
-                "slMultiplier": getattr(config, "SL_MULTIPLIER", 1.0),
-                "marginPerTrade": getattr(config, "MAX_MARGIN_PER_TRADE_USD", 150),
-                "maxOpenPositions": config.MAX_OPEN_POSITIONS,
-                "isActive": True
-            }]
-        else:
-            logger.info(f"Loaded {len(self.active_profiles)} active strategy profiles: {[p['name'] for p in self.active_profiles]}")
+        db_profiles = self.positions.get_strategy_profiles() or []
+        
+        # Define the virtual legacy profile for "Standard Scalping"
+        legacy_profile = {
+            "id": None,
+            "name": "Standard Scalping",
+            "minConfluenceScore": config.MIN_CONFLUENCE_SCORE,
+            "minNexusConfidence": getattr(config, "MIN_ENTRY_NEXUS", 70.0),
+            "tpMultiplier": getattr(config, "TP_MULTIPLIER", 2.0),
+            "slMultiplier": getattr(config, "SL_MULTIPLIER", 1.0),
+            "marginPerTrade": getattr(config, "MAX_MARGIN_PER_TRADE_USD", 150),
+            "maxOpenPositions": config.MAX_OPEN_POSITIONS,
+            "isActive": True
+        }
+
+        # The active profiles list will ALWAYS include Standard Scalping + any DB profile
+        self.active_profiles = [legacy_profile] + db_profiles
+        
+        logger.info(f"Active strategies this cycle: {[p['name'] for p in self.active_profiles]}")
 
         self._manage_open_positions()
         logger.info("[Step 1/6] Done.")

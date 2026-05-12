@@ -11,6 +11,8 @@ public class StrategyProfile : FullAuditedAggregateRoot<Guid>
 {
     public Guid UserId { get; set; }
     public string Name { get; set; } = string.Empty;
+    public string Description { get; set; }
+    public string Color { get; set; } = "#00C47D";
     public bool IsActive { get; set; } = true;
 
     // ── Entry Filters ──────────────────────────────────────────────────────
@@ -31,6 +33,7 @@ public class StrategyProfile : FullAuditedAggregateRoot<Guid>
     public float MinRR { get; set; } = 1.5f;
     public int MaxOpenPositions { get; set; } = 3;
     public int MaxTradeDurationCandles { get; set; } = 8;
+    public bool ExtremeRsiVeto { get; set; } = true;
 
     protected StrategyProfile() { }
 

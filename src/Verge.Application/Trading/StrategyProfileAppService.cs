@@ -83,6 +83,8 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
     private static void ApplyInput(StrategyProfile p, CreateUpdateStrategyProfileDto i)
     {
         p.Name = i.Name;
+        p.Description = i.Description;
+        p.Color = i.Color;
         p.IsActive = i.IsActive;
         p.MinConfluenceScore = i.MinConfluenceScore;
         p.MinNexusConfidence = i.MinNexusConfidence;
@@ -90,6 +92,7 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
         p.MinRsiShort = i.MinRsiShort;
         p.MaxMa7DistancePct = i.MaxMa7DistancePct;
         p.RequireMacdPositive = i.RequireMacdPositive;
+        p.ExtremeRsiVeto = i.ExtremeRsiVeto;
         p.AllowedSources = i.AllowedSources;
         p.AllowLong = i.AllowLong;
         p.AllowShort = i.AllowShort;
@@ -106,6 +109,8 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
         Id = p.Id,
         UserId = p.UserId,
         Name = p.Name,
+        Description = p.Description,
+        Color = p.Color,
         IsActive = p.IsActive,
         MinConfluenceScore = p.MinConfluenceScore,
         MinNexusConfidence = p.MinNexusConfidence,
@@ -113,6 +118,7 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
         MinRsiShort = p.MinRsiShort,
         MaxMa7DistancePct = p.MaxMa7DistancePct,
         RequireMacdPositive = p.RequireMacdPositive,
+        ExtremeRsiVeto = p.ExtremeRsiVeto,
         AllowedSources = p.AllowedSources,
         AllowLong = p.AllowLong,
         AllowShort = p.AllowShort,

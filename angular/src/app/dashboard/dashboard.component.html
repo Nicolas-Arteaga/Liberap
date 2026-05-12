@@ -42,6 +42,16 @@
             </div>
           </div>
           <div class="d-flex align-items-center gap-2">
+            <!-- Strategy Profile Selector -->
+            <div class="strategy-selector-wrapper d-flex align-items-center gap-2 bg-white-03 px-2 py-1 rounded border border-white-05 me-2">
+              <ion-icon name="layers-outline" class="text-info-light"></ion-icon>
+              <select [(ngModel)]="selectedProfileId" (change)="onStrategyChange()" 
+                      class="bg-transparent border-0 text-white text-xs outline-none cursor-pointer">
+                <option [ngValue]="null">Standard Scalping</option>
+                <option *ngFor="let p of strategyProfiles" [ngValue]="p.id">{{ p.name }}</option>
+              </select>
+            </div>
+            
             <app-glass-button class="btn-header-sober" variant="warning" (click)="alertService.markAllAsRead()">Borrar alertas</app-glass-button>
             <app-glass-button class="btn-header-sober" variant="danger" (click)="finalizeHunt()">Finalizar</app-glass-button>
           </div>
@@ -374,20 +384,36 @@
         <!-- 💰 Positions & Orders Table (New) -->
         <div class="positions-console bg-dark-deep mb-4 overflow-hidden">
           <div class="console-tabs d-flex border-bottom border-white-05 bg-dark-soft">
+            <!-- Tab: Standart Scalping -->
             <div class="tab-item py-2 px-3 pointer text-xs uppercase" 
-                 [class.active]="consoleTab === 'positions'" 
-                 (click)="setConsoleTab('positions')">Posiciones({{ activeTrades.length }})</div>
+                 [class.active]="consoleTab === 'legacy'" 
+                 (click)="setConsoleTab('legacy')">
+              Standart Scalping ({{ getActiveTradesCount(null) }})
+            </div>
+
+            <!-- Tabs: Dynamic Strategies -->
+            <div *ngFor="let profile of strategyProfiles"
+                 class="tab-item py-2 px-3 pointer text-xs uppercase"
+                 [class.active]="consoleTab === profile.id" 
+                 (click)="setConsoleTab(profile.id!)">
+              {{ profile.name }} ({{ getActiveTradesCount(profile.id!) }})
+            </div>
+
+            <!-- Tab: History -->
             <div class="tab-item py-2 px-3 pointer text-xs uppercase"
                  [class.active]="consoleTab === 'history'" 
-                 (click)="setConsoleTab('history')">Historial de trades</div>
+                 (click)="setConsoleTab('history')">
+              Historial de trades
+            </div>
+
             <div class="ms-auto d-flex align-items-center px-3 gap-2">
               <input type="checkbox" class="form-check-input bg-dark border-white-10" style="width: 12px; height: 12px;">
               <span class="text-white-50" style="font-size: 10px;">Ocultar otros símbolos</span>
             </div>
           </div>
           <div class="table-responsive p-0" style="min-height: 200px;">
-            <!-- Positions Table -->
-            <table *ngIf="consoleTab === 'positions'" class="table table-dark table-sm mb-0 position-table" style="font-size: 10px;">
+            <!-- Positions Table (Used for both Legacy and Custom strategies) -->
+            <table *ngIf="consoleTab !== 'history'" class="table table-dark table-sm mb-0 position-table" style="font-size: 10px;">
               <thead>
                 <tr class="text-white-50">
                   <th>Símbolo</th>
@@ -414,6 +440,7 @@
                         {{ trade.symbol }}
                       </span>
                       <span class="badge bg-dark-accent text-white-50">{{ trade.leverage }}x</span>
+                      <span *ngIf="trade.strategyProfileId" class="badge bg-info-10 text-info border border-info-20" style="font-size: 8px;">CUSTOM</span>
                     </div>
                   </td>
                   <td class="align-middle text-white-50">
@@ -446,7 +473,7 @@
                     </button>
                   </td>
                 </tr>
-                <tr *ngIf="activeTrades.length === 0">
+                <tr *ngIf="filteredActiveTrades.length === 0">
                   <td colspan="8" class="text-center py-5 border-0">
                     <div class="empty-positions text-center opacity-40">
                       <ion-icon name="document-text-outline" style="font-size: 40px;" class="mb-2"></ion-icon>
@@ -461,9 +488,9 @@
             </table>
 
             <app-paginator
-              *ngIf="consoleTab === 'positions' && activeTrades.length > 5"
+              *ngIf="consoleTab !== 'history' && filteredActiveTrades.length > 5"
               class="px-3 pb-3 d-block"
-              [totalItems]="activeTrades.length"
+              [totalItems]="filteredActiveTrades.length"
               [pageSize]="activePositionsPageSize"
               [currentPage]="activePositionsPage"
               (pageChange)="onActivePositionsPageChange($event)">

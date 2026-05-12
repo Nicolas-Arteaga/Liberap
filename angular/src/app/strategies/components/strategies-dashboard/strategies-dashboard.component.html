@@ -1,53 +1,235 @@
-<div class="strategies-container">
-  <header class="dashboard-header">
-    <div class="title-section">
-      <h1>Estrategias de Trading</h1>
-      <p class="subtitle">{{ activeProfilesCount }} estrategias activas de {{ profiles.length }} configuradas</p>
-    </div>
-    <app-glass-button icon="add-outline" label="Nueva Estrategia" variant="solid" (click)="onNewStrategy()"></app-glass-button>
-  </header>
+<div class="strategies-shell">
 
-  <div class="comparison-bar" *ngIf="profiles.length >= 2">
-    <div class="bar-item">
-      <span class="label">Portfolio PnL</span>
-      <span class="value" [class.positive]="totalNetPnL > 0" [class.negative]="totalNetPnL < 0">
-        {{ totalNetPnL | number:'1.2-2' }}%
+  <!-- ══════════════ PAGE HEADER ══════════════ -->
+  <div class="page-header">
+    <div class="header-left">
+      <div class="page-icon">
+        <ion-icon name="layers-outline"></ion-icon>
+      </div>
+      <div>
+        <h1>Estrategias de Trading</h1>
+        <p class="page-subtitle">
+          <span class="dot-active"></span>
+          {{ activeProfilesCount }} activas
+          <span class="dot-sep">·</span>
+          {{ profiles.length }} configuradas en total
+        </p>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <button class="new-strategy-btn" (click)="onNewStrategy()">
+        <ion-icon name="add-outline"></ion-icon>
+        Nueva Estrategia
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════ PORTFOLIO STATS BAR ══════════════ -->
+  <div class="stats-bar" *ngIf="profiles.length > 0">
+    <div class="stat-item">
+      <span class="stat-label">Portfolio PnL</span>
+      <span class="stat-value" [class.positive]="totalNetPnL > 0" [class.negative]="totalNetPnL < 0">
+        {{ totalNetPnL > 0 ? '+' : '' }}{{ totalNetPnL | number:'1.2-2' }}%
       </span>
     </div>
-    <div class="bar-divider"></div>
-    <div class="bar-item">
-      <span class="label">Mejor Estrategia</span>
-      <span class="value success">Scalping LSE</span>
+    <div class="stat-divider"></div>
+    <div class="stat-item">
+      <span class="stat-label">Mejor Estrategia</span>
+      <span class="stat-value positive">{{ bestProfile?.name || '--' }}</span>
     </div>
-    <div class="bar-divider"></div>
-    <div class="bar-item">
-      <span class="label">Riesgo Total</span>
-      <span class="value warning">Moderado</span>
+    <div class="stat-divider"></div>
+    <div class="stat-item">
+      <span class="stat-label">Total de Trades</span>
+      <span class="stat-value">{{ totalTrades }}</span>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat-item">
+      <span class="stat-label">Win Rate Global</span>
+      <span class="stat-value" [class.positive]="globalWinRate >= 50">
+        {{ globalWinRate | number:'1.1-1' }}%
+      </span>
     </div>
   </div>
 
-  <div class="profiles-grid">
-    <div *ngIf="isLoading" class="loader-box">
-      <p>Cargando perfiles...</p>
-    </div>
+  <!-- ══════════════ LOADING ══════════════ -->
+  <div class="loading-state" *ngIf="isLoading">
+    <div class="loading-ring"></div>
+    <p>Cargando estrategias...</p>
+  </div>
 
-    <ng-container *ngIf="!isLoading">
-      <app-strategy-card 
-        *ngFor="let profile of profiles" 
-        [profile]="profile"
-        (edit)="onEdit($event)"
-        (duplicate)="onDuplicate($event)"
-        (delete)="onDelete($event)"
-        (toggle)="onToggle($event)"
-        (viewPerformance)="onViewPerformance($event)">
-      </app-strategy-card>
+  <!-- ══════════════ GRID ══════════════ -->
+  <div class="profiles-grid" *ngIf="!isLoading">
 
-      <div class="empty-state" *ngIf="profiles.length === 0">
-        <ion-icon name="flask-outline"></ion-icon>
-        <h3>No tienes perfiles configurados</h3>
-        <p>Crea tu primera estrategia para empezar a automatizar tus operaciones.</p>
-        <app-glass-button icon="add-outline" label="Crear Perfil" (click)="onNewStrategy()"></app-glass-button>
+    <!-- STANDARD Card (siempre primero) -->
+    <div class="strategy-card standard-card">
+      <div class="card-bar" style="background: linear-gradient(135deg, #3b82f6, #8b5cf6)"></div>
+      <div class="card-glow" style="background: radial-gradient(circle at top right, #3b82f622, transparent)"></div>
+
+      <div class="card-header">
+        <div class="card-identity">
+          <div class="card-dot" style="background: #3b82f6"></div>
+          <div>
+            <h3 class="card-name">Standard Scalping</h3>
+            <p class="card-desc">Configuración base del agente. Opera Nexus-15 + LSE Spring con parámetros de riesgo predeterminados.</p>
+          </div>
+        </div>
+        <span class="status-pill running">
+          <span class="status-dot-ani"></span>
+          SYSTEM
+        </span>
       </div>
-    </ng-container>
+
+      <div class="card-metrics">
+        <div class="metric">
+          <span class="m-label">WINRATE</span>
+          <span class="m-val" [class.positive]="standardStats.winRate >= 50">
+            {{ standardStats.winRate | number:'1.1-1' }}%
+          </span>
+        </div>
+        <div class="metric">
+          <span class="m-label">TRADES</span>
+          <span class="m-val">{{ standardStats.totalTrades }}</span>
+        </div>
+        <div class="metric">
+          <span class="m-label">NET PnL</span>
+          <span class="m-val" [class.positive]="standardStats.netPnL > 0" [class.negative]="standardStats.netPnL < 0">
+            {{ standardStats.netPnL > 0 ? '+' : '' }}{{ standardStats.netPnL | number:'1.2-2' }}%
+          </span>
+        </div>
+        <div class="metric">
+          <span class="m-label">AVG R/R</span>
+          <span class="m-val" style="color: #3b82f6">
+            {{ standardStats.avgRR | number:'1.1-1' }}
+          </span>
+        </div>
+      </div>
+
+      <div class="card-footer" style="padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.05); margin-top: auto;">
+        <button class="action-btn" (click)="viewPerformance('standard')">
+          <ion-icon name="stats-chart-outline"></ion-icon>
+          Ver Rendimiento Base
+        </button>
+      </div>
+    </div>
+
+    <!-- DYNAMIC Profile Cards -->
+    <div class="strategy-card" *ngFor="let profile of profiles; trackBy: trackById"
+         [style.--accent]="profile.color || '#00C47D'">
+      <div class="card-bar" [style.background]="profile.color || '#00C47D'"></div>
+      <div class="card-glow" [style.background]="'radial-gradient(circle at top right, ' + (profile.color || '#00C47D') + '22, transparent)'"></div>
+
+      <div class="card-header">
+        <div class="card-identity">
+          <div class="card-dot" [style.background]="profile.color || '#00C47D'"></div>
+          <div>
+            <h3 class="card-name">{{ profile.name }}</h3>
+            <p class="card-desc">{{ profile.description || 'Sin descripción definida.' }}</p>
+          </div>
+        </div>
+        <div class="header-right-actions">
+          <span class="status-pill" [class.running]="profile.isActive">
+            <span class="status-dot-ani" *ngIf="profile.isActive"></span>
+            {{ profile.isActive ? 'RUNNING' : 'PAUSED' }}
+          </span>
+          <div class="mini-toggle-wrap" (click)="onToggle(profile.id)">
+            <div class="mini-toggle" [class.on]="profile.isActive">
+              <div class="mt-dot"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-metrics">
+        <div class="metric">
+          <span class="m-label">WINRATE</span>
+          <span class="m-val" [class.positive]="(profile.winRate || 0) >= 50">
+            {{ (profile.winRate || 0) | number:'1.1-1' }}%
+          </span>
+        </div>
+        <div class="metric">
+          <span class="m-label">TRADES</span>
+          <span class="m-val">{{ profile.totalTrades || 0 }}</span>
+        </div>
+        <div class="metric">
+          <span class="m-label">NET PnL</span>
+          <span class="m-val" [class.positive]="(profile.netPnL || 0) > 0" [class.negative]="(profile.netPnL || 0) < 0">
+            {{ (profile.netPnL || 0) > 0 ? '+' : '' }}{{ (profile.netPnL || 0) | number:'1.2-2' }}%
+          </span>
+        </div>
+        <div class="metric">
+          <span class="m-label">AVG R/R</span>
+          <span class="m-val" [style.color]="profile.color || '#00C47D'">
+            {{ (profile.avgRR || 0) | number:'1.1-1' }}
+          </span>
+        </div>
+      </div>
+
+      <div class="card-params">
+        <div class="param-chip">
+          <ion-icon name="funnel-outline"></ion-icon>
+          Score ≥ {{ profile.minConfluenceScore }}
+        </div>
+        <div class="param-chip">
+          <ion-icon name="wallet-outline"></ion-icon>
+          {{ profile.marginPerTrade }} USDT
+        </div>
+        <div class="param-chip">
+          <ion-icon name="layers-outline"></ion-icon>
+          Máx {{ profile.maxOpenPositions }} pos.
+        </div>
+        <div class="param-chip">
+          <ion-icon name="time-outline"></ion-icon>
+          {{ profile.maxTradeDurationCandles * 15 }}m timeout
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <div class="footer-left">
+          <button class="action-btn primary" (click)="onEdit(profile.id)">
+            <ion-icon name="create-outline"></ion-icon>
+            Editar
+          </button>
+          <button class="action-btn" (click)="viewPerformance(profile.id)">
+            <ion-icon name="stats-chart-outline"></ion-icon>
+            Rendimiento
+          </button>
+        </div>
+        <div class="footer-right">
+          <button class="icon-btn" title="Duplicar" (click)="onDuplicate(profile.id)">
+            <ion-icon name="copy-outline"></ion-icon>
+          </button>
+          <button class="icon-btn danger" title="Eliminar" (click)="onDelete(profile.id)">
+            <ion-icon name="trash-outline"></ion-icon>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ADD NEW Card -->
+    <div class="strategy-card add-card" (click)="onNewStrategy()">
+      <div class="add-inner">
+        <div class="add-icon">
+          <ion-icon name="add-outline"></ion-icon>
+        </div>
+        <h3>Nueva Estrategia</h3>
+        <p>Configura un perfil personalizado con tus propias reglas de entrada, riesgo y timing.</p>
+      </div>
+    </div>
+
+  </div><!-- /profiles-grid -->
+
+  <!-- ══════════════ EMPTY STATE ══════════════ -->
+  <div class="empty-state" *ngIf="!isLoading && profiles.length === 0">
+    <div class="empty-icon">
+      <ion-icon name="layers-outline"></ion-icon>
+    </div>
+    <h2>No hay estrategias configuradas</h2>
+    <p>Crea tu primera estrategia personalizada para que el agente opere con tus parámetros.</p>
+    <button class="new-strategy-btn" (click)="onNewStrategy()">
+      <ion-icon name="add-outline"></ion-icon>
+      Crear mi primera estrategia
+    </button>
   </div>
+
 </div>

@@ -21,7 +21,35 @@
   .institutional-header {
     background: #1e2329;
     box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-    .v-divider { width: 1px; height: 16px; background: rgba(255,255,255,0.05); }
+    .v-divider {
+      width: 1px;
+      height: 16px;
+      background: rgba(255,255,255,0.1);
+    }
+
+    .strategy-selector-wrapper {
+      transition: all 0.2s;
+      &:hover {
+        background: rgba(255,255,255,0.06);
+        border-color: rgba(255,255,255,0.15);
+      }
+
+      select {
+        appearance: none;
+        -webkit-appearance: none;
+        padding-right: 1.5rem;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.5)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7' /%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right center;
+        background-size: 1rem;
+        
+        option {
+          background: #1a1d21;
+          color: white;
+        }
+      }
+    }
+
     .status-dot {
       width: 8px;
       height: 8px;

@@ -1,183 +1,476 @@
-<div class="editor-container" [class.loading]="isLoading">
-  <header class="editor-header">
-    <div class="back-nav" (click)="cancel()">
+<div class="editor-shell" [class.loading]="isLoading">
+
+  <!-- ══════════════════ TOP BAR ══════════════════ -->
+  <div class="top-bar">
+    <button class="back-btn" (click)="cancel()">
       <ion-icon name="arrow-back-outline"></ion-icon>
-      <span>Volver</span>
-    </div>
-    <h1>{{ id ? 'Editar Estrategia' : 'Nueva Estrategia' }}</h1>
-    <div class="actions">
-      <app-glass-button label="Cancelar" (click)="cancel()"></app-glass-button>
-      <app-glass-button [label]="id ? 'Guardar Cambios' : 'Crear Perfil'" variant="solid" (click)="save()"></app-glass-button>
-    </div>
-  </header>
+      <span>Estrategias</span>
+    </button>
 
-  <nav class="tab-nav">
-    <div class="tab-item" [class.active]="activeTab === 'identity'" (click)="activeTab = 'identity'">Identidad</div>
-    <div class="tab-item" [class.active]="activeTab === 'filters'" (click)="activeTab = 'filters'">Filtros</div>
-    <div class="tab-item" [class.active]="activeTab === 'risk'" (click)="activeTab = 'risk'">Riesgo</div>
-    <div class="tab-item" [class.active]="activeTab === 'advanced'" (click)="activeTab = 'advanced'">Avanzado</div>
-    <div class="tab-item disabled">Backsim</div>
-  </nav>
-
-  <div class="tab-content">
-    <!-- Tab 1: Identidad -->
-    <div class="tab-pane" *ngIf="activeTab === 'identity'">
-      <app-card-content>
-        <div class="form-group">
-          <label>Nombre del Perfil</label>
-          <input type="text" [(ngModel)]="model.name" placeholder="Ej: Scalping Agresivo LSE">
-        </div>
-        <div class="form-group">
-          <label>Descripción</label>
-          <textarea [(ngModel)]="model.description" rows="3" placeholder="Explica brevemente la lógica de esta estrategia..."></textarea>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Color Identificador</label>
-            <div class="color-picker">
-              <input type="color" [(ngModel)]="model.color">
-              <span class="color-hex">{{ model.color }}</span>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>Estado Inicial</label>
-            <div class="toggle-row">
-              <span>{{ model.isActive ? 'Activo' : 'Inactivo' }}</span>
-              <app-toggle [(value)]="model.isActive"></app-toggle>
-            </div>
-          </div>
-        </div>
-      </app-card-content>
+    <div class="top-center">
+      <div class="breadcrumb">
+        <span class="bc-parent">Estrategias</span>
+        <ion-icon name="chevron-forward-outline" class="bc-sep"></ion-icon>
+        <span class="bc-current">{{ id ? 'Editar Perfil' : 'Nuevo Perfil' }}</span>
+      </div>
     </div>
 
-    <!-- Tab 2: Filtros de Entrada -->
-    <div class="tab-pane" *ngIf="activeTab === 'filters'">
-      <app-card-content>
-        <div class="section-title">Parámetros de Entrada</div>
-        
-        <div class="form-group">
-          <div class="label-row">
-            <label>Confluencia Mínima</label>
-            <span class="value-badge">{{ model.minConfluenceScore }}</span>
-          </div>
-          <input type="range" [(ngModel)]="model.minConfluenceScore" min="0" max="100">
-          <p class="help-text">Puntaje total mínimo requerido sumando todos los indicadores activos.</p>
-        </div>
-
-        <div class="form-group">
-          <div class="label-row">
-            <label>Nexus Mínimo %</label>
-            <span class="value-badge">{{ model.minNexusConfidence }}%</span>
-          </div>
-          <input type="range" [(ngModel)]="model.minNexusConfidence" min="0" max="100">
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label>RSI Máx (Long)</label>
-            <input type="number" [(ngModel)]="model.maxRsiLong" min="50" max="100">
-          </div>
-          <div class="form-group">
-            <label>RSI Mín (Short)</label>
-            <input type="number" [(ngModel)]="model.minRsiShort" min="0" max="50">
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>Fuentes Permitidas</label>
-          <div class="checkbox-group">
-            <label class="cb-container">
-              <input type="checkbox" [checked]="isSourceAllowed('Nexus')" (change)="toggleSource('Nexus')">
-              <span class="cb-label">Nexus</span>
-            </label>
-            <label class="cb-container">
-              <input type="checkbox" [checked]="isSourceAllowed('LSE')" (change)="toggleSource('LSE')">
-              <span class="cb-label">LSE</span>
-            </label>
-            <label class="cb-container">
-              <input type="checkbox" [checked]="isSourceAllowed('Bridge')" (change)="toggleSource('Bridge')">
-              <span class="cb-label">Bridge Redis</span>
-            </label>
-          </div>
-        </div>
-      </app-card-content>
-    </div>
-
-    <!-- Tab 3: Gestión de Riesgo -->
-    <div class="tab-pane" *ngIf="activeTab === 'risk'">
-      <app-card-content>
-        <div class="form-group">
-          <label>Margen por Operación (USDT)</label>
-          <input type="number" [(ngModel)]="model.marginPerTrade">
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <div class="label-row">
-              <label>Mult. Take Profit</label>
-              <span class="value-badge">x{{ model.tpMultiplier }}</span>
-            </div>
-            <input type="range" [(ngModel)]="model.tpMultiplier" min="1" max="5" step="0.1">
-          </div>
-          <div class="form-group">
-            <div class="label-row">
-              <label>Mult. Stop Loss</label>
-              <span class="value-badge">x{{ model.slMultiplier }}</span>
-            </div>
-            <input type="range" [(ngModel)]="model.slMultiplier" min="0.2" max="2" step="0.1">
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label>RR Mínimo Requerido</label>
-            <input type="number" [(ngModel)]="model.minRR" step="0.1">
-          </div>
-          <div class="form-group">
-            <label>Posiciones Máximas</label>
-            <input type="number" [(ngModel)]="model.maxOpenPositions" min="1" max="10">
-          </div>
-        </div>
-      </app-card-content>
-    </div>
-
-    <!-- Tab 4: Avanzado -->
-    <div class="tab-pane" *ngIf="activeTab === 'advanced'">
-      <app-card-content>
-        <div class="form-group">
-          <label>Tiempo Máx en Posición (Velas 15m)</label>
-          <input type="number" [(ngModel)]="model.maxTradeDurationCandles">
-          <p class="help-text">Equivale a {{ model.maxTradeDurationCandles * 15 }} minutos.</p>
-        </div>
-
-        <div class="form-group">
-          <div class="toggle-row">
-            <div class="label-box">
-              <label>VETO RSI Extremo</label>
-              <p class="help-text">Bloquea trades si RSI > 85 o < 15 independientemente de otros filtros.</p>
-            </div>
-            <app-toggle [(value)]="model.extremeRsiVeto"></app-toggle>
-          </div>
-        </div>
-
-        <div class="veto-info">
-          <h4>VETOs Globales Activos</h4>
-          <div class="veto-item">
-            <ion-icon name="shield-checkmark-outline"></ion-icon>
-            <span><strong>Late Entry:</strong> No entra si el precio ya se alejó > 0.3% del punto ideal.</span>
-          </div>
-          <div class="veto-item">
-            <ion-icon name="shield-checkmark-outline"></ion-icon>
-            <span><strong>Liquidity Gate:</strong> Solo opera si hay suficiente profundidad en el orderbook.</span>
-          </div>
-        </div>
-      </app-card-content>
+    <div class="top-actions">
+      <button class="btn-ghost" (click)="resetToDefaults()">
+        <ion-icon name="refresh-outline"></ion-icon>
+        Defaults
+      </button>
+      <button class="btn-solid" (click)="save()">
+        <ion-icon name="checkmark-outline"></ion-icon>
+        {{ id ? 'Guardar Cambios' : 'Crear Estrategia' }}
+      </button>
     </div>
   </div>
 
-  <footer class="editor-footer">
-    <app-glass-button label="Restablecer Defaults" (click)="resetToDefaults()"></app-glass-button>
-    <div class="spacer"></div>
-    <app-glass-button label="Guardar Estrategia" variant="solid" (click)="save()"></app-glass-button>
-  </footer>
+  <!-- ══════════════════ BODY (2 PANELS) ══════════════════ -->
+  <div class="editor-body">
+
+    <!-- ──────────── LEFT: Form ──────────── -->
+    <div class="form-panel">
+
+      <!-- Tab Navigation -->
+      <nav class="tab-strip">
+        <button class="tab-btn" [class.active]="activeTab === 'identity'" (click)="activeTab = 'identity'">
+          <ion-icon name="finger-print-outline"></ion-icon>
+          <span>Identidad</span>
+          <div class="tab-indicator"></div>
+        </button>
+        <button class="tab-btn" [class.active]="activeTab === 'filters'" (click)="activeTab = 'filters'">
+          <ion-icon name="funnel-outline"></ion-icon>
+          <span>Filtros</span>
+          <div class="tab-indicator"></div>
+        </button>
+        <button class="tab-btn" [class.active]="activeTab === 'risk'" (click)="activeTab = 'risk'">
+          <ion-icon name="shield-half-outline"></ion-icon>
+          <span>Riesgo</span>
+          <div class="tab-indicator"></div>
+        </button>
+        <button class="tab-btn" [class.active]="activeTab === 'advanced'" (click)="activeTab = 'advanced'">
+          <ion-icon name="options-outline"></ion-icon>
+          <span>Avanzado</span>
+          <div class="tab-indicator"></div>
+        </button>
+        <button class="tab-btn disabled" disabled>
+          <ion-icon name="bar-chart-outline"></ion-icon>
+          <span>Backsim</span>
+          <span class="coming-soon">Pronto</span>
+          <div class="tab-indicator"></div>
+        </button>
+      </nav>
+
+      <!-- ── TAB 1: Identidad ── -->
+      <div class="tab-pane slide-in" *ngIf="activeTab === 'identity'">
+        <div class="section-header">
+          <ion-icon name="finger-print-outline"></ion-icon>
+          <div>
+            <h2>Identidad del Perfil</h2>
+            <p>Define el nombre, color y estado de esta estrategia</p>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Nombre del Perfil <span class="required">*</span></label>
+          <input class="field-input" type="text" [(ngModel)]="model.name"
+                 placeholder="Ej: Scalping Agresivo LSE">
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Descripción</label>
+          <textarea class="field-input" [(ngModel)]="model.description" rows="3"
+                    placeholder="Describe la lógica de trading de este perfil..."></textarea>
+        </div>
+
+        <div class="field-row">
+          <div class="field-group">
+            <label class="field-label">Color Identificador</label>
+            <div class="color-row">
+              <input type="color" class="color-swatch" [(ngModel)]="model.color">
+              <span class="color-hex">{{ model.color }}</span>
+              <div class="color-preview" [style.background]="model.color + '33'"
+                   [style.border-color]="model.color + '66'">
+                <span [style.color]="model.color">●</span> Activo
+              </div>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Estado Inicial</label>
+            <div class="toggle-card" [class.on]="model.isActive" (click)="model.isActive = !model.isActive">
+              <div class="toggle-dot"></div>
+              <span>{{ model.isActive ? 'Activa' : 'Pausada' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Dirección Permitida</label>
+          <div class="direction-selector">
+            <button class="dir-btn"
+                    [class.active-auto]="model.allowLong && model.allowShort"
+                    (click)="model.allowLong = true; model.allowShort = true">
+              <ion-icon name="swap-horizontal-outline"></ion-icon>
+              <span>Automático</span>
+              <span class="dir-hint">Long + Short</span>
+            </button>
+            <button class="dir-btn"
+                    [class.active-long]="model.allowLong && !model.allowShort"
+                    (click)="model.allowLong = true; model.allowShort = false">
+              <ion-icon name="trending-up-outline"></ion-icon>
+              <span>Solo Long</span>
+              <span class="dir-hint">Únicamente compras</span>
+            </button>
+            <button class="dir-btn"
+                    [class.active-short]="!model.allowLong && model.allowShort"
+                    (click)="model.allowLong = false; model.allowShort = true">
+              <ion-icon name="trending-down-outline"></ion-icon>
+              <span>Solo Short</span>
+              <span class="dir-hint">Únicamente ventas</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── TAB 2: Filtros ── -->
+      <div class="tab-pane slide-in" *ngIf="activeTab === 'filters'">
+        <div class="section-header">
+          <ion-icon name="funnel-outline"></ion-icon>
+          <div>
+            <h2>Filtros de Entrada</h2>
+            <p>Controla qué señales activan esta estrategia</p>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="slider-label-row">
+            <label class="field-label">Confluencia Mínima</label>
+            <span class="slider-value" [style.color]="model.minConfluenceScore >= 70 ? '#00C47D' : model.minConfluenceScore >= 50 ? '#FFB000' : '#FF4D4D'">
+              {{ model.minConfluenceScore }}
+            </span>
+          </div>
+          <div class="slider-track-wrap">
+            <input type="range" class="slider" [(ngModel)]="model.minConfluenceScore" min="0" max="100">
+            <div class="slider-fill" [style.width.%]="model.minConfluenceScore"
+                 [style.background]="model.minConfluenceScore >= 70 ? '#00C47D' : model.minConfluenceScore >= 50 ? '#FFB000' : '#FF4D4D'"></div>
+          </div>
+          <p class="field-hint">Puntaje total combinado (Nexus + SCAR + LSE) requerido para abrir una entrada.</p>
+        </div>
+
+        <div class="field-group">
+          <div class="slider-label-row">
+            <label class="field-label">Confianza Nexus Mínima</label>
+            <span class="slider-value">{{ model.minNexusConfidence }}%</span>
+          </div>
+          <div class="slider-track-wrap">
+            <input type="range" class="slider" [(ngModel)]="model.minNexusConfidence" min="0" max="100">
+            <div class="slider-fill" [style.width.%]="model.minNexusConfidence" style="background:#3b82f6"></div>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field-group">
+            <label class="field-label">RSI Máx (Long)</label>
+            <input class="field-input" type="number" [(ngModel)]="model.maxRsiLong" min="50" max="100">
+            <p class="field-hint">Bloquea longs si RSI supera este valor</p>
+          </div>
+          <div class="field-group">
+            <label class="field-label">RSI Mín (Short)</label>
+            <input class="field-input" type="number" [(ngModel)]="model.minRsiShort" min="0" max="50">
+            <p class="field-hint">Bloquea shorts si RSI es menor a este valor</p>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="slider-label-row">
+            <label class="field-label">Distancia Máxima a MA7</label>
+            <span class="slider-value">{{ model.maxMa7DistancePct | number:'1.1-1' }}%</span>
+          </div>
+          <div class="slider-track-wrap">
+            <input type="range" class="slider" [(ngModel)]="model.maxMa7DistancePct" min="0.5" max="10" step="0.1">
+            <div class="slider-fill" [style.width.%]="(model.maxMa7DistancePct - 0.5) / 9.5 * 100"
+                 [style.background]="model.maxMa7DistancePct <= 3 ? '#00C47D' : model.maxMa7DistancePct <= 6 ? '#FFB000' : '#FF4D4D'"></div>
+          </div>
+          <p class="field-hint">Rechaza la entrada si el precio está más del <strong>{{ model.maxMa7DistancePct }}%</strong> por encima/debajo de la MA7. Evita entradas tardías en extensiones.</p>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Fuentes de Señal</label>
+          <div class="source-pills">
+            <button class="source-pill" [class.active]="isSourceAllowed('Nexus')" (click)="toggleSource('Nexus')">
+              <ion-icon name="analytics-outline"></ion-icon> Nexus-15
+            </button>
+            <button class="source-pill" [class.active]="isSourceAllowed('LSE')" (click)="toggleSource('LSE')">
+              <ion-icon name="pulse-outline"></ion-icon> LSE Spring
+            </button>
+            <button class="source-pill" [class.active]="isSourceAllowed('Bridge')" (click)="toggleSource('Bridge')">
+              <ion-icon name="git-merge-outline"></ion-icon> Bridge Redis
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── TAB 3: Riesgo ── -->
+      <div class="tab-pane slide-in" *ngIf="activeTab === 'risk'">
+        <div class="section-header">
+          <ion-icon name="shield-half-outline"></ion-icon>
+          <div>
+            <h2>Gestión de Riesgo</h2>
+            <p>Parámetros de sizing, TP/SL y límites de exposición</p>
+          </div>
+        </div>
+
+        <div class="risk-highlight">
+          <ion-icon name="wallet-outline"></ion-icon>
+          <div>
+            <label class="field-label">Margen por Operación (USDT)</label>
+            <input class="field-input big-input" type="number" [(ngModel)]="model.marginPerTrade">
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field-group">
+            <div class="slider-label-row">
+              <label class="field-label">Mult. Take Profit</label>
+              <span class="slider-value success">×{{ model.tpMultiplier | number:'1.1-1' }}</span>
+            </div>
+            <div class="slider-track-wrap">
+              <input type="range" class="slider" [(ngModel)]="model.tpMultiplier" min="1" max="6" step="0.1">
+              <div class="slider-fill" [style.width.%]="(model.tpMultiplier - 1) / 5 * 100" style="background:#00C47D"></div>
+            </div>
+          </div>
+          <div class="field-group">
+            <div class="slider-label-row">
+              <label class="field-label">Mult. Stop Loss</label>
+              <span class="slider-value danger">×{{ model.slMultiplier | number:'1.1-1' }}</span>
+            </div>
+            <div class="slider-track-wrap">
+              <input type="range" class="slider" [(ngModel)]="model.slMultiplier" min="0.2" max="2" step="0.1">
+              <div class="slider-fill" [style.width.%]="(model.slMultiplier - 0.2) / 1.8 * 100" style="background:#FF4D4D"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="rr-display">
+          <div class="rr-label">Ratio R/R Proyectado</div>
+          <div class="rr-value" [style.color]="(model.tpMultiplier / model.slMultiplier) >= model.minRR ? '#00C47D' : '#FF4D4D'">
+            1:{{ (model.tpMultiplier / model.slMultiplier) | number:'1.1-1' }}
+          </div>
+          <div class="rr-check" [class.ok]="(model.tpMultiplier / model.slMultiplier) >= model.minRR">
+            <ion-icon [name]="(model.tpMultiplier / model.slMultiplier) >= model.minRR ? 'checkmark-circle' : 'alert-circle'"></ion-icon>
+            {{ (model.tpMultiplier / model.slMultiplier) >= model.minRR ? 'Cumple mínimo requerido' : 'Por debajo del mínimo' }}
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field-group">
+            <label class="field-label">RR Mínimo Requerido</label>
+            <input class="field-input" type="number" [(ngModel)]="model.minRR" min="0.5" max="5" step="0.1">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Posiciones Simultáneas Máx</label>
+            <input class="field-input" type="number" [(ngModel)]="model.maxOpenPositions" min="1" max="10">
+          </div>
+        </div>
+      </div>
+
+      <!-- ── TAB 4: Avanzado ── -->
+      <div class="tab-pane slide-in" *ngIf="activeTab === 'advanced'">
+        <div class="section-header">
+          <ion-icon name="options-outline"></ion-icon>
+          <div>
+            <h2>Configuración Avanzada</h2>
+            <p>Horarios, timeouts y VETOs de protección</p>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Duración Máxima en Posición</label>
+          <div class="duration-input-row">
+            <input class="field-input" type="number" [(ngModel)]="model.maxTradeDurationCandles" min="1" max="96">
+            <span class="duration-unit">velas 15m</span>
+            <span class="duration-equiv">= {{ model.maxTradeDurationCandles * 15 }} min</span>
+          </div>
+        </div>
+
+        <div class="veto-section">
+          <div class="veto-title">
+            <ion-icon name="shield-checkmark-outline"></ion-icon>
+            VETOs de Protección
+          </div>
+
+          <div class="veto-toggle-row" [class.on]="model.extremeRsiVeto">
+            <div class="veto-info-box">
+              <span class="veto-name">RSI Extremo</span>
+              <span class="veto-desc" *ngIf="!model.extremeRsiVeto">Bloquea trades si el RSI alcanza niveles extremos, independientemente del score.</span>
+              <div class="veto-threshold-inputs" *ngIf="model.extremeRsiVeto">
+                <div class="threshold-row">
+                  <span class="threshold-label">RSI Superior ≥</span>
+                  <input class="threshold-input" type="number"
+                         [(ngModel)]="vetoRsiHigh" min="70" max="99"
+                         [style.border-color]="'#FF4D4D44'"
+                         [style.color]="'#FF4D4D'">
+                  <span class="threshold-unit">→ bloquea LONG</span>
+                </div>
+                <div class="threshold-row">
+                  <span class="threshold-label">RSI Inferior ≤</span>
+                  <input class="threshold-input" type="number"
+                         [(ngModel)]="vetoRsiLow" min="1" max="30"
+                         [style.border-color]="'#00C47D44'"
+                         [style.color]="'#00C47D'">
+                  <span class="threshold-unit">→ bloquea SHORT</span>
+                </div>
+              </div>
+            </div>
+            <div class="mini-toggle" [class.on]="model.extremeRsiVeto"
+                 (click)="model.extremeRsiVeto = !model.extremeRsiVeto">
+              <div class="mini-dot"></div>
+            </div>
+          </div>
+
+          <div class="veto-static-row">
+            <div class="veto-info-box">
+              <span class="veto-name">Late Entry Guard</span>
+              <span class="veto-desc">Rechaza entrada si el precio se alejó &gt;0.3% del punto ideal de entrada.</span>
+            </div>
+            <span class="always-on-badge">Siempre activo</span>
+          </div>
+
+          <div class="veto-static-row">
+            <div class="veto-info-box">
+              <span class="veto-name">Volume Surge Gate</span>
+              <span class="veto-desc">Solo entra si el volumen actual supera 1.3× el promedio de 20 períodos.</span>
+            </div>
+            <span class="always-on-badge">Siempre activo</span>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /form-panel -->
+
+    <!-- ──────────── RIGHT: Live Preview ──────────── -->
+    <div class="preview-panel">
+      <div class="preview-sticky">
+
+        <div class="preview-label">
+          <ion-icon name="eye-outline"></ion-icon>
+          Vista Previa en Tiempo Real
+        </div>
+
+        <!-- Strategy Card Preview -->
+        <div class="live-card" [style.--accent]="model.color">
+          <div class="lc-glow"></div>
+          <div class="lc-bar" [style.background]="model.color"></div>
+
+          <div class="lc-header">
+            <div class="lc-name-row">
+              <span class="lc-name">{{ model.name || 'Sin Nombre' }}</span>
+              <span class="lc-badge" [class.running]="model.isActive">
+                <span class="badge-dot"></span>
+                {{ model.isActive ? 'RUNNING' : 'PAUSED' }}
+              </span>
+            </div>
+            <p class="lc-desc">{{ model.description || 'Agrega una descripción para tu estrategia...' }}</p>
+          </div>
+
+          <div class="lc-metrics">
+            <div class="lc-metric">
+              <span class="lm-label">WINRATE</span>
+              <span class="lm-value">--%</span>
+            </div>
+            <div class="lc-metric">
+              <span class="lm-label">TRADES</span>
+              <span class="lm-value">--</span>
+            </div>
+            <div class="lc-metric">
+              <span class="lm-label">NET PnL</span>
+              <span class="lm-value">-- USDT</span>
+            </div>
+            <div class="lc-metric">
+              <span class="lm-label">AVG R/R</span>
+              <span class="lm-value" [style.color]="model.color">{{ (model.tpMultiplier / model.slMultiplier) | number:'1.1-1' }}</span>
+            </div>
+          </div>
+
+          <div class="lc-params">
+            <div class="lc-param">
+              <ion-icon name="funnel-outline"></ion-icon>
+              <span>Confluencia mín: <strong>{{ model.minConfluenceScore }}</strong></span>
+            </div>
+            <div class="lc-param">
+              <ion-icon name="wallet-outline"></ion-icon>
+              <span>Margen: <strong>{{ model.marginPerTrade }} USDT</strong></span>
+            </div>
+            <div class="lc-param">
+              <ion-icon name="trending-up-outline" *ngIf="model.allowLong"></ion-icon>
+              <ion-icon name="trending-down-outline" *ngIf="model.allowShort"></ion-icon>
+              <span>
+                <strong>{{ model.allowLong && model.allowShort ? 'Long + Short' : model.allowLong ? 'Solo Long' : 'Solo Short' }}</strong>
+              </span>
+            </div>
+            <div class="lc-param">
+              <ion-icon name="layers-outline"></ion-icon>
+              <span>Máx <strong>{{ model.maxOpenPositions }}</strong> posiciones</span>
+            </div>
+          </div>
+
+          <div class="lc-footer">
+            <div class="lc-sources">
+              <span class="src-chip" *ngIf="isSourceAllowed('Nexus')">Nexus</span>
+              <span class="src-chip" *ngIf="isSourceAllowed('LSE')">LSE</span>
+              <span class="src-chip" *ngIf="isSourceAllowed('Bridge')">Bridge</span>
+            </div>
+            <div class="lc-rr">
+              RR: <span [style.color]="(model.tpMultiplier/model.slMultiplier) >= model.minRR ? '#00C47D' : '#FF4D4D'">
+                1:{{ (model.tpMultiplier / model.slMultiplier) | number:'1.1-1' }}
+              </span>
+            </div>
+          </div>
+        </div>
+        <!-- /live-card -->
+
+        <!-- Config Summary -->
+        <div class="config-summary">
+          <div class="cs-title">Resumen de Configuración</div>
+          <div class="cs-row">
+            <span>Score mín.</span>
+            <span class="cs-val">{{ model.minConfluenceScore }}</span>
+          </div>
+          <div class="cs-row">
+            <span>Nexus mín.</span>
+            <span class="cs-val">{{ model.minNexusConfidence }}%</span>
+          </div>
+          <div class="cs-row">
+            <span>TP Multiplier</span>
+            <span class="cs-val success">×{{ model.tpMultiplier }}</span>
+          </div>
+          <div class="cs-row">
+            <span>SL Multiplier</span>
+            <span class="cs-val danger">×{{ model.slMultiplier }}</span>
+          </div>
+          <div class="cs-row">
+            <span>Max posiciones</span>
+            <span class="cs-val">{{ model.maxOpenPositions }}</span>
+          </div>
+          <div class="cs-row">
+            <span>Timeout</span>
+            <span class="cs-val">{{ model.maxTradeDurationCandles * 15 }}m</span>
+          </div>
+          <div class="cs-row">
+            <span>Veto RSI</span>
+            <span class="cs-val" [class.success]="model.extremeRsiVeto" [class.danger]="!model.extremeRsiVeto">
+              {{ model.extremeRsiVeto ? 'ON' : 'OFF' }}
+            </span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <!-- /preview-panel -->
+
+  </div><!-- /editor-body -->
+
 </div>

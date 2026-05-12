@@ -4,16 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { StrategyProfileService } from '../../services/strategy-profile.service';
 import { CreateUpdateStrategyProfileDto } from '../../../proxy/trading/dtos/models';
-import { GlassButtonComponent } from '../../../../shared/components/glass-button/glass-button.component';
-import { CardContentComponent } from '../../../../shared/components/card-content/card-content.component';
-import { ToggleComponent } from '../../../../shared/components/toggle/toggle.component';
 import { IonIcon } from '@ionic/angular/standalone';
 import { finalize } from 'rxjs/operators';
 
 @Component({
   selector: 'app-strategy-editor',
   standalone: true,
-  imports: [CommonModule, FormsModule, GlassButtonComponent, CardContentComponent, ToggleComponent, IonIcon],
+  imports: [CommonModule, FormsModule, IonIcon],
   templateUrl: './strategy-editor.component.html',
   styleUrls: ['./strategy-editor.component.scss']
 })
@@ -25,6 +22,10 @@ export class StrategyEditorComponent implements OnInit {
   id: string | null = null;
   isLoading = false;
   activeTab: 'identity' | 'filters' | 'risk' | 'advanced' | 'preview' = 'identity';
+
+  // RSI VETO thresholds — stored locally, applied by agent config
+  vetoRsiHigh = 85;
+  vetoRsiLow  = 15;
 
   model: CreateUpdateStrategyProfileDto = {
     name: '',

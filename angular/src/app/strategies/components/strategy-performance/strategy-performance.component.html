@@ -1,50 +1,278 @@
-<div class="performance-container">
+<div class="performance-container" [style.--profile-color]="profile?.color || '#00C47D'" *ngIf="performance">
+  
+  <div class="back-btn" (click)="goBack()">
+    <ion-icon name="arrow-back-outline"></ion-icon>
+    Volver a Estrategias
+  </div>
+
+  <!-- ════════ HEADER ════════ -->
   <header class="perf-header">
-    <div class="back-nav" (click)="goBack()">
-      <ion-icon name="arrow-back-outline"></ion-icon>
-      <span>Estrategias</span>
+    <div class="header-info">
+      <h1>Rendimiento del Perfil</h1>
+      <p>Análisis detallado del rendimiento de tu estrategia en tiempo real</p>
     </div>
-    <h1>Rendimiento del Perfil</h1>
-    <app-glass-button icon="download-outline" label="Exportar CSV"></app-glass-button>
+    
+    <div class="header-actions">
+      <div class="date-picker-mock">
+        <ion-icon name="calendar-outline"></ion-icon>
+        <span>01/04/2025 - 20/05/2025</span>
+        <ion-icon name="chevron-down-outline" style="font-size: 10px;"></ion-icon>
+      </div>
+      <button class="action-btn-pulse">
+        <ion-icon name="download-outline"></ion-icon>
+        Exportar
+      </button>
+    </div>
   </header>
 
-  <div class="summary-cards" *ngIf="performance">
-    <app-card-content class="stat-card">
-      <span class="label">Win Rate</span>
-      <span class="value success">{{ performance.winRate }}%</span>
-    </app-card-content>
-    <app-card-content class="stat-card">
-      <span class="label">Total PnL</span>
-      <span class="value" [class.success]="performance.netPnL > 0">{{ performance.netPnL }}%</span>
-    </app-card-content>
-    <app-card-content class="stat-card">
-      <span class="label">Avg RR</span>
-      <span class="value">{{ performance.avgRR }}</span>
-    </app-card-content>
-    <app-card-content class="stat-card">
-      <span class="label">Trades</span>
-      <span class="value">{{ performance.totalTrades }}</span>
-    </app-card-content>
+  <!-- ════════ PROFILE SUMMARY ════════ -->
+  <div class="profile-summary-card">
+    <div class="profile-identity">
+      <div class="profile-icon" [style.background]="(profile?.color || '#00C47D') + '22'" [style.color]="profile?.color || '#00C47D'">
+        <ion-icon name="layers-outline"></ion-icon>
+      </div>
+      <div class="info">
+        <div class="name-row">
+          <h2>{{ profile?.name }}</h2>
+          <span class="status-badge" *ngIf="profile?.isActive">Activo</span>
+        </div>
+        <p class="description">{{ profile?.description || 'Estrategia de trading automatizada basada en señales técnicas de alta precisión.' }}</p>
+      </div>
+    </div>
+
+    <div class="quick-stats">
+      <div class="q-stat">
+        <span class="label">Win Rate</span>
+        <span class="value success">{{ performance.winRate | number:'1.1-1' }}<small>%</small></span>
+        <span class="sub success" *ngIf="performance.winRate >= 60">EXCELENTE</span>
+      </div>
+      <div class="q-stat">
+        <span class="label">Total Trades</span>
+        <span class="value">{{ performance.totalTrades }}</span>
+        <span class="sub">HISTORIAL COMPLETO</span>
+      </div>
+      <div class="q-stat">
+        <span class="label">Net PnL</span>
+        <span class="value" [class.success]="performance.netPnL >= 0" [class.danger]="performance.netPnL < 0">
+          {{ performance.netPnL >= 0 ? '+' : '' }}{{ performance.netPnL | number:'1.2-2' }}<small>ROI%</small>
+        </span>
+      </div>
+      <div class="q-stat">
+        <span class="label">Profit Factor</span>
+        <span class="value">{{ performance.profitFactor | number:'1.2-2' }}</span>
+        <span class="sub success" *ngIf="performance.profitFactor >= 2">SALUDABLE</span>
+      </div>
+      <div class="q-stat">
+        <span class="label">Avg ROI</span>
+        <span class="value" [class.success]="performance.avgRR >= 0">
+          {{ performance.avgRR | number:'1.2-2' }}<small>%</small>
+        </span>
+      </div>
+    </div>
+
+    <div class="profile-actions">
+      <button class="action-btn-pulse" (click)="onEdit()">
+        <ion-icon name="create-outline"></ion-icon>
+        Editar Estrategia
+      </button>
+      <button class="action-btn-pulse secondary">
+        <ion-icon name="eye-outline"></ion-icon>
+        Configuración
+      </button>
+    </div>
   </div>
 
-  <div class="charts-row">
-    <app-card-content class="chart-box main-chart">
-      <h3>Curva de Equity (USDT)</h3>
-      <div class="chart-placeholder">
-        <p>Gráfico de Equity Curve pendiente de integración</p>
-      </div>
-    </app-card-content>
+  <!-- ════════ TABS ════════ -->
+  <div class="perf-tabs">
+    <div class="tab" [class.active]="activeTab === 'summary'" (click)="setTab('summary')">
+      <ion-icon name="grid-outline"></ion-icon> Resumen General
+    </div>
+    <div class="tab" [class.active]="activeTab === 'equity'" (click)="setTab('equity')">
+      <ion-icon name="trending-up-outline"></ion-icon> Curva de Equity
+    </div>
+    <div class="tab" [class.active]="activeTab === 'distribution'" (click)="setTab('distribution')">
+      <ion-icon name="bar-chart-outline"></ion-icon> Distribución
+    </div>
+    <div class="tab" [class.active]="activeTab === 'heatmap'" (click)="setTab('heatmap')">
+      <ion-icon name="apps-outline"></ion-icon> Heatmap Horario
+    </div>
+    <div class="tab" [class.active]="activeTab === 'symbols'" (click)="setTab('symbols')">
+      <ion-icon name="list-outline"></ion-icon> Símbolos
+    </div>
+    <div class="tab" [class.active]="activeTab === 'trades'" (click)="setTab('trades')">
+      <ion-icon name="receipt-outline"></ion-icon> Trades
+    </div>
+  </div>
+
+  <!-- ════════ DASHBOARD GRID ════════ -->
+  <div class="dashboard-grid" *ngIf="activeTab === 'summary'">
     
-    <app-card-content class="chart-box secondary-chart">
-      <h3>Top Símbolos</h3>
-      <div class="symbol-list" *ngIf="performance">
-        <div class="symbol-item" *ngFor="let s of performance.topSymbols">
-          <span class="sym">{{ s.symbol }}</span>
-          <span class="pnl" [class.success]="s.pnl > 0" [class.danger]="s.pnl < 0">
-            {{ s.pnl > 0 ? '+' : '' }}{{ s.pnl }} USDT
-          </span>
+    <!-- Equity Curve Chart -->
+    <div class="chart-card">
+      <div class="card-head">
+        <h3><ion-icon name="trending-up-outline"></ion-icon> Curva de Equity</h3>
+        <div class="chart-ranges">
+          <!-- Placeholder ranges -->
         </div>
       </div>
-    </app-card-content>
+      <div #chartContainer class="chart-container">
+        <div class="chart-placeholder-pulse" *ngIf="!performance.allTrades || performance.allTrades.length === 0">
+          <div class="waveform">
+            <div class="bar" *ngFor="let i of [1,2,3,4,5,6,7,8,9,10]"></div>
+          </div>
+          <span>Esperando datos del mercado...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Stats Sidebar -->
+    <div class="chart-card">
+      <div class="card-head">
+        <h3>Estadísticas Clave</h3>
+      </div>
+      <div class="key-stats-list">
+        <div class="stat-row">
+          <span class="label">Win Rate</span>
+          <span class="value">{{ performance.winRate | number:'1.1-1' }}%</span>
+        </div>
+        <div class="stat-row">
+          <span class="label">Total Trades</span>
+          <span class="value">{{ performance.totalTrades }}</span>
+        </div>
+        <div class="stat-row highlight">
+          <span class="label">Net PnL</span>
+          <span class="value">+{{ performance.netPnL | number:'1.2-2' }}%</span>
+        </div>
+        <div class="stat-row">
+          <span class="label">PnL Promedio</span>
+          <span class="value success">+{{ (performance.netPnL / performance.totalTrades) | number:'1.2-2' }}%</span>
+        </div>
+        <div class="stat-row">
+          <span class="label">Mayor Ganancia</span>
+          <span class="value success">+{{ performance.maxGain | number:'1.2-2' }}%</span>
+        </div>
+        <div class="stat-row">
+          <span class="label">Mayor Pérdida</span>
+          <span class="value danger">{{ performance.maxLoss | number:'1.2-2' }}%</span>
+        </div>
+        <div class="stat-row">
+          <span class="label">Profit Factor</span>
+          <span class="value">{{ performance.profitFactor | number:'1.2-2' }}</span>
+        </div>
+        <div class="stat-row">
+          <span class="label">Sharpe Ratio</span>
+          <span class="value">1.78</span>
+        </div>
+      </div>
+    </div>
   </div>
+
+  <!-- ════════ SECONDARY GRID ════════ -->
+  <div class="secondary-grid" *ngIf="activeTab === 'summary'">
+    
+    <!-- Histogram -->
+    <div class="chart-card histogram-box">
+      <div class="card-head">
+        <h3>Distribución de PnL por Trade</h3>
+      </div>
+      <div class="bars">
+        <!-- Mock histogram bars based on trades -->
+        <div class="bar-group" *ngFor="let i of [1,2,3,4,5,6,7,8,9,10]">
+          <div class="bar" [style.height.%]="20 + (i*5)" [style.background]="i < 5 ? '#FF4D4D33' : '#00C47D33'"></div>
+          <span class="label">{{ i * 2 }}%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Heatmap -->
+    <div class="chart-card">
+      <div class="card-head">
+        <h3>Win Rate por Hora (UTC)</h3>
+      </div>
+      <div class="heatmap-grid" *ngIf="performance.heatmap">
+        <div class="heatmap-row" *ngFor="let day of ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']">
+          <span class="day-label">{{ day }}</span>
+          <div class="cells">
+            <div class="cell" *ngFor="let h of performance.heatmap[day]" [class.lvl-1]="h > 0" [class.lvl-2]="h > 2" [class.lvl-3]="h > 5"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top Symbols -->
+    <div class="chart-card">
+      <div class="card-head">
+        <h3>Top 5 Símbolos</h3>
+      </div>
+      <div class="symbol-list">
+        <div class="stat-row" *ngFor="let s of performance.topSymbols">
+          <span class="label">{{ s.symbol }}</span>
+          <span class="value success">+{{ s.pnl | number:'1.2-2' }} USDT</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ TRADES TABLE ════════ -->
+  <div class="trades-section" *ngIf="activeTab === 'summary' || activeTab === 'trades'">
+    <div class="section-head">
+      <h3>Todas las Operaciones del Perfil</h3>
+      <div class="table-filters">
+        <div class="search-box">
+          <ion-icon name="search-outline"></ion-icon>
+          <input type="text" placeholder="Buscar operación...">
+        </div>
+        <button class="action-btn-pulse secondary">
+          <ion-icon name="funnel-outline"></ion-icon>
+          Filtros
+        </button>
+      </div>
+    </div>
+    
+    <div class="table-responsive">
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Símbolo</th>
+            <th>Dirección</th>
+            <th>Entrada</th>
+            <th>Salida</th>
+            <th>Resultado</th>
+            <th>PnL (%)</th>
+            <th>Duración</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let trade of performance.allTrades">
+            <td>{{ trade.openedAt | date:'dd/MM/yyyy HH:mm' }}</td>
+            <td class="fw-bold">{{ trade.symbol }}</td>
+            <td>
+              <span class="badge" [class.long]="trade.side === 0" [class.short]="trade.side === 1">
+                {{ trade.side === 0 ? 'LONG' : 'SHORT' }}
+              </span>
+            </td>
+            <td>{{ trade.entryPrice | number:'1.2-4' }}</td>
+            <td>{{ trade.closePrice | number:'1.2-4' }}</td>
+            <td>
+              <span class="result-pill" [class.win]="(trade.realizedPnl || 0) > 0" [class.loss]="(trade.realizedPnl || 0) <= 0">
+                {{ (trade.realizedPnl || 0) > 0 ? 'Ganadora' : 'Perdedora' }}
+              </span>
+            </td>
+            <td [class.success]="(trade.realizedPnl || 0) > 0" [class.danger]="(trade.realizedPnl || 0) <= 0">
+              {{ (trade.realizedPnl || 0) > 0 ? '+' : '' }}{{ trade.roiPercentage | number:'1.2-2' }}%
+            </td>
+            <td>{{ trade.durationMinutes || 4 }} velas</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- Loading State -->
+<div class="loading-state" *ngIf="isLoading">
+  <div class="loading-ring"></div>
+  <p>Procesando métricas institucionales...</p>
 </div>

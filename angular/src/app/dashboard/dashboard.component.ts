@@ -25,6 +25,8 @@ import { AlertService } from '../services/alert.service';
 import { TradingPanelComponent } from 'src/shared/components/trading-panel/trading-panel.component';
 import { TpSlModalComponent } from 'src/shared/components/tpsl-modal/tpsl-modal.component';
 import { PaginatorComponent } from '../shared/components/paginator/paginator.component';
+import { StrategyProfileService } from '../strategies/services/strategy-profile.service';
+import { StrategyProfileDto } from '../proxy/trading/dtos/models';
 
 interface TradingSignal {
   id: number;
@@ -81,6 +83,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private signalrService = inject(TradingSignalrService);
   public alertService = inject(AlertService);
   private alertHistoryService = inject(AlertHistoryService);
+  private strategyService = inject(StrategyProfileService);
   private destroy$ = new Subject<void>();
 
   // Estado del dashboard
@@ -143,6 +146,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   // Configuración
   selectedSymbol = 'BTCUSDT';
   selectedTimeframe = '15';
+  // Estrategias
+  strategyProfiles: StrategyProfileDto[] = [];
+  selectedProfileId: string | null = null; // null = Standard/Legacy
   hmaPeriod = 50;
 
   // Deprecated/migrated symbols that should be filtered out everywhere
@@ -186,7 +192,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   // Simulation
   activeTrades: SimulatedTradeDto[] = [];
   tradeHistory: SimulatedTradeDto[] = [];
-  consoleTab: 'positions' | 'orders' | 'history' = 'positions';
+  consoleTab: string = 'legacy'; // 'legacy', 'history', or UUID of strategy
   showTpSlModal = false;
   selectedTradeForModal: SimulatedTradeDto | null = null;
   private simulatedTradeService = inject(SimulatedTradeService);
@@ -195,9 +201,17 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   activePositionsPage = 1;
   activePositionsPageSize = 5;
 
+  get filteredActiveTrades(): SimulatedTradeDto[] {
+    return this.activeTrades.filter(t => {
+      if (this.consoleTab === 'legacy') return !t.strategyProfileId;
+      if (this.consoleTab === 'history') return false; // History has its own table
+      return t.strategyProfileId === this.consoleTab;
+    });
+  }
+
   get paginatedActiveTrades(): SimulatedTradeDto[] {
     const startIndex = (this.activePositionsPage - 1) * this.activePositionsPageSize;
-    return this.activeTrades.slice(startIndex, startIndex + this.activePositionsPageSize);
+    return this.filteredActiveTrades.slice(startIndex, startIndex + this.activePositionsPageSize);
   }
 
   onActivePositionsPageChange(page: number) {
@@ -292,6 +306,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loadTickers();
     this.loadActiveTrades();
     this.loadTradeHistory();
+    this.loadStrategyProfiles();
 
     // 🔄 Polling fallback: refresh active trade PnL every 5 seconds
     // This covers cases where SignalR updates are missed (tab in background, reconnect lag, etc.)
@@ -323,6 +338,21 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     this.subscribeToNotifications();
+  }
+
+  loadStrategyProfiles() {
+    this.strategyService.getAll().subscribe(profiles => {
+      this.strategyProfiles = profiles;
+    });
+  }
+
+  onStrategyChange() {
+    console.log('[Dashboard] 🎯 Estrategia cambiada:', this.selectedProfileId);
+    this.loadActiveTrades();
+    this.loadTradeHistory();
+    // Reiniciar paginación
+    this.activePositionsPage = 1;
+    this.tradeHistoryPage = 1;
   }
 
   private subscribeToNotifications() {
@@ -977,25 +1007,33 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   loadActiveTrades() {
     this.simulatedTradeService.getActiveTrades().subscribe({
-      next: (trades) => this.activeTrades = trades,
+      next: (trades) => {
+        this.activeTrades = trades;
+      },
       error: (err) => console.error('Error loading active trades', err)
     });
   }
 
   loadTradeHistory() {
     this.simulatedTradeService.getTradeHistory().subscribe({
-      next: (history) => this.tradeHistory = history,
+      next: (history) => {
+        this.tradeHistory = history;
+      },
       error: (err) => console.error('Error loading trade history', err)
     });
   }
 
-  setConsoleTab(tab: 'positions' | 'orders' | 'history') {
+  setConsoleTab(tab: string) {
     this.consoleTab = tab;
     if (tab === 'history') {
       this.loadTradeHistory();
-    } else if (tab === 'positions') {
+    } else {
       this.loadActiveTrades();
     }
+  }
+
+  getActiveTradesCount(profileId: string | null): number {
+    return this.activeTrades.filter(t => t.strategyProfileId === profileId).length;
   }
 
   closePosition(tradeId: string) {
