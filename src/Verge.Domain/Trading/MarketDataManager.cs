@@ -19,7 +19,7 @@ public class MarketDataManager : DomainService
     private readonly BinanceWebSocketService _webSocketService;
     private const string BinanceBaseUrl = "https://api.binance.com";
     private const string FuturesBaseUrl = "https://fapi.binance.com";
-    private const string PythonBaseUrl  = "http://127.0.0.1:8001";
+    private const string PythonBaseUrl  = "http://market-data:8000";
 
     private readonly IDatabase _redis;
     private static readonly SemaphoreSlim _binanceGate = new(10, 10);    // Max 10 parallel REST calls
