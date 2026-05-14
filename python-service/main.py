@@ -18,6 +18,7 @@ from scar import router as scar_router
 from scar import data_store as scar_db
 from scar import scheduler as scar_scheduler
 from lse.router import router as lse_router
+from scar import proxies
 
 
 # Initialize logging
@@ -270,6 +271,49 @@ async def analyze_technicals(request: TechRequest):
     except Exception as e:
         logger.error(f"Tech error: {e}")
         return TechResponse(rsi=50, macd_histogram=0, atr=0)
+
+@app.get("/market/tickers")
+async def get_tickers():
+    """Proxy for 24h Tickers (Binance/Bybit) used by ABP Backend."""
+    try:
+        # Try Binance first
+        r = requests.get("https://fapi.binance.com/fapi/v1/ticker/24hr", timeout=5)
+        if r.status_code == 200:
+            return r.json()
+            
+        # Fallback to Bybit
+        r = requests.get("https://api.bybit.com/v5/market/tickers?category=linear", timeout=5)
+        if r.status_code == 200:
+            data = r.json()
+            # Normalize Bybit format to what the backend expects (approximate)
+            return data.get("result", {}).get("list", [])
+            
+        return []
+    except Exception as e:
+        logger.error(f"Error fetching tickers: {e}")
+        return []
+
+@app.get("/market/candles/{symbol}")
+async def get_candles(symbol: str, limit: int = 100):
+    """Proxy for Klines used by ABP Backend."""
+    try:
+        # Try local Market-WS first
+        r = requests.get(f"http://verge-market-ws:8001/market/candle/{symbol}", timeout=2)
+        if r.status_code == 200:
+            # Normalize to list format if needed
+            return [r.json()]
+            
+        # Try Binance
+        r = requests.get(f"https://fapi.binance.com/fapi/v1/klines?symbol={symbol}&interval=1h&limit={limit}", timeout=5)
+        if r.status_code == 200:
+            raw = r.json()
+            # Map to the format MarketDataManager expects
+            return [{"open_time": k[0], "open": float(k[1]), "high": float(k[2]), "low": float(k[3]), "close": float(k[4]), "volume": float(k[5])} for k in raw]
+            
+        return []
+    except Exception as e:
+        logger.error(f"Error fetching candles for {symbol}: {e}")
+        return []
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

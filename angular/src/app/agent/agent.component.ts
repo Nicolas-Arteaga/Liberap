@@ -285,35 +285,57 @@ export class AgentComponent implements OnInit, OnDestroy, AfterViewChecked {
     }
   }
 
+  private consecutiveStoppedCount = 0;
+  private readonly MAX_STOPPED_BEFORE_TRANSITION = 3;
+
   refreshData() {
     if (this.isRefreshing) {
       return;
     }
     this.isRefreshing = true;
 
-    // Refresh backend state; backend is source of truth for MarketWS health.
-    this.agentService.getSystemState().subscribe((data: any) => {
-      if (data?.health) {
-        this.exchangeStats = data.health;
-      } else if (data?.isServerHealthy === false) {
-        this.exchangeStats = null;
-      }
+    // Backend is source of truth for MarketWS health.
+    this.agentService.getSystemState().subscribe({
+      next: (data: any) => {
+        if (data?.health) {
+          this.exchangeStats = data.health;
+        } else if (data?.isServerHealthy === false) {
+          this.exchangeStats = null;
+        }
 
-      if (data?.state) {
-        const st = this.normalizeAgentState(data.state);
-        this.systemState = st;
-        if (st === 'STOPPED') {
-          this.dockerTerminalSeeded = false;
-          this.seenDockerLogs.clear();
+        if (data?.state) {
+          const st = this.normalizeAgentState(data.state);
+
+          if (st === 'STOPPED') {
+            // Don't flip to STOPPED on a single bad response - require 3 consecutive
+            this.consecutiveStoppedCount++;
+            if (this.consecutiveStoppedCount >= this.MAX_STOPPED_BEFORE_TRANSITION) {
+              this.systemState = 'STOPPED';
+              this.consecutiveStoppedCount = 0;
+              this.dockerTerminalSeeded = false;
+              this.seenDockerLogs.clear();
+            }
+          } else {
+            // Any positive state clears the counter and updates immediately
+            this.consecutiveStoppedCount = 0;
+            this.systemState = st;
+            if (st === 'SERVER_READY' && data?.marketWsExternal && (data?.health || data?.logs)) {
+              this.maybeSeedDockerMarketWsLogs(data);
+            }
+          }
         }
-        if (st === 'SERVER_READY' && data?.marketWsExternal && (data?.health || data?.logs)) {
-          this.maybeSeedDockerMarketWsLogs(data);
+      },
+      error: () => {
+        // On HTTP error, increment failure counter but don't immediately kill the state
+        this.consecutiveStoppedCount++;
+        if (this.consecutiveStoppedCount >= this.MAX_STOPPED_BEFORE_TRANSITION) {
+          this.systemState = 'STOPPED';
+          this.consecutiveStoppedCount = 0;
         }
+      },
+      complete: () => {
+        this.isRefreshing = false;
       }
-    }, () => {
-      // Keep previous telemetry on transient failures.
-    }, () => {
-      this.isRefreshing = false;
     });
 
     this.agentService.getAuditSummary().subscribe((data: any) => {

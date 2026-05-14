@@ -133,7 +133,13 @@ def validate_lse_setup(
 
         slip = (cp - entry_f) / entry_f
         metrics["entry_slippage_pct"] = round(slip, 6)
-        max_slip = float(getattr(config, "MAX_ENTRY_SLIPPAGE_PCT", 0.002))
+        max_slip = float(
+            getattr(
+                config,
+                "LSE_MAX_ENTRY_SLIPPAGE_PCT",
+                getattr(config, "MAX_ENTRY_SLIPPAGE_PCT", 0.002),
+            )
+        )
         if slip > max_slip:
             logger.info("[SKIP] late_entry slippage_pct=%s max=%s", slip, max_slip)
             return False, "late_entry", metrics
@@ -309,6 +315,30 @@ def validate_nexus_confluence_setup(
             candidate.get("symbol"), estimated_range_pct, MIN_RANGE_PCT
         )
         return False, "range_too_small", metrics
+
+    # ── BONUS SMC Triple: OB + FVG + BOS simultáneos ──────────────
+    # En producción: BILLUSDT con este patrón hizo +17.82% ROI en 5h.
+    # Priorizar estos setups en el ranking es el siguiente nivel.
+    smc_triple = (
+        bool(nexus_features.get("order_block_detected", False)) and
+        bool(nexus_features.get("fair_value_gap", False)) and
+        bool(nexus_features.get("bos_detected", False))
+    )
+
+    wyckoff_markup = str(nexus_features.get("wyckoff_phase", "")).lower() == "markup"
+
+    if smc_triple:
+        # Agregar metadata al candidate para que el ranking lo priorice
+        metrics["smc_triple_confirmed"] = True
+        metrics["smc_bonus"] = 5.0  # puntos de bonus a documentar en audit
+        if wyckoff_markup:
+            metrics["smc_bonus"] = 8.0  # Markup + triple SMC = máxima calidad
+        logger.info(
+            "[BONUS] smc_triple_confirmed — %s | OB+FVG+BOS | Wyckoff=%s | bonus=+%.1f",
+            candidate.get("symbol"),
+            nexus_features.get("wyckoff_phase"),
+            metrics["smc_bonus"]
+        )
 
     # ── Fin bloqueos duros ────────────────────────────────────────────────
 

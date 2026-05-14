@@ -4,7 +4,7 @@ import os
 import config
 import logging
 import requests
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger("ReportEngine")
 
@@ -61,8 +61,15 @@ class ReportEngine:
             opened_at_str = local_pos_data.get("opened_at")
             duration_h = 0.0
             if opened_at_str:
-                opened_at = datetime.fromisoformat(opened_at_str)
-                duration_h = round((datetime.utcnow() - opened_at).total_seconds() / 3600.0, 1)
+                try:
+                    opened_at = datetime.fromisoformat(opened_at_str.replace("Z", "+00:00"))
+                    now_utc = datetime.now(timezone.utc)
+                    # Ensure opened_at is timezone-aware for subtraction
+                    if opened_at.tzinfo is None:
+                        opened_at = opened_at.replace(tzinfo=timezone.utc)
+                    duration_h = round((now_utc - opened_at).total_seconds() / 3600.0, 1)
+                except Exception as dt_err:
+                    logger.warning(f"Could not calculate duration for trade: {dt_err}")
 
             entry_reason = local_pos_data.get("entry_reason", "")
             nexus_group = local_pos_data.get("nexus_group", "")

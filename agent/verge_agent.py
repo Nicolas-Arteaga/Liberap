@@ -307,11 +307,26 @@ class VergeAgent:
                         "nexus15": self._json_safe_for_audit(nexus_data),
                         "scar": self._json_safe_for_audit(scar_data) if scar_data else {},
                     }
-                    candidates.append(enriched)
-                    logger.info(
-                        f"✅ CANDIDATE: {symbol} | Score={confluence['confluence_score']:.1f} | "
-                        f"Dir={confluence['trade_direction']} | Nexus={confluence['nexus_confidence']}%"
-                    )
+
+                    # ── BONUS SMC: Aplicar bonus de calidad antes del ranking ──
+                    # Usamos price_at_signal (last_close de Nexus) para validar sin latencia REST
+                    px_val = enriched.get("price_at_signal") or self.fetcher.get_current_price(symbol)
+                    if px_val:
+                        v_ok, v_code, v_metrics = validate_pre_trade(enriched, px_val)
+                        if v_ok:
+                            if "smc_bonus" in v_metrics:
+                                bonus = float(v_metrics["smc_bonus"])
+                                enriched["confluence_score"] += bonus
+                                enriched["smc_bonus_applied"] = bonus
+
+                            candidates.append(enriched)
+                            logger.info(
+                                f"✅ CANDIDATE: {symbol} | Score={enriched['confluence_score']:.1f} | "
+                                f"Dir={enriched['trade_direction']} | Nexus={enriched['nexus_confidence']}%" +
+                                (f" | SMC Bonus=+{enriched['smc_bonus_applied']}" if "smc_bonus_applied" in enriched else "")
+                            )
+                        else:
+                            logger.info(f"❌ [VETO] {symbol} rechazado en scan: {v_code}")
             except Exception as e:
                 logger.error(f"⚠️ Error analyzing {symbol}: {e}")
                 continue
@@ -455,9 +470,21 @@ class VergeAgent:
                     "bridge":  sig,
                 },
             }
-            candidates.append(bridge_cand)
-            existing_syms.add(sym)
-            injected += 1
+
+            # ── BONUS SMC: Aplicar bonus de calidad antes del ranking (Bridge) ──
+            v_ok, v_code, v_metrics = validate_pre_trade(bridge_cand, current_px)
+            if v_ok:
+                if "smc_bonus" in v_metrics:
+                    bonus = float(v_metrics["smc_bonus"])
+                    bridge_cand["confluence_score"] += bonus
+                    bridge_cand["smc_bonus_applied"] = bonus
+                    logger.info("[BRIDGE] %s bonus SMC detectado: +%.1f score", sym, bonus)
+
+                candidates.append(bridge_cand)
+                existing_syms.add(sym)
+                injected += 1
+            else:
+                logger.info("[BRIDGE] %s filtrado por validación pre-ranking: %s", sym, v_code)
             logger.info(
                 "[BRIDGE] ✅ VALIDADO %s | BridgeScore=%.0f | Nexus15=%.0f%% | "
                 "FinalScore=%.1f | Dir=%s | Age=%.0fs",
@@ -1131,11 +1158,20 @@ class VergeAgent:
         now_ms = time.time() * 1000
         eligible: list = []
         for k in klines[:-1]:
-            o = int(k["open_time"])
+            # Normalize key: REST fetcher may return 'open_time', 'openTime', or 't'
+            raw_ot = k.get("open_time") or k.get("openTime") or k.get("t")
+            if raw_ot is None:
+                continue
+            o = int(raw_ot)
             close_ts = o + tf_ms
             if close_ts > opened_ms and close_ts <= now_ms:
                 eligible.append(k)
-        eligible.sort(key=lambda x: int(x["open_time"]))
+
+        def _get_open_time(kline):
+            raw = kline.get("open_time") or kline.get("openTime") or kline.get("t") or 0
+            return int(raw)
+
+        eligible.sort(key=_get_open_time)
 
         if reclaim_f is not None and len(eligible) >= 3:
             for i, k in enumerate(eligible):

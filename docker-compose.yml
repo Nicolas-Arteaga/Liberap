@@ -42,42 +42,18 @@ services:
       dockerfile: agent/Dockerfile.market-ws
     image: verge-market-ws
     container_name: verge-market-ws
+    env_file:
+      - ./python-service/.env
+    environment:
+      - BINANCE_API_KEY=${BINANCE_API_KEY}
+      - BINANCE_API_SECRET=${BINANCE_API_SECRET}
     ports:
       - "8001:8001"
     volumes:
       - market_ws_data:/app/data
     restart: always
 
-  dotnet-backend:
-    build:
-      context: .
-      dockerfile: src/Verge.HttpApi.Host/Dockerfile
-    container_name: verge-dotnet-backend
-    ports:
-      - "5000:8080"
-      - "5001:443"
-    env_file:
-      - ./python-service/.env
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_HTTP_PORTS=8080
-      - Redis:Configuration=redis:6379
-      - ConnectionStrings:Default=Host=db;Port=5432;Database=Verge;Username=postgres;Password=postgres;Pooling=true;TrustServerCertificate=true
-      - PythonService__Url=http://market-data:8000
-      - App__HealthUiCheckUrl=http://localhost:8080/health-status
-      # Health / audit del Market WS (contenedor propio; 127.0.0.1 sería el propio .NET).
-      - MarketWs__BaseUrls__0=http://market-ws:8001
-      - MarketWs__BaseUrls__1=http://host.docker.internal:8001
-      - MarketWs__BaseUrls__2=http://127.0.0.1:8001
-      - MarketWs__BaseUrls__3=http://localhost:8001
-      - BINANCE_API_KEY=${BINANCE_API_KEY}
-      - BINANCE_API_SECRET=${BINANCE_API_SECRET}
-    depends_on:
-      - redis
-      - db
-      - market-data
-      - market-ws
-    restart: always
+  # El backend se corre localmente en el host, no en Docker.
 
 volumes:
   redis_data:
