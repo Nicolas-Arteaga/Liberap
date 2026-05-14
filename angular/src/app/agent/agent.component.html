@@ -28,22 +28,9 @@
       </div>
 
       <div class="action-buttons">
-        <!-- STOPPED -->
-        <button *ngIf="systemState === 'STOPPED'" class="btn-start" style="width: 100%; justify-content: center;" (click)="startServer()">
-          <ion-icon name="power"></ion-icon> INICIAR MARKET WS
-        </button>
-
-        <!-- STARTING -->
-        <button *ngIf="systemState === 'STARTING_SERVER'" class="btn-start" style="width: 100%; justify-content: center; opacity: 0.7; cursor: not-allowed;" disabled>
-          <ion-icon name="sync" class="spin"></ion-icon> INICIANDO...
-        </button>
-
-        <!-- SERVER READY -->
-        <button *ngIf="systemState === 'SERVER_READY'" class="btn-start" style="flex: 2;" (click)="startAgent()">
+        <!-- READY TO START AGENT -->
+        <button *ngIf="systemState !== 'AGENT_RUNNING'" class="btn-start" style="width: 100%; justify-content: center;" [disabled]="systemState !== 'SERVER_READY'" (click)="startAgent()">
           <ion-icon name="play"></ion-icon> INICIAR AGENTE
-        </button>
-        <button *ngIf="systemState === 'SERVER_READY'" class="btn-stop" style="flex: 1;" (click)="stopServer()">
-          <ion-icon name="square"></ion-icon> DETENER SERVER
         </button>
 
         <!-- AGENT RUNNING -->
@@ -81,7 +68,7 @@
           <span class="log-time">[{{ log.time }}]</span>
           <span class="log-text" [style.color]="log.color || '#00f3ff'">{{ log.text }}</span>
         </div>
-        <div class="log-line" *ngIf="systemState === 'AGENT_RUNNING' || systemState === 'STARTING_SERVER'">
+        <div class="log-line" *ngIf="systemState === 'AGENT_RUNNING' || systemState === 'STARTING_SERVER' || systemState === 'SERVER_READY'">
           <span class="prompt">></span>
           <span class="log-text" style="color: #00ffaa;"><span class="cursor"></span></span>
         </div>

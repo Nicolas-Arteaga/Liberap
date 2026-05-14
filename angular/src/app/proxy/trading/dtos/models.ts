@@ -40,7 +40,7 @@ export interface CreateUpdateStrategyProfileDto {
   maxRsiLong: number;
   minRsiShort: number;
   maxMa7DistancePct: number;
-  macdRequired?: string;
+  requireMacdPositive?: boolean;
   allowedSources?: string;
   allowLong: boolean;
   allowShort: boolean;
@@ -52,7 +52,7 @@ export interface CreateUpdateStrategyProfileDto {
   maxTradeDurationCandles: number;
   activeHoursStart?: string;
   activeHoursEnd?: string;
-  enabledDays?: string[];
+  enabledDays: string[];
   extremeRsiVeto: boolean;
 }
 
@@ -158,7 +158,7 @@ export interface StrategyProfileDto extends EntityDto<string> {
   maxRsiLong: number;
   minRsiShort: number;
   maxMa7DistancePct: number;
-  macdRequired?: string;
+  requireMacdPositive?: boolean;
   allowedSources?: string;
   allowLong: boolean;
   allowShort: boolean;
@@ -170,12 +170,12 @@ export interface StrategyProfileDto extends EntityDto<string> {
   maxTradeDurationCandles: number;
   activeHoursStart?: string;
   activeHoursEnd?: string;
-  enabledDays?: string[];
+  enabledDays: string[];
   extremeRsiVeto: boolean;
-  winRate?: number;
-  totalTrades?: number;
-  netPnL?: number;
-  avgRR?: number;
+  winRate: number;
+  totalTrades: number;
+  netPnL: number;
+  avgRR: number;
 }
 
 export interface TargetZoneDto {

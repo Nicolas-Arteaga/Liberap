@@ -19,17 +19,21 @@ public class MarketDataManager : DomainService
     private readonly BinanceWebSocketService _webSocketService;
     private const string BinanceBaseUrl = "https://api.binance.com";
     private const string FuturesBaseUrl = "https://fapi.binance.com";
-    private const string PythonBaseUrl  = "http://market-data:8000";
-
+    private readonly string _pythonBaseUrl;
     private readonly IDatabase _redis;
     private static readonly SemaphoreSlim _binanceGate = new(10, 10);    // Max 10 parallel REST calls
     private static readonly SemaphoreSlim _tickerGate  = new(3, 3);      // Dedicated slots for ticker calls (Nexus-15 top scan)
 
-    public MarketDataManager(IHttpClientFactory httpClientFactory, BinanceWebSocketService webSocketService, IConnectionMultiplexer redis)
+    public MarketDataManager(
+        IHttpClientFactory httpClientFactory, 
+        BinanceWebSocketService webSocketService, 
+        IConnectionMultiplexer redis,
+        Microsoft.Extensions.Configuration.IConfiguration configuration)
     {
         _httpClientFactory = httpClientFactory;
         _webSocketService = webSocketService;
         _redis = redis.GetDatabase();
+        _pythonBaseUrl = configuration["PythonService:Url"]?.TrimEnd('/') ?? "http://localhost:8005";
     }
 
     /// <summary>
@@ -411,7 +415,7 @@ public class MarketDataManager : DomainService
         try
         {
             var client = _httpClientFactory.CreateClient();
-            var response = await client.GetAsync($"{PythonBaseUrl}/market/tickers");
+            var response = await client.GetAsync($"{_pythonBaseUrl}/market/tickers");
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
@@ -548,7 +552,7 @@ public class MarketDataManager : DomainService
         {
             var client = _httpClientFactory.CreateClient();
             // interval is already converted to 1m, 15m, etc. Python expects those.
-            var url = $"{PythonBaseUrl}/market/candles/{symbol}?limit={limit}";
+            var url = $"{_pythonBaseUrl}/market/candles/{symbol}?limit={limit}";
             var response = await client.GetAsync(url);
             if (!response.IsSuccessStatusCode) return null;
 

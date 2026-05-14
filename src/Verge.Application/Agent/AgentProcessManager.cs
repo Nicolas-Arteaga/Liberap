@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.IO;
 using System.Net.NetworkInformation;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Volo.Abp.DependencyInjection;
 
@@ -15,15 +17,18 @@ public class AgentProcessManager : ISingletonDependency
     private const int MarketWsPort = 8001;
     private readonly IHubContext<AgentHub> _hubContext;
     private readonly ILogger<AgentProcessManager> _logger;
+    private readonly IConfiguration _configuration;
     private readonly ConcurrentDictionary<string, Process> _processes = new();
     private readonly ConcurrentDictionary<string, DateTime> _startTimes = new();
 
     public AgentProcessManager(
         IHubContext<AgentHub> hubContext,
-        ILogger<AgentProcessManager> logger)
+        ILogger<AgentProcessManager> logger,
+        IConfiguration configuration)
     {
         _hubContext = hubContext;
         _logger = logger;
+        _configuration = configuration;
     }
 
     public async Task StartProcessAsync(string name, string scriptName,
@@ -45,10 +50,21 @@ public class AgentProcessManager : ISingletonDependency
                 await EnsureMarketWsPortIsFreeAsync();
             }
 
-            string pythonPath = "python";
-            string scriptPath = System.IO.Path.Combine(@"C:\Users\Nicolas\Desktop\Verge\Verge\agent", scriptName);
+            var agentDir = TryResolveAgentScriptsDirectory();
+            if (string.IsNullOrEmpty(agentDir))
+            {
+                await _hubContext.Clients.All.SendAsync(
+                    "ReceiveAgentLog",
+                    "❌ ERROR: No se encontró la carpeta del agente Python (verge_agent.py). " +
+                    "Definí Agent:ScriptsDirectory en appsettings o la variable de entorno VERGE_AGENT_DIR.",
+                    "#ef4444");
+                return;
+            }
 
-            if (!System.IO.File.Exists(scriptPath))
+            string pythonPath = "python";
+            string scriptPath = Path.Combine(agentDir, scriptName);
+
+            if (!File.Exists(scriptPath))
             {
                 await _hubContext.Clients.All.SendAsync("ReceiveAgentLog", $"❌ ERROR: No se encontró el script en {scriptPath}", "#ef4444");
                 return;
@@ -62,7 +78,7 @@ public class AgentProcessManager : ISingletonDependency
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true,
-                WorkingDirectory = @"C:\Users\Nicolas\Desktop\Verge\Verge\agent"
+                WorkingDirectory = agentDir
             };
 
             // Inject any extra environment variables (e.g. VERGE_SKIP_SEED=1 during ban)
@@ -263,6 +279,82 @@ public class AgentProcessManager : ISingletonDependency
         }
 
         await Task.Delay(300);
+    }
+
+    /// <summary>
+    /// Resuelve el directorio que contiene verge_agent.py / market_ws_server.py.
+    /// Orden: Agent:ScriptsDirectory → VERGE_AGENT_DIR → búsqueda hacia arriba desde cwd y BaseDirectory.
+    /// </summary>
+    private string? TryResolveAgentScriptsDirectory()
+    {
+        var fromConfig = _configuration["Agent:ScriptsDirectory"]?.Trim();
+        if (!string.IsNullOrEmpty(fromConfig))
+        {
+            try
+            {
+                var full = Path.GetFullPath(fromConfig);
+                if (IsAgentDirectory(full))
+                {
+                    return full;
+                }
+
+                _logger.LogWarning("Agent:ScriptsDirectory apunta a {Path} pero no contiene verge_agent.py.", full);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Agent:ScriptsDirectory inválido.");
+            }
+        }
+
+        var envDir = Environment.GetEnvironmentVariable("VERGE_AGENT_DIR")?.Trim();
+        if (!string.IsNullOrEmpty(envDir))
+        {
+            try
+            {
+                var full = Path.GetFullPath(envDir);
+                if (IsAgentDirectory(full))
+                {
+                    return full;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "VERGE_AGENT_DIR inválido.");
+            }
+        }
+
+        foreach (var start in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory })
+        {
+            if (string.IsNullOrWhiteSpace(start))
+            {
+                continue;
+            }
+
+            try
+            {
+                var dir = new DirectoryInfo(Path.GetFullPath(start));
+                for (var depth = 0; depth < 14 && dir != null; depth++, dir = dir.Parent)
+                {
+                    var candidate = Path.Combine(dir.FullName, "agent");
+                    if (IsAgentDirectory(candidate))
+                    {
+                        _logger.LogInformation("Directorio del agente resuelto por búsqueda: {Dir}", candidate);
+                        return candidate;
+                    }
+                }
+            }
+            catch
+            {
+                // siguiente raíz
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsAgentDirectory(string path)
+    {
+        return Directory.Exists(path) && File.Exists(Path.Combine(path, "verge_agent.py"));
     }
 }
 

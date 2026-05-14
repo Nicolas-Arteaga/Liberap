@@ -51,9 +51,11 @@ if LSE_ENTRY_MODE not in ("conservative", "aggressive"):
 LSE_HTTP_TIMEOUT_SEC = int(getattr(config, "LSE_HTTP_TIMEOUT_SEC", 360))
 LSE_MAX_SYMBOLS_PER_CYCLE = int(getattr(config, "LSE_MAX_SYMBOLS_PER_CYCLE", 200))
 LSE_BATCH_TOP_K = int(getattr(config, "LSE_BATCH_TOP_K", 10))
+LSE_MAX_INJECTED_CANDIDATES = int(getattr(config, "LSE_MAX_INJECTED_CANDIDATES", 10))
 LSE_REQUIRE_SCAN_BEFORE_ENTRY = getattr(config, "LSE_REQUIRE_SCAN_BEFORE_ENTRY", True)
 LSE_MIN_SYMBOLS_PROCESSED_GATE = int(getattr(config, "LSE_MIN_SYMBOLS_PROCESSED_GATE", 1))
 LSE_REQUIRE_ALL_QUEUED_PROCESSED = getattr(config, "LSE_REQUIRE_ALL_QUEUED_PROCESSED", True)
+AGENT_MAX_CANDIDATES_PER_CYCLE = int(getattr(config, "AGENT_MAX_CANDIDATES_PER_CYCLE", 10))
 
 # ---------------------------------------------------------
 # Logging Configuration
@@ -235,17 +237,19 @@ class VergeAgent:
 
         # 2. LSE — LiquiditySweepEngine (antes de Nexus). Candidato LSE compite en el ranking final;
         #    si LSE_REQUIRE_SCAN_BEFORE_ENTRY, no se opera si el batch no terminó bien (mismo ciclo, misma decisión).
-        lse_candidate = None
+        lse_candidates: list[dict] = []
         lse_meta: dict = {}
         if LSE_ENABLED:
             logger.info("[Step 2/6] Running LSE (Liquidity Sweep Engine)...")
-            lse_candidate, lse_meta = self._run_lse_scan()
-            if lse_candidate:
+            lse_candidates, lse_meta = self._run_lse_scan()
+            if lse_candidates:
+                top = lse_candidates[0]
                 logger.info(
-                    "[Step 2/6] LSE candidate ready: %s | Score=%.1f | mode=%s",
-                    lse_candidate.get("symbol"),
-                    float(lse_candidate.get("confluence_score", 0.0)),
-                    lse_candidate.get("lse_detection_mode"),
+                    "[Step 2/6] LSE: %d ranked candidate(s); top=%s | Score=%.1f | mode=%s",
+                    len(lse_candidates),
+                    top.get("symbol"),
+                    float(top.get("confluence_score", 0.0)),
+                    top.get("lse_detection_mode"),
                 )
             else:
                 logger.info("[Step 2/6] LSE: no signal this cycle.")
@@ -324,12 +328,15 @@ class VergeAgent:
             f"{len(candidates)} candidates | {skipped_trading} skipped | {no_data} no data"
         )
 
-        if lse_candidate:
-            candidates.append(lse_candidate)
+        if lse_candidates:
+            for lc in lse_candidates:
+                candidates.append(lc)
+            top = lse_candidates[0]
             logger.info(
-                "[Step 5/6] Added LSE candidate into final ranking: %s | Score=%.1f",
-                lse_candidate.get("symbol"),
-                float(lse_candidate.get("confluence_score", 0.0)),
+                "[Step 5/6] Added %d LSE candidate(s) to final ranking (top: %s @ %.1f)",
+                len(lse_candidates),
+                top.get("symbol"),
+                float(top.get("confluence_score", 0.0)),
             )
 
         # ── Redis Signal Bridge: inyectar señales calientes con validación en tiempo real ──
@@ -528,8 +535,8 @@ class VergeAgent:
                 logger.info(f"[LIMIT] Profile {p_name} is full ({p_active_count}/{p_max_pos}). Skipping new trades.")
                 continue
 
-            # Try to execute top candidate
-            max_try = 3
+            # Try ranked candidates in order (LSE + Nexus); AGENT_MAX_CANDIDATES_PER_CYCLE enables rank 2..N fallback.
+            max_try = max(1, AGENT_MAX_CANDIDATES_PER_CYCLE)
             p_ranked = p_candidates[:max_try]
             
             for idx, cand in enumerate(p_ranked):
@@ -627,7 +634,7 @@ class VergeAgent:
         batch_items: list[dict],
         modes_order: list[str],
         base_py: str,
-    ) -> tuple[dict | None, dict]:
+    ) -> tuple[list[dict], dict]:
         """
         Imágenes Docker antiguas sin /lse/scan-batch (404): misma lógica vía POST /lse/scan.
         """
@@ -703,16 +710,32 @@ class VergeAgent:
         )
 
         hits.sort(key=lambda x: x[0], reverse=True)
+        best_by_symbol: dict[str, tuple[float, dict, str]] = {}
         for sc, symbol, sig, dm in hits:
-            if sc >= LSE_MIN_SCORE:
-                logger.info(
-                    "🚨 [LSE] TOP candidate %s | Score=%.1f | detection_mode=%s | Entry=%.6f",
-                    symbol,
-                    sc,
-                    dm,
-                    float(sig.get("entry_price") or 0),
-                )
-                return self._lse_row_to_candidate(symbol, sig, dm), meta_ok
+            if sc < LSE_MIN_SCORE:
+                continue
+            sym_u = str(symbol or "").strip().upper()
+            if not sym_u:
+                continue
+            prev = best_by_symbol.get(sym_u)
+            if prev is None or sc > prev[0]:
+                best_by_symbol[sym_u] = (sc, sig, dm)
+
+        inject_cap = min(LSE_MAX_INJECTED_CANDIDATES, LSE_BATCH_TOP_K)
+        ranked = sorted(best_by_symbol.items(), key=lambda kv: kv[1][0], reverse=True)
+        out: list[dict] = []
+        for sym_u, (sc, sig, dm) in ranked[:inject_cap]:
+            out.append(self._lse_row_to_candidate(sym_u, sig, dm))
+
+        if out:
+            logger.info(
+                "[LSE] Fallback: injecting %d LSE candidate(s) (cap=%d); top=%s @ %.1f",
+                len(out),
+                inject_cap,
+                out[0].get("symbol"),
+                float(out[0].get("confluence_score", 0.0)),
+            )
+            return out, meta_ok
 
         if hits:
             sc, symbol, _, _ = hits[0]
@@ -725,13 +748,13 @@ class VergeAgent:
         else:
             logger.info("[LSE] Fallback: no LSE signals this cycle.")
 
-        return None, meta_ok
+        return [], meta_ok
 
-    def _run_lse_scan(self) -> tuple[dict | None, dict]:
+    def _run_lse_scan(self) -> tuple[list[dict], dict]:
         """
         TOP-K LSE vía POST /lse/scan-batch. Velas 1h/4h con backfill REST si la caché no alcanza.
 
-        Retorna (candidato | None, meta) para el candado LSE_REQUIRE_SCAN_BEFORE_ENTRY.
+        Retorna (lista de candidatos rankeados por score, meta) para el candado LSE_REQUIRE_SCAN_BEFORE_ENTRY.
         """
         empty = {
             "batch_called": False,
@@ -745,7 +768,7 @@ class VergeAgent:
 
         if not self.state.can_trade_today():
             logger.debug("[LSE] Daily trade limit reached — skip LSE scan.")
-            return None, {**empty, "reason": "daily_limit"}
+            return [], {**empty, "reason": "daily_limit"}
 
         targets = LSE_SYMBOLS if LSE_SYMBOLS else config.WATCHLIST
         base_py = config.PYTHON_SERVICE_URL.rstrip("/")
@@ -793,7 +816,7 @@ class VergeAgent:
         )
 
         if not batch_items:
-            return None, {
+            return [], {
                 **empty,
                 "reason": "no_batch_items",
             }
@@ -825,7 +848,7 @@ class VergeAgent:
                     len(chunks),
                     LSE_HTTP_TIMEOUT_SEC,
                 )
-                return None, {
+                return [], {
                     **empty,
                     "batch_called": True,
                     "items_queued": len(batch_items),
@@ -834,7 +857,7 @@ class VergeAgent:
                 }
             except Exception as e:
                 logger.warning("[LSE] scan-batch request failed chunk=%d/%d: %s", idx, len(chunks), e)
-                return None, {
+                return [], {
                     **empty,
                     "batch_called": True,
                     "items_queued": len(batch_items),
@@ -859,7 +882,7 @@ class VergeAgent:
                     len(chunks),
                     (resp.text or "")[:500],
                 )
-                return None, {
+                return [], {
                     **empty,
                     "batch_called": True,
                     "items_queued": len(batch_items),
@@ -890,20 +913,35 @@ class VergeAgent:
             len(signals),
         )
 
+        best_by_symbol: dict[str, tuple[float, dict, str]] = {}
         for row in signals:
             sig = row.get("signal") or {}
             score = float(sig.get("score", 0.0))
-            dm = row.get("detection_mode", LSE_DETECTION_MODE)
-            sym = row.get("symbol", "")
-            if score >= LSE_MIN_SCORE:
-                logger.info(
-                    "🚨 [LSE] TOP candidate %s | Score=%.1f | detection_mode=%s | Entry=%.6f",
-                    sym,
-                    score,
-                    dm,
-                    float(sig.get("entry_price") or 0),
-                )
-                return self._lse_row_to_candidate(sym, sig, dm), meta_ok
+            if score < LSE_MIN_SCORE:
+                continue
+            sym_u = str(row.get("symbol") or "").strip().upper()
+            if not sym_u:
+                continue
+            dm = str(row.get("detection_mode") or LSE_DETECTION_MODE)
+            prev = best_by_symbol.get(sym_u)
+            if prev is None or score > prev[0]:
+                best_by_symbol[sym_u] = (score, sig, dm)
+
+        inject_cap = min(LSE_MAX_INJECTED_CANDIDATES, LSE_BATCH_TOP_K)
+        ranked_pairs = sorted(best_by_symbol.items(), key=lambda kv: kv[1][0], reverse=True)
+        lse_out: list[dict] = []
+        for sym_u, (score, sig, dm) in ranked_pairs[:inject_cap]:
+            lse_out.append(self._lse_row_to_candidate(sym_u, sig, dm))
+
+        if lse_out:
+            logger.info(
+                "[LSE] Injected %d ranked candidate(s) (cap=%d); top=%s @ %.1f",
+                len(lse_out),
+                inject_cap,
+                lse_out[0].get("symbol"),
+                float(lse_out[0].get("confluence_score", 0.0)),
+            )
+            return lse_out, meta_ok
 
         if signals:
             best = signals[0]
@@ -917,7 +955,7 @@ class VergeAgent:
         else:
             logger.info("[LSE] Batch: no LSE signals this cycle.")
 
-        return None, meta_ok
+        return [], meta_ok
 
 
 

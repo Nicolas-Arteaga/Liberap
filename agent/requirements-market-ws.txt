@@ -1,0 +1,3 @@
+# Dependencias mínimas para market_ws_server.py (sin el resto del agente).
+websocket-client>=1.6.0,<2
+requests>=2.31.0

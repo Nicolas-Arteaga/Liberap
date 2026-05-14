@@ -32,6 +32,9 @@ LSE_HTTP_TIMEOUT_SEC = int(os.getenv("LSE_HTTP_TIMEOUT_SEC", "360"))
 # Por defecto escanea todo el universo elegible para decidir con contexto completo.
 LSE_MAX_SYMBOLS_PER_CYCLE = int(os.getenv("LSE_MAX_SYMBOLS_PER_CYCLE", "200"))
 LSE_BATCH_TOP_K = int(os.getenv("LSE_BATCH_TOP_K", "10"))
+# Cuántos candidatos LSE distintos (por símbolo, mejor score) inyectar al ranking tras scan-batch.
+# Permite fallback rank 2..N si el #1 cae en lse_warning_block / validate_lse_setup.
+LSE_MAX_INJECTED_CANDIDATES = int(os.getenv("LSE_MAX_INJECTED_CANDIDATES", "10"))
 # Si True: no abrir operación nueva si LSE no completó scan-batch HTTP 200 con suficientes símbolos procesados.
 LSE_REQUIRE_SCAN_BEFORE_ENTRY = os.getenv(
     "LSE_REQUIRE_SCAN_BEFORE_ENTRY", "true"
@@ -87,8 +90,6 @@ MIN_ENTRY_NEXUS  = float(os.getenv("MIN_ENTRY_NEXUS",  "70.0"))  # Nexus mínimo
 MIN_UPGRADE_NEXUS = float(os.getenv("MIN_UPGRADE_NEXUS", "80.0"))  # Nexus mínimo para reemplazar la peor posición
 MAX_TRADES_PER_DAY = 100
 MAX_POSITION_DURATION_HOURS = 48
-# Zombie timeout para scalping 15m: si el trade lleva más de N velas abierto con PnL negativo, se cierra.
-# 8 velas de 15m = 2 horas. Si en 2h no se movió, el setup ya expiró.
 MAX_TRADE_DURATION_CANDLES = int(os.getenv("MAX_TRADE_DURATION_CANDLES", "8"))
 DEFAULT_LEVERAGE = 1
 

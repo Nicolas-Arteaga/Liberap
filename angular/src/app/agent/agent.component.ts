@@ -69,6 +69,9 @@ export class AgentComponent implements OnInit, OnDestroy, AfterViewChecked {
   private agentService = inject(AgentService);
   private agentSignalrService = inject(AgentSignalrService);
   private subscriptions = new Subscription();
+  /** Market WS vía Docker/red: evita duplicar el bloque de logs sintéticos. */
+  private dockerTerminalSeeded = false;
+  private statePollHandle: ReturnType<typeof setInterval> | null = null;
 
   constructor() { }
 
@@ -82,26 +85,19 @@ export class AgentComponent implements OnInit, OnDestroy, AfterViewChecked {
       console.error('Error connecting to SignalR:', err);
     });
 
-    // 2. Sync state on load (Fix for F5)
+    // 2. Sync state on load (Fix for F5) + reintento si Docker aún no respondía
     this.agentService.getSystemState().subscribe({
       next: (data: any) => {
-        this.systemState = data.state as SystemState;
-
-        if (this.systemState !== 'STOPPED') {
-          this.addLog(`✅ Sistema detectado en ejecución: ${this.systemState}`, '#10b981');
-          
-          if (data.startTime) {
-            this.startTimestamp = new Date(data.startTime).getTime();
-            this.startTime = `Iniciado ${new Date(data.startTime).toLocaleTimeString()}`;
-          }
-
-          this.startUptime();
-          this.startDataRefresh();
+        const state = this.normalizeAgentState(data?.state);
+        this.applySyncedState(data, state);
+        if (state === 'STOPPED') {
+          this.startPollingUntilServerReady();
         }
       },
       error: (err) => {
         this.addLog('⚠️ No se pudo sincronizar el estado inicial con el servidor.', '#f59e0b');
         console.error('Error syncing state:', err);
+        this.startPollingUntilServerReady();
       }
     });
 
@@ -116,26 +112,145 @@ export class AgentComponent implements OnInit, OnDestroy, AfterViewChecked {
 
     this.subscriptions.add(
       this.agentSignalrService.state$.subscribe((state: any) => {
-        this.systemState = state as SystemState;
-        if (state === 'SERVER_READY' || state === 'AGENT_RUNNING') {
+        const s = this.normalizeAgentState(state);
+        this.systemState = s;
+        if (s === 'STOPPED') {
+          this.dockerTerminalSeeded = false;
+          this.seenDockerLogs.clear();
+          this.stopUptime();
+          this.stopDataRefresh();
+        }
+        if (s === 'SERVER_READY' || s === 'AGENT_RUNNING') {
           if (!this.uptimeInterval) {
-            this.startTimestamp = Date.now();
+            if (!this.startTimestamp) {
+              this.startTimestamp = Date.now();
+            }
             this.startUptime();
             this.startDataRefresh();
           }
-        } else if (state === 'STOPPED') {
-          this.stopUptime();
-          this.stopDataRefresh();
         }
       })
     );
   }
 
   ngOnDestroy(): void {
+    this.stopStatePolling();
     this.subscriptions.unsubscribe();
     this.stopUptime();
     this.stopDataRefresh();
     this.agentSignalrService.stopConnection();
+  }
+
+  private normalizeAgentState(raw: unknown): SystemState {
+    const s = String(raw ?? '')
+      .trim()
+      .toUpperCase()
+      .replace(/-/g, '_');
+    if (s === 'STOPPED' || s === 'STARTING_SERVER' || s === 'SERVER_READY' || s === 'AGENT_RUNNING') {
+      return s as SystemState;
+    }
+    return 'STOPPED';
+  }
+
+  /** Aplica estado del API (getSystemState) y arranca uptime/refresh si corresponde. */
+  private applySyncedState(data: any, state: SystemState): void {
+    this.systemState = state;
+
+    if (state === 'STOPPED') {
+      this.dockerTerminalSeeded = false;
+      this.seenDockerLogs.clear();
+      return;
+    }
+
+    this.addLog(`✅ Sistema detectado en ejecución: ${state}`, '#10b981');
+
+    if (data?.startTime) {
+      this.startTimestamp = new Date(data.startTime).getTime();
+      this.startTime = `Iniciado ${new Date(data.startTime).toLocaleTimeString()}`;
+    } else if (!this.startTimestamp) {
+      this.startTimestamp = Date.now();
+      this.startTime = `Hoy ${this.getCurrentTime()}`;
+    }
+
+    if (data?.marketWsExternal && (data?.health || data?.logs)) {
+      this.maybeSeedDockerMarketWsLogs(data);
+    }
+
+    this.startUptime();
+    this.startDataRefresh();
+  }
+
+  private startPollingUntilServerReady(): void {
+    if (this.statePollHandle != null) {
+      return;
+    }
+    let attempts = 0;
+    const maxAttempts = 48;
+    this.statePollHandle = setInterval(() => {
+      attempts++;
+      if (attempts > maxAttempts || this.systemState !== 'STOPPED') {
+        this.stopStatePolling();
+        return;
+      }
+      this.agentService.getSystemState().subscribe({
+        next: (data: any) => {
+          const st = this.normalizeAgentState(data?.state);
+          if (st !== 'STOPPED') {
+            this.applySyncedState(data, st);
+            this.stopStatePolling();
+          }
+        },
+        error: () => { /* seguir intentando */ }
+      });
+    }, 2500);
+  }
+
+  private stopStatePolling(): void {
+    if (this.statePollHandle != null) {
+      clearInterval(this.statePollHandle);
+      this.statePollHandle = null;
+    }
+  }
+
+  private seenDockerLogs = new Set<string>();
+
+  private maybeSeedDockerMarketWsLogs(data: any): void {
+    if (data?.logs && Array.isArray(data.logs)) {
+      data.logs.forEach((logLine: string) => {
+        if (!this.seenDockerLogs.has(logLine)) {
+          this.seenDockerLogs.add(logLine);
+          this.addLog(logLine, '#cbd5e1');
+        }
+      });
+      // Mantener tamaño del Set para no perder memoria
+      if (this.seenDockerLogs.size > 2000) {
+        const arr = Array.from(this.seenDockerLogs).slice(-1000);
+        this.seenDockerLogs = new Set(arr);
+      }
+    } else {
+      if (this.dockerTerminalSeeded) {
+        return;
+      }
+      this.dockerTerminalSeeded = true;
+      this.addLog('═══════════════════════════════════════════════════════════════', '#64748b');
+      this.addLog('  VERGE Market Data Service — resumen vía Docker/red (GET /health)', '#3b82f6');
+      const health = data?.health;
+      const exchanges = (health as any)?.exchanges as Record<string, { connected?: boolean; reconnects?: number }> | undefined;
+      if (exchanges && typeof exchanges === 'object') {
+        for (const name of Object.keys(exchanges)) {
+          const v = exchanges[name];
+          const ok = v?.connected === true;
+          this.addLog(
+            `  [WS:${name}] ${ok ? 'Connected' : 'Disconnected'}${v?.reconnects ? ` (reconnects=${v.reconnects})` : ''}`,
+            ok ? '#10b981' : '#f59e0b'
+          );
+        }
+      } else {
+        this.addLog('  (Sin detalle exchanges en health; servicios marcados ACTIVO por estado online.)', '#94a3b8');
+      }
+      this.addLog('  HTTP Market WS operativo. Podés iniciar el agente.', '#10b981');
+      this.addLog('═══════════════════════════════════════════════════════════════', '#64748b');
+    }
   }
 
   ngAfterViewChecked() {
@@ -158,6 +273,7 @@ export class AgentComponent implements OnInit, OnDestroy, AfterViewChecked {
   // --- Data Fetching ---
 
   private startDataRefresh() {
+    this.stopDataRefresh();
     this.refreshData();
     this.refreshInterval = setInterval(() => this.refreshData(), 5000);
   }
@@ -165,6 +281,7 @@ export class AgentComponent implements OnInit, OnDestroy, AfterViewChecked {
   private stopDataRefresh() {
     if (this.refreshInterval) {
       clearInterval(this.refreshInterval);
+      this.refreshInterval = null;
     }
   }
 
@@ -183,7 +300,15 @@ export class AgentComponent implements OnInit, OnDestroy, AfterViewChecked {
       }
 
       if (data?.state) {
-        this.systemState = data.state as SystemState;
+        const st = this.normalizeAgentState(data.state);
+        this.systemState = st;
+        if (st === 'STOPPED') {
+          this.dockerTerminalSeeded = false;
+          this.seenDockerLogs.clear();
+        }
+        if (st === 'SERVER_READY' && data?.marketWsExternal && (data?.health || data?.logs)) {
+          this.maybeSeedDockerMarketWsLogs(data);
+        }
       }
     }, () => {
       // Keep previous telemetry on transient failures.
@@ -287,7 +412,7 @@ export class AgentComponent implements OnInit, OnDestroy, AfterViewChecked {
     if (this.exchangeStats) {
         // 1. Check WebSocket status
         const ws = this.exchangeStats.exchanges?.[key];
-        if (ws?.connected) return { text: 'CONECTADO', class: 'text-success' };
+        if (ws?.connected) return { text: 'ACTIVO', class: 'text-success' };
 
         // 2. Check Circuit Breaker status (most reliable for REST fallbacks)
         const cb = this.exchangeStats.circuit_breakers?.[key];
@@ -354,10 +479,6 @@ export class AgentComponent implements OnInit, OnDestroy, AfterViewChecked {
   stopAgent() {
     if (this.systemState !== 'AGENT_RUNNING') return;
     this.agentService.stopAgent().subscribe();
-  }
-
-  stopServer() {
-    this.agentService.stopServer().subscribe();
   }
 
   clearLogs() {

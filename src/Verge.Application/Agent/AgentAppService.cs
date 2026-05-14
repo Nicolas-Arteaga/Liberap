@@ -6,7 +6,9 @@ using System.Net.Http.Json;
 using System.Collections.Generic;
 using System;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using System.Text.Json;
+using System.Linq;
 using Verge.Trading;
 
 namespace Verge.Agent;
@@ -14,26 +16,33 @@ namespace Verge.Agent;
 [Authorize]
 public class AgentAppService : VergeAppService, IAgentAppService
 {
-    private static readonly string[] MarketWsBaseUrls =
+    private static readonly string[] DefaultMarketWsBaseUrls =
     {
         "http://127.0.0.1:8001",
         "http://host.docker.internal:8001",
         "http://localhost:8001"
     };
+
+    private readonly IReadOnlyList<string> _marketWsBaseUrls;
     private readonly AgentProcessManager _processManager;
     private readonly IHubContext<AgentHub> _agentHubContext;
     private readonly IHubContext<TradingHub> _tradingHubContext;
     private readonly HttpClient _marketWsClient;
-    private string _activeMarketWsBaseUrl = MarketWsBaseUrls[0];
+    private string _activeMarketWsBaseUrl = "";
     private DateTime _lastMarketWsProbeUtc = DateTime.MinValue;
     private object? _lastHealthSnapshot;
     private DateTime _lastHealthSnapshotUtc = DateTime.MinValue;
     private DateTime _nextFullProbeUtc = DateTime.MinValue;
+    /// <summary>
+    /// Cuando Market WS corre en Docker (sin proceso hijo en este host), guardamos UTC de primera detección para uptime en la UI.
+    /// </summary>
+    private DateTime? _externalMarketWsDetectedUtc;
 
     public AgentAppService(
         AgentProcessManager processManager,
         IHubContext<AgentHub> agentHubContext,
-        IHubContext<TradingHub> tradingHubContext)
+        IHubContext<TradingHub> tradingHubContext,
+        IConfiguration configuration)
     {
         _processManager = processManager;
         _agentHubContext = agentHubContext;
@@ -42,6 +51,33 @@ public class AgentAppService : VergeAppService, IAgentAppService
         {
             Timeout = TimeSpan.FromSeconds(3)
         };
+
+        _marketWsBaseUrls = ResolveMarketWsBaseUrls(configuration);
+        _activeMarketWsBaseUrl = _marketWsBaseUrls[0];
+        Console.WriteLine($"[DEBUG] AgentAppService initialized. MarketWS URL: {_activeMarketWsBaseUrl}");
+    }
+
+    private static IReadOnlyList<string> ResolveMarketWsBaseUrls(IConfiguration configuration)
+    {
+        var section = configuration.GetSection("MarketWs:BaseUrls");
+        var urls = new List<string>();
+        foreach (var child in section.GetChildren())
+        {
+            var v = child.Value?.Trim();
+            if (string.IsNullOrEmpty(v))
+            {
+                continue;
+            }
+
+            urls.Add(v.TrimEnd('/'));
+        }
+
+        if (urls.Count == 0)
+        {
+            return DefaultMarketWsBaseUrls.ToList();
+        }
+
+        return urls;
     }
 
     [AllowAnonymous]
@@ -55,10 +91,21 @@ public class AgentAppService : VergeAppService, IAgentAppService
 
             // Fetch health status from Python service, trying host/container routes.
             var health = await TryGetHealthAsync();
+            Console.WriteLine($"[DEBUG] getSystemState: health check against {_activeMarketWsBaseUrl} returned {(health != null ? "OK" : "FAIL")}");
             if (health != null)
             {
                 isServerRunning = true;
                 exchangeStatus = health;
+            }
+
+            var marketWsLocalProcess = _processManager.IsProcessRunning("MarketWS");
+            if (isServerRunning && !isAgentRunning && !marketWsLocalProcess)
+            {
+                _externalMarketWsDetectedUtc ??= DateTime.UtcNow;
+            }
+            else if (!isServerRunning && !isAgentRunning)
+            {
+                _externalMarketWsDetectedUtc = null;
             }
 
             string state = "STOPPED";
@@ -66,12 +113,20 @@ public class AgentAppService : VergeAppService, IAgentAppService
             else if (isServerRunning) state = "SERVER_READY";
 
             var startTime = _processManager.GetStartTime(isAgentRunning ? "Agent" : "MarketWS");
+            if (startTime == null && isServerRunning && !isAgentRunning)
+            {
+                startTime = _externalMarketWsDetectedUtc;
+            }
+
+            var marketWsExternal = isServerRunning && !marketWsLocalProcess && !isAgentRunning;
 
             return new {
                 state,
                 startTime = startTime?.ToString("yyyy-MM-ddTHH:mm:ss"),
                 isServerHealthy = isServerRunning,
-                health = exchangeStatus
+                health = exchangeStatus,
+                marketWsExternal,
+                logs = (marketWsExternal && state == "SERVER_READY") ? await TryGetMarketWsLogsAsync() : null
             };
         }
         catch (Exception ex)
@@ -79,6 +134,32 @@ public class AgentAppService : VergeAppService, IAgentAppService
             Logger.LogWarning("⚠️ Error getting system state: {Message}", ex.Message);
             return new { state = "STOPPED" };
         }
+    }
+
+    private async Task<List<string>?> TryGetMarketWsLogsAsync()
+    {
+        try
+        {
+            using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromMilliseconds(800));
+            var response = await _marketWsClient.GetAsync($"{_activeMarketWsBaseUrl}/logs", cts.Token);
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync(cts.Token);
+                var parsed = JsonSerializer.Deserialize<JsonElement>(content);
+                if (parsed.TryGetProperty("logs", out var logsArray))
+                {
+                    var logs = new List<string>();
+                    foreach(var log in logsArray.EnumerateArray())
+                    {
+                        var s = log.GetString();
+                        if (s != null) logs.Add(s);
+                    }
+                    return logs;
+                }
+            }
+        }
+        catch { }
+        return null;
     }
 
     public async Task StartServerAsync()
@@ -143,67 +224,40 @@ public class AgentAppService : VergeAppService, IAgentAppService
 
     private async Task<object?> TryGetHealthAsync()
     {
-        // 1) Fast path: active URL only. Keep UI responsive.
+        // 1) Fast path: active URL only.
         try
         {
-            using var fastCts = new System.Threading.CancellationTokenSource(TimeSpan.FromMilliseconds(800));
+            using var fastCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(5)); 
             var fastResponse = await _marketWsClient.GetAsync($"{_activeMarketWsBaseUrl}/health", fastCts.Token);
             if (fastResponse.IsSuccessStatusCode)
             {
                 var fastContent = await fastResponse.Content.ReadAsStringAsync(fastCts.Token);
-                var parsed = JsonSerializer.Deserialize<dynamic>(fastContent);
-                if (parsed != null)
-                {
-                    _lastHealthSnapshot = parsed;
-                    _lastHealthSnapshotUtc = DateTime.UtcNow;
-                    return parsed;
-                }
+                var parsed = JsonSerializer.Deserialize<JsonElement>(fastContent);
+                _lastHealthSnapshot = parsed;
+                _lastHealthSnapshotUtc = DateTime.UtcNow;
+                return parsed;
             }
         }
         catch
         {
-            // Continue to fallback strategy.
+             // Continue to fallback.
         }
 
-        // 2) If we have a recent successful snapshot, use it instead of dropping to null.
-        if (_lastHealthSnapshot != null && DateTime.UtcNow - _lastHealthSnapshotUtc < TimeSpan.FromSeconds(45))
-        {
-            return _lastHealthSnapshot;
-        }
-
-        // 3) Full probe no more than every 30s.
-        if (DateTime.UtcNow < _nextFullProbeUtc)
-        {
-            return null;
-        }
-        _nextFullProbeUtc = DateTime.UtcNow.AddSeconds(30);
-        _lastMarketWsProbeUtc = DateTime.UtcNow;
-
+        // 2) Fallback to full probe if needed
         var candidateUrls = new List<string> { _activeMarketWsBaseUrl };
-        foreach (var candidate in MarketWsBaseUrls)
-        {
-            if (!string.Equals(candidate, _activeMarketWsBaseUrl, StringComparison.OrdinalIgnoreCase))
-            {
-                candidateUrls.Add(candidate);
-            }
-        }
+        candidateUrls.AddRange(_marketWsBaseUrls.Where(u => u != _activeMarketWsBaseUrl));
 
         foreach (var baseUrl in candidateUrls)
         {
             try
             {
-                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromMilliseconds(1200));
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(5));
                 var response = await _marketWsClient.GetAsync($"{baseUrl}/health", cts.Token);
-                if (!response.IsSuccessStatusCode)
+                if (response.IsSuccessStatusCode)
                 {
-                    continue;
-                }
-
-                var content = await response.Content.ReadAsStringAsync(cts.Token);
-                _activeMarketWsBaseUrl = baseUrl;
-                var parsed = JsonSerializer.Deserialize<dynamic>(content);
-                if (parsed != null)
-                {
+                    var content = await response.Content.ReadAsStringAsync(cts.Token);
+                    _activeMarketWsBaseUrl = baseUrl;
+                    var parsed = JsonSerializer.Deserialize<JsonElement>(content);
                     _lastHealthSnapshot = parsed;
                     _lastHealthSnapshotUtc = DateTime.UtcNow;
                     return parsed;
@@ -211,7 +265,7 @@ public class AgentAppService : VergeAppService, IAgentAppService
             }
             catch
             {
-                // Try next candidate URL.
+                // Try next.
             }
         }
 

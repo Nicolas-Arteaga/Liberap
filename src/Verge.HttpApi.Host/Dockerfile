@@ -4,7 +4,7 @@ WORKDIR /app
 EXPOSE 8080
 EXPOSE 443
 
-# Build stage
+# Build stage 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
