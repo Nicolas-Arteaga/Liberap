@@ -30,6 +30,10 @@ def _normalize_reasons(candidate: dict) -> list[str]:
 
 def lse_reasoning_blocks_trade(candidate: dict) -> bool:
     needle = getattr(config, "LSE_BLOCK_REASONING_SUBSTRING", "R:R bajo").lower()
+    score = float(candidate.get("confluence_score", 0) or 0)
+    lse_override_score = float(getattr(config, "LSE_WARNING_OVERRIDE_SCORE", 85.0))
+    if score >= lse_override_score:
+        return False
     for line in _normalize_reasons(candidate):
         if needle in line.lower():
             return True

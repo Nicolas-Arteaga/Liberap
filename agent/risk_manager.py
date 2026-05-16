@@ -141,11 +141,14 @@ class RiskManager:
         else:
             sl_mult = float(getattr(config, "SL_MULTIPLIER", 0.8))
 
-        if atr_signal and float(atr_signal) > 0:
-            sl_distance_price = float(atr_signal) * sl_mult
+        atr_f = float(atr_signal) if atr_signal else 0.0
+        est_range_f = float(est_range) if est_range else 0.0
+
+        if atr_f > 0 and (atr_f / cp) <= 0.20:
+            sl_distance_price = atr_f * sl_mult
             sl_distance_pct = sl_distance_price / cp
-        elif est_range and float(est_range) > 0:
-            sl_distance_pct = float(est_range) * sl_mult
+        elif est_range_f > 0:
+            sl_distance_pct = (est_range_f / 100.0) * sl_mult
         else:
             sl_distance_pct = 0.015 * sl_mult
 

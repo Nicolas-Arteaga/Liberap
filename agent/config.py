@@ -97,7 +97,8 @@ DEFAULT_LEVERAGE = 1
 # 4. Intelligence Thresholds
 MIN_NEXUS_CONFIDENCE = 75.0          # antes 70 — menos trades, más certeza en 15m
 MIN_SCAR_SCORE = 4
-MIN_CONFLUENCE_SCORE = 55.0          # antes 50 — prod 24h: conf 50-55 = 14-22% WR; conf 55+ = 43% WR
+MIN_CONFLUENCE_SCORE = 45.0          # antes 50 — prod 24h: conf 50-55 = 14-22% WR; conf 55+ = 43% WR
+LSE_WARNING_OVERRIDE_SCORE = float(os.getenv("LSE_WARNING_OVERRIDE_SCORE", "85.0"))
 MIN_ESTIMATED_RANGE_PCT = float(os.getenv("MIN_ESTIMATED_RANGE_PCT", "3.0"))  # prod: rango <3% = WR negativo; >3.5% = 100% WR (+38 USDT)
 
 # 5. Take Profit / Stop Loss — Fat Tail Strategy (asimétrica)
