@@ -31,13 +31,13 @@ class SignalEngine:
             logger.error(f"Error fetching SCAR alerts: {e}")
         return {}
 
-    def get_nexus15_prediction(self, symbol: str) -> Optional[Dict[str, Any]]:
+    def get_nexus15_prediction(self, symbol: str, limit: int = 300) -> Optional[Dict[str, Any]]:
         """
         Fetches the Nexus-15 prediction for a symbol.
         Sends 15m candles (from SQLite cache, already in correct format) to the AI service.
         Returns None silently on ANY error — never crashes the agent cycle.
         """
-        klines = self.fetcher.get_klines_for_nexus(symbol)
+        klines = self.fetcher.get_klines_for_nexus(symbol, limit=limit)
         if not klines or len(klines) < 25:
             logger.warning(f"Not enough klines to analyze {symbol} with Nexus-15 ({len(klines) if klines else 0} candles).")
             return None

@@ -198,7 +198,14 @@ class KlineCache:
         conn.executemany("""
             INSERT INTO klines (symbol, interval, open_time, open, high, low, close, volume, is_final, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
-            ON CONFLICT(symbol, interval, open_time) DO NOTHING
+            ON CONFLICT(symbol, interval, open_time) DO UPDATE SET
+                open       = excluded.open,
+                high       = MAX(high, excluded.high),
+                low        = MIN(low, excluded.low),
+                close      = excluded.close,
+                volume     = excluded.volume,
+                is_final   = excluded.is_final,
+                updated_at = excluded.updated_at
         """, [
             (symbol, interval,
              int(k["open_time"]),
@@ -228,12 +235,13 @@ class KlineCache:
 
         # Reverse so oldest is first (chronological order for ML)
         return [{
-            "timestamp": time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(r["open_time"] / 1000)),
-            "open":      r["open"],
-            "high":      r["high"],
-            "low":       r["low"],
-            "close":     r["close"],
-            "volume":    r["volume"],
+            "open_time":  r["open_time"],  # ms timestamp — used for staleness check in binance_fetcher
+            "timestamp":  time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(r["open_time"] / 1000)),
+            "open":       r["open"],
+            "high":       r["high"],
+            "low":        r["low"],
+            "close":      r["close"],
+            "volume":     r["volume"],
         } for r in reversed(rows)]
 
     def get_live_price(self, symbol: str) -> float:

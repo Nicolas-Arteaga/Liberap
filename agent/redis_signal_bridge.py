@@ -163,7 +163,11 @@ class RedisSignalBridge:
                 "regime":    payload.get("regime", "Unknown"),
                 "estado":    payload.get("estado", "WAIT"),
                 "received_at": now_utc,
-                "source":    "redis_bridge",
+                "source":    payload.get("source", "redis_bridge"),
+                "nexus15":   payload.get("nexus15", score),
+                "estimatedRangePercent": payload.get("estimatedRangePercent", 0.0),
+                "features":  payload.get("features", {}),
+                "groupScores": payload.get("groupScores", {})
             }
 
             with self._lock:

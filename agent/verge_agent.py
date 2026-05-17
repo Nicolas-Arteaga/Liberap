@@ -282,7 +282,22 @@ class VergeAgent:
             f"[Step 4/6] Scanning {len(all_targets)} symbols with Nexus-15..."
         )
 
-        # 5. Run Nexus-15 on all watchlist symbols
+        # 4. Fetch Nexus-15 Top candidates from the backend (same data as UI "TOP" button)
+        #    The .NET backend downloads 1000 fresh candles from Binance and runs the full model.
+        #    This is equivalent to clicking "TOP DE NEXUS-15" in the UI — we just automate it.
+        logger.info("[Step 4/6] Fetching Nexus-15 TOP from backend...")
+        nexus_top_candidates = self._fetch_nexus_top(top_n=10)
+        if nexus_top_candidates:
+            logger.info(
+                "[Step 4/6] Nexus-15 TOP: %d candidates from backend (top: %s @ %.1f%%)",
+                len(nexus_top_candidates),
+                nexus_top_candidates[0].get("symbol"),
+                nexus_top_candidates[0].get("nexus_confidence", 0),
+            )
+        else:
+            logger.info("[Step 4/6] Nexus-15 TOP: no results from backend (offline or no signal).")
+
+        # 5. Run Nexus-15 on all watchlist symbols (internal scan with local data)
         candidates = []
         skipped_trading = 0
         analyzed = 0
@@ -350,6 +365,17 @@ class VergeAgent:
             f"{len(candidates)} candidates | {skipped_trading} skipped | {no_data} no data"
         )
 
+        # Inject Nexus-15 TOP candidates as high-priority entries
+        for nc in nexus_top_candidates:
+            # Avoid duplicate symbols already found in internal scan
+            existing_syms = {c["symbol"] for c in candidates}
+            if nc["symbol"] not in existing_syms:
+                candidates.append(nc)
+                logger.info(
+                    "[NEXUS-TOP] Injected: %s | Nexus=%.1f%% | Dir=%s",
+                    nc["symbol"], nc.get("nexus_confidence", 0), nc.get("trade_direction", "?")
+                )
+
         if lse_candidates:
             for lc in lse_candidates:
                 candidates.append(lc)
@@ -413,12 +439,23 @@ class VergeAgent:
 
             # ── Validación 2: Nexus-15 fresco — confirma dirección en tiempo real ──
             # Llama al python-service Nexus-15 sobre el símbolo AHORA, no con el caché.
-            # Si Nexus-15 dice WAIT o dirección opuesta, la señal del bridge ya expiró.
-            try:
-                nexus_fresh = self.signals.get_nexus15_prediction(sym)
-            except Exception as ex:
-                logger.warning("[BRIDGE] No se pudo obtener Nexus-15 para %s: %s — descartando.", sym, ex)
-                continue
+            # EXCEPCIÓN: Si la señal viene de la UI (nexus15_ui), ya tiene 1000 velas procesadas, 
+            # usar sus features directamente en lugar de degradar la señal con un re-cálculo local.
+            if sig.get("source") == "nexus15_ui":
+                nexus_fresh = {
+                    "prediction": sig.get("direction", ""),
+                    "ai_confidence": sig.get("nexus15", 0),
+                    "features": sig.get("features", {}),
+                    "group_scores": sig.get("groupScores", {}),
+                }
+            else:
+                try:
+                    # FETCH 1000 CANDLES to guarantee identical features to the .NET backend/UI.
+                    # A 300-candle fallback destroys volume_ratio_20 and RSI accuracy.
+                    nexus_fresh = self.signals.get_nexus15_prediction(sym, limit=1000)
+                except Exception as ex:
+                    logger.warning("[BRIDGE] No se pudo obtener Nexus-15 para %s: %s — descartando.", sym, ex)
+                    continue
 
             if not nexus_fresh:
                 logger.info(
@@ -468,6 +505,7 @@ class VergeAgent:
                 "trade_direction":  bridge_dir,
                 "side":             side,
                 "source":           "redis_bridge",
+                "estimated_range_pct": sig.get("estimatedRangePercent", 0.0),
                 "bridge_regime":    sig.get("regime", "Unknown"),
                 "bridge_score_raw": bridge_score,
                 "bridge_age_s":     round(sig_age_s, 1),
@@ -537,21 +575,31 @@ class VergeAgent:
                     if self.state.is_lse_symbol_cooldown_active(c.get("symbol")): continue
 
                 if c.get("confluence_score", 0) < min_score:
+                    logger.info(f"[{p_name}] SKIP {c.get('symbol')}: score {c.get('confluence_score')} < {min_score}")
                     continue
                 if c.get("source") != "LSE" and c.get("nexus_confidence", 0) < min_nexus:
+                    logger.info(f"[{p_name}] SKIP {c.get('symbol')}: nexus {c.get('nexus_confidence')} < {min_nexus}")
                     continue
                 
                 # Check if sources are allowed
                 allowed = profile.get("allowedSources")
                 if allowed:
                     src = (c.get("source", "") or "").lower()
+                    # Normalize agent internal sources to match .NET StrategyProfile enum values
+                    if src in ("nexus_top", "nexus15_ui"):
+                        src = "nexus"
+                    elif src == "redis_bridge":
+                        src = "bridge"
+                        
                     if isinstance(allowed, list):
                         if src not in [s.lower() for s in allowed]:
+                            logger.info(f"[{p_name}] SKIP {c.get('symbol')}: src {src} not in {allowed}")
                             continue
                     elif isinstance(allowed, str):
                         # .NET serializes as "LSE,Nexus,Bridge"
                         allowed_list = [s.strip().lower() for s in allowed.split(",")]
                         if src not in allowed_list:
+                            logger.info(f"[{p_name}] SKIP {c.get('symbol')}: src {src} not in {allowed_list}")
                             continue
                 
                 # Profile side filters
@@ -559,8 +607,12 @@ class VergeAgent:
                 allow_short = profile.get("allowShort", True)
                 cand_side = int(c.get("side", 0))
                 
-                if cand_side == 0 and not allow_long: continue
-                if cand_side == 1 and not allow_short: continue
+                if cand_side == 0 and not allow_long:
+                    logger.info(f"[{p_name}] SKIP {c.get('symbol')}: Long not allowed")
+                    continue
+                if cand_side == 1 and not allow_short:
+                    logger.info(f"[{p_name}] SKIP {c.get('symbol')}: Short not allowed")
+                    continue
 
                 # Fix 2: Filtros RSI y MA7 por perfil (PascalCase del DTO -> camelCase del JSON)
                 max_rsi_long  = profile.get("maxRsiLong")
@@ -598,7 +650,7 @@ class VergeAgent:
             # Fix 3: Contador robusto para camelCase (API) y snake_case (Local)
             p_active_count = len([
                 t for t in active_trades 
-                if t.get("strategyProfileId") == p_id or t.get("strategy_profile_id") == p_id
+                if t.get("strategyProfileId", t.get("strategy_profile_id")) == p_id
             ])
             
             if p_active_count >= p_max_pos:
@@ -616,6 +668,59 @@ class VergeAgent:
                     # Update active_trades list for next profile in same cycle
                     active_trades = self.positions.get_active_trades() or []
                     break
+
+
+    # ─────────────────────────────────────────────────────────
+    # Nexus-15 Top Backend Injection
+    # ─────────────────────────────────────────────────────────
+    def _fetch_nexus_top(self, top_n: int = 10) -> list[dict]:
+        """
+        Calls the .NET backend's Top Nexus-15 endpoint (simulating the UI button).
+        The backend performs an aggressive scan using 1000 fresh candles for each asset.
+        Returns mapped candidates ready for injection into the ranking.
+        """
+        url = f"{config.ABP_BACKEND_URL}/api/app/nexus15/analyze-top-available?topN={top_n}"
+        try:
+            # We wait up to 180 seconds because the backend fetches 1000 candles from Binance sequentially
+            headers = self.auth.get_auth_headers()
+            r = requests.post(url, headers=headers, verify=False, timeout=180)
+            if r.status_code == 200:
+                results = r.json()
+                candidates = []
+                for res in results:
+                    direction = res.get("direction", "NEUTRAL")
+                    if direction not in ("BULLISH", "BEARISH"):
+                        continue
+                        
+                    conf = res.get("aiConfidence", 0.0)
+                    if conf < 60.0:  # Only inject strong signals
+                        continue
+                        
+                    # Map to the agent's internal format
+                    cand = {
+                        "symbol": res.get("symbol"),
+                        "confluence_score": 85.0 + (conf / 100.0 * 15.0), # Guarantee high rank (85 - 100)
+                        "trade_direction": direction,
+                        "side": 0 if direction == "BULLISH" else 1,
+                        "nexus_confidence": conf,
+                        "estimated_range_pct": res.get("estimatedRangePercent", 0.0),
+                        "source": "nexus_top",
+                        "price_at_signal": None, # Will be fetched dynamically
+                        "agent_audit_context": {
+                            "nexus15": res
+                        }
+                    }
+                    candidates.append(cand)
+                return candidates
+            else:
+                logger.warning(f"[NEXUS-TOP] Backend error: HTTP {r.status_code}")
+                return []
+        except requests.exceptions.Timeout:
+            logger.warning("[NEXUS-TOP] Backend timed out after 180s (scan took too long).")
+            return []
+        except Exception as e:
+            logger.warning(f"[NEXUS-TOP] Failed to fetch Top Nexus: {e}")
+            return []
 
 
     # ─────────────────────────────────────────────────────────

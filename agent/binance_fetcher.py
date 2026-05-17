@@ -88,19 +88,30 @@ class BinanceFetcher:
             return ticker
         return None
 
-    def get_klines_for_nexus(self, symbol: str, interval: str = "15m", limit: int = 50) -> list:
+    def get_klines_for_nexus(self, symbol: str, interval: str = "15m", limit: int = 300) -> list:
         """
         Returns OHLCV klines for Nexus-15 analysis.
 
         Priority:
           1. KlineCache (SQLite) — always preferred (written by WS from any exchange)
-          2. Multi-source REST fetch if cache has < 25 candles
+          2. Multi-source REST fetch if cache stale or has < 100 candles
+
+        NOTE: Nexus-15 model was trained on 1000 candles. Sending fewer degrades accuracy.
+              300 candles (~3 days of 15m data) is the practical minimum for consistent scoring.
 
         Returns [] if insufficient data and all REST sources fail.
         """
+
         # 1. Check cache first
         klines = self._cache.get_klines(symbol, interval, limit)
-        if len(klines) >= 25:
+        is_fresh = False
+        if len(klines) >= 100:  # Need at least 100 candles for a meaningful Nexus score
+            last_open = klines[-1]["open_time"]
+            age_mins = (time.time() - (last_open / 1000.0)) / 60.0
+            if age_mins <= 35:  # Tolerance for 15m candles
+                is_fresh = True
+
+        if is_fresh:
             return klines
 
         # 2. On-demand multi-source REST fetch
@@ -155,7 +166,16 @@ class BinanceFetcher:
         Sin esto, LSE veía siempre lista vacía: el agente llamaba get_klines() que no existía en esta clase.
         """
         klines = self._cache.get_klines(symbol, interval, limit)
+        is_fresh = False
         if len(klines) >= min_cache:
+            last_open = klines[-1]["open_time"]
+            age_mins = (time.time() - (last_open / 1000.0)) / 60.0
+            if interval == "1h" and age_mins <= 125:
+                is_fresh = True
+            elif interval != "1h":
+                is_fresh = True
+
+        if is_fresh:
             return klines
 
         if len(klines) > 0:
