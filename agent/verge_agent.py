@@ -1355,9 +1355,17 @@ class VergeAgent:
             return "no_follow_through"
         return None
 
-    def _close_worst_position(self) -> bool:
-        """Encuentra la peor posicion abierta (peor PnL) y la cierra para liberar cupo."""
+    def _close_worst_position(self, profile_id: str = None) -> bool:
+        """Encuentra la peor posicion abierta (peor PnL) de la estrategia y la cierra para liberar cupo."""
         open_positions = self.state.get_open_positions()
+        if not open_positions:
+            return False
+
+        # Filtrar para cerrar solo posiciones pertenecientes a esta estrategia específica
+        open_positions = [
+            p for p in open_positions
+            if p.get("strategyProfileId", p.get("strategy_profile_id")) == profile_id
+        ]
         if not open_positions:
             return False
 
@@ -1487,8 +1495,15 @@ class VergeAgent:
             logger.error("[LIMIT] No se pudo conectar al backend para verificar posiciones activas. Abortando trade.")
             return False
 
-        open_count = len(active_trades)
-        if open_count >= config.MAX_OPEN_POSITIONS:
+        # El límite se calcula por perfil para que las 5 estrategias operen de forma independiente
+        p_max_pos = int(profile.get("maxOpenPositions", config.MAX_OPEN_POSITIONS)) if profile else config.MAX_OPEN_POSITIONS
+        p_id = profile.get("id") if profile else None
+        p_active_count = len([
+            t for t in active_trades
+            if t.get("strategyProfileId", t.get("strategy_profile_id")) == p_id
+        ])
+
+        if p_active_count >= p_max_pos:
             if is_lse:
                 # LSE nunca tiene nexus_confidence — usa confluence_score con umbral LSE_MIN_SCORE
                 lse_upgrade_threshold = float(getattr(config, "LSE_MIN_SCORE", 65.0))
@@ -1502,9 +1517,9 @@ class VergeAgent:
 
             if can_upgrade:
                 logger.info(
-                    f"Cupos llenos, candidato élite ({gate_desc}). Reemplazando peor posición..."
+                    f"Cupos de la estrategia llenos, candidato élite ({gate_desc}). Reemplazando peor posición..."
                 )
-                closed_worst = self._close_worst_position()
+                closed_worst = self._close_worst_position(profile_id=p_id)
                 if not closed_worst:
                     logger.info("No se pudo cerrar la peor posición. Upgrade abortado.")
                     return False

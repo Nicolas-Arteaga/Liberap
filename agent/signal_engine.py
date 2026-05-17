@@ -197,6 +197,7 @@ class SignalEngine:
             "confluence_score":  score,
             "trade_direction":   trade_direction,
             "side":              side,
+            "source":            "nexus",
             "scar_score":        scar_score,
             "nexus_confidence":  nexus_confidence,
             "nexus_direction":   nexus_direction,

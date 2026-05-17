@@ -244,11 +244,14 @@ def validate_nexus_confluence_setup(
     regime = bridge_regime or nexus_regime
 
     if "ranging" in regime and not volume_surge_bullish and volume_ratio_20 < 2.0:
-        logger.info(
-            "[VETO] ranging_no_momentum — %s | regime=%s vol_ratio=%.2f surge=False",
-            candidate.get("symbol"), regime, volume_ratio_20
-        )
-        return False, "ranging_no_momentum", metrics
+        if getattr(config, "MIN_CONFLUENCE_SCORE", 50.0) > 30.0:
+            logger.info(
+                "[VETO] ranging_no_momentum — %s | regime=%s vol_ratio=%.2f surge=False",
+                candidate.get("symbol"), regime, volume_ratio_20
+            )
+            return False, "ranging_no_momentum", metrics
+        else:
+            logger.info("[TESTING] Bypassed ranging_no_momentum veto for %s", candidate.get("symbol"))
 
     # ── VETO #5: Bearish Rejection at Top ──────────────────────────────
     if side == 0:
@@ -260,11 +263,14 @@ def validate_nexus_confluence_setup(
 
     # Volume check only blocks when volume is very weak AND no surge at all
     if volume_ratio_20 < 0.8 and not volume_surge_bullish:
-        logger.info(
-            "[SKIP] no_volume_confirmation — %s | volume_ratio_20=%.2f surge=False",
-            candidate.get("symbol"), volume_ratio_20,
-        )
-        return False, "no_volume_confirmation", metrics
+        if getattr(config, "MIN_CONFLUENCE_SCORE", 50.0) > 30.0:
+            logger.info(
+                "[SKIP] no_volume_confirmation — %s | volume_ratio_20=%.2f surge=False",
+                candidate.get("symbol"), volume_ratio_20,
+            )
+            return False, "no_volume_confirmation", metrics
+        else:
+            logger.info("[TESTING] Bypassed no_volume_confirmation veto for %s", candidate.get("symbol"))
     # ── VETO #3: Post-Pump/Dump Distance from MA7 ────────────────────────
     # Si el precio ya se alejó >3.5% de la MA7, el movimiento ya ocurrió.
     # Entrar LONG cuando el precio está >3.5% sobre MA7 = comprar el techo.
