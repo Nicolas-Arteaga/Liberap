@@ -467,7 +467,7 @@ def _finalize_lse_signal(
         reasoning.append(f"⚠️ R:R bajo ({reward/risk:.2f}) — señal emitida igual (ejecutar con cautela)")
 
     if not preview_only:
-        sm.enter_emit_cooldown(symbol, timeframe, cfg.cooldown_candles)
+        sm.enter_emit_cooldown(symbol, timeframe, cfg.cooldown_candles, detection_mode.value)
 
     alert_message = (
         f"🚨 LSE[{detection_mode.value}] | {symbol} | Score {total_score:.0f}/100 | "
@@ -723,12 +723,12 @@ def run_lse_detection(
     sm = LSEStateMachine.get()
 
     if not preview_only:
-        sm.tick(symbol, timeframe)
+        sm.tick(symbol, timeframe, detection_mode.value)
 
-        if not sm.can_emit(symbol, timeframe):
+        if not sm.can_emit(symbol, timeframe, detection_mode.value):
             msg = (
-                f"🔒 {symbol}: cooldown LSE activo para este par/timeframe — esperá velas o "
-                f"POST /lse/reset-state/{symbol}?timeframe={timeframe}"
+                f"🔒 {symbol}: cooldown LSE activo ({detection_mode.value}) para este par/timeframe — esperá velas o "
+                f"POST /lse/reset-state/{symbol}?timeframe={timeframe}&detection_mode={detection_mode.value}"
             )
             logger.debug(msg)
             return None, [msg]

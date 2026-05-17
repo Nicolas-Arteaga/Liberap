@@ -102,6 +102,13 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
         p.MinRR = i.MinRR;
         p.MaxOpenPositions = i.MaxOpenPositions;
         p.MaxTradeDurationCandles = i.MaxTradeDurationCandles;
+        p.MaxEntrySlippagePct = i.MaxEntrySlippagePct;
+        p.LseMaxEntrySlippagePct = i.LseMaxEntrySlippagePct;
+        p.MinTpDistancePct = i.MinTpDistancePct;
+        p.MinSlDistancePct = i.MinSlDistancePct;
+        p.MinEstimatedRangePct = i.MinEstimatedRangePct;
+        p.MaxNexusSignalAgeSeconds = i.MaxNexusSignalAgeSeconds;
+        p.NexusMaxPriceDriftPct = i.NexusMaxPriceDriftPct;
     }
 
     private static StrategyProfileDto MapToDto(StrategyProfile p) => new()
@@ -128,5 +135,12 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
         MinRR = p.MinRR,
         MaxOpenPositions = p.MaxOpenPositions,
         MaxTradeDurationCandles = p.MaxTradeDurationCandles,
+        MaxEntrySlippagePct = p.MaxEntrySlippagePct,
+        LseMaxEntrySlippagePct = p.LseMaxEntrySlippagePct,
+        MinTpDistancePct = p.MinTpDistancePct,
+        MinSlDistancePct = p.MinSlDistancePct,
+        MinEstimatedRangePct = p.MinEstimatedRangePct,
+        MaxNexusSignalAgeSeconds = p.MaxNexusSignalAgeSeconds,
+        NexusMaxPriceDriftPct = p.NexusMaxPriceDriftPct
     };
 }

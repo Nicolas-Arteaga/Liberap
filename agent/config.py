@@ -25,12 +25,12 @@ LSE_ENABLED = os.getenv("LSE_ENABLED", "true").lower() in ("1", "true", "yes")
 LSE_MIN_SCORE = float(os.getenv("LSE_MIN_SCORE", "65"))
 LSE_DETECTION_MODE = os.getenv("LSE_DETECTION_MODE", "conservative")  # conservative | aggressive
 LSE_DUAL_SCAN = os.getenv("LSE_DUAL_SCAN", "true").lower() in ("1", "true", "yes")
-LSE_ENTRY_MODE = os.getenv("LSE_ENTRY_MODE", "conservative")  # conservative | aggressive (timing entrada)
+LSE_ENTRY_MODE = os.getenv("LSE_ENTRY_MODE", "aggressive")  # conservative | aggressive (timing entrada)
 # UI/LSE pueden tardar 1–3+ min; el agente antes usaba 10s y cortaba todas las respuestas.
 LSE_HTTP_TIMEOUT_SEC = int(os.getenv("LSE_HTTP_TIMEOUT_SEC", "360"))
 # Cuántos pares con historial 1h completo entran al batch TOP-K.
 # Por defecto escanea todo el universo elegible para decidir con contexto completo.
-LSE_MAX_SYMBOLS_PER_CYCLE = int(os.getenv("LSE_MAX_SYMBOLS_PER_CYCLE", "200"))
+LSE_MAX_SYMBOLS_PER_CYCLE = int(os.getenv("LSE_MAX_SYMBOLS_PER_CYCLE", "450"))
 LSE_BATCH_TOP_K = int(os.getenv("LSE_BATCH_TOP_K", "10"))
 # Cuántos candidatos LSE distintos (por símbolo, mejor score) inyectar al ranking tras scan-batch.
 # Permite fallback rank 2..N si el #1 cae en lse_warning_block / validate_lse_setup.
@@ -236,7 +236,7 @@ TIER3_ROTATE_PER_CYCLE   = 10    # Symbols to rotate per cycle in Tier 3 (10 = ~
 # Tier sizes
 _TIER1_SIZE  = 30
 _TIER2_SIZE  = 70
-_TOTAL_LIMIT = 200
+_TOTAL_LIMIT = 400
 
 # Watchlist cache TTL: refresh from Binance every 6 hours
 _CACHE_TTL_SECONDS = 6 * 3600
@@ -313,6 +313,28 @@ def _fetch_watchlist_multi(limit: int) -> list | None:
         return None
 
 
+def _fetch_top_volatile_symbols(limit: int = 150) -> list:
+    """
+    Fetches the top volatile symbols from Binance Futures based on absolute 24h price change %.
+    This matches exactly the behavior of the UI dashboard Top LSE Scan list.
+    """
+    try:
+        import requests
+        url = "https://fapi.binance.com/fapi/v1/ticker/24hr"
+        resp = requests.get(url, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            pairs = [x for x in data if str(x.get("symbol", "")).endswith("USDT")]
+            # Sort by absolute price change percent descending
+            pairs.sort(key=lambda x: abs(float(x.get("priceChangePercent", 0.0))), reverse=True)
+            res = [x["symbol"] for x in pairs[:limit]]
+            print(f"[Config] Volatile symbols fetched: {len(res)} symbols (top volatile).")
+            return res
+    except Exception as e:
+        print(f"[Config] Error fetching volatile symbols: {e}")
+    return []
+
+
 def _build_tiered_watchlist() -> dict:
     """
     Builds the tiered watchlist with this priority:
@@ -338,8 +360,14 @@ def _build_tiered_watchlist() -> dict:
             print(f"[Config] WARNING: Using static fallback ({len(base_symbols)} symbols). "
                   f"All exchanges unavailable. Cache will be refreshed on next successful startup.")
 
-    # --- Merge: open positions FIRST, then base_symbols without duplicates ---
+    # --- Fetch volatile symbols and merge them right after open positions ---
+    volatile_symbols = _fetch_top_volatile_symbols(150)
+
+    # --- Merge: open positions FIRST, then top volatile, then base_symbols without duplicates ---
     ordered = list(open_pos)
+    for s in volatile_symbols:
+        if s not in ordered:
+            ordered.append(s)
     for s in base_symbols:
         if s not in ordered:
             ordered.append(s)
@@ -359,6 +387,25 @@ def _build_tiered_watchlist() -> dict:
         "tier3": tier3,
         "all":   ordered,
     }
+
+
+def refresh_watchlist():
+    """
+    Refreshes the watchlist dynamically by re-building the tiered watchlist.
+    Ensures newly opened positions or volatile tokens are immediately monitored.
+    """
+    global TIERED_WATCHLIST, WATCHLIST, WATCHLIST_TIER1, WATCHLIST_TIER2, WATCHLIST_TIER3
+    try:
+        new_watchlist = _build_tiered_watchlist()
+        if new_watchlist and new_watchlist.get("all"):
+            TIERED_WATCHLIST = new_watchlist
+            WATCHLIST = new_watchlist["all"]
+            WATCHLIST_TIER1 = new_watchlist["tier1"]
+            WATCHLIST_TIER2 = new_watchlist["tier2"]
+            WATCHLIST_TIER3 = new_watchlist["tier3"]
+            print(f"[Config] Watchlist refreshed dynamically: T1={len(WATCHLIST_TIER1)} | T2={len(WATCHLIST_TIER2)} | T3={len(WATCHLIST_TIER3)}")
+    except Exception as e:
+        print(f"[Config] Error refreshing watchlist dynamically: {e}")
 
 
 # Build on import — uses cache when possible (0 REST calls after first run)

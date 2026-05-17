@@ -198,6 +198,10 @@ class VergeAgent:
     # ─────────────────────────────────────────────────────────
     def loop_cycle(self):
         logger.debug("[TRACE] Entering loop_cycle")
+        try:
+            config.refresh_watchlist()
+        except Exception as e:
+            logger.error(f"Failed to refresh watchlist: {e}")
         logger.info("--- Starting new analysis cycle ---")
 
         # 0. Check exchange health

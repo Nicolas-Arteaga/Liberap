@@ -117,8 +117,6 @@ def _run_lse_batch_sync(request: LSEBatchScanRequest) -> LSEBatchScanResponse:
 
         processed += 1
         for dm in request.detection_modes:
-            if len(request.detection_modes) > 1:
-                sm.reset(item.symbol, item.timeframe)
 
             signal, diagnostics = run_lse_detection(
                 symbol=item.symbol,
@@ -182,22 +180,28 @@ async def scan_lse_batch(request: LSEBatchScanRequest):
 
 
 @router.get("/state/{symbol}")
-async def get_state(symbol: str, timeframe: str = "1h"):
-    """Consulta el estado actual de la State Machine para un símbolo."""
-    state = LSEStateMachine.get().get_state(symbol, timeframe)
+async def get_state(symbol: str, timeframe: str = "1h", detection_mode: str = "conservative"):
+    """Consulta el estado actual de la State Machine para un símbolo y modo de detección."""
+    state = LSEStateMachine.get().get_state(symbol, timeframe, detection_mode)
     return {
         "symbol": symbol,
         "timeframe": timeframe,
+        "detection_mode": detection_mode,
         "state": state.value,
-        "can_emit": LSEStateMachine.get().can_emit(symbol, timeframe)
+        "can_emit": LSEStateMachine.get().can_emit(symbol, timeframe, detection_mode)
     }
 
 
 @router.post("/reset-state/{symbol}")
-async def reset_state(symbol: str, timeframe: str = "1h"):
+async def reset_state(symbol: str, timeframe: str = "1h", detection_mode: str = None):
     """Resetea el estado de un símbolo (útil para debug o forzar re-evaluación)."""
-    LSEStateMachine.get().reset(symbol, timeframe)
-    return {"symbol": symbol, "timeframe": timeframe, "status": "reset_to_idle"}
+    LSEStateMachine.get().reset(symbol, timeframe, detection_mode)
+    return {
+        "symbol": symbol, 
+        "timeframe": timeframe, 
+        "detection_mode": detection_mode, 
+        "status": "reset_to_idle"
+    }
 
 
 @router.get("/active-states")
