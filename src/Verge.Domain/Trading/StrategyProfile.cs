@@ -35,6 +35,15 @@ public class StrategyProfile : FullAuditedAggregateRoot<Guid>
     public int MaxTradeDurationCandles { get; set; } = 8;
     public bool ExtremeRsiVeto { get; set; } = true;
 
+    // ── Advanced Execution Constraints ──────────────────────────────────────
+    public float MaxEntrySlippagePct { get; set; } = 0.002f; // e.g. 0.002 = 0.2%
+    public float LseMaxEntrySlippagePct { get; set; } = 0.015f; 
+    public float MinTpDistancePct { get; set; } = 0.003f; // Minimum TP distance vs price
+    public float MinSlDistancePct { get; set; } = 0.002f; // Minimum SL distance vs price
+    public float MinEstimatedRangePct { get; set; } = 3.0f; // Minimum allowed estimated range
+    public float MaxNexusSignalAgeSeconds { get; set; } = 120.0f; 
+    public float NexusMaxPriceDriftPct { get; set; } = 0.025f; // Max allowed drift if signal is old
+
     protected StrategyProfile() { }
 
     public StrategyProfile(Guid id, Guid userId, string name) : base(id)

@@ -298,6 +298,58 @@
 
         <div class="veto-section">
           <div class="veto-title">
+            <ion-icon name="rocket-outline"></ion-icon>
+            Reglas de Ejecución
+          </div>
+
+          <div class="field-row">
+            <div class="field-group">
+              <label class="field-label">Slippage Máx (Nexus)</label>
+              <input class="field-input" type="number" [(ngModel)]="model.maxEntrySlippagePct" step="0.001">
+              <p class="field-hint">0.002 = 0.2% de tolerancia</p>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Slippage Máx (LSE)</label>
+              <input class="field-input" type="number" [(ngModel)]="model.lseMaxEntrySlippagePct" step="0.001">
+              <p class="field-hint">0.015 = 1.5% de tolerancia</p>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field-group">
+              <label class="field-label">Dist. Mín TP</label>
+              <input class="field-input" type="number" [(ngModel)]="model.minTpDistancePct" step="0.001">
+              <p class="field-hint">Mín % de distancia al TP</p>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Dist. Mín SL</label>
+              <input class="field-input" type="number" [(ngModel)]="model.minSlDistancePct" step="0.001">
+              <p class="field-hint">Mín % de distancia al SL</p>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field-group">
+              <label class="field-label">Rango Est. Mínimo</label>
+              <input class="field-input" type="number" [(ngModel)]="model.minEstimatedRangePct" step="0.1">
+              <p class="field-hint">Rechaza si el rango es < X%</p>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Edad Máx Señal (s)</label>
+              <input class="field-input" type="number" [(ngModel)]="model.maxNexusSignalAgeSeconds">
+              <p class="field-hint">Segundos antes de expirar</p>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Drift de Precio Máx</label>
+            <input class="field-input" type="number" [(ngModel)]="model.nexusMaxPriceDriftPct" step="0.001">
+            <p class="field-hint">Desviación permitida en señales viejas</p>
+          </div>
+        </div>
+
+        <div class="veto-section">
+          <div class="veto-title">
             <ion-icon name="shield-checkmark-outline"></ion-icon>
             VETOs de Protección
           </div>
@@ -329,22 +381,6 @@
                  (click)="model.extremeRsiVeto = !model.extremeRsiVeto">
               <div class="mini-dot"></div>
             </div>
-          </div>
-
-          <div class="veto-static-row">
-            <div class="veto-info-box">
-              <span class="veto-name">Late Entry Guard</span>
-              <span class="veto-desc">Rechaza entrada si el precio se alejó &gt;0.3% del punto ideal de entrada.</span>
-            </div>
-            <span class="always-on-badge">Siempre activo</span>
-          </div>
-
-          <div class="veto-static-row">
-            <div class="veto-info-box">
-              <span class="veto-name">Volume Surge Gate</span>
-              <span class="veto-desc">Solo entra si el volumen actual supera 1.3× el promedio de 20 períodos.</span>
-            </div>
-            <span class="always-on-badge">Siempre activo</span>
           </div>
         </div>
       </div>

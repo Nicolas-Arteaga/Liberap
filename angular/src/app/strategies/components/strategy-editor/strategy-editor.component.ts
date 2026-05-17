@@ -47,7 +47,14 @@ export class StrategyEditorComponent implements OnInit {
     maxOpenPositions: 3,
     maxTradeDurationCandles: 8,
     extremeRsiVeto: true,
-    enabledDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    enabledDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    maxEntrySlippagePct: 0.002,
+    lseMaxEntrySlippagePct: 0.015,
+    minTpDistancePct: 0.003,
+    minSlDistancePct: 0.002,
+    minEstimatedRangePct: 3.0,
+    maxNexusSignalAgeSeconds: 120,
+    nexusMaxPriceDriftPct: 0.025
   };
 
   ngOnInit() {

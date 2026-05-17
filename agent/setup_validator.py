@@ -108,7 +108,8 @@ def validate_lse_setup(
             return False, "low_rr", metrics
 
         atr_f = float(atr) if atr is not None else 0.0
-        pct_tp_floor = entry_f * float(getattr(config, "MIN_TP_DISTANCE_PCT_OF_PRICE", 0.003))
+        tp_dist_pct = float(profile.get("minTpDistancePct", getattr(config, "MIN_TP_DISTANCE_PCT_OF_PRICE", 0.003))) if profile else float(getattr(config, "MIN_TP_DISTANCE_PCT_OF_PRICE", 0.003))
+        pct_tp_floor = entry_f * tp_dist_pct
         if atr_f > 0:
             min_reward_abs = max(
                 float(getattr(config, "MIN_TP_DISTANCE_ATR_MULT", 0.8)) * atr_f,
@@ -121,7 +122,8 @@ def validate_lse_setup(
             metrics["min_tp_distance_required"] = min_reward_abs
             return False, "tp_too_close", metrics
 
-        pct_floor = entry_f * float(getattr(config, "MIN_STOP_PCT_OF_PRICE", 0.002))
+        sl_dist_pct = float(profile.get("minSlDistancePct", getattr(config, "MIN_STOP_PCT_OF_PRICE", 0.002))) if profile else float(getattr(config, "MIN_STOP_PCT_OF_PRICE", 0.002))
+        pct_floor = entry_f * sl_dist_pct
         if atr_f > 0:
             min_stop = max(
                 float(getattr(config, "MIN_STOP_ATR_MULT", 0.5)) * atr_f,
@@ -137,13 +139,7 @@ def validate_lse_setup(
 
         slip = (cp - entry_f) / entry_f
         metrics["entry_slippage_pct"] = round(slip, 6)
-        max_slip = float(
-            getattr(
-                config,
-                "LSE_MAX_ENTRY_SLIPPAGE_PCT",
-                getattr(config, "MAX_ENTRY_SLIPPAGE_PCT", 0.002),
-            )
-        )
+        max_slip = float(profile.get("lseMaxEntrySlippagePct", getattr(config, "LSE_MAX_ENTRY_SLIPPAGE_PCT", 0.015))) if profile else float(getattr(config, "LSE_MAX_ENTRY_SLIPPAGE_PCT", 0.015))
         if slip > max_slip:
             logger.info("[SKIP] late_entry slippage_pct=%s max=%s", slip, max_slip)
             return False, "late_entry", metrics
@@ -273,7 +269,7 @@ def validate_nexus_confluence_setup(
     # Si el precio ya se alejó >3.5% de la MA7, el movimiento ya ocurrió.
     # Entrar LONG cuando el precio está >3.5% sobre MA7 = comprar el techo.
     # Entrar SHORT cuando el precio está >3.5% bajo MA7 = vender el piso.
-    post_pump_threshold = float(getattr(config, "POST_PUMP_MA7_DISTANCE_PCT", 0.035))
+    post_pump_threshold = float(profile.get("maxMa7DistancePct", getattr(config, "POST_PUMP_MA7_DISTANCE_PCT", 0.035)) / 100.0) if profile else float(getattr(config, "POST_PUMP_MA7_DISTANCE_PCT", 0.035))
     if ma7 > 0:
         ma7_distance = (cp - ma7) / ma7  # positivo = precio sobre MA7
         if side == 0 and ma7_distance > post_pump_threshold:
@@ -295,8 +291,8 @@ def validate_nexus_confluence_setup(
     # Si el mercado está quieto, aunque la señal sea vieja, puede seguir válida.
     signal_age_s = float(candidate.get("scored_at_age_s", 0) or 0)
     price_at_signal = float(candidate.get("price_at_signal", 0) or 0)
-    max_nexus_age = float(getattr(config, "MAX_NEXUS_SIGNAL_AGE_SECONDS", 120.0))
-    max_drift_pct = float(getattr(config, "NEXUS_MAX_PRICE_DRIFT_PCT", 0.025))
+    max_nexus_age = float(profile.get("maxNexusSignalAgeSeconds", getattr(config, "MAX_NEXUS_SIGNAL_AGE_SECONDS", 120.0))) if profile else float(getattr(config, "MAX_NEXUS_SIGNAL_AGE_SECONDS", 120.0))
+    max_drift_pct = float(profile.get("nexusMaxPriceDriftPct", getattr(config, "NEXUS_MAX_PRICE_DRIFT_PCT", 0.025))) if profile else float(getattr(config, "NEXUS_MAX_PRICE_DRIFT_PCT", 0.025))
 
     if signal_age_s > max_nexus_age and price_at_signal > 0:
         price_drift = abs(cp - price_at_signal) / price_at_signal
@@ -312,7 +308,7 @@ def validate_nexus_confluence_setup(
     #           rango >3.5% = 100% WR, +38 USDT (los 3 trades ganaron todos).
     # Un rango <3% en 15m no tiene recorrido suficiente para cubrir el riesgo.
     estimated_range_pct = float(candidate.get("estimated_range_pct", 0) or 0)
-    MIN_RANGE_PCT = float(getattr(config, "MIN_ESTIMATED_RANGE_PCT", 3.0))
+    MIN_RANGE_PCT = float(profile.get("minEstimatedRangePct", getattr(config, "MIN_ESTIMATED_RANGE_PCT", 3.0))) if profile else float(getattr(config, "MIN_ESTIMATED_RANGE_PCT", 3.0))
     if estimated_range_pct < MIN_RANGE_PCT:
         logger.info(
             "[VETO] range_too_small — %s | range=%.2f%% < min=%.1f%%",
@@ -347,8 +343,8 @@ def validate_nexus_confluence_setup(
     # ── Fin bloqueos duros ────────────────────────────────────────────────
 
     range_pct = float(candidate.get("estimated_range_pct", 2.0) or 2.0) / 100.0
-    tp_dist = range_pct * config.TP_MULTIPLIER
-    sl_dist = range_pct * config.SL_MULTIPLIER
+    tp_dist = range_pct * (float(profile.get("tpMultiplier", config.TP_MULTIPLIER)) if profile else config.TP_MULTIPLIER)
+    sl_dist = range_pct * (float(profile.get("slMultiplier", config.SL_MULTIPLIER)) if profile else config.SL_MULTIPLIER)
 
     if side == 0:
         tp_price = cp * (1 + tp_dist)
@@ -377,18 +373,20 @@ def validate_nexus_confluence_setup(
     metrics["risk_abs"] = risk_w
     metrics["reward_abs"] = reward_w
 
-    min_rr = float(getattr(config, "MIN_RR_NEXUS", getattr(config, "MIN_RR_DEFAULT", 1.5)))
+    min_rr = float(profile.get("minRR", getattr(config, "MIN_RR_NEXUS", 1.5))) if profile else float(getattr(config, "MIN_RR_NEXUS", 1.5))
     if rr < min_rr:
         logger.info("[SKIP] nexus low_rr rr=%s min=%s", rr, min_rr)
         return False, "low_rr", metrics
 
-    pct_tp = cp * float(getattr(config, "MIN_TP_DISTANCE_PCT_OF_PRICE", 0.003))
+    tp_dist_pct = float(profile.get("minTpDistancePct", getattr(config, "MIN_TP_DISTANCE_PCT_OF_PRICE", 0.003))) if profile else float(getattr(config, "MIN_TP_DISTANCE_PCT_OF_PRICE", 0.003))
+    pct_tp = cp * tp_dist_pct
     if reward_w < pct_tp:
         logger.info("[SKIP] nexus tp_too_close reward=%s min=%s", reward_w, pct_tp)
         metrics["min_tp_distance_required"] = pct_tp
         return False, "tp_too_close", metrics
 
-    pct_sl = cp * float(getattr(config, "MIN_STOP_PCT_OF_PRICE", 0.002))
+    sl_dist_pct = float(profile.get("minSlDistancePct", getattr(config, "MIN_STOP_PCT_OF_PRICE", 0.002))) if profile else float(getattr(config, "MIN_STOP_PCT_OF_PRICE", 0.002))
+    pct_sl = cp * sl_dist_pct
     if risk_w < pct_sl:
         logger.info("[SKIP] nexus stop_too_tight risk=%s min=%s", risk_w, pct_sl)
         metrics["min_stop_required"] = pct_sl

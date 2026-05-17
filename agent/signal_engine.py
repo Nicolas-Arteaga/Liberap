@@ -204,6 +204,7 @@ class SignalEngine:
             "volume_explosion":  volume_explosion,
             "group_scores":      group_scores,
             "rsi":               rsi,
+            "distance_to_ma7_pct": features.get("distance_to_ma7_pct", 0),
             "estimated_range_pct": est_range,
             "reasons":           reasons,
             # VETO #4 staleness data — inyectado en el momento del cálculo

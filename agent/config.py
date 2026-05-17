@@ -57,11 +57,11 @@ RISK_PER_TRADE_PCT = 0.015
 EQUITY_RISK_PCT_FOR_STOP = float(os.getenv("EQUITY_RISK_PCT_FOR_STOP", "0.01"))
 MIN_RR_DEFAULT = float(os.getenv("MIN_RR_DEFAULT", "1.5"))
 MIN_RR_NEXUS = float(os.getenv("MIN_RR_NEXUS", str(MIN_RR_DEFAULT)))
-MIN_RR_AGGRESSIVE_LSE = float(os.getenv("MIN_RR_AGGRESSIVE_LSE", "2.0"))
+MIN_RR_AGGRESSIVE_LSE = float(os.getenv("MIN_RR_AGGRESSIVE_LSE", "1.2"))
 MIN_STOP_ATR_MULT = float(os.getenv("MIN_STOP_ATR_MULT", "0.5"))
 MIN_STOP_PCT_OF_PRICE = float(os.getenv("MIN_STOP_PCT_OF_PRICE", "0.002"))
 MAX_ENTRY_SLIPPAGE_PCT = float(os.getenv("MAX_ENTRY_SLIPPAGE_PCT", "0.002"))
-LSE_MAX_ENTRY_SLIPPAGE_PCT = float(os.getenv("LSE_MAX_ENTRY_SLIPPAGE_PCT", "0.012"))
+LSE_MAX_ENTRY_SLIPPAGE_PCT = float(os.getenv("LSE_MAX_ENTRY_SLIPPAGE_PCT", "0.20"))
 MAX_MARGIN_PER_TRADE_USD = float(os.getenv("MAX_MARGIN_PER_TRADE_USD", "150"))
 MAX_NOTIONAL_PER_TRADE_USD = float(os.getenv("MAX_NOTIONAL_PER_TRADE_USD", "50000"))
 TICK_SIZE_MIN_RELATIVE_OF_PRICE = float(os.getenv("TICK_SIZE_MIN_RELATIVE_OF_PRICE", "1e-7"))
@@ -99,7 +99,7 @@ MIN_NEXUS_CONFIDENCE = 75.0          # antes 70 — menos trades, más certeza e
 MIN_SCAR_SCORE = 4
 MIN_CONFLUENCE_SCORE = 45.0          # antes 50 — prod 24h: conf 50-55 = 14-22% WR; conf 55+ = 43% WR
 LSE_WARNING_OVERRIDE_SCORE = float(os.getenv("LSE_WARNING_OVERRIDE_SCORE", "85.0"))
-MIN_ESTIMATED_RANGE_PCT = float(os.getenv("MIN_ESTIMATED_RANGE_PCT", "3.0"))  # prod: rango <3% = WR negativo; >3.5% = 100% WR (+38 USDT)
+MIN_ESTIMATED_RANGE_PCT = float(os.getenv("MIN_ESTIMATED_RANGE_PCT", "0.8"))  # calibración LSE inicial — subir progresivamente según resultados
 
 # 5. Take Profit / Stop Loss — Fat Tail Strategy (asimétrica)
 # SL amplio: 0.8× el rango estimado para que el ruido de 15m no active el stop.

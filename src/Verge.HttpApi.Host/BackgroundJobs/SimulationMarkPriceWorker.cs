@@ -322,6 +322,7 @@ public class SimulationMarkPriceWorker : BackgroundService
         SlPrice = t.SlPrice,
         TradingSignalId = t.TradingSignalId,
         Exchange = t.Exchange,
-        AgentDecisionJson = t.AgentDecisionJson
+        AgentDecisionJson = t.AgentDecisionJson,
+        StrategyProfileId = t.StrategyProfileId
     };
 }

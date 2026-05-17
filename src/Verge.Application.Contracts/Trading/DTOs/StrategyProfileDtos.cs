@@ -34,10 +34,19 @@ public class StrategyProfileDto : EntityDto<Guid>
     public int MaxTradeDurationCandles { get; set; }
 
     // Advanced Filters
-    public string ActiveHoursStart { get; set; }
-    public string ActiveHoursEnd { get; set; }
-    public List<string> EnabledDays { get; set; }
+    public string? ActiveHoursStart { get; set; }
+    public string? ActiveHoursEnd { get; set; }
+    public List<string>? EnabledDays { get; set; }
     public bool ExtremeRsiVeto { get; set; }
+
+    // Advanced Execution Constraints
+    public float MaxEntrySlippagePct { get; set; }
+    public float LseMaxEntrySlippagePct { get; set; }
+    public float MinTpDistancePct { get; set; }
+    public float MinSlDistancePct { get; set; }
+    public float MinEstimatedRangePct { get; set; }
+    public float MaxNexusSignalAgeSeconds { get; set; }
+    public float NexusMaxPriceDriftPct { get; set; }
 
     // Metrics (Calculated)
     public double WinRate { get; set; }
@@ -73,8 +82,17 @@ public class CreateUpdateStrategyProfileDto
     public int MaxTradeDurationCandles { get; set; } = 8;
 
     // Advanced Filters
-    public string ActiveHoursStart { get; set; }
-    public string ActiveHoursEnd { get; set; }
-    public List<string> EnabledDays { get; set; }
+    public string? ActiveHoursStart { get; set; }
+    public string? ActiveHoursEnd { get; set; }
+    public List<string>? EnabledDays { get; set; }
     public bool ExtremeRsiVeto { get; set; } = true;
+
+    // Advanced Execution Constraints
+    public float MaxEntrySlippagePct { get; set; } = 0.002f;
+    public float LseMaxEntrySlippagePct { get; set; } = 0.015f;
+    public float MinTpDistancePct { get; set; } = 0.003f;
+    public float MinSlDistancePct { get; set; } = 0.002f;
+    public float MinEstimatedRangePct { get; set; } = 3.0f;
+    public float MaxNexusSignalAgeSeconds { get; set; } = 120.0f;
+    public float NexusMaxPriceDriftPct { get; set; } = 0.025f;
 }

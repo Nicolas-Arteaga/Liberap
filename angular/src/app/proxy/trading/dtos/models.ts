@@ -54,6 +54,13 @@ export interface CreateUpdateStrategyProfileDto {
   activeHoursEnd?: string;
   enabledDays: string[];
   extremeRsiVeto: boolean;
+  maxEntrySlippagePct: number;
+  lseMaxEntrySlippagePct: number;
+  minTpDistancePct: number;
+  minSlDistancePct: number;
+  minEstimatedRangePct: number;
+  maxNexusSignalAgeSeconds: number;
+  nexusMaxPriceDriftPct: number;
 }
 
 export interface EnhancedAnalysisDto {
@@ -172,6 +179,13 @@ export interface StrategyProfileDto extends EntityDto<string> {
   activeHoursEnd?: string;
   enabledDays: string[];
   extremeRsiVeto: boolean;
+  maxEntrySlippagePct: number;
+  lseMaxEntrySlippagePct: number;
+  minTpDistancePct: number;
+  minSlDistancePct: number;
+  minEstimatedRangePct: number;
+  maxNexusSignalAgeSeconds: number;
+  nexusMaxPriceDriftPct: number;
   winRate: number;
   totalTrades: number;
   netPnL: number;

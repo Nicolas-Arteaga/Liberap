@@ -224,6 +224,9 @@ class VergeAgent:
             "slMultiplier": getattr(config, "SL_MULTIPLIER", 1.0),
             "marginPerTrade": getattr(config, "MAX_MARGIN_PER_TRADE_USD", 150),
             "maxOpenPositions": config.MAX_OPEN_POSITIONS,
+            "allowLong": True,
+            "allowShort": True,
+            "allowedSources": ["nexus", "scar", "redis_bridge"],
             "isActive": True
         }
 
@@ -536,15 +539,47 @@ class VergeAgent:
                 
                 # Check if sources are allowed
                 allowed = profile.get("allowedSources")
-                if allowed and c.get("source") not in allowed:
-                    continue
+                if allowed:
+                    src = (c.get("source", "") or "").lower()
+                    if isinstance(allowed, list):
+                        if src not in [s.lower() for s in allowed]:
+                            continue
+                    elif isinstance(allowed, str):
+                        # .NET serializes as "LSE,Nexus,Bridge"
+                        allowed_list = [s.strip().lower() for s in allowed.split(",")]
+                        if src not in allowed_list:
+                            continue
                 
                 # Profile side filters
                 allow_long = profile.get("allowLong", True)
                 allow_short = profile.get("allowShort", True)
-                side = int(c.get("side", 0))
-                if side == 0 and not allow_long: continue
-                if side == 1 and not allow_short: continue
+                cand_side = int(c.get("side", 0))
+                
+                if cand_side == 0 and not allow_long: continue
+                if cand_side == 1 and not allow_short: continue
+
+                # Fix 2: Filtros RSI y MA7 por perfil (PascalCase del DTO -> camelCase del JSON)
+                max_rsi_long  = profile.get("maxRsiLong")
+                min_rsi_short = profile.get("minRsiShort")
+                cand_rsi = float(c.get("rsi", 50))
+
+                if max_rsi_long is not None and cand_side == 0:
+                    if cand_rsi > float(max_rsi_long):
+                        logger.info(f"[VETO] {c['symbol']} RSI {cand_rsi} > max {max_rsi_long} for profile {p_name}")
+                        continue
+
+                if min_rsi_short is not None and cand_side == 1:
+                    if cand_rsi < float(min_rsi_short):
+                        logger.info(f"[VETO] {c['symbol']} RSI {cand_rsi} < min {min_rsi_short} for profile {p_name}")
+                        continue
+
+                # Filtro distancia MA7 por perfil
+                max_dist_ma7 = profile.get("maxMa7DistancePct")
+                if max_dist_ma7 is not None:
+                    dist = abs(float(c.get("distance_to_ma7_pct", 0)))
+                    if dist > float(max_dist_ma7):
+                        logger.info(f"[VETO] {c['symbol']} MA7 Dist {dist:.2f}% > max {max_dist_ma7}% for profile {p_name}")
+                        continue
 
                 p_candidates.append(c)
 
@@ -556,7 +591,11 @@ class VergeAgent:
             
             # Check slot availability for this profile
             p_max_pos = int(profile.get("maxOpenPositions", config.MAX_OPEN_POSITIONS))
-            p_active_count = len([t for t in active_trades if t.get("strategyProfileId") == p_id])
+            # Fix 3: Contador robusto para camelCase (API) y snake_case (Local)
+            p_active_count = len([
+                t for t in active_trades 
+                if t.get("strategyProfileId") == p_id or t.get("strategy_profile_id") == p_id
+            ])
             
             if p_active_count >= p_max_pos:
                 logger.info(f"[LIMIT] Profile {p_name} is full ({p_active_count}/{p_max_pos}). Skipping new trades.")

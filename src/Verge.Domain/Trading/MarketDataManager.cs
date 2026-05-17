@@ -36,6 +36,8 @@ public class MarketDataManager : DomainService
         _pythonBaseUrl = configuration["PythonService:Url"]?.TrimEnd('/') ?? "http://localhost:8005";
     }
 
+    public string GetPythonBaseUrl() => _pythonBaseUrl;
+
     /// <summary>
     /// Returns the live price from the WebSocket in-memory cache (zero REST calls).
     /// Returns null if data is not yet available (e.g., on startup before WebSocket connects).
@@ -84,7 +86,7 @@ public class MarketDataManager : DomainService
         "BTTUSDT",    // Split/rebrand
     };
 
-    public async Task<List<string>> GetTopSymbolsAsync(int limit = 30)
+    public async Task<List<string>> GetTopSymbolsAsync(int limit = 200)
     {
         try
         {

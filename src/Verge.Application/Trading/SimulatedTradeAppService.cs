@@ -140,6 +140,7 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
 
                 if (input.TpPrice.HasValue && input.TpPrice.Value > 0) existingTrade.TpPrice = input.TpPrice;
                 if (input.SlPrice.HasValue && input.SlPrice.Value > 0) existingTrade.SlPrice = input.SlPrice;
+                if (input.StrategyProfileId.HasValue) existingTrade.StrategyProfileId = input.StrategyProfileId;
 
                 await _tradeRepo.UpdateAsync(existingTrade, autoSave: true);
                 
@@ -224,6 +225,9 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
 
         if (!string.IsNullOrWhiteSpace(input.AgentDecisionJson))
             trade.AgentDecisionJson = input.AgentDecisionJson.Trim();
+        
+        if (input.StrategyProfileId.HasValue)
+            trade.StrategyProfileId = input.StrategyProfileId;
         else
             Logger.LogWarning(
                 "⚠️ [Simulation] OpenTrade for {Symbol} sin AgentDecisionJson — la pantalla de auditoría no podrá mostrar el contexto Nexus/SCAR/LSE para este trade.",
@@ -470,7 +474,8 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         SlPrice = t.SlPrice,
         TradingSignalId = t.TradingSignalId,
         Exchange = t.Exchange,
-        AgentDecisionJson = t.AgentDecisionJson
+        AgentDecisionJson = t.AgentDecisionJson,
+        StrategyProfileId = t.StrategyProfileId
     };
 
     /// <summary>
@@ -538,7 +543,7 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
             if (wsPrice.HasValue && wsPrice.Value > 0) return wsPrice.Value;
 
             // 2) Local Python Service (Multi-exchange source)
-            var pythonPrice = await TryFetchDirectPriceAsync($"http://127.0.0.1:8001/market/ticker/{symbol}");
+            var pythonPrice = await TryFetchDirectPriceAsync($"{_marketDataManager.GetPythonBaseUrl()}/market/ticker/{symbol}");
             if (pythonPrice.HasValue && pythonPrice.Value > 0) return pythonPrice.Value;
 
             // 3) Aggregated 24h tickers
