@@ -66,7 +66,6 @@ export class HistoryComponent {
   // Filtros
   tradeType: string = 'all';
   dateRange: string = 'last30';
-  versionFilter: string = 'all';
   strategyFilter: string = 'all';
   strategies: StrategyProfileDto[] = [];
 
@@ -90,13 +89,13 @@ export class HistoryComponent {
     { value: 'custom', label: 'Personalizado' }
   ];
 
-  versionOptions: FilterOption[] = [
-    { value: 'all', label: 'Todas las versiones' },
-    { value: 'risk_v4.0', label: 'Versión 4.0 (Nueva)' },
-    { value: 'risk_v3.0', label: 'Versión 3.0' },
-    { value: 'risk_v2.0', label: 'Versión 2.0' },
-    { value: 'v1.0', label: 'Versión 1.0 (Sin Contexto)' }
-  ];
+  get strategyOptions(): FilterOption[] {
+    const options: FilterOption[] = [{ value: 'all', label: 'Todas las Estrategias' }];
+    this.strategies.forEach(s => {
+      options.push({ value: s.id, label: s.name });
+    });
+    return options;
+  }
 
   // Helper para extraer versión
   getTradeVersion(trade: SimulatedTradeDto): string {
@@ -119,6 +118,7 @@ export class HistoryComponent {
       if (this.tradeType === 'win' && item.status !== 1) return false;
       if (this.tradeType === 'loss' && item.status !== 2 && item.status !== 6) return false;
       if (this.tradeType === 'open' && item.status !== 0) return false;
+      if (this.tradeType === 'breakeven' && item.status !== 3) return false;
 
       // 2. Filtro por Fecha
       if (this.dateRange !== 'all') {
@@ -130,15 +130,13 @@ export class HistoryComponent {
         if (this.dateRange === 'last90' && diffDays > 90) return false;
       }
 
-      // 3. Filtro por Versión
-      if (this.versionFilter !== 'all') {
-        const v = this.getTradeVersion(item);
-        if (v !== this.versionFilter) return false;
-      }
-
-      // 4. Filtro por Estrategia
+      // 3. Filtro por Estrategia
       if (this.strategyFilter !== 'all') {
-        if (item.strategyProfileId !== this.strategyFilter) return false;
+        if (this.strategyFilter === '00000000-0000-0000-0000-000000000000') {
+          if (item.strategyProfileId !== null && item.strategyProfileId !== undefined && item.strategyProfileId !== '00000000-0000-0000-0000-000000000000') return false;
+        } else {
+          if (item.strategyProfileId !== this.strategyFilter) return false;
+        }
       }
 
       return true;
@@ -347,12 +345,12 @@ export class HistoryComponent {
   }
 
   getStrategyLabel(id?: string): string {
-    if (!id) return 'Legacy';
+    if (!id || id === '00000000-0000-0000-0000-000000000000') return 'Standard Scalping';
     return this.getStrategy(id)?.name || 'Unknown';
   }
 
   getStrategyColor(id?: string): string {
-    if (!id) return 'rgba(255,255,255,0.4)';
+    if (!id || id === '00000000-0000-0000-0000-000000000000') return '#3B82F6';
     return this.getStrategy(id)?.color || '#00C47D';
   }
 }

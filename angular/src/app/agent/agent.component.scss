@@ -187,6 +187,8 @@
     background: #020608 !important;
     border: 1px solid #00f3ff44 !important;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
 
     .nexus-header {
       background: #081217;
@@ -195,6 +197,7 @@
       align-items: center;
       gap: 1.5rem;
       border-bottom: 1px solid #00f3ff22;
+      flex-shrink: 0;
 
       .traffic-lights {
         display: flex;
@@ -236,10 +239,35 @@
   .terminal {
     background: #020608;
     padding: 1.5rem 1rem;
-    height: 350px;
+    flex: 1;
+    min-height: 350px;
     overflow-y: auto;
     font-size: 0.85rem;
     box-shadow: inset 0 0 40px rgba(0, 243, 255, 0.05);
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 243, 255, 0.35) #010a0e;
+    
+    // Custom cyberpunk scrollbar
+    &::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    &::-webkit-scrollbar-track {
+      background: #010a0e;
+      border-left: 1px solid rgba(0, 243, 255, 0.05);
+    }
+    &::-webkit-scrollbar-thumb {
+      background: rgba(0, 243, 255, 0.35);
+      border-radius: 3px;
+      box-shadow: inset 0 0 4px rgba(0, 243, 255, 0.4);
+      border: 1px solid rgba(0, 243, 255, 0.1);
+      transition: all 0.2s;
+      
+      &:hover {
+        background: rgba(0, 243, 255, 0.75);
+        box-shadow: 0 0 10px rgba(0, 243, 255, 0.8);
+      }
+    }
     
     .log-line {
       margin-bottom: 0.35rem;

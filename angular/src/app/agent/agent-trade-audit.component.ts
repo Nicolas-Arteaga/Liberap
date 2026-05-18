@@ -3,8 +3,9 @@ import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { SimulatedTradeService } from '../proxy/trading/simulated-trade.service';
-import type { SimulatedTradeDto } from '../proxy/trading/dtos/models';
+import type { SimulatedTradeDto, StrategyProfileDto } from '../proxy/trading/dtos/models';
 import { TradeStatus } from '../proxy/trading/trade-status.enum';
+import { StrategyProfileService } from '../strategies/services/strategy-profile.service';
 
 export interface AgentDecisionSnapshot {
   schema_version?: number;
@@ -36,12 +37,14 @@ export interface VersionStats {
 })
 export class AgentTradeAuditComponent implements OnInit {
   private readonly tradesApi = inject(SimulatedTradeService);
+  private readonly strategyService = inject(StrategyProfileService);
 
   loading = signal(true);
   loadError = signal<string | null>(null);
   allRows = signal<SimulatedTradeDto[]>([]);
   selected = signal<SimulatedTradeDto | null>(null);
   showRawJson = signal(false);
+  strategies = signal<StrategyProfileDto[]>([]);
 
   readonly TradeStatus = TradeStatus;
 
@@ -78,8 +81,10 @@ export class AgentTradeAuditComponent implements OnInit {
     forkJoin({
       active: this.tradesApi.getActiveTrades(),
       history: this.tradesApi.getTradeHistory(),
+      strategies: this.strategyService.getAll(),
     }).subscribe({
-      next: ({ active, history }) => {
+      next: ({ active, history, strategies }) => {
+        this.strategies.set(strategies || []);
         const seen = new Set<string>();
         const merged: SimulatedTradeDto[] = [];
         for (const t of [...(active ?? []), ...(history ?? [])]) {
@@ -129,6 +134,15 @@ export class AgentTradeAuditComponent implements OnInit {
     const snap = this.parseSnapshot(trade);
     const src = snap?.candidate?.['source'];
     return typeof src === 'string' ? src : 'Nexus+SCAR';
+  }
+
+  getStrategyName(trade: SimulatedTradeDto): string {
+    const id = trade.strategyProfileId;
+    if (!id || id === '00000000-0000-0000-0000-000000000000') {
+      return 'Standard Scalping';
+    }
+    const found = this.strategies().find(s => s.id === id);
+    return found?.name || 'Unknown Strategy';
   }
 
   agentVersion(trade: SimulatedTradeDto): string {
@@ -436,9 +450,11 @@ export class AgentTradeAuditComponent implements OnInit {
       const openedStr = tr.openedAt ? new Date(tr.openedAt).toLocaleString('es-AR') : '—';
       const closedStr = tr.closedAt ? new Date(tr.closedAt).toLocaleString('es-AR') : '—';
       const hasAudit = this.hasAuditSnapshot(tr) ? 'Sí' : 'No';
+      const strategyName = this.getStrategyName(tr);
       
-      out += `${tr.symbol}\t${hasAudit}\t${this.signalSource(tr)}\t${this.scoreSummary(tr)}\t${this.statusLabel(tr.status)}\t${openedStr}\t${closedStr}\t${pnlStr}\n`;
+      out += `${tr.symbol}\t${strategyName}\t${hasAudit}\t${this.signalSource(tr)}\t${this.scoreSummary(tr)}\t${this.statusLabel(tr.status)}\t${openedStr}\t${closedStr}\t${pnlStr}\n`;
       out += `${tr.symbol}\n`;
+      out += `Estrategia: ${strategyName}\n`;
       out += `${this.signalSource(tr)}\n`;
       out += `Ejecución simulada\n`;
       out += `Entrada (servidor)\n${tr.entryPrice}\n`;
@@ -526,7 +542,7 @@ export class AgentTradeAuditComponent implements OnInit {
   downloadCsv(): void {
     // Semicolon is better for Excel in Spanish locales, and we add BOM for UTF-8 characters
     let out = '\uFEFF'; 
-    out += 'Symbol;Apertura;Cierre;Source;NexusConf;Confluence;LSE_Score;SCAR;Estado;RealizedPnL;Margin;Leverage;EntryReason\n';
+    out += 'Symbol;Apertura;Cierre;Source;Strategy;NexusConf;Confluence;LSE_Score;SCAR;Estado;RealizedPnL;Margin;Leverage;EntryReason\n';
     
     for (const tr of this.allRows()) {
       const pnlStr = (tr.realizedPnl != null && tr.status !== TradeStatus.Open) ? tr.realizedPnl.toFixed(2).replace('.', ',') : '';
@@ -540,6 +556,7 @@ export class AgentTradeAuditComponent implements OnInit {
       let scar = '';
       let reason = '';
       let src = this.signalSource(tr);
+      let strat = this.getStrategyName(tr);
       
       if (snap) {
          if (snap.agent_meta) {
@@ -555,7 +572,7 @@ export class AgentTradeAuditComponent implements OnInit {
       }
       
       // We use ; as separator for Spanish Excel
-      out += `${tr.symbol};${openedStr};${closedStr};${src};${nxConf};${conf};${lseScore};${scar};${this.statusLabel(tr.status)};${pnlStr};${tr.margin};${tr.leverage};${reason}\n`;
+      out += `${tr.symbol};${openedStr};${closedStr};${src};${strat};${nxConf};${conf};${lseScore};${scar};${this.statusLabel(tr.status)};${pnlStr};${tr.margin};${tr.leverage};${reason}\n`;
     }
     
     const blob = new Blob([out], { type: 'text/csv;charset=utf-8' });

@@ -24,12 +24,37 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
     {
         var userId = CurrentUser.Id!.Value;
         var items = await _repo.GetListAsync(p => p.UserId == userId);
-        return items.OrderBy(p => p.Name).Select(MapToDto).ToList();
+        var dtos = items.OrderBy(p => p.Name).Select(MapToDto).ToList();
+
+        // Add virtual Standard Scalping profile at index 0
+        dtos.Insert(0, new StrategyProfileDto
+        {
+            Id = Guid.Empty,
+            UserId = userId,
+            Name = "Standard Scalping",
+            Description = "Estrategia predeterminada de la app (Scalping)",
+            Color = "#3B82F6",
+            IsActive = true
+        });
+
+        return dtos;
     }
 
     [HttpGet]
     public async Task<StrategyProfileDto> GetAsync(Guid id)
     {
+        if (id == Guid.Empty)
+        {
+            return new StrategyProfileDto
+            {
+                Id = Guid.Empty,
+                UserId = CurrentUser.Id!.Value,
+                Name = "Standard Scalping",
+                Description = "Estrategia predeterminada de la app (Scalping)",
+                Color = "#3B82F6",
+                IsActive = true
+            };
+        }
         var profile = await _repo.GetAsync(id);
         EnsureOwnership(profile);
         return MapToDto(profile);

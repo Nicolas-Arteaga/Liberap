@@ -49,6 +49,7 @@
               <th>Versión</th>
               <th class="col-audit">Contexto</th>
               <th>Origen</th>
+              <th>Estrategia</th>
               <th>Scores</th>
               <th>Estado</th>
               <th>Apertura</th>
@@ -73,6 +74,7 @@
                   }
                 </td>
                 <td>{{ signalSource(tr) }}</td>
+                <td><strong style="color: #3B82F6;">{{ getStrategyName(tr) }}</strong></td>
                 <td>{{ scoreSummary(tr) }}</td>
                 <td>{{ statusLabel(tr.status) }}</td>
                 <td>{{ tr.openedAt | date:'short' }}</td>
@@ -109,6 +111,7 @@
           <section class="panel">
             <h3>Ejecución simulada</h3>
             <dl class="kv">
+              <dt>Estrategia</dt><dd><strong style="color: #3B82F6;">{{ getStrategyName(tr) }}</strong></dd>
               <dt>Entrada (servidor)</dt><dd>{{ tr.entryPrice | number:'1.4-6' }}</dd>
               <dt>Cierre (servidor)</dt><dd>{{ tr.closedAt ? (tr.closedAt | date:'medium') : '—' }}</dd>
               <dt>TP</dt><dd>{{ tr.tpPrice | number:'1.4-6' }}</dd>
