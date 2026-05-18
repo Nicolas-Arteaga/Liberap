@@ -1,4 +1,17 @@
 <div class="agent-dashboard">
+  <!-- GHOST AGENTS WARNING BANNER -->
+  <div *ngIf="ghostAgents && ghostAgents.length > 0" class="ghost-alert-banner">
+    <div class="alert-content">
+      <ion-icon name="warning" class="alert-icon"></ion-icon>
+      <div class="alert-text">
+        <strong>⚠️ ALERTA DE SEGURIDAD — AGENTE DOBLE DETECTADO:</strong> Se encontraron <strong>{{ ghostAgents.length }}</strong> proceso(s) fantasma de <code>verge_agent.py</code> corriendo en segundo plano que podrían duplicar operaciones y arruinar tus estadísticas.
+      </div>
+    </div>
+    <button class="btn-purge-ghosts" (click)="purgeGhosts()">
+      <ion-icon name="skull-outline"></ion-icon> ELIMINAR AGENTES DOBLES
+    </button>
+  </div>
+
   <!-- TOP ROW -->
   <div class="grid-row">
     <!-- Control Panel -->

@@ -180,4 +180,125 @@ public class AgentAppService : VergeAppService, IAgentAppService
         if (signals == null || signals.Count == 0) return;
         await _tradingHubContext.Clients.All.SendAsync("ReceiveSuperScores", signals);
     }
+
+    public async Task<object> GetGhostAgentsAsync()
+    {
+        var ghosts = new List<object>();
+        try
+        {
+            var backendPid = _processManager.GetProcessId("Agent");
+            
+            var startInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                Arguments = "-NoProfile -Command \"Get-CimInstance Win32_Process | Where-Object { ($_.Name -match 'python') -and ($_.CommandLine -match 'verge_agent.py') } | Select-Object ProcessId, CommandLine | ConvertTo-Json -Compress\"",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            
+            using var proc = System.Diagnostics.Process.Start(startInfo);
+            if (proc != null)
+            {
+                string json = (await proc.StandardOutput.ReadToEndAsync()).Trim();
+                await proc.WaitForExitAsync();
+                
+                if (!string.IsNullOrEmpty(json))
+                {
+                    using var doc = JsonDocument.Parse(json);
+                    if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var el in doc.RootElement.EnumerateArray())
+                        {
+                            var pid = el.GetProperty("ProcessId").GetInt32();
+                            var cmd = el.GetProperty("CommandLine").GetString() ?? "";
+                            if (pid != backendPid)
+                            {
+                                ghosts.Add(new { pid, cmdLine = cmd });
+                            }
+                        }
+                    }
+                    else if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                    {
+                        var pid = doc.RootElement.GetProperty("ProcessId").GetInt32();
+                        var cmd = doc.RootElement.GetProperty("CommandLine").GetString() ?? "";
+                        if (pid != backendPid)
+                        {
+                            ghosts.Add(new { pid, cmdLine = cmd });
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning("⚠️ Error scanning ghost agents: {Message}", ex.Message);
+        }
+        return ghosts;
+    }
+
+    public async Task PurgeGhostAgentsAsync()
+    {
+        try
+        {
+            var backendPid = _processManager.GetProcessId("Agent");
+            var ghosts = new List<int>();
+            
+            var startInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                Arguments = "-NoProfile -Command \"Get-CimInstance Win32_Process | Where-Object { ($_.Name -match 'python') -and ($_.CommandLine -match 'verge_agent.py') } | Select-Object ProcessId | ConvertTo-Json -Compress\"",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            
+            using var proc = System.Diagnostics.Process.Start(startInfo);
+            if (proc != null)
+            {
+                string json = (await proc.StandardOutput.ReadToEndAsync()).Trim();
+                await proc.WaitForExitAsync();
+                
+                if (!string.IsNullOrEmpty(json))
+                {
+                    using var doc = JsonDocument.Parse(json);
+                    if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var el in doc.RootElement.EnumerateArray())
+                        {
+                            var pid = el.GetProperty("ProcessId").GetInt32();
+                            if (pid != backendPid) ghosts.Add(pid);
+                        }
+                    }
+                    else if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                    {
+                        var pid = doc.RootElement.GetProperty("ProcessId").GetInt32();
+                        if (pid != backendPid) ghosts.Add(pid);
+                    }
+                }
+            }
+            
+            foreach (var pid in ghosts)
+            {
+                try
+                {
+                    using var killProc = System.Diagnostics.Process.GetProcessById(pid);
+                    if (!killProc.HasExited)
+                    {
+                        killProc.Kill(entireProcessTree: true);
+                        await killProc.WaitForExitAsync();
+                        Logger.LogInformation("Successfully purged ghost agent PID {Pid}", pid);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning("Failed to kill ghost agent PID {Pid}: {Msg}", pid, ex.Message);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning("⚠️ Error purging ghost agents: {Message}", ex.Message);
+        }
+    }
 }

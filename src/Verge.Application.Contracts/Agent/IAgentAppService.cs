@@ -19,4 +19,6 @@ public interface IAgentAppService : IApplicationService
     Task<object> GetOpenPositionsAsync();
     Task BroadcastSignalAsync(object signal);
     Task BroadcastSignalsAsync(List<object> signals);
+    Task<object> GetGhostAgentsAsync();
+    Task PurgeGhostAgentsAsync();
 }

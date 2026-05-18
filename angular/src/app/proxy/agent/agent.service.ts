@@ -107,4 +107,20 @@ export class AgentService {
       url: '/api/app/agent/stop-server',
     },
     { apiName: this.apiName,...config });
+  
+
+  getGhostAgents = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, any[]>({
+      method: 'GET',
+      url: '/api/app/agent/ghost-agents',
+    },
+    { apiName: this.apiName,...config });
+  
+
+  purgeGhostAgents = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'POST',
+      url: '/api/app/agent/purge-ghost-agents',
+    },
+    { apiName: this.apiName,...config });
 }

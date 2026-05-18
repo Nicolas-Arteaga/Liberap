@@ -62,6 +62,7 @@ export class AgentComponent implements OnInit, OnDestroy, AfterViewChecked {
   // Recent Operations
   operations: any[] = [];
   openPositions: any[] = [];
+  ghostAgents: any[] = [];
 
   private refreshInterval: any;
   private isRefreshing = false;
@@ -401,6 +402,15 @@ export class AgentComponent implements OnInit, OnDestroy, AfterViewChecked {
         }));
       }
     });
+
+    this.agentService.getGhostAgents().subscribe({
+      next: (ghosts: any[]) => {
+        this.ghostAgents = ghosts || [];
+      },
+      error: (err) => {
+        console.error('Error fetching ghost agents:', err);
+      }
+    });
   }
 
   // --- UI Helpers ---
@@ -501,6 +511,19 @@ export class AgentComponent implements OnInit, OnDestroy, AfterViewChecked {
   stopAgent() {
     if (this.systemState !== 'AGENT_RUNNING') return;
     this.agentService.stopAgent().subscribe();
+  }
+
+  purgeGhosts() {
+    this.addLog('🧹 Iniciando purga de agentes fantasmas en el sistema...', '#f59e0b');
+    this.agentService.purgeGhostAgents().subscribe({
+      next: () => {
+        this.addLog('✅ Purga completada. Todos los agentes duplicados fueron terminados.', '#10b981');
+        this.ghostAgents = [];
+      },
+      error: (err) => {
+        this.addLog('❌ ERROR durante la purga: ' + (err.message || 'Error desconocido'), '#ef4444');
+      }
+    });
   }
 
   clearLogs() {

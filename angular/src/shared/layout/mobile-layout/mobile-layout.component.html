@@ -1,16 +1,210 @@
 <ion-app>
 
-  <!-- HEADER -->
-  <app-mobile-top-bar></app-mobile-top-bar>
+  <!-- ════════════════ MOBILE LAYOUT ════════════════ -->
+  <div class="mobile-only-layout">
+    <!-- HEADER -->
+    <app-mobile-top-bar></app-mobile-top-bar>
 
-  <!-- CONTENIDO (ÚNICO SCROLL) -->
-  <ion-content fullscreen class="deudaso-bg">
-    <div class="pb-28">
-      <router-outlet></router-outlet>
+    <!-- CONTENIDO (ÚNICO SCROLL) -->
+    <ion-content fullscreen class="deudaso-bg">
+      <div class="pb-28">
+        <router-outlet></router-outlet>
+      </div>
+    </ion-content>
+
+    <!-- FOOTER -->
+    <app-mobile-bottom-nav></app-mobile-bottom-nav>
+  </div>
+
+  <!-- ════════════════ DESKTOP LAYOUT ════════════════ -->
+  <div class="desktop-only-layout">
+    <div class="desktop-main-container">
+      
+      <!-- SIDEBAR CONSTANTE (IZQUIERDA) -->
+      <aside class="desktop-sidebar">
+        <!-- Fondo Global Sidebar: Kraken Procedural Engine -->
+        <div class="sidebar-bg-kraken">
+          <canvas #krakenCanvas class="kraken-canvas-el"></canvas>
+        </div>
+
+        <!-- Logo VERGE -->
+        <div class="sidebar-logo">
+          <img src="assets/images/logo/logo.png" alt="Verge Logo" class="logo-image">
+        </div>
+
+        <!-- Menu Lateral -->
+        <nav class="sidebar-nav">
+          <a class="nav-item" [routerLink]="['/']" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+            <ion-icon name="home-outline"></ion-icon>
+            <span>HOME</span>
+          </a>
+          <a class="nav-item" [routerLink]="['/nexus-15']" routerLinkActive="active">
+            <ion-icon name="pulse-outline"></ion-icon>
+            <span>NEXUS-15</span>
+          </a>
+          <a class="nav-item" [routerLink]="['/agent']" routerLinkActive="active">
+            <ion-icon name="hardware-chip-outline"></ion-icon>
+            <span>AGENT</span>
+          </a>
+          <a class="nav-item" [routerLink]="['/strategies']" routerLinkActive="active">
+            <ion-icon name="grid-outline"></ion-icon>
+            <span>ESTRATEGIAS</span>
+          </a>
+          <a class="nav-item" [routerLink]="['/dashboard-advanced']" routerLinkActive="active">
+            <ion-icon name="briefcase-outline"></ion-icon>
+            <span>POSICIONES</span>
+          </a>
+          <a class="nav-item" [routerLink]="['/history']" routerLinkActive="active">
+            <ion-icon name="list-outline"></ion-icon>
+            <span>HISTORIAL</span>
+          </a>
+          <a class="nav-item" [routerLink]="['/backtesting']" routerLinkActive="active">
+            <ion-icon name="analytics-outline"></ion-icon>
+            <span>BACKTESTING</span>
+          </a>
+          <a class="nav-item" [routerLink]="['/alerts']" routerLinkActive="active">
+            <ion-icon name="notifications-outline"></ion-icon>
+            <span>ALERTAS</span>
+          </a>
+          <a class="nav-item" [routerLink]="['/profile']" routerLinkActive="active">
+            <ion-icon name="settings-outline"></ion-icon>
+            <span>CONFIGURACIÓN</span>
+          </a>
+        </nav>
+
+        <!-- CARD: ESTADO DEL SISTEMA -->
+        <div class="system-status-card">
+          
+          <div class="card-content-wrapper">
+            <div class="card-header-status">
+              <span class="card-title">ESTADO DEL SISTEMA</span>
+            </div>
+            
+            <div class="status-pulse-wave-row">
+              <div class="pulse-container">
+                <span class="pulse-dot"></span>
+                <span class="status-text">ONLINE</span>
+              </div>
+              <div class="wave-container">
+                <!-- Lifeline/Heartbeat SVG Wave -->
+                <svg class="heartbeat-svg" viewBox="0 0 100 30" preserveAspectRatio="none">
+                  <path d="M0,15 L30,15 L35,5 L40,25 L45,10 L50,18 L55,15 L100,15" fill="none" stroke="#00f3ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+            </div>
+
+            <!-- Divider Line like in Image 1 -->
+            <div class="status-divider"></div>
+
+            <div class="stat-blocks">
+              <div class="stat-block">
+                <span class="stat-label">UPTIME</span>
+                <span class="stat-value">{{ uptime }}</span>
+              </div>
+
+              <div class="stat-block">
+                <span class="stat-label">LATENCIA</span>
+                <span class="stat-value">{{ latency }}ms</span>
+              </div>
+            </div>
+
+            <!-- Centered label at the very bottom -->
+            <div class="kraken-label-centered">VERGE KRAKEN</div>
+          </div>
+
+        </div>
+      </aside>
+
+      <!-- CONTENIDO CENTRAL (DERECHA) -->
+      <main class="desktop-content-area">
+        <!-- HEADER SUPERIOR DEL CONTENIDO (SEPARADO DEL MENU PERO DEL MISMO ANCHO) -->
+        <header class="desktop-top-header">
+          <div class="header-breadcrumbs">
+            <span class="bc-prefix">//</span>
+            <span class="bc-active">{{ currentRouteName }}</span>
+          </div>
+
+          <div class="header-actions">
+            <!-- Nexus Button -->
+            <button class="action-btn nexus-btn" [routerLink]="['/nexus-15']" title="Nexus-15">
+              <ion-icon name="hardware-chip-outline"></ion-icon>
+            </button>
+            
+            <!-- Notifications Dropdown -->
+            <div class="notification-dropdown-wrapper">
+              <button class="action-btn notification-btn" (click)="toggleNotificationPanel(); $event.stopPropagation()" title="Notificaciones">
+                <ion-icon name="notifications-outline"></ion-icon>
+                <span class="badge-pill" *ngIf="unreadCount > 0">{{ unreadCount }}</span>
+              </button>
+              
+              <!-- Backdrop para cerrar dropdown al hacer click fuera -->
+              <div class="desktop-panel-backdrop" *ngIf="showNotifications" (click)="showNotifications = false; $event.stopPropagation()"></div>
+
+              <!-- Notifications Panel (Desktop version) -->
+              <div class="desktop-notification-panel" *ngIf="showNotifications" (click)="$event.stopPropagation()">
+                <div class="panel-header d-flex justify-content-between align-items-center mb-3">
+                  <h3 class="m-0 fs-6 text-white fw-bold">Notificaciones</h3>
+                  <button class="btn btn-link text-primary p-0 shadow-none text-decoration-none" style="font-size: 0.8rem;" (click)="markAllAsRead()">Marcar leídas</button>
+                </div>
+                <div class="panel-body">
+                  <app-alerts [alerts]="(notifications$ | async) || []" [showOnlyUnread]="false" mode="list"
+                    (alertClick)="onNotificationClick($event)" (markAsRead)="markAsRead($event)">
+                  </app-alerts>
+                </div>
+              </div>
+            </div>
+
+            <!-- Profile Button -->
+            <button class="action-btn profile-btn" [routerLink]="['/profile']" title="Perfil">
+              <ion-icon name="person-outline"></ion-icon>
+            </button>
+          </div>
+        </header>
+
+        <!-- AREA DE CONTENIDO CON SCROLL CYBERPUNK -->
+        <div class="desktop-router-container">
+          <router-outlet></router-outlet>
+        </div>
+      </main>
+
     </div>
-  </ion-content>
 
-  <!-- FOOTER -->
-  <app-mobile-bottom-nav></app-mobile-bottom-nav>
+    <!-- FOOTER GENERAL (OCUPA TODO EL ANCHO DE LA APP) -->
+    <footer class="desktop-footer">
+      <div class="footer-left">
+        <span class="connection-dot"></span>
+        <span class="connection-text">CONECTADO</span>
+        <span class="connection-sep">|</span>
+        <span class="connection-ws">WS: ONLINE</span>
+      </div>
+
+      <!-- Marquee/Ticker de Precios -->
+      <div class="footer-ticker">
+        <div class="ticker-wrapper">
+          <!-- Primer loop (Base) -->
+          <div class="ticker-item" *ngFor="let tick of tickers">
+            <span class="tick-sym">{{ tick.symbol.replace('USDT', '') }}</span>
+            <span class="tick-price">{{ tick.price | number:'1.2-4' }}</span>
+            <span class="tick-change" [class.pos]="tick.change >= 0" [class.neg]="tick.change < 0">
+              {{ tick.change >= 0 ? '▲' : '▼' }} {{ tick.changePercent | number:'1.2-2' }}%
+            </span>
+          </div>
+          <!-- Segundo loop (Seamless clone) -->
+          <div class="ticker-item" *ngFor="let tick of tickers">
+            <span class="tick-sym">{{ tick.symbol.replace('USDT', '') }}</span>
+            <span class="tick-price">{{ tick.price | number:'1.2-4' }}</span>
+            <span class="tick-change" [class.pos]="tick.change >= 0" [class.neg]="tick.change < 0">
+              {{ tick.change >= 0 ? '▲' : '▼' }} {{ tick.changePercent | number:'1.2-2' }}%
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-right">
+        <span class="footer-time">{{ currentTime }}</span>
+        <span class="footer-tz">UTC-3</span>
+      </div>
+    </footer>
+  </div>
 
 </ion-app>

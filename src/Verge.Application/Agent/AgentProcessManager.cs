@@ -179,6 +179,17 @@ public class AgentProcessManager : ISingletonDependency
         return false;
     }
 
+    public int? GetProcessId(string name)
+    {
+        if (_processes.TryGetValue(name, out var process))
+        {
+            try {
+                if (!process.HasExited) return process.Id;
+            } catch {}
+        }
+        return null;
+    }
+
     public DateTime? GetStartTime(string name)
     {
         if (_startTimes.TryGetValue(name, out var startTime))
