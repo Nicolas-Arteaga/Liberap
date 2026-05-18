@@ -1495,6 +1495,11 @@ class VergeAgent:
             logger.error("[LIMIT] No se pudo conectar al backend para verificar posiciones activas. Abortando trade.")
             return False
 
+        # Evitar duplicar margen en el mismo símbolo
+        if any(t.get("symbol") == symbol for t in active_trades):
+            logger.info(f"[SKIP] Ya existe una posición activa para {symbol} en el backend. Evitando duplicar margen.")
+            return False
+
         # El límite se calcula por perfil para que las 5 estrategias operen de forma independiente
         p_max_pos = int(profile.get("maxOpenPositions", config.MAX_OPEN_POSITIONS)) if profile else config.MAX_OPEN_POSITIONS
         p_id = profile.get("id") if profile else None
