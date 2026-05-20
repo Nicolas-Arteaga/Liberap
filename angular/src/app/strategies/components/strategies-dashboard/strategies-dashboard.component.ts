@@ -37,7 +37,7 @@ export class StrategiesDashboardComponent implements OnInit {
     this.isLoading = true;
     this.service.getAll()
       .subscribe(data => {
-        this.profiles = data;
+        this.profiles = data.filter(p => p.id !== '00000000-0000-0000-0000-000000000000');
         this.loadTrades();
       });
   }
@@ -52,8 +52,8 @@ export class StrategiesDashboardComponent implements OnInit {
   }
 
   enrichProfilesWithStats() {
-    // Calculate for Standard (Legacy) - strategyProfileId is null
-    const standardTrades = this.trades.filter(t => !t.strategyProfileId);
+    // Calculate for Standard (Legacy) - strategyProfileId is null or Guid.Empty
+    const standardTrades = this.trades.filter(t => !t.strategyProfileId || t.strategyProfileId === '00000000-0000-0000-0000-000000000000');
     if (standardTrades.length > 0) {
       const wins = standardTrades.filter(t => (t.realizedPnl || 0) > 0).length;
       this.standardStats = {

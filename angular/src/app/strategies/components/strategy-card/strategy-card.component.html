@@ -11,7 +11,7 @@
       <span class="status-badge" [class.active]="profile.isActive">
         {{ profile.isActive ? 'Activo' : 'Inactivo' }}
       </span>
-      <app-toggle [value]="profile.isActive" (valueChange)="onToggle()"></app-toggle>
+      <app-toggle *ngIf="profile.id !== '00000000-0000-0000-0000-000000000000'" [value]="profile.isActive" (valueChange)="onToggle()"></app-toggle>
     </div>
   </div>
 
@@ -39,11 +39,11 @@
   <div class="card-footer">
     <div class="main-actions">
       <app-glass-button icon="stats-chart-outline" label="Rendimiento" (click)="viewPerformance.emit(profile.id)"></app-glass-button>
-      <app-glass-button icon="create-outline" label="Editar" (click)="edit.emit(profile.id)"></app-glass-button>
+      <app-glass-button *ngIf="profile.id !== '00000000-0000-0000-0000-000000000000'" icon="create-outline" label="Editar" (click)="edit.emit(profile.id)"></app-glass-button>
     </div>
     <div class="secondary-actions">
       <app-glass-button icon="copy-outline" (click)="duplicate.emit(profile.id)"></app-glass-button>
-      <app-glass-button icon="trash-outline" variant="danger" (click)="delete.emit(profile.id)"></app-glass-button>
+      <app-glass-button *ngIf="profile.id !== '00000000-0000-0000-0000-000000000000'" icon="trash-outline" variant="danger" (click)="delete.emit(profile.id)"></app-glass-button>
     </div>
   </div>
 </app-card-content>

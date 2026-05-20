@@ -151,6 +151,11 @@
 
   // Control Panel
   .control-panel {
+    height: 520px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+
     .status-indicator {
       display: inline-flex;
       align-items: center;
@@ -233,34 +238,50 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 0.4rem 0;
-        font-size: 0.85rem;
+        padding: 0.25rem 0;
+        font-size: 0.75rem;
         border-bottom: 1px solid rgba(255,255,255,0.02);
+        white-space: nowrap;
+        overflow: hidden;
         
         .s-name {
           color: #cbd5e1;
           display: flex;
           align-items: center;
-          gap: 0.5rem;
+          gap: 0.4rem;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+          overflow: hidden;
+          padding-right: 0.5rem;
         }
         .s-status {
           font-weight: 600;
-          font-size: 0.75rem;
+          font-size: 0.7rem;
           display: flex;
           align-items: center;
-          gap: 0.3rem;
+          gap: 0.25rem;
+          flex-shrink: 0;
+          white-space: nowrap;
           
           &::after {
             content: '';
             display: inline-block;
-            width: 6px;
-            height: 6px;
+            width: 5px;
+            height: 5px;
             border-radius: 50%;
             background-color: currentColor;
           }
         }
       }
     }
+  }
+
+  // Performance card in the top row
+  .grid-row:first-of-type > .col-3.glass-card:not(.control-panel) {
+    height: 520px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
   }
 
   // Nexus-15 Terminal
@@ -271,6 +292,7 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    height: 520px;
 
     .nexus-header {
       background: #081217;
@@ -322,8 +344,8 @@
     background: #020608;
     padding: 1.5rem 1rem;
     flex: 1;
-    min-height: 350px;
     overflow-y: auto;
+    overflow-x: hidden;
     font-size: 0.85rem;
     box-shadow: inset 0 0 40px rgba(0, 243, 255, 0.05);
     scrollbar-width: thin;
@@ -359,7 +381,7 @@
       
       .prompt { color: #ff007f; font-weight: 700; }
       .log-time { color: #00f3ff; opacity: 0.6; min-width: 85px; }
-      .log-text { color: #00f3ff; line-height: 1.4; }
+      .log-text { color: #00f3ff; line-height: 1.4; word-break: break-all; white-space: pre-wrap; }
       
       &.highlight {
         .log-text { color: #ff007f; font-weight: 700; text-shadow: 0 0 8px #ff007f44; }

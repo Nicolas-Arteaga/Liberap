@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { StrategyProfileService as ProxyService } from '../../proxy/trading/strategy-profile.service';
 import { SimulatedTradeService as ProxyTradeService } from '../../proxy/trading/simulated-trade.service';
 import { CreateUpdateStrategyProfileDto, StrategyProfileDto } from '../../proxy/trading/dtos/models';
-import { map } from 'rxjs/operators';
+import { map, switchMap } from 'rxjs/operators';
 import { Observable, of } from 'rxjs';
 
 @Injectable({
@@ -38,15 +38,14 @@ export class StrategyProfileService {
 
   duplicate(id: string) {
     return this.getById(id).pipe(
-      map(p => {
+      switchMap(p => {
         const copy: CreateUpdateStrategyProfileDto = {
           ...p,
           name: `${p.name} (Copia)`,
           isActive: false
         };
-        return copy;
-      }),
-      map(copy => this.create(copy))
+        return this.create(copy);
+      })
     );
   }
 

@@ -73,6 +73,7 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
     [HttpPut]
     public async Task<StrategyProfileDto> UpdateAsync(Guid id, CreateUpdateStrategyProfileDto input)
     {
+        if (id == Guid.Empty) throw new UserFriendlyException("No se puede editar la estrategia predeterminada.");
         var profile = await _repo.GetAsync(id);
         EnsureOwnership(profile);
         ApplyInput(profile, input);
@@ -83,6 +84,7 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
     [HttpDelete]
     public async Task DeleteAsync(Guid id)
     {
+        if (id == Guid.Empty) throw new UserFriendlyException("No se puede eliminar la estrategia predeterminada.");
         var profile = await _repo.GetAsync(id);
         EnsureOwnership(profile);
         await _repo.DeleteAsync(profile, autoSave: true);
@@ -91,6 +93,7 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
     [HttpPost]
     public async Task<StrategyProfileDto> ToggleActiveAsync(Guid id)
     {
+        if (id == Guid.Empty) throw new UserFriendlyException("No se puede desactivar la estrategia predeterminada directamente.");
         var profile = await _repo.GetAsync(id);
         EnsureOwnership(profile);
         profile.IsActive = !profile.IsActive;

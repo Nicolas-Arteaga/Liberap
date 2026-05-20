@@ -1590,6 +1590,7 @@ class VergeAgent:
     def _manage_open_positions(self):
         """
         Monitors open positions and closes them if TP/SL/timeout is reached.
+        Also syncs phantom positions (local records not in backend) every cycle.
         Prices are ALWAYS fetched from local cache.
         """
         positions = self.state.get_open_positions()
@@ -1597,6 +1598,16 @@ class VergeAgent:
             return
 
         logger.info(f"Monitoring {len(positions)} open positions...")
+
+        # ── Fetch backend active trades ONCE before the loop (not per-position) ──
+        # Critical: if this returns None (network error), skip phantom check for this cycle
+        # rather than crashing mid-loop and leaving positions unmonitored.
+        active_backend_trades = self.positions.get_active_trades()
+        backend_ids: set = set()
+        if active_backend_trades is not None:
+            backend_ids = {t["id"] for t in active_backend_trades}
+        else:
+            logger.warning("[SYNC] Could not reach backend to verify positions — skipping phantom check this cycle.")
 
         for pos in positions:
             symbol   = pos["symbol"]
@@ -1671,9 +1682,8 @@ class VergeAgent:
                 should_close, close_reason = True, "Max duration exceeded"
 
             if not should_close:
-                active_backend_trades = self.positions.get_active_trades()
-                backend_ids = [t["id"] for t in active_backend_trades]
-                if trade_id not in backend_ids:
+                # Use pre-fetched backend_ids (fetched once before the loop)
+                if backend_ids and trade_id not in backend_ids:
                     logger.info(f"Position {symbol} ({trade_id}) closed by server. Syncing state.")
                     self.state.remove_position(trade_id)
                     continue
@@ -1695,8 +1705,8 @@ class VergeAgent:
                     self.state.remove_position(trade_id)
 
     def _repair_existing_positions(self):
-        """Ensures all backend positions have TP/SL and syncs local state."""
-        logger.info("Verifying TP/SL and syncing active positions...")
+        """Bidirectional sync: ensures backend positions have TP/SL and removes phantom local positions."""
+        logger.info("Verifying TP/SL and syncing active positions (bidirectional)...")
         active_trades = self.positions.get_active_trades()
         if active_trades is None:
             logger.error("Failed to fetch active trades from backend during repair. Skipping.")
@@ -1704,15 +1714,37 @@ class VergeAgent:
 
         local_positions = self.state.get_open_positions()
         local_ids = [p.get("trade_id") for p in local_positions]
+        backend_ids = {t["id"] for t in active_trades}
+
+        # ── REVERSE SYNC: remove phantom local positions that don't exist in backend ──
+        # This is the key fix: if the agent recorded a trade locally but the backend
+        # never confirmed it (or already closed it), remove it from local state so
+        # _should_skip() doesn't block the symbol forever.
+        phantoms_removed = 0
+        for local_pos in local_positions:
+            tid = local_pos.get("trade_id")
+            sym = local_pos.get("symbol", "?")
+            if tid not in backend_ids:
+                logger.warning(
+                    "[REPAIR] Phantom position removed: %s (%s) — not found in backend. "
+                    "Was recorded locally but never confirmed by exchange.",
+                    sym, tid
+                )
+                self.state.remove_position(tid)
+                phantoms_removed += 1
+        if phantoms_removed:
+            logger.warning(
+                "[REPAIR] Removed %d phantom position(s). Agent unblocked for those symbols.",
+                phantoms_removed
+            )
 
         for trade in active_trades:
             symbol   = trade["symbol"]
             trade_id = trade["id"]
-            
+
             # 1. Sync local state if missing
             if trade_id not in local_ids:
                 logger.info(f"🔄 Syncing missing position {symbol} ({trade_id}) to local state.")
-                # Basic sync - enough for _should_skip and monitoring
                 sync_pos = {
                     "trade_id": trade_id,
                     "symbol": symbol,
@@ -1732,16 +1764,15 @@ class VergeAgent:
 
             if tp is None or sl is None or tp == 0 or sl == 0:
                 logger.info(f"🔧 Repairing TP/SL for {symbol} ({trade_id})...")
-                # Using a generic 2% range for repair calculation if missing
                 entry = float(trade["entryPrice"])
                 range_pct = 0.02
                 tp_dist = range_pct * config.TP_MULTIPLIER
                 sl_dist = range_pct * config.SL_MULTIPLIER
 
-                if trade["side"] == 0: # LONG
+                if trade["side"] == 0:  # LONG
                     tp_val = entry * (1 + tp_dist)
                     sl_val = entry * (1 - sl_dist)
-                else: # SHORT
+                else:  # SHORT
                     tp_val = entry * (1 - tp_dist)
                     sl_val = entry * (1 + sl_dist)
 

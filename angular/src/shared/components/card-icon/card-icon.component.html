@@ -6,12 +6,22 @@
   [class.proximo]="status === 'proximo'"
   [class.card-content-bg]="useCardContentBg"  
 >
+  <!-- Card number badge at top right -->
+  <div *ngIf="cardNumber && variant === 'stacked'" class="card-number-badge">
+    {{ cardNumber }}
+  </div>
+
   <div class="icon-wrapper">
     <ion-icon [name]="icon"></ion-icon>
   </div>
 
   <div class="content">
     <ng-content></ng-content>
+  </div>
+
+  <!-- Chevron on the right -->
+  <div *ngIf="showChevron" class="card-chevron" [style.color]="chevronColor">
+    <ion-icon name="chevron-forward-outline"></ion-icon>
   </div>
 
   <!-- TEXTO SIMPLE A LA DERECHA -->

@@ -6,7 +6,7 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { GlassButtonComponent } from 'src/shared/components/glass-button/glass-button.component';
 import { IonIcon } from '@ionic/angular/standalone';
 import { IconService } from 'src/shared/services/icon.service';
-import { createChart, IChartApi, ISeriesApi, CandlestickData, CandlestickSeries, LineSeries } from 'lightweight-charts';
+import { createChart, IChartApi, ISeriesApi, CandlestickData, CandlestickSeries, LineSeries, HistogramSeries, LineStyle, CrosshairMode, ColorType } from 'lightweight-charts';
 import { MarketDataService } from '../proxy/trading/market-data.service';
 import { TradingService } from '../proxy/trading/trading.service';
 import { TradingSessionDto, AnalysisLogDto, MarketAnalysisDto, OpportunityDto, SymbolTickerDto } from '../proxy/trading/models';
@@ -136,16 +136,30 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private ma7Series: ISeriesApi<'Line'> | null = null;
   private ma25Series: ISeriesApi<'Line'> | null = null;
   private ma99Series: ISeriesApi<'Line'> | null = null;
+  private volumeSeries: any = null;
   private chartContainerElement: HTMLElement | null = null;
 
   chartData: CandlestickData[] = [];
+  chartVolumes: any[] = [];
   isLoadingHistory: boolean = false;
   loadedSymbol: string = '';
   loadedTimeframe: string = '';
 
+  currentHmaValue: number | null = null;
+  currentMa7Value: number | null = null;
+  currentMa25Value: number | null = null;
+  currentMa99Value: number | null = null;
+  currentVolumeValue: number | null = null;
+
+  lastHmaValue: number | null = null;
+  lastMa7Value: number | null = null;
+  lastMa25Value: number | null = null;
+  lastMa99Value: number | null = null;
+  lastVolumeValue: number | null = null;
+
   // Configuración
   selectedSymbol = 'BTCUSDT';
-  selectedTimeframe = '15';
+  selectedTimeframe = '15m';
   // Estrategias
   strategyProfiles: StrategyProfileDto[] = [];
   selectedProfileId: string | null = null; // null = Standard/Legacy
@@ -203,7 +217,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   get filteredActiveTrades(): SimulatedTradeDto[] {
     return this.activeTrades.filter(t => {
-      if (this.consoleTab === 'legacy') return !t.strategyProfileId;
+      const isLegacy = !t.strategyProfileId || t.strategyProfileId === '00000000-0000-0000-0000-000000000000';
+      if (this.consoleTab === 'legacy') return isLegacy;
       if (this.consoleTab === 'history') return false; // History has its own table
       return t.strategyProfileId === this.consoleTab;
     });
@@ -342,7 +357,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   loadStrategyProfiles() {
     this.strategyService.getAll().subscribe(profiles => {
-      this.strategyProfiles = profiles;
+      this.strategyProfiles = profiles.filter(p => p.id !== '00000000-0000-0000-0000-000000000000');
     });
   }
 
@@ -764,58 +779,109 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       width: container.clientWidth,
       height: 500,
       layout: {
-        background: { color: '#0d1117' },
-        textColor: '#d1d4dc',
+        background: { type: ColorType.Solid, color: 'rgba(5, 9, 16, 0.4)' },
+        textColor: '#00f3ff',
+        fontFamily: "'Share Tech Mono', 'Orbitron', monospace",
+        fontSize: 11,
       },
       grid: {
-        vertLines: { color: 'rgba(42, 46, 57, 0.5)' },
-        horzLines: { color: 'rgba(42, 46, 57, 0.5)' },
+        vertLines: { color: 'rgba(0, 243, 255, 0.04)', style: LineStyle.Dotted },
+        horzLines: { color: 'rgba(0, 243, 255, 0.04)', style: LineStyle.Dotted },
       },
       rightPriceScale: {
-        borderColor: 'rgba(197, 203, 206, 0.8)',
+        borderColor: 'rgba(0, 243, 255, 0.15)',
       },
       timeScale: {
-        borderColor: 'rgba(197, 203, 206, 0.8)',
+        borderColor: 'rgba(0, 243, 255, 0.15)',
         timeVisible: true,
         secondsVisible: false,
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal,
+        vertLine: {
+          color: 'rgba(0, 243, 255, 0.35)',
+          width: 1,
+          style: LineStyle.Dashed,
+          labelBackgroundColor: 'rgba(5, 9, 16, 0.95)',
+        },
+        horzLine: {
+          color: 'rgba(0, 243, 255, 0.35)',
+          width: 1,
+          style: LineStyle.Dashed,
+          labelBackgroundColor: 'rgba(5, 9, 16, 0.95)',
+        },
       },
     });
 
     this.candlestickSeries = this.chart.addSeries(CandlestickSeries, {
-      upColor: '#26a69a',
-      downColor: '#ef5350',
-      borderVisible: false,
-      wickUpColor: '#26a69a',
-      wickDownColor: '#ef5350',
+      upColor: '#00ff88',
+      downColor: '#ff4466',
+      borderUpColor: '#00ff88',
+      borderDownColor: '#ff4466',
+      wickUpColor: '#00ff88',
+      wickDownColor: '#ff4466',
+    });
+
+    this.volumeSeries = this.chart.addSeries(HistogramSeries, {
+      color: '#00e5ff',
+      priceFormat: { type: 'volume' },
+      priceScaleId: 'volume',
+    });
+
+    this.chart.priceScale('volume').applyOptions({
+      scaleMargins: {
+        top: 0.8, // Volume takes bottom 20%
+        bottom: 0,
+      },
     });
 
     this.hmaSeries = this.chart.addSeries(LineSeries, {
-      color: '#3b82f6',
+      color: '#00e5ff',
       lineWidth: 2,
       title: 'HMA 50',
     });
 
     this.ma7Series = this.chart.addSeries(LineSeries, {
-      color: '#fadb14', // Amarilla
+      color: '#ffcc00', // Yellow
       lineWidth: 1,
       title: 'MA(7)',
+      lineStyle: LineStyle.Dashed,
     });
 
     this.ma25Series = this.chart.addSeries(LineSeries, {
-      color: '#ba55d3', // Violeta/Fucsia
+      color: '#ba55d3', // Purple
       lineWidth: 1,
       title: 'MA(25)',
     });
 
     this.ma99Series = this.chart.addSeries(LineSeries, {
-      color: '#722ed1', // Azul/Violeta Oscuro
+      color: '#722ed1', // Deep purple
       lineWidth: 1,
       title: 'MA(99)',
     });
 
     window.addEventListener('resize', this.onResize);
 
-    // Paginación Histórica Infinita (Evita el paywall de TradingView)
+    // Crosshair move overlay tracker
+    this.chart.subscribeCrosshairMove((param) => {
+      if (param && param.time) {
+        const hmaData = param.seriesData.get(this.hmaSeries!) as any;
+        const ma7Data = param.seriesData.get(this.ma7Series!) as any;
+        const ma25Data = param.seriesData.get(this.ma25Series!) as any;
+        const ma99Data = param.seriesData.get(this.ma99Series!) as any;
+        const volData = param.seriesData.get(this.volumeSeries!) as any;
+
+        this.currentHmaValue = hmaData ? hmaData.value : null;
+        this.currentMa7Value = ma7Data ? ma7Data.value : null;
+        this.currentMa25Value = ma25Data ? ma25Data.value : null;
+        this.currentMa99Value = ma99Data ? ma99Data.value : null;
+        this.currentVolumeValue = volData ? volData.value : null;
+      } else {
+        this.restoreLastIndicatorValues();
+      }
+    });
+
+    // Infinite Historical Pagination
     this.chart.timeScale().subscribeVisibleLogicalRangeChange((logicalRange) => {
       if (logicalRange !== null) {
         if (logicalRange.from < 5 && !this.isLoadingHistory && this.chartData.length > 0) {
@@ -836,34 +902,61 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.isLoadingHistory = true;
     
     const oldestTime = this.chartData[0].time as number;
+    const binanceSym = this.toBinanceSymbol(this.selectedSymbol);
+    let tf = this.selectedTimeframe;
+    if (tf === '15') tf = '15m';
+    const interval = tf.endsWith('m') || tf.endsWith('h') || tf.endsWith('d') || tf.endsWith('w') || tf.endsWith('M') ? tf : (tf + 'm');
 
-    this.marketDataService.getCandles({
-      symbol: this.selectedSymbol,
-      interval: this.selectedTimeframe,
-      limit: 1000,
-      endTime: oldestTime * 1000 // Convert to milliseconds for Binance
-    }).subscribe({
-      next: (data) => {
-        if (data && data.length > 0 && this.candlestickSeries && this.chart) {
+    const parseKlines = (raw: any[]) => {
+      const candles: CandlestickData[] = [];
+      const volumes: any[] = [];
+      for (const k of raw) {
+        let t = Math.floor(k[0] / 1000) as any;
+        const o   = parseFloat(k[1]);
+        const h   = parseFloat(k[2]);
+        const l   = parseFloat(k[3]);
+        const c   = parseFloat(k[4]);
+        const vol = parseFloat(k[5]);
+        candles.push({ time: t, open: o, high: h, low: l, close: c });
+        volumes.push({
+          time: t,
+          value: vol,
+          color: c >= o ? 'rgba(0, 255, 136, 0.4)' : 'rgba(255, 68, 102, 0.4)'
+        });
+      }
+      return { candles, volumes };
+    };
+
+    const futuresUrl = `https://fapi.binance.com/fapi/v1/klines?symbol=${binanceSym}&interval=${interval}&limit=1000&endTime=${oldestTime * 1000}`;
+    
+    fetch(futuresUrl)
+      .then(r => r.json())
+      .then((raw: any[]) => {
+        if (raw && raw.length > 0 && this.candlestickSeries && this.chart) {
           const timeScale = this.chart.timeScale();
           const oldLogicalRange = timeScale.getVisibleLogicalRange();
 
-          const newCandles = data as CandlestickData[];
+          const { candles: newCandles, volumes: newVolumes } = parseKlines(raw);
           const map = new Map<number, CandlestickData>();
-          
-          newCandles.forEach(c => map.set(c.time as number, c));
           this.chartData.forEach(c => map.set(c.time as number, c));
+          newCandles.forEach(c => map.set(c.time as number, c));
           
           this.chartData = Array.from(map.values()).sort((a, b) => (a.time as number) - (b.time as number));
+
+          const volMap = new Map<number, any>();
+          this.chartVolumes.forEach(v => volMap.set(v.time as number, v));
+          newVolumes.forEach(v => volMap.set(v.time as number, v));
+          this.chartVolumes = Array.from(volMap.values()).sort((a, b) => (a.time as number) - (b.time as number));
           
           this.candlestickSeries.setData(this.chartData);
+          this.volumeSeries?.setData(this.chartVolumes);
+          
           this.updateHMA(this.chartData);
           this.updateMA(this.chartData, 7, this.ma7Series);
           this.updateMA(this.chartData, 25, this.ma25Series);
           this.updateMA(this.chartData, 99, this.ma99Series);
           
           if (oldLogicalRange) {
-             // Shift visible range to maintain the user's scroll position seamlessly
              const shift = newCandles.length;
              timeScale.setVisibleLogicalRange({
                from: oldLogicalRange.from + shift,
@@ -872,12 +965,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
           }
         }
         this.isLoadingHistory = false;
-      },
-      error: (err) => {
+      })
+      .catch((err) => {
         console.error('Error fetching historical data', err);
         this.isLoadingHistory = false;
-      }
-    });
+      });
   }
 
   loadData() {
@@ -885,57 +977,240 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
     if (this.loadedSymbol !== this.selectedSymbol || this.loadedTimeframe !== this.selectedTimeframe) {
       this.chartData = [];
+      this.chartVolumes = [];
       this.loadedSymbol = this.selectedSymbol;
       this.loadedTimeframe = this.selectedTimeframe;
     }
 
-    this.marketDataService.getCandles({
-      symbol: this.selectedSymbol,
-      interval: this.selectedTimeframe,
-      limit: 1000
-    }).subscribe({
-      next: (data) => {
-        if (this.candlestickSeries) {
-          const timeScale = this.chart!.timeScale();
-          const visibleRange = timeScale.getVisibleLogicalRange();
+    const binanceSym = this.toBinanceSymbol(this.selectedSymbol);
+    let tf = this.selectedTimeframe;
+    if (tf === '15') tf = '15m';
+    const interval = tf.endsWith('m') || tf.endsWith('h') || tf.endsWith('d') || tf.endsWith('w') || tf.endsWith('M') ? tf : (tf + 'm');
 
-          const sortedData = [...data].sort((a, b) => a.time - b.time);
-          
-          if (this.chartData.length === 0) {
-            this.chartData = sortedData as CandlestickData[];
-          } else {
-            const map = new Map<number, CandlestickData>();
-            this.chartData.forEach(c => map.set(c.time as number, c));
-            sortedData.forEach(c => map.set(c.time, c as CandlestickData));
-            this.chartData = Array.from(map.values()).sort((a, b) => (a.time as number) - (b.time as number));
-          }
+    const parseKlines = (raw: any[]) => {
+      const candles: CandlestickData[] = [];
+      const volumes: any[] = [];
+      for (const k of raw) {
+        let t = Math.floor(k[0] / 1000) as any;
+        const o   = parseFloat(k[1]);
+        const h   = parseFloat(k[2]);
+        const l   = parseFloat(k[3]);
+        const c   = parseFloat(k[4]);
+        const vol = parseFloat(k[5]);
+        candles.push({ time: t, open: o, high: h, low: l, close: c });
+        volumes.push({
+          time: t,
+          value: vol,
+          color: c >= o ? 'rgba(0, 255, 136, 0.4)' : 'rgba(255, 68, 102, 0.4)'
+        });
+      }
+      return { candles, volumes };
+    };
 
-          this.candlestickSeries.setData(this.chartData);
+    const apply = (candles: CandlestickData[], volumes: any[]) => {
+      if (this.selectedSymbol !== this.loadedSymbol) return;
 
-          this.updateHMA(this.chartData);
-          this.updateMA(this.chartData, 7, this.ma7Series);
-          this.updateMA(this.chartData, 25, this.ma25Series);
-          this.updateMA(this.chartData, 99, this.ma99Series);
+      const timeScale = this.chart!.timeScale();
+      const visibleRange = timeScale.getVisibleLogicalRange();
 
-          // Restore scroll only if we're not actively scrolling back
-          if (visibleRange && this.chartData.length > 0 && !this.isLoadingHistory) {
-             // Only auto-scroll to newest if we were already looking at the newest candles
-             const isAtEnd = visibleRange.to >= this.chartData.length - 10;
-             if (isAtEnd) {
-                 timeScale.scrollToRealTime();
-             } else {
-                 timeScale.setVisibleLogicalRange(visibleRange);
-             }
-          }
+      const sortedCandles = [...candles].sort((a, b) => (a.time as number) - (b.time as number));
+      const sortedVolumes = [...volumes].sort((a, b) => (a.time as number) - (b.time as number));
 
-          if (this.chartData.length > 0) {
-            const lastCandle = this.chartData[this.chartData.length - 1];
-            this.chartPrices.current = Number(lastCandle.close);
-          }
+      if (this.chartData.length === 0) {
+        this.chartData = sortedCandles;
+        this.chartVolumes = sortedVolumes;
+      } else {
+        const map = new Map<number, CandlestickData>();
+        this.chartData.forEach(c => map.set(c.time as number, c));
+        sortedCandles.forEach(c => map.set(c.time as number, c));
+        this.chartData = Array.from(map.values()).sort((a, b) => (a.time as number) - (b.time as number));
+
+        const volMap = new Map<number, any>();
+        this.chartVolumes.forEach(v => volMap.set(v.time as number, v));
+        sortedVolumes.forEach(v => volMap.set(v.time as number, v));
+        this.chartVolumes = Array.from(volMap.values()).sort((a, b) => (a.time as number) - (b.time as number));
+      }
+
+      // Dynamic Precision (TradingView style)
+      let prec = 2;
+      let minMove = 0.01;
+      if (this.chartData.length > 0) {
+         const p = this.chartData[this.chartData.length - 1].close;
+         if (p < 0.001) { prec = 6; minMove = 0.000001; }
+         else if (p < 0.1) { prec = 5; minMove = 0.00001; }
+         else if (p < 1)   { prec = 4; minMove = 0.0001; }
+         else if (p < 10)  { prec = 3; minMove = 0.001; }
+      }
+
+      const format = { type: 'price' as const, precision: prec, minMove };
+      this.candlestickSeries?.applyOptions({ priceFormat: format });
+      this.hmaSeries?.applyOptions({ priceFormat: format });
+      this.ma7Series?.applyOptions({ priceFormat: format });
+      this.ma25Series?.applyOptions({ priceFormat: format });
+      this.ma99Series?.applyOptions({ priceFormat: format });
+
+      this.candlestickSeries?.setData(this.chartData);
+      this.volumeSeries?.setData(this.chartVolumes);
+
+      this.updateHMA(this.chartData);
+      this.updateMA(this.chartData, 7, this.ma7Series);
+      this.updateMA(this.chartData, 25, this.ma25Series);
+      this.updateMA(this.chartData, 99, this.ma99Series);
+
+      // Store volume last values
+      if (this.chartVolumes.length > 0) {
+        this.lastVolumeValue = this.chartVolumes[this.chartVolumes.length - 1].value;
+        if (this.currentVolumeValue === null) {
+          this.currentVolumeValue = this.lastVolumeValue;
         }
-      },
-      error: (err) => console.error('Error fetching market data', err)
-    });
+      }
+
+      // Restore scroll only if we're not actively scrolling back
+      if (visibleRange && this.chartData.length > 0 && !this.isLoadingHistory) {
+         const isAtEnd = visibleRange.to >= this.chartData.length - 10;
+         if (isAtEnd) {
+             timeScale.scrollToRealTime();
+         } else {
+             timeScale.setVisibleLogicalRange(visibleRange);
+         }
+      }
+
+      if (this.chartData.length > 0) {
+        const lastCandle = this.chartData[this.chartData.length - 1];
+        this.chartPrices.current = Number(lastCandle.close);
+      }
+    };
+
+    let spotSym = binanceSym;
+    let multiplier = 1;
+    const match = binanceSym.match(/^(10000|1000|100)(.+)$/);
+    if (match) {
+        multiplier = parseInt(match[1], 10);
+        spotSym = match[2];
+        const spotUrl = `https://api.binance.com/api/v3/klines?symbol=${spotSym}&interval=${interval}&limit=1000`;
+        fetch(spotUrl).then(r => r.json()).then((raw: any[]) => {
+            const { candles, volumes } = parseKlines(raw);
+            candles.forEach(c => {
+                c.open *= multiplier; c.high *= multiplier; c.low *= multiplier; c.close *= multiplier;
+            });
+            apply(candles, volumes);
+        }).catch(e => console.error('Binance Spot Error:', e));
+        return;
+    }
+
+    const futuresUrl = `https://fapi.binance.com/fapi/v1/klines?symbol=${binanceSym}&interval=${interval}&limit=1000`;
+    fetch(futuresUrl)
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((raw: any[]) => {
+        if (!Array.isArray(raw) || raw.length === 0) throw new Error('no data');
+        const { candles, volumes } = parseKlines(raw);
+        apply(candles, volumes);
+      })
+      .catch((e) => {
+        console.error('Binance Futures Error:', e);
+        // Fallback Spot
+        const spotUrl = `https://api.binance.com/api/v3/klines?symbol=${binanceSym}&interval=${interval}&limit=1000`;
+        fetch(spotUrl)
+          .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json();
+          })
+          .then((raw: any[]) => {
+            if (!Array.isArray(raw) || raw.length === 0) throw new Error('no data');
+            const { candles, volumes } = parseKlines(raw);
+            apply(candles, volumes);
+          })
+          .catch((e2) => {
+            console.error('Binance Spot Error:', e2);
+            // Fallback Bybit
+            const bybitIntervals: any = { '1m': '1', '3m': '3', '5m': '5', '15m': '15', '30m': '30', '1h': '60', '2h': '120', '4h': '240', '1d': 'D', '1w': 'W', '1M': 'M' };
+            const bbInterval = bybitIntervals[interval] || '15';
+            const bybitUrl = `https://api.bybit.com/v5/market/kline?category=linear&symbol=${binanceSym}&interval=${bbInterval}&limit=1000`;
+            
+            fetch(bybitUrl)
+              .then(r => r.json())
+              .then(bbData => {
+                 if (bbData.retCode !== 0 || !bbData.result || !bbData.result.list || bbData.result.list.length === 0) {
+                    throw new Error('Bybit no data');
+                 }
+                 const rawList = bbData.result.list.reverse();
+                 const parseBybit = (raw: any[]) => {
+                    const candles: CandlestickData[] = [];
+                    const volumes: any[]             = [];
+                    for (const k of raw) {
+                      let t = Math.floor(parseInt(k[0], 10) / 1000) as any;
+                      const o   = parseFloat(k[1]);
+                      const h   = parseFloat(k[2]);
+                      const l   = parseFloat(k[3]);
+                      const c   = parseFloat(k[4]);
+                      const vol = parseFloat(k[5]);
+                      candles.push({ time: t, open: o, high: h, low: l, close: c });
+                      volumes.push({ time: t, value: vol,
+                        color: c >= o ? 'rgba(0,255,136,0.4)' : 'rgba(255,68,102,0.4)' });
+                    }
+                    return { candles, volumes };
+                 };
+                 const { candles, volumes } = parseBybit(rawList);
+                 apply(candles, volumes);
+              })
+              .catch(e3 => {
+                console.error('Bybit Error:', e3);
+                this.loadFallbackDemo();
+              });
+          });
+      });
+  }
+
+  toBinanceSymbol(sym: string): string {
+    const withoutSettle = sym.includes(':') ? sym.split(':')[0] : sym;
+    return withoutSettle.replace(/[/\-]/g, '').toUpperCase().trim();
+  }
+
+  restoreLastIndicatorValues() {
+    this.currentHmaValue = this.lastHmaValue;
+    this.currentMa7Value = this.lastMa7Value;
+    this.currentMa25Value = this.lastMa25Value;
+    this.currentMa99Value = this.lastMa99Value;
+    this.currentVolumeValue = this.lastVolumeValue;
+  }
+
+  loadFallbackDemo(basePrice = 1.0) {
+    const now      = Math.floor(Date.now() / 1000);
+    const interval = 15 * 60;
+    const candles: CandlestickData[] = [];
+    const volumes: any[]             = [];
+    let price = basePrice;
+    for (let i = 200; i >= 0; i--) {
+      const t       = (now - i * interval - (now % interval)) as any;
+      const o       = price;
+      const pct     = (Math.random() - 0.48) * 0.018;
+      const c       = o * (1 + pct);
+      const h       = Math.max(o, c) * (1 + Math.random() * 0.005);
+      const l       = Math.min(o, c) * (1 - Math.random() * 0.005);
+      candles.push({ time: t, open: o, high: h, low: l, close: c });
+      volumes.push({ time: t, value: Math.random() * 500000 + 100000,
+        color: c > o ? 'rgba(0,255,136,0.4)' : 'rgba(255,68,102,0.4)' });
+      price = c;
+    }
+    this.chartData = candles;
+    this.chartVolumes = volumes;
+    this.candlestickSeries?.setData(candles);
+    this.volumeSeries?.setData(volumes);
+    
+    this.updateHMA(candles);
+    this.updateMA(candles, 7, this.ma7Series);
+    this.updateMA(candles, 25, this.ma25Series);
+    this.updateMA(candles, 99, this.ma99Series);
+
+    if (this.chartVolumes.length > 0) {
+      this.lastVolumeValue = this.chartVolumes[this.chartVolumes.length - 1].value;
+      this.currentVolumeValue = this.lastVolumeValue;
+    }
+
+    this.chart?.timeScale().fitContent();
   }
 
   loadOrderBook() {
@@ -1033,7 +1308,12 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   getActiveTradesCount(profileId: string | null): number {
-    return this.activeTrades.filter(t => t.strategyProfileId === profileId).length;
+    return this.activeTrades.filter(t => {
+      if (profileId === null) {
+        return !t.strategyProfileId || t.strategyProfileId === '00000000-0000-0000-0000-000000000000';
+      }
+      return t.strategyProfileId === profileId;
+    }).length;
   }
 
   closePosition(tradeId: string) {
@@ -1547,6 +1827,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   updateHMA(data: any[]) {
     if (!this.hmaSeries || data.length < this.hmaPeriod) {
       if (this.hmaSeries) this.hmaSeries.setData([]);
+      this.lastHmaValue = null;
+      this.currentHmaValue = null;
       return;
     }
 
@@ -1558,13 +1840,21 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       value: val
     }));
 
-    this.hmaSeries. setData(hmaData);
+    this.hmaSeries.setData(hmaData);
     this.hmaSeries.applyOptions({ title: `HMA ${this.hmaPeriod}` });
+
+    this.lastHmaValue = hmaData.length > 0 ? hmaData[hmaData.length - 1].value : null;
+    if (this.currentHmaValue === null) {
+      this.currentHmaValue = this.lastHmaValue;
+    }
   }
 
   updateMA(data: any[], period: number, series: ISeriesApi<'Line'> | null) {
     if (!series || data.length < period) {
       if (series) series.setData([]);
+      if (period === 7) { this.lastMa7Value = null; this.currentMa7Value = null; }
+      else if (period === 25) { this.lastMa25Value = null; this.currentMa25Value = null; }
+      else if (period === 99) { this.lastMa99Value = null; this.currentMa99Value = null; }
       return;
     }
 
@@ -1577,6 +1867,18 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     }));
 
     series.setData(maData);
+
+    const lastVal = maData.length > 0 ? maData[maData.length - 1].value : null;
+    if (period === 7) {
+      this.lastMa7Value = lastVal;
+      if (this.currentMa7Value === null) this.currentMa7Value = lastVal;
+    } else if (period === 25) {
+      this.lastMa25Value = lastVal;
+      if (this.currentMa25Value === null) this.currentMa25Value = lastVal;
+    } else if (period === 99) {
+      this.lastMa99Value = lastVal;
+      if (this.currentMa99Value === null) this.currentMa99Value = lastVal;
+    }
   }
 
   private calculateSMA(data: number[], period: number): number[] {

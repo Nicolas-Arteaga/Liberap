@@ -2,10 +2,21 @@
   class="glass-btn"
   [class.solid-btn]="variant === 'solid'"
   [class.danger-btn]="variant === 'danger'"
-  [style.background]="variant === 'solid' ? color : null"
+  [class.warning-btn]="variant === 'warning'"
+  [class.success-btn]="variant === 'success'"
+  [class.pink-btn]="variant === 'pink'"
   [disabled]="disabled"
 >
-  <ion-icon *ngIf="icon" [name]="icon" class="me-2"></ion-icon>
-  <span *ngIf="label">{{ label }}</span>
-  <ng-content></ng-content>
+  <!-- Dashes bottom-right -->
+  <span class="dashes">////</span>
+
+  <!-- Icon with divider -->
+  <span class="btn-icon-wrap" *ngIf="icon">
+    <ion-icon [name]="icon"></ion-icon>
+    <span class="btn-divider"></span>
+  </span>
+  <span class="btn-label">
+    <span *ngIf="label">{{ label }}</span>
+    <ng-content></ng-content>
+  </span>
 </button>

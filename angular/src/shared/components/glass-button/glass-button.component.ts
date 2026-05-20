@@ -12,7 +12,7 @@ import { IonIcon } from '@ionic/angular/standalone';
 export class GlassButtonComponent {
   @Input() label?: string;
   @Input() icon?: string;
-  @Input() variant: 'glass' | 'solid' | 'danger' = 'glass';
+  @Input() variant: 'glass' | 'solid' | 'danger' | 'warning' | 'success' | 'pink' = 'glass';
   @Input() color: string = '#00C47D';
   @Input() disabled: boolean = false;  
 }

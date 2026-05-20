@@ -42,6 +42,10 @@
             <ion-icon name="pulse-outline"></ion-icon>
             <span>NEXUS-15</span>
           </a>
+          <a class="nav-item" [routerLink]="['/dashboard']" routerLinkActive="active">
+            <ion-icon name="stats-chart-outline"></ion-icon>
+            <span>DASHBOARD</span>
+          </a>
           <a class="nav-item" [routerLink]="['/agent']" routerLinkActive="active">
             <ion-icon name="hardware-chip-outline"></ion-icon>
             <span>AGENT</span>
@@ -50,17 +54,9 @@
             <ion-icon name="grid-outline"></ion-icon>
             <span>ESTRATEGIAS</span>
           </a>
-          <a class="nav-item" [routerLink]="['/dashboard-advanced']" routerLinkActive="active">
-            <ion-icon name="briefcase-outline"></ion-icon>
-            <span>POSICIONES</span>
-          </a>
           <a class="nav-item" [routerLink]="['/history']" routerLinkActive="active">
             <ion-icon name="list-outline"></ion-icon>
             <span>HISTORIAL</span>
-          </a>
-          <a class="nav-item" [routerLink]="['/backtesting']" routerLinkActive="active">
-            <ion-icon name="analytics-outline"></ion-icon>
-            <span>BACKTESTING</span>
           </a>
           <a class="nav-item" [routerLink]="['/alerts']" routerLinkActive="active">
             <ion-icon name="notifications-outline"></ion-icon>
@@ -74,44 +70,17 @@
 
         <!-- CARD: ESTADO DEL SISTEMA -->
         <div class="system-status-card">
-          
-          <div class="card-content-wrapper">
-            <div class="card-header-status">
-              <span class="card-title">ESTADO DEL SISTEMA</span>
-            </div>
-            
-            <div class="status-pulse-wave-row">
-              <div class="pulse-container">
-                <span class="pulse-dot"></span>
-                <span class="status-text">ONLINE</span>
-              </div>
-              <div class="wave-container">
-                <!-- Lifeline/Heartbeat SVG Wave -->
-                <svg class="heartbeat-svg" viewBox="0 0 100 30" preserveAspectRatio="none">
-                  <path d="M0,15 L30,15 L35,5 L40,25 L45,10 L50,18 L55,15 L100,15" fill="none" stroke="#00f3ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-              </div>
+          <div class="stat-row">
+            <div class="stat-block">
+              <span class="stat-label">UPTIME</span>
+              <span class="stat-value">{{ uptime }}</span>
             </div>
 
-            <!-- Divider Line like in Image 1 -->
-            <div class="status-divider"></div>
-
-            <div class="stat-blocks">
-              <div class="stat-block">
-                <span class="stat-label">UPTIME</span>
-                <span class="stat-value">{{ uptime }}</span>
-              </div>
-
-              <div class="stat-block">
-                <span class="stat-label">LATENCIA</span>
-                <span class="stat-value">{{ latency }}ms</span>
-              </div>
+            <div class="stat-block text-right">
+              <span class="stat-label">LATENCIA</span>
+              <span class="stat-value">{{ latency }}ms</span>
             </div>
-
-            <!-- Centered label at the very bottom -->
-            <div class="kraken-label-centered">VERGE KRAKEN</div>
           </div>
-
         </div>
       </aside>
 

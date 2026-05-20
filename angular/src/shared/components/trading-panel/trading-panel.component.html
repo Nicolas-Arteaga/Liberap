@@ -109,8 +109,23 @@
   </div>
 
   <!-- Action Buttons -->
-  <button class="btn btn-success w-100 mb-2 py-2 fw-bold text-dark" (click)="onBuy()">Comprar/Long</button>
-  <button class="btn btn-danger w-100 py-2 fw-bold" (click)="onSell()">Vender/Short</button>
+  <button class="cyberBtn cyberBtn--buy w-100 mb-2" (click)="onBuy()">
+    <span class="dashes">////</span>
+    <span class="btn-icon-wrap">
+      <ion-icon name="cart-outline"></ion-icon>
+      <span class="btn-divider"></span>
+    </span>
+    <span class="btn-label">COMPRAR / LONG</span>
+  </button>
+
+  <button class="cyberBtn cyberBtn--sell w-100" (click)="onSell()">
+    <span class="dashes">////</span>
+    <span class="btn-icon-wrap">
+      <ion-icon name="arrow-down-outline"></ion-icon>
+      <span class="btn-divider"></span>
+    </span>
+    <span class="btn-label">VENDER / SHORT</span>
+  </button>
 
   <!-- Footer Stats -->
   <div class="mt-3 text-white-50" style="font-size: 10px;">

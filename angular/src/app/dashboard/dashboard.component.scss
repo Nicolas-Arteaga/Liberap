@@ -4,11 +4,36 @@
   font-family: 'Inter', -apple-system, sans-serif;
   font-size: 13px;
 
-  /* Global Overrides - Remove Borders */
+  /* Global Overrides - Remove Borders & Gray Backgrounds */
   .border, .border-top, .border-bottom, .border-start, .border-end {
-    border-color: rgba(255,255,255,0.05) !important;
+    border-color: rgba(0, 243, 255, 0.15) !important;
   }
-  .border-white-10 { border-color: transparent !important; }
+  .border-white-10, .border-white-05, .border-white-03 { border-color: rgba(0, 243, 255, 0.15) !important; }
+  
+  /* Cyberpunk Override for rounded corners */
+  * {
+    border-radius: 0 !important;
+  }
+
+  /* Override old gray backgrounds */
+  .bg-dark-soft, .bg-dark-deep, .bg-dark, .bg-dark-accent {
+    background: transparent !important;
+  }
+  
+  .table-dark {
+    --bs-table-bg: transparent;
+    --bs-table-striped-bg: transparent;
+    background-color: transparent !important;
+    
+    tbody tr:hover {
+      background-color: rgba(0, 243, 255, 0.05) !important;
+      color: inherit;
+    }
+    
+    td, th {
+      background-color: transparent !important;
+    }
+  }
 
   /* Header Branding Original */
   header {
@@ -19,8 +44,9 @@
 
   /* Institutional Components Restoration */
   .institutional-header {
-    background: #1e2329;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    background: rgba(8, 12, 17, 0.85);
+    border: 1px solid rgba(0, 243, 255, 0.15) !important;
+    box-shadow: 0 0 15px rgba(0, 243, 255, 0.05);
     .v-divider {
       width: 1px;
       height: 16px;
@@ -61,32 +87,59 @@
     /* Sober Button Refinement (Take 2) */
     .btn-header-sober {
       ::ng-deep .glass-btn {
-        height: 28px !important;
-        padding: 0 10px !important;
-        font-size: 10px !important;
-        border-radius: 6px !important;
-        font-weight: 700 !important;
-        text-transform: uppercase;
-        letter-spacing: 0.8px;
-        backdrop-filter: none !important;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        
-        &.glass-btn { background: rgba(0, 196, 173, 0.1) !important; color: #00c4ad; }
-        &.solid-btn { background: #00ff8f !important; color: #000 !important; border: none; font-weight: 800 !important; } // Bright Green for EJECUTAR
-        &.warning-btn { background: #00c4ad !important; color: #000 !important; border: none; } // Vibrant Cyan for Borrar alertas
-        &.danger-btn { background: rgba(239, 68, 68, 0.2) !important; color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); } // Dark Red for Finalizar
+        height: 30px !important; // Compact height for header
+        padding: 0 12px !important;
+        font-size: 9.5px !important;
+        letter-spacing: 0.08em;
 
-        &:hover {
-          transform: translateY(-1px);
-          filter: brightness(1.2);
-          box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        // Custom polygon adjusting for the smaller height!
+        &::before {
+          clip-path: polygon(5px 0, calc(100% - 5px) 0, 100% 5px, 100% calc(100% - 5px), calc(100% - 5px) 100%, 5px 100%, 0 calc(100% - 5px), 0 5px) !important;
+        }
+        &::after {
+          clip-path: polygon(4.5px 0, calc(100% - 4.5px) 0, 100% 4.5px, 100% calc(100% - 4.5px), calc(100% - 4.5px) 100%, 4.5px 100%, 0 calc(100% - 4.5px), 0 4.5px) !important;
+        }
+
+        .corner {
+          width: 6px !important;
+          height: 6px !important;
+          
+          &.corner-tl, &.corner-tr, &.corner-bl, &.corner-br {
+            border-width: 1px;
+          }
+        }
+
+        .dashes {
+          font-size: 4px !important;
+          bottom: 1px !important;
+          right: 6px !important;
         }
       }
 
       &.tiny-btn ::ng-deep .glass-btn {
-        height: 22px !important;
+        height: 24px !important;
         padding: 0 8px !important;
-        font-size: 9px !important;
+        font-size: 8.5px !important;
+
+        &::before {
+          clip-path: polygon(4px 0, calc(100% - 4px) 0, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 0 calc(100% - 4px), 0 4px) !important;
+        }
+        &::after {
+          clip-path: polygon(3.5px 0, calc(100% - 3.5px) 0, 100% 3.5px, 100% calc(100% - 3.5px), calc(100% - 3.5px) 100%, 3.5px 100%, 0 calc(100% - 3.5px), 0 3.5px) !important;
+        }
+
+        .corner {
+          width: 4px !important;
+          height: 4px !important;
+          
+          &.corner-tl, &.corner-tr, &.corner-bl, &.corner-br {
+            border-width: 1px;
+          }
+        }
+        
+        .dashes {
+          display: none !important; // Hide dashes at micro height
+        }
       }
     }
   }
@@ -170,57 +223,167 @@
 
   /* Positions Console Styles */
   .positions-console {
-    background: #161a1e;
+    background: rgba(8, 12, 17, 0.85);
+    border: 1px solid rgba(0, 243, 255, 0.15) !important;
+    box-shadow: 0 0 15px rgba(0, 243, 255, 0.05);
+    margin-bottom: 8px;
+    
+    .console-tabs {
+      background: rgba(0, 243, 255, 0.05) !important;
+      border-bottom: 1px solid rgba(0, 243, 255, 0.15) !important;
+    }
+    
     .tab-item {
       color: #848e9c;
       font-weight: 600;
       border-bottom: 2px solid transparent;
-      &.active { color: #f0b90b; border-bottom-color: #f0b90b; }
-      &:hover { color: white; }
+      &.active { color: #00f3ff; border-bottom-color: #00f3ff; }
+      &:hover { color: white; background: rgba(0, 243, 255, 0.05); }
     }
     .position-table {
-      th { font-weight: 400; color: #848e9c; padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.03); }
-      td { padding: 12px 8px; vertical-align: middle; border-bottom: 1px solid rgba(255,255,255,0.02); }
+      th { font-weight: 400; color: #00f3ff; padding: 10px 8px; border-bottom: 1px solid rgba(0, 243, 255, 0.15); text-shadow: 0 0 8px rgba(0, 243, 255, 0.4); }
+      td { padding: 12px 8px; vertical-align: middle; border-bottom: 1px solid rgba(0, 243, 255, 0.05); }
+    }
+  }
+  
+  .chart-container-vision {
+    background: linear-gradient(180deg, #09101e 0%, #03060a 100%) !important;
+    border: 1px solid rgba(0, 243, 255, 0.15) !important;
+    box-shadow: 0 0 25px rgba(0, 243, 255, 0.08), inset 0 0 15px rgba(0, 243, 255, 0.05) !important;
+    position: relative;
+    overflow: hidden;
+    clip-path: polygon(
+      12px 0,
+      calc(100% - 12px) 0,
+      100% 12px,
+      100% calc(100% - 12px),
+      calc(100% - 12px) 100%,
+      12px 100%,
+      0 calc(100% - 12px),
+      0 12px
+    );
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      border: 1px solid rgba(0, 243, 255, 0.25);
+      clip-path: polygon(
+        12px 0,
+        calc(100% - 12px) 0,
+        100% 12px,
+        100% calc(100% - 12px),
+        calc(100% - 12px) 100%,
+        12px 100%,
+        0 calc(100% - 12px),
+        0 12px
+      );
+      z-index: 10;
+    }
+
+    .chart-toolbar {
+      background: rgba(8, 12, 17, 0.85);
+      border-bottom: 1px solid rgba(0, 243, 255, 0.15) !important;
+      position: relative;
+      z-index: 4;
     }
   }
 
-  .chart-container-vision {
-    background: #000;
-    .chart-toolbar {
-      background: #1e2329;
-      border-bottom: 1px solid rgba(255,255,255,0.03);
-    }
+  .metallic-sheen-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.03) 0%,
+      rgba(255, 255, 255, 0) 50%,
+      rgba(255, 255, 255, 0.02) 100%
+    );
+    pointer-events: none;
+    z-index: 3;
+  }
+
+  .diagonal-grid-overlay {
+    position: absolute;
+    inset: 0;
+    background-image: repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 4px,
+      rgba(0, 243, 255, 0.012) 4px,
+      rgba(0, 243, 255, 0.012) 5px
+    );
+    pointer-events: none;
+    z-index: 3;
   }
 
   .tf-btn {
-    background: transparent;
-    color: #848e9c;
-    border: 0;
-    font-size: 11px;
-    padding: 4px 10px;
-    transition: all 0.2s;
-    &:hover { color: white; background: rgba(255,255,255,0.05); }
-    &.active { color: #f0b90b; background: rgba(240, 185, 11, 0.1); }
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 800;
+    font-size: 9px;
+    letter-spacing: 0.05em;
+    background: rgba(0, 243, 255, 0.03) !important;
+    border: 1px solid rgba(0, 243, 255, 0.1) !important;
+    color: rgba(0, 243, 255, 0.6) !important;
+    padding: 3px 8px;
+    margin-right: 4px;
+    transition: all 0.2s ease;
+    clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px);
+
+    &:hover {
+      background: rgba(0, 243, 255, 0.08) !important;
+      border-color: rgba(0, 243, 255, 0.2) !important;
+      color: #fff !important;
+    }
+
+    &.active {
+      background: rgba(0, 243, 255, 0.15) !important;
+      border-color: #00e5ff !important;
+      color: #00e5ff !important;
+      text-shadow: 0 0 5px rgba(0, 229, 255, 0.4);
+      box-shadow: 0 0 10px rgba(0, 229, 255, 0.15);
+    }
   }
 
   .institutional-console {
+    background: rgba(8, 12, 17, 0.85);
+    border: 1px solid rgba(0, 243, 255, 0.15) !important;
+    box-shadow: 0 0 15px rgba(0, 243, 255, 0.05);
+    margin-bottom: 8px;
+    
+    .console-tabs {
+      background: rgba(0, 243, 255, 0.05) !important;
+      border-bottom: 1px solid rgba(0, 243, 255, 0.15) !important;
+    }
+    
     .tab-item {
       color: #848e9c;
       font-weight: 600;
       border-bottom: 2px solid transparent;
-      &.active { color: #f0b90b; border-bottom-color: #f0b90b; }
-      &:hover { color: white; }
+      &.active { color: #00f3ff; border-bottom-color: #00f3ff; }
+      &:hover { color: white; background: rgba(0, 243, 255, 0.05); }
     }
     .console-content {
-      background: #0b0e11;
-      font-family: 'Roboto Mono', monospace;
+      background: transparent;
+      font-family: 'JetBrains Mono', 'Fira Code', 'Roboto Mono', monospace;
+      
+      table th { color: #00f3ff; text-shadow: 0 0 8px rgba(0, 243, 255, 0.4); border-bottom: 1px solid rgba(0, 243, 255, 0.15); }
+      table td { border-bottom: 1px solid rgba(0, 243, 255, 0.05); }
     }
   }
 
   /* Sidebar Binance Widgets */
   .side-panel {
-    background: #1e2329;
-    .panel-header { padding: 8px 12px; background: rgba(255,255,255,0.01); }
+    background: rgba(8, 12, 17, 0.85);
+    border: 1px solid rgba(0, 243, 255, 0.15) !important;
+    box-shadow: 0 0 15px rgba(0, 243, 255, 0.05);
+    .panel-header { 
+      padding: 8px 12px; 
+      background: rgba(0, 243, 255, 0.05); 
+      border-bottom: 1px solid rgba(0, 243, 255, 0.15);
+      color: #00f3ff !important;
+      text-shadow: 0 0 8px rgba(0, 243, 255, 0.4);
+    }
   }
 
   .side-ranking-panel {
@@ -237,12 +400,24 @@
     width: 100%;
     table-layout: fixed;
     border-collapse: collapse;
+    background: transparent;
     
     th, td { 
       padding: 2px 4px; 
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      background: transparent !important;
+    }
+    
+    th {
+      color: #00f3ff !important;
+      text-shadow: 0 0 8px rgba(0, 243, 255, 0.4);
+      border-bottom: 1px solid rgba(0, 243, 255, 0.15) !important;
+    }
+    
+    td {
+      border-bottom: 1px solid rgba(0, 243, 255, 0.05) !important;
     }
     
     // Price column (Start)
@@ -252,7 +427,7 @@
     // Total column (End)
     th:nth-child(3), td:nth-child(3) { text-align: right; width: 35%; }
 
-    tr:hover { background: rgba(255,255,255,0.02); }
+    tr:hover { background: rgba(0, 243, 255, 0.05); }
   }
 
   /* Animations */

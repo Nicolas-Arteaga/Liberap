@@ -1,4 +1,4 @@
-<div class="min-vh-100 pb-5 dashboard-vision bg-black">
+<div class="min-vh-100 pb-2 dashboard-vision bg-black">
 
   <!-- Toast de Notificación de Stage (Restored) -->
   <div *ngIf="stageNotification?.visible"
@@ -15,18 +15,11 @@
     <ion-icon name="close-outline" class="pointer opacity-50" (click)="stageNotification = null"></ion-icon>
   </div>
 
-  <!-- Header Branding (REVERSED TO ORIGINAL) -->
-  <header class="d-flex align-items-center justify-content-between px-4 py-3 border-bottom border-white-10">
-    <div class="d-flex align-items-center gap-2">
-      <ion-icon name="settings-outline" class="text-primary fs-4"></ion-icon>
-      <h1 class="text-white fw-medium mt-2 fs-5">Análisis Inteligente en Curso</h1>
-    </div>
-  </header>
-
-  <main class="container-fluid px-4 py-3">
+  <main class="container-fluid p-1">
     <!-- 🏆 Institutional Header (Restored 3 Lines - No borders) -->
-    <div class="institutional-header bg-dark-soft p-3 mb-4 rounded-3 border border-white-05 shadow-lg overflow-hidden position-relative">
-      
+    <div
+      class="institutional-header bg-dark-soft p-3 mb-2 rounded-3 border border-white-05 shadow-lg overflow-hidden position-relative">
+
       <!-- VIEW 1: NORMAL STATE (Image 2) -->
       <ng-container *ngIf="!activeHeaderAlert; else alertDrivenHeader">
         <div class="header-line d-flex align-items-center justify-content-between mb-2">
@@ -43,17 +36,20 @@
           </div>
           <div class="d-flex align-items-center gap-2">
             <!-- Strategy Profile Selector -->
-            <div class="strategy-selector-wrapper d-flex align-items-center gap-2 bg-white-03 px-2 py-1 rounded border border-white-05 me-2">
+            <div
+              class="strategy-selector-wrapper d-flex align-items-center gap-2 bg-white-03 px-2 py-1 rounded border border-white-05 me-2">
               <ion-icon name="layers-outline" class="text-info-light"></ion-icon>
-              <select [(ngModel)]="selectedProfileId" (change)="onStrategyChange()" 
-                      class="bg-transparent border-0 text-white text-xs outline-none cursor-pointer">
+              <select [(ngModel)]="selectedProfileId" (change)="onStrategyChange()"
+                class="bg-transparent border-0 text-white text-xs outline-none cursor-pointer">
                 <option [ngValue]="null">Standard Scalping</option>
                 <option *ngFor="let p of strategyProfiles" [ngValue]="p.id">{{ p.name }}</option>
               </select>
             </div>
-            
-            <app-glass-button class="btn-header-sober" variant="warning" (click)="alertService.markAllAsRead()">Borrar alertas</app-glass-button>
-            <app-glass-button class="btn-header-sober" variant="danger" (click)="finalizeHunt()">Finalizar</app-glass-button>
+
+            <app-glass-button class="btn-header-sober" variant="warning" (click)="alertService.markAllAsRead()">Borrar
+              alertas</app-glass-button>
+            <app-glass-button class="btn-header-sober" variant="danger"
+              (click)="finalizeHunt()">Finalizar</app-glass-button>
           </div>
         </div>
 
@@ -77,7 +73,8 @@
               <ion-icon name="water" class="text-info"></ion-icon>
               <span class="text-white text-xs fw-bold">BALLENAS:</span>
               <div class="d-flex gap-1" *ngIf="headerWhales.length > 0">
-                <span *ngFor="let w of headerWhales" class="badge bg-info text-dark" style="font-size: 9px;">{{ w.symbol }} ({{ w.influence }}%)</span>
+                <span *ngFor="let w of headerWhales" class="badge bg-info text-dark" style="font-size: 9px;">{{ w.symbol
+                  }} ({{ w.influence }}%)</span>
               </div>
               <span *ngIf="headerWhales.length === 0" class="text-white-50 text-xs">Monitoreando...</span>
             </div>
@@ -92,7 +89,8 @@
             <span class="text-white-50 text-xs fw-bold">HEATMAP:</span>
             <div *ngFor="let c of headerHeatmapCoins" class="heatmap-bar-mini d-flex align-items-center gap-1">
               <span class="text-white text-xs">{{ c.symbol }}</span>
-              <div class="bar-bg" style="width: 30px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 10px;">
+              <div class="bar-bg"
+                style="width: 30px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 10px;">
                 <div class="bar-fill" [style.width.%]="c.score" style="height: 100%; background: #10b981;"></div>
               </div>
             </div>
@@ -103,24 +101,28 @@
       <!-- VIEW 2: ALERT ACTIVE STATE (3 COLUMNS - Image 1) -->
       <ng-template #alertDrivenHeader>
         <div class="alert-driven-header-container d-grid gap-3 h-100" *ngIf="activeHeaderAlert as alert">
-          
+
           <!-- [SPECIAL] ANIQUILADOR VIEW -->
           <ng-container *ngIf="alert.type === 'Aniquilador'">
             <div class="header-col alert-details-col border-end border-white-05 pe-3 aniquilador-alert-theme">
               <div class="d-flex align-items-center justify-content-between mb-1">
                 <div class="d-flex align-items-center gap-2">
                   <div class="status-dot pulsing bg-warning"></div>
-                  <span class="text-warning text-xxs bold tracking-tighter uppercase" style="text-shadow: 0 0 10px rgba(255,193,7,0.8);">🔥 ALGORITMO ANIQUILADOR 🔥</span>
+                  <span class="text-warning text-xxs bold tracking-tighter uppercase"
+                    style="text-shadow: 0 0 10px rgba(255,193,7,0.8);">🔥 ALGORITMO ANIQUILADOR 🔥</span>
                   <span class="text-white-30 text-xxs opacity-75">{{ alert.timestamp | date:'HH:mm:ss' }}</span>
                 </div>
-                <ion-icon name="close-outline" class="pointer text-white-30" (click)="alertService.markAsRead(alert.id)"></ion-icon>
+                <ion-icon name="close-outline" class="pointer text-white-30"
+                  (click)="alertService.markAsRead(alert.id)"></ion-icon>
               </div>
-              
+
               <div class="d-flex align-items-center gap-3 mb-2">
-                <div class="direction-text text-warning fw-black fs-3 line-height-1" style="text-shadow: 0 0 15px rgba(255,193,7,0.5);">PUMP MASSIVE</div>
+                <div class="direction-text text-warning fw-black fs-3 line-height-1"
+                  style="text-shadow: 0 0 15px rgba(255,193,7,0.5);">PUMP MASSIVE</div>
                 <div class="context-info">
                   <div class="text-white text-xs fw-bold">{{ alert.crypto }}</div>
-                  <div class="text-warning text-xxs italic opacity-90">Cruce de Medias Confirmado en ${{ alert.price | number:'1.2-4' }}</div>
+                  <div class="text-warning text-xxs italic opacity-90">Cruce de Medias Confirmado en ${{ alert.price |
+                    number:'1.2-4' }}</div>
                 </div>
                 <div class="ms-auto text-end">
                   <div class="text-white-30 text-xxxxs bold uppercase">SEVERIDAD</div>
@@ -128,12 +130,16 @@
                 </div>
               </div>
 
-              <div class="tactical-strip d-flex align-items-center justify-content-between bg-warning-10 p-2 rounded mt-1 border border-warning" style="box-shadow: 0 0 20px rgba(255,193,7,0.15) inset;">
+              <div
+                class="tactical-strip d-flex align-items-center justify-content-between bg-warning-10 p-2 rounded mt-1 border border-warning"
+                style="box-shadow: 0 0 20px rgba(255,193,7,0.15) inset;">
                 <div class="d-flex align-items-center gap-2">
                   <ion-icon name="flame-outline" class="text-warning"></ion-icon>
                   <span class="text-white text-xs fw-bold">{{ alert.message }}</span>
                 </div>
-                <app-glass-button class="btn-header-sober ms-auto" variant="solid" (click)="alertService.handleAlertClick(alert.id)" style="width: auto; min-width: 110px; height: 26px !important; border: 1px solid #ffc107; background: rgba(255, 193, 7, 0.2);">
+                <app-glass-button class="btn-header-sober ms-auto" variant="solid"
+                  (click)="alertService.handleAlertClick(alert.id)"
+                  style="width: auto; min-width: 110px; height: 26px !important; border: 1px solid #ffc107; background: rgba(255, 193, 7, 0.2);">
                   ENTRAR YA
                 </app-glass-button>
               </div>
@@ -146,17 +152,20 @@
               <div class="d-flex align-items-center justify-content-between mb-1">
                 <div class="d-flex align-items-center gap-2">
                   <div class="status-dot pulsing bg-info"></div>
-                  <span class="text-info-light text-xxs bold tracking-tighter uppercase">ANÁLISIS DE FRACTAL (NICOLAS)</span>
+                  <span class="text-info-light text-xxs bold tracking-tighter uppercase">ANÁLISIS DE FRACTAL
+                    (NICOLAS)</span>
                   <span class="text-white-30 text-xxs opacity-75">{{ alert.timestamp | date:'HH:mm:ss' }}</span>
                 </div>
-                <ion-icon name="close-outline" class="pointer text-white-30" (click)="alertService.markAsRead(alert.id)"></ion-icon>
+                <ion-icon name="close-outline" class="pointer text-white-30"
+                  (click)="alertService.markAsRead(alert.id)"></ion-icon>
               </div>
-              
+
               <div class="d-flex align-items-center gap-3 mb-2">
                 <div class="direction-text text-info fw-black fs-3 line-height-1">POTENCIAL LONG</div>
                 <div class="context-info">
                   <div class="text-white text-xs fw-bold">{{ alert.crypto }}</div>
-                  <div class="text-info-light text-xxs italic opacity-75">Patrón de Acumulación en ${{ alert.price | number:'1.2-4' }}</div>
+                  <div class="text-info-light text-xxs italic opacity-75">Patrón de Acumulación en ${{ alert.price |
+                    number:'1.2-4' }}</div>
                 </div>
                 <div class="ms-auto text-end">
                   <div class="text-white-30 text-xxxxs bold uppercase">PROBABILIDAD</div>
@@ -164,12 +173,15 @@
                 </div>
               </div>
 
-              <div class="tactical-strip d-flex align-items-center justify-content-between bg-info-10 p-2 rounded mt-1 border border-info-20">
+              <div
+                class="tactical-strip d-flex align-items-center justify-content-between bg-info-10 p-2 rounded mt-1 border border-info-20">
                 <div class="d-flex align-items-center gap-2">
                   <ion-icon name="analytics-outline" class="text-info"></ion-icon>
                   <span class="text-white text-xs">{{ alert.message }}</span>
                 </div>
-                <app-glass-button class="btn-header-sober ms-auto" variant="solid" (click)="alertService.handleAlertClick(alert.id)" style="width: auto; min-width: 110px; height: 26px !important;">
+                <app-glass-button class="btn-header-sober ms-auto" variant="solid"
+                  (click)="alertService.handleAlertClick(alert.id)"
+                  style="width: auto; min-width: 110px; height: 26px !important;">
                   VER GRÁFICO
                 </app-glass-button>
               </div>
@@ -177,21 +189,27 @@
           </ng-container>
 
           <!-- Standard COLUMN 1: INTEGRATED ALERT (Original logic) -->
-          <div class="header-col alert-details-col border-end border-white-05 pe-3" *ngIf="alert.type !== 'Fractal' && alert.type !== 'Aniquilador'">
+          <div class="header-col alert-details-col border-end border-white-05 pe-3"
+            *ngIf="alert.type !== 'Fractal' && alert.type !== 'Aniquilador'">
             <div class="d-flex align-items-center justify-content-between mb-1">
               <div class="d-flex align-items-center gap-2">
                 <div class="status-dot pulsing bg-success"></div>
-                <span class="text-white-50 text-xxs bold tracking-tighter uppercase">SIGNAL {{ alert.crypto || 'AUTO' }}</span>
+                <span class="text-white-50 text-xxs bold tracking-tighter uppercase">SIGNAL {{ alert.crypto || 'AUTO'
+                  }}</span>
                 <span class="text-info-light text-xxs opacity-75">{{ alert.timestamp | date:'HH:mm:ss' }}</span>
               </div>
-              <ion-icon name="close-outline" class="pointer text-white-30" (click)="alertService.markAsRead(alert.id)"></ion-icon>
+              <ion-icon name="close-outline" class="pointer text-white-30"
+                (click)="alertService.markAsRead(alert.id)"></ion-icon>
             </div>
-            
+
             <div class="d-flex align-items-end gap-3 mb-2">
-              <div class="direction-text text-success fw-black fs-2 line-height-1">{{ alert.direction === 0 ? 'LONG' : 'SHORT' }}</div>
+              <div class="direction-text text-success fw-black fs-2 line-height-1">{{ alert.direction === 0 ? 'LONG' :
+                'SHORT' }}</div>
               <div class="context-info">
-                <div class="text-info-light text-xxs bold uppercase opacity-50">{{ alert.type === 'System' ? 'Intelligence' : 'Market Context' }}</div>
-                <div class="text-white text-xs italic text-truncate" style="max-width: 140px;">"{{ alert.message }}"</div>
+                <div class="text-info-light text-xxs bold uppercase opacity-50">{{ alert.type === 'System' ?
+                  'Intelligence' : 'Market Context' }}</div>
+                <div class="text-white text-xs italic text-truncate" style="max-width: 140px;">"{{ alert.message }}"
+                </div>
               </div>
               <div class="alert-stats-mini ms-auto d-flex gap-2">
                 <div class="mini-stat-box text-end">
@@ -208,7 +226,8 @@
             <div class="tactical-strip d-flex align-items-center justify-content-between bg-white-03 p-1 rounded mt-1">
               <div class="price-tab d-flex align-items-baseline gap-1">
                 <span class="text-white-30 text-xxxxxs bold">ENTRY</span>
-                <span class="text-white text-xxs bold">${{ (alert.entryPrice || alert.price || 0) | number:'1.2-2' }}</span>
+                <span class="text-white text-xxs bold">${{ (alert.entryPrice || alert.price || 0) | number:'1.2-2'
+                  }}</span>
               </div>
               <div class="price-tab d-flex align-items-baseline gap-1 mx-2">
                 <span class="text-white-30 text-xxxxxs bold">SL</span>
@@ -222,7 +241,9 @@
                 <span class="text-white-30 text-xxxxxs bold">RR</span>
                 <span class="text-warning text-xxs bold">1:{{ alert.riskRewardRatio || '0.0' }}</span>
               </div>
-              <app-glass-button class="btn-header-sober ms-auto" variant="solid" (click)="alertService.handleAlertClick(alert.id)" style="width: auto; min-width: 90px; height: 24px !important;">
+              <app-glass-button class="btn-header-sober ms-auto" variant="solid"
+                (click)="alertService.handleAlertClick(alert.id)"
+                style="width: auto; min-width: 90px; height: 24px !important;">
                 EJECUTAR
               </app-glass-button>
             </div>
@@ -230,39 +251,43 @@
 
           <!-- COLUMN 2: COMPRESSED MOTOR INFO -->
           <div class="header-col motor-info-col border-end border-white-05 px-3">
-             <div class="d-flex align-items-center gap-2 mb-2">
-                <div class="status-dot pulsing"></div>
-                <span class="text-success fw-bold text-xs tracking-wider">MOTOR ACTIVO</span>
-                <span class="text-white-50 text-xs ms-auto">{{ analysisTime }}</span>
-             </div>
-             
-             <div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom border-white-03">
-               <div class="d-flex gap-3">
-                 <div class="text-xxs uppercase">
-                   <span class="text-white-50">SHIELD:</span>
-                   <span class="text-success ms-1 bold">QUIET PERIOD</span>
-                 </div>
-                 <div class="text-xxs uppercase border-start border-white-10 ps-3">
-                   <span class="text-white-50">SENTIMIENTO:</span>
-                   <span class="text-info ms-1 bold">BULLISH</span>
-                 </div>
-               </div>
-             </div>
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <div class="status-dot pulsing"></div>
+              <span class="text-success fw-bold text-xs tracking-wider">MOTOR ACTIVO</span>
+              <span class="text-white-50 text-xs ms-auto">{{ analysisTime }}</span>
+            </div>
 
-             <div class="d-flex align-items-center gap-2">
-                <span class="text-white-50 text-xxs bold">BALLENAS:</span>
-                <div class="d-flex gap-1">
-                   <span *ngFor="let w of headerWhales" class="badge bg-info-light text-dark-soft" style="font-size: 8px; padding: 2px 4px;">{{ w.symbol }} ({{ w.influence }}%)</span>
+            <div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom border-white-03">
+              <div class="d-flex gap-3">
+                <div class="text-xxs uppercase">
+                  <span class="text-white-50">SHIELD:</span>
+                  <span class="text-success ms-1 bold">QUIET PERIOD</span>
                 </div>
-                <span class="text-white-50 text-xxs ms-auto bold">SQUEEZES: <span class="text-white-30 fw-normal">Normal</span></span>
-             </div>
+                <div class="text-xxs uppercase border-start border-white-10 ps-3">
+                  <span class="text-white-50">SENTIMIENTO:</span>
+                  <span class="text-info ms-1 bold">BULLISH</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+              <span class="text-white-50 text-xxs bold">BALLENAS:</span>
+              <div class="d-flex gap-1">
+                <span *ngFor="let w of headerWhales" class="badge bg-info-light text-dark-soft"
+                  style="font-size: 8px; padding: 2px 4px;">{{ w.symbol }} ({{ w.influence }}%)</span>
+              </div>
+              <span class="text-white-50 text-xxs ms-auto bold">SQUEEZES: <span
+                  class="text-white-30 fw-normal">Normal</span></span>
+            </div>
           </div>
 
           <!-- COLUMN 3: BUTTONS & HEATMAP -->
           <div class="header-col actions-heatmap-col ps-3">
             <div class="d-flex align-items-center justify-content-between mb-3">
-               <app-glass-button class="btn-header-sober" variant="warning" (click)="alertService.markAllAsRead()">Borrar alertas</app-glass-button>
-               <app-glass-button class="btn-header-sober" variant="danger" (click)="finalizeHunt()">Finalizar</app-glass-button>
+              <app-glass-button class="btn-header-sober" variant="warning" (click)="alertService.markAllAsRead()">Borrar
+                alertas</app-glass-button>
+              <app-glass-button class="btn-header-sober" variant="danger"
+                (click)="finalizeHunt()">Finalizar</app-glass-button>
             </div>
 
             <div class="mini-heatmap-vision border-top border-white-05 pt-2">
@@ -273,8 +298,10 @@
                     <span class="text-white-50">{{ c.symbol }}</span>
                     <span class="text-success-light">{{ c.score }}%</span>
                   </div>
-                  <div class="bar-bg" style="width: 100%; height: 3px; background: rgba(255,255,255,0.05); border-radius: 2px;">
-                    <div class="bar-fill" [style.width.%]="c.score" style="height: 100%; background: #10b981; box-shadow: 0 0 5px rgba(16, 185, 129, 0.4);"></div>
+                  <div class="bar-bg"
+                    style="width: 100%; height: 3px; background: rgba(255,255,255,0.05); border-radius: 2px;">
+                    <div class="bar-fill" [style.width.%]="c.score"
+                      style="height: 100%; background: #10b981; box-shadow: 0 0 5px rgba(16, 185, 129, 0.4);"></div>
                   </div>
                 </div>
               </div>
@@ -286,56 +313,60 @@
     </div>
 
     <!-- Main Content Row -->
-    <div class="row g-4">
+    <div class="row g-2">
       <!-- Left Column: Chart, Positions, Console -->
       <div class="col-xl-8">
         <!-- 📈 Super Chart Console (No borders) -->
         <div class="chart-container-vision mb-2 bg-dark-deep position-relative">
-          <div class="chart-toolbar d-flex align-items-center justify-content-between p-2 border-bottom border-white-05 bg-dark-soft">
+          <div
+            class="chart-toolbar d-flex align-items-center justify-content-between p-2 border-bottom border-white-05 bg-dark-soft">
             <div class="d-flex align-items-center gap-3">
               <div class="symbol-select d-flex align-items-center gap-2">
                 <ion-icon name="search-outline" class="text-info-light"></ion-icon>
                 <!-- Premium Symbol Selector -->
                 <div class="symbol-selector-root position-relative">
-                  <div class="selected-symbol-container d-flex align-items-center gap-2 cursor-pointer" 
-                       (click)="showSymbolSelector = !showSymbolSelector">
+                  <div class="selected-symbol-container d-flex align-items-center gap-2 cursor-pointer"
+                    (click)="showSymbolSelector = !showSymbolSelector">
                     <span class="symbol-name text-white fw-bold">{{ selectedTicker?.symbol || selectedSymbol }}</span>
-                    <span class="symbol-price ms-1" [class.text-success]="(selectedTicker?.priceChangePercent || 0) >= 0" 
-                          [class.text-danger]="(selectedTicker?.priceChangePercent || 0) < 0">
+                    <span class="symbol-price ms-1"
+                      [class.text-success]="(selectedTicker?.priceChangePercent || 0) >= 0"
+                      [class.text-danger]="(selectedTicker?.priceChangePercent || 0) < 0">
                       {{ selectedTicker?.lastPrice | number:'1.2-8' }}
                     </span>
-                    <span class="symbol-change text-xs" [class.text-success]="(selectedTicker?.priceChangePercent || 0) >= 0" 
-                          [class.text-danger]="(selectedTicker?.priceChangePercent || 0) < 0">
-                      {{ (selectedTicker?.priceChangePercent || 0) >= 0 ? '+' : '' }}{{ selectedTicker?.priceChangePercent | number:'1.2-2' }}%
+                    <span class="symbol-change text-xs"
+                      [class.text-success]="(selectedTicker?.priceChangePercent || 0) >= 0"
+                      [class.text-danger]="(selectedTicker?.priceChangePercent || 0) < 0">
+                      {{ (selectedTicker?.priceChangePercent || 0) >= 0 ? '+' : '' }}{{
+                      selectedTicker?.priceChangePercent | number:'1.2-2' }}%
                     </span>
                     <ion-icon name="chevron-down-outline" class="text-white-50 ms-1"></ion-icon>
                   </div>
 
                   <!-- Backdrop to close dropdown -->
-                  <div *ngIf="showSymbolSelector" class="dropdown-backdrop position-fixed top-0 start-0 w-100 h-100" 
-                       style="z-index: 999; background: transparent;"
-                       (click)="showSymbolSelector = false"></div>
+                  <div *ngIf="showSymbolSelector" class="dropdown-backdrop position-fixed top-0 start-0 w-100 h-100"
+                    style="z-index: 999; background: transparent;" (click)="showSymbolSelector = false"></div>
 
                   <!-- Dropdown Searcher -->
-                  <div *ngIf="showSymbolSelector" class="symbol-dropdown-container animate-fade-in shadow-xl" style="z-index: 1000;">
+                  <div *ngIf="showSymbolSelector" class="symbol-dropdown-container animate-fade-in shadow-xl"
+                    style="z-index: 1000;">
                     <div class="search-box p-3 border-bottom border-white-05">
                       <div class="input-group bg-dark-soft rounded-pill px-3 border border-white-10">
                         <ion-icon name="search-outline" class="text-white-30 mt-2"></ion-icon>
-                        <input type="text" [(ngModel)]="searchTerm" (input)="filterTickers()" placeholder="Buscar moneda..."
-                               class="form-control bg-transparent border-0 text-white text-xs py-2 outline-none shadow-none">
+                        <input type="text" [(ngModel)]="searchTerm" (input)="filterTickers()"
+                          placeholder="Buscar moneda..."
+                          class="form-control bg-transparent border-0 text-white text-xs py-2 outline-none shadow-none">
                       </div>
                     </div>
-                    
+
                     <div class="tickers-list overflow-auto" style="max-height: 400px;">
                       <div class="ticker-item-header d-flex text-white-30 text-xs px-3 py-2">
                         <div class="flex-grow-1">Moneda</div>
                         <div class="w-1/3 text-end" style="width: 80px;">Precio</div>
                         <div class="w-1/3 text-end" style="width: 80px;">Cambio</div>
                       </div>
-                      
-                      <div *ngFor="let t of filteredTickers" 
-                           (click)="selectSymbol(t.symbol)"
-                           class="ticker-item d-flex align-items-center px-3 py-2 cursor-pointer hover:bg-white-05 border-bottom border-white-03">
+
+                      <div *ngFor="let t of filteredTickers" (click)="selectSymbol(t.symbol)"
+                        class="ticker-item d-flex align-items-center px-3 py-2 cursor-pointer hover:bg-white-05 border-bottom border-white-03">
                         <div class="flex-grow-1">
                           <div class="text-white fw-bold text-sm">{{ t.symbol }}</div>
                           <div class="text-white-30 text-xxs">Perpetuo</div>
@@ -344,8 +375,8 @@
                           <div class="text-white text-xs fw-medium">{{ t.lastPrice | number:'1.2-4' }}</div>
                         </div>
                         <div class="text-end" style="width: 80px;">
-                          <div class="text-xs fw-medium" [class.text-success]="t.priceChangePercent >= 0" 
-                               [class.text-danger]="t.priceChangePercent < 0">
+                          <div class="text-xs fw-medium" [class.text-success]="t.priceChangePercent >= 0"
+                            [class.text-danger]="t.priceChangePercent < 0">
                             {{ t.priceChangePercent >= 0 ? '+' : '' }}{{ t.priceChangePercent | number:'1.2-2' }}%
                           </div>
                         </div>
@@ -367,7 +398,8 @@
               </div>
             </div>
             <div class="d-flex align-items-center gap-3">
-              <div class="hma-settings d-flex align-items-center gap-2 px-2 py-1 rounded bg-dark-accent border border-white-05">
+              <div
+                class="hma-settings d-flex align-items-center gap-2 px-2 py-1 rounded bg-dark-accent border border-white-05">
                 <span class="text-white-50 text-xs">HMA</span>
                 <input type="number" [(ngModel)]="hmaPeriod" (change)="onHmaChange()"
                   class="bg-transparent border-0 text-info text-xs w-16 outline-none text-center" style="width: 40px;">
@@ -375,45 +407,81 @@
               <div class="status-dot pulsing"></div>
             </div>
           </div>
-          <div class="position-relative">
+          <div class="position-relative overflow-hidden" style="background: rgba(2, 6, 15, 0.4);">
+            <!-- Sheen & Grid Overlay -->
+            <div class="metallic-sheen-overlay"></div>
+            <div class="diagonal-grid-overlay"></div>
+
             <app-alerts *ngIf="!activeHeaderAlert" [alerts]="alertService.alerts()" [mode]="'overlay'"></app-alerts>
-            <div id="tradingview-chart" #chartContainer class="w-100" style="height: 480px;"></div>
+            
+            <!-- Indicators Overlay (Top-Left) -->
+            <div class="chart-hud-indicators position-absolute p-2 d-flex align-items-center gap-3" style="top: 10px; left: 12px; z-index: 5; pointer-events: none; background: rgba(5, 9, 16, 0.85); border: 1px solid rgba(0, 243, 255, 0.15); font-family: 'Share Tech Mono', monospace; font-size: 11px;">
+              <span class="d-flex align-items-center gap-1" style="color: #00e5ff;">
+                <span class="hud-label">HMA({{ hmaPeriod }}):</span>
+                <span class="hud-value fw-bold">{{ currentHmaValue ? (currentHmaValue | number:'1.2-5') : '0.00000' }}</span>
+              </span>
+              <span class="d-flex align-items-center gap-1" style="color: #ffcc00;">
+                <span class="hud-label">MA(7):</span>
+                <span class="hud-value fw-bold">{{ currentMa7Value ? (currentMa7Value | number:'1.2-5') : '0.00000' }}</span>
+              </span>
+              <span class="d-flex align-items-center gap-1" style="color: #ba55d3;">
+                <span class="hud-label">MA(25):</span>
+                <span class="hud-value fw-bold">{{ currentMa25Value ? (currentMa25Value | number:'1.2-5') : '0.00000' }}</span>
+              </span>
+              <span class="d-flex align-items-center gap-1" style="color: #722ed1;">
+                <span class="hud-label">MA(99):</span>
+                <span class="hud-value fw-bold">{{ currentMa99Value ? (currentMa99Value | number:'1.2-5') : '0.00000' }}</span>
+              </span>
+            </div>
+
+            <!-- Volume Overlay (Bottom-Left) -->
+            <div class="chart-hud-volume position-absolute p-2 d-flex flex-column" style="bottom: 50px; left: 12px; z-index: 5; pointer-events: none; background: rgba(5, 9, 16, 0.85); border: 1px solid rgba(0, 243, 255, 0.15); font-family: 'Share Tech Mono', monospace; font-size: 11px; line-height: 1.2;">
+              <span class="text-white-50 text-xxxxs letter-spacing-1">VOLUME</span>
+              <span class="fw-bold text-info" style="color: #00e5ff;">
+                {{ currentVolumeValue ? (currentVolumeValue >= 1000000 ? (currentVolumeValue / 1000000 | number:'1.3-3') + 'M' : (currentVolumeValue >= 1000 ? (currentVolumeValue / 1000 | number:'1.1-1') + 'K' : (currentVolumeValue | number:'1.0-0'))) : '0.00' }}
+              </span>
+            </div>
+
+            <!-- Brand Badge -->
+            <div class="position-absolute p-1" style="top: 10px; right: 12px; z-index: 4; font-family: 'Share Tech Mono', monospace; font-size: 9px; color: rgba(0, 243, 255, 0.4); pointer-events: none;">
+              VERGE INTEL CORE v2.5
+            </div>
+
+            <div id="tradingview-chart" #chartContainer class="w-100" style="height: 480px; position: relative; z-index: 2;"></div>
           </div>
         </div>
 
         <!-- 💰 Positions & Orders Table (New) -->
-        <div class="positions-console bg-dark-deep mb-4 overflow-hidden">
+        <div class="positions-console bg-dark-deep mb-2 overflow-hidden">
           <div class="console-tabs d-flex border-bottom border-white-05 bg-dark-soft">
             <!-- Tab: Standart Scalping -->
-            <div class="tab-item py-2 px-3 pointer text-xs uppercase" 
-                 [class.active]="consoleTab === 'legacy'" 
-                 (click)="setConsoleTab('legacy')">
-              Standart Scalping ({{ getActiveTradesCount(null) }})
+            <div class="tab-item py-2 px-3 pointer text-xs uppercase" [class.active]="consoleTab === 'legacy'"
+              (click)="setConsoleTab('legacy')">
+              Standard Scalping ({{ getActiveTradesCount(null) }})
             </div>
 
             <!-- Tabs: Dynamic Strategies -->
-            <div *ngFor="let profile of strategyProfiles"
-                 class="tab-item py-2 px-3 pointer text-xs uppercase"
-                 [class.active]="consoleTab === profile.id" 
-                 (click)="setConsoleTab(profile.id!)">
+            <div *ngFor="let profile of strategyProfiles" class="tab-item py-2 px-3 pointer text-xs uppercase"
+              [class.active]="consoleTab === profile.id" (click)="setConsoleTab(profile.id!)">
               {{ profile.name }} ({{ getActiveTradesCount(profile.id!) }})
             </div>
 
             <!-- Tab: History -->
-            <div class="tab-item py-2 px-3 pointer text-xs uppercase"
-                 [class.active]="consoleTab === 'history'" 
-                 (click)="setConsoleTab('history')">
+            <div class="tab-item py-2 px-3 pointer text-xs uppercase" [class.active]="consoleTab === 'history'"
+              (click)="setConsoleTab('history')">
               Historial de trades
             </div>
 
             <div class="ms-auto d-flex align-items-center px-3 gap-2">
-              <input type="checkbox" class="form-check-input bg-dark border-white-10" style="width: 12px; height: 12px;">
+              <input type="checkbox" class="form-check-input bg-dark border-white-10"
+                style="width: 12px; height: 12px;">
               <span class="text-white-50" style="font-size: 10px;">Ocultar otros símbolos</span>
             </div>
           </div>
           <div class="table-responsive p-0" style="min-height: 200px;">
             <!-- Positions Table (Used for both Legacy and Custom strategies) -->
-            <table *ngIf="consoleTab !== 'history'" class="table table-dark table-sm mb-0 position-table" style="font-size: 10px;">
+            <table *ngIf="consoleTab !== 'history'" class="table table-dark table-sm mb-0 position-table"
+              style="font-size: 10px;">
               <thead>
                 <tr class="text-white-50">
                   <th>Símbolo</th>
@@ -435,12 +503,13 @@
                       <span [class.text-success]="trade.side === 0" [class.text-danger]="trade.side === 1">
                         {{ trade.side === 0 ? 'Long' : 'Short' }}
                       </span>
-                      <span class="text-white fw-bold cursor-pointer hover-text-primary" 
-                            (click)="selectSymbol(trade.symbol)">
+                      <span class="text-white fw-bold cursor-pointer hover-text-primary"
+                        (click)="selectSymbol(trade.symbol)">
                         {{ trade.symbol }}
                       </span>
                       <span class="badge bg-dark-accent text-white-50">{{ trade.leverage }}x</span>
-                      <span *ngIf="trade.strategyProfileId" class="badge bg-info-10 text-info border border-info-20" style="font-size: 8px;">CUSTOM</span>
+                      <span *ngIf="trade.strategyProfileId" class="badge bg-info-10 text-info border border-info-20"
+                        style="font-size: 8px;">CUSTOM</span>
                     </div>
                   </td>
                   <td class="align-middle text-white-50">
@@ -448,27 +517,33 @@
                   </td>
                   <td class="align-middle">
                     <div class="text-white">{{ trade.amount | number:'1.2-2' }} USDT</div>
-                    <div class="text-white-50" style="font-size: 9px;">{{ trade.size | number:'1.3-3' }} {{ trade.symbol.replace('USDT', '') }}</div>
+                    <div class="text-white-50" style="font-size: 9px;">{{ trade.size | number:'1.3-3' }} {{
+                      trade.symbol.replace('USDT', '') }}</div>
                   </td>
                   <td class="align-middle text-white">{{ trade.entryPrice | number:'1.2-4' }}</td>
                   <td class="align-middle text-white">{{ trade.markPrice | number:'1.2-4' }}</td>
                   <td class="align-middle text-warning fw-bold">{{ trade.liquidationPrice | number:'1.2-4' }}</td>
                   <td class="align-middle cursor-pointer hover:bg-white-05" (click)="openTpSlModal(trade)">
                     <div class="d-flex flex-column" style="font-size: 9px;">
-                      <span class="text-success" title="Take Profit">{{ trade.tpPrice != null ? (trade.tpPrice | number:'1.2-4') : '--' }}</span>
-                      <span class="text-danger" title="Stop Loss">{{ trade.slPrice != null ? (trade.slPrice | number:'1.2-4') : '--' }}</span>
+                      <span class="text-success" title="Take Profit">{{ trade.tpPrice != null ? (trade.tpPrice |
+                        number:'1.2-4') : '--' }}</span>
+                      <span class="text-danger" title="Stop Loss">{{ trade.slPrice != null ? (trade.slPrice |
+                        number:'1.2-4') : '--' }}</span>
                     </div>
                   </td>
                   <td class="align-middle text-white">
                     <div>{{ trade.margin | number:'1.2-2' }} USDT</div>
-                    <div class="text-white-50" style="font-size: 8px;">(1x: {{ (trade.amount / trade.leverage) | number:'1.2-2' }})</div>
+                    <div class="text-white-50" style="font-size: 8px;">(1x: {{ (trade.amount / trade.leverage) |
+                      number:'1.2-2' }})</div>
                   </td>
-                  <td class="align-middle" [class.text-success]="trade.unrealizedPnl >= 0" [class.text-danger]="trade.unrealizedPnl < 0">
+                  <td class="align-middle" [class.text-success]="trade.unrealizedPnl >= 0"
+                    [class.text-danger]="trade.unrealizedPnl < 0">
                     <div class="fw-bold">{{ trade.unrealizedPnl | number:'1.2-2' }} USDT</div>
                     <div style="font-size: 9px;">({{ trade.roiPercentage | number:'1.2-2' }}%)</div>
                   </td>
                   <td class="align-middle">
-                    <button class="btn btn-dark btn-sm text-xxs px-2 py-0 border-white-05 hover:bg-white-10" (click)="closePosition(trade.id)">
+                    <button class="btn btn-dark btn-sm text-xxs px-2 py-0 border-white-05 hover:bg-white-10"
+                      (click)="closePosition(trade.id)">
                       Mercado
                     </button>
                   </td>
@@ -487,17 +562,14 @@
               </tbody>
             </table>
 
-            <app-paginator
-              *ngIf="consoleTab !== 'history' && filteredActiveTrades.length > 5"
-              class="px-3 pb-3 d-block"
-              [totalItems]="filteredActiveTrades.length"
-              [pageSize]="activePositionsPageSize"
-              [currentPage]="activePositionsPage"
-              (pageChange)="onActivePositionsPageChange($event)">
+            <app-paginator *ngIf="consoleTab !== 'history' && filteredActiveTrades.length > 5" class="px-3 pb-3 d-block"
+              [totalItems]="filteredActiveTrades.length" [pageSize]="activePositionsPageSize"
+              [currentPage]="activePositionsPage" (pageChange)="onActivePositionsPageChange($event)">
             </app-paginator>
 
             <!-- Trade History Table -->
-            <table *ngIf="consoleTab === 'history'" class="table table-dark table-sm mb-0 position-table" style="font-size: 10px;">
+            <table *ngIf="consoleTab === 'history'" class="table table-dark table-sm mb-0 position-table"
+              style="font-size: 10px;">
               <thead>
                 <tr class="text-white-50">
                   <th>Símbolo</th>
@@ -512,8 +584,7 @@
               </thead>
               <tbody>
                 <tr *ngFor="let trade of paginatedTradeHistory">
-                  <td class="text-white fw-bold cursor-pointer hover-text-primary" 
-                      (click)="selectSymbol(trade.symbol)">
+                  <td class="text-white fw-bold cursor-pointer hover-text-primary" (click)="selectSymbol(trade.symbol)">
                     {{ trade.symbol }}
                   </td>
                   <td [class.text-success]="trade.side === 0" [class.text-danger]="trade.side === 1">
@@ -536,12 +607,8 @@
               </tbody>
             </table>
 
-            <app-paginator
-              *ngIf="consoleTab === 'history' && tradeHistory.length > 10"
-              class="px-3 pb-3 d-block"
-              [totalItems]="tradeHistory.length"
-              [pageSize]="tradeHistoryPageSize"
-              [currentPage]="tradeHistoryPage"
+            <app-paginator *ngIf="consoleTab === 'history' && tradeHistory.length > 10" class="px-3 pb-3 d-block"
+              [totalItems]="tradeHistory.length" [pageSize]="tradeHistoryPageSize" [currentPage]="tradeHistoryPage"
               (pageChange)="onTradeHistoryPageChange($event)">
             </app-paginator>
           </div>
@@ -550,8 +617,9 @@
         <!-- Institutional Console (Events, Whales, etc.) -->
         <div class="institutional-console bg-dark-deep border-top border-white-05 overflow-hidden">
           <div class="console-tabs d-flex border-bottom border-white-05 bg-dark-soft">
-            <div *ngFor="let tab of ['events', 'whales', 'liquidations', 'scanner', 'performance', 'history']" 
-              class="tab-item py-2 px-4 pointer text-xs uppercase" [class.active]="activeTab === tab" (click)="setTab(tab)">
+            <div *ngFor="let tab of ['events', 'whales', 'liquidations', 'scanner', 'performance', 'history']"
+              class="tab-item py-2 px-4 pointer text-xs uppercase" [class.active]="activeTab === tab"
+              (click)="setTab(tab)">
               {{ tab }}
             </div>
           </div>
@@ -563,29 +631,40 @@
               </div>
             </div>
             <div *ngIf="activeTab === 'scanner'">
-               <table class="table table-dark table-sm text-xs">
-                  <thead><tr><th>MONEDA</th><th>STYLE</th><th>SCORE</th><th>DIRECTION</th><th>ESTADO</th><th>DYNAMIC</th></tr></thead>
-                  <tbody>
-                    <tr *ngFor="let coin of getScannerList()" (click)="selectSymbol(coin.symbol)" class="pointer hover:bg-white-05">
-                      <td class="text-info">{{ coin.symbol }}</td>
-                      <td class="text-white-50">{{ coin.style }}</td>
-                      <td [class.text-success]="coin.score > 70" class="fw-bold">{{ coin.score }}</td>
-                      <td>
-                        <span *ngIf="coin.direction === 0" class="text-success fw-black">LONG</span>
-                        <span *ngIf="coin.direction === 1" class="text-danger fw-black">SHORT</span>
-                        <span *ngIf="coin.direction !== 0 && coin.direction !== 1" class="text-white-30 italic">WAIT</span>
-                      </td>
-                      <td>{{ coin.isSqueeze ? '🔥 SQUEEZE' : 'CONTEXT' }}</td>
-                      <td>{{ coin.winProb | percent }}</td>
-                    </tr>
-                  </tbody>
-               </table>
+              <table class="table table-dark table-sm text-xs">
+                <thead>
+                  <tr>
+                    <th>MONEDA</th>
+                    <th>STYLE</th>
+                    <th>SCORE</th>
+                    <th>DIRECTION</th>
+                    <th>ESTADO</th>
+                    <th>DYNAMIC</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let coin of getScannerList()" (click)="selectSymbol(coin.symbol)"
+                    class="pointer hover:bg-white-05">
+                    <td class="text-info">{{ coin.symbol }}</td>
+                    <td class="text-white-50">{{ coin.style }}</td>
+                    <td [class.text-success]="coin.score > 70" class="fw-bold">{{ coin.score }}</td>
+                    <td>
+                      <span *ngIf="coin.direction === 0" class="text-success fw-black">LONG</span>
+                      <span *ngIf="coin.direction === 1" class="text-danger fw-black">SHORT</span>
+                      <span *ngIf="coin.direction !== 0 && coin.direction !== 1"
+                        class="text-white-30 italic">WAIT</span>
+                    </td>
+                    <td>{{ coin.isSqueeze ? '🔥 SQUEEZE' : 'CONTEXT' }}</td>
+                    <td>{{ coin.winProb | percent }}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
 
             <!-- Tab de Historial Completo (Fase 5) -->
             <div *ngIf="activeTab === 'history'" class="d-flex flex-column h-100">
               <div *ngIf="historyLoading" class="text-center py-4 text-white-50">Cargando historial...</div>
-              
+
               <div *ngIf="!historyLoading && alertHistoryPage?.items" class="flex-grow-1 overflow-auto">
                 <table class="table table-dark table-sm text-xs">
                   <thead>
@@ -602,8 +681,8 @@
                   <tbody>
                     <tr *ngFor="let alert of alertHistoryPage?.items" class="hover:bg-white-05">
                       <td class="text-white-50">{{ alert.emittedAt | date:'MM/dd HH:mm' }}</td>
-                      <td class="fw-bold text-info cursor-pointer hover-text-primary" 
-                          (click)="selectSymbol(alert.symbol)">
+                      <td class="fw-bold text-info cursor-pointer hover-text-primary"
+                        (click)="selectSymbol(alert.symbol)">
                         {{ alert.symbol }}
                       </td>
                       <td class="text-white-75">{{ alert.alertTierDisplay || alert.alertTier }}</td>
@@ -612,7 +691,8 @@
                         <span *ngIf="alert.direction === 1" class="text-danger fw-bold">SHORT</span>
                         <span *ngIf="alert.direction === 2" class="text-white-50">WAIT</span>
                       </td>
-                      <td [class.text-success]="alert.confidenceScore >= 70" [class.text-warning]="alert.confidenceScore < 70 && alert.confidenceScore >= 50">
+                      <td [class.text-success]="alert.confidenceScore >= 70"
+                        [class.text-warning]="alert.confidenceScore < 70 && alert.confidenceScore >= 50">
                         {{ alert.confidenceScore }}%
                       </td>
                       <td>${{ alert.entryPrice | number:'1.2-4' }}</td>
@@ -623,13 +703,17 @@
               </div>
 
               <!-- Paginación Simple -->
-              <div *ngIf="!historyLoading && alertHistoryPage" class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top border-white-05">
-                <span class="text-xxs text-white-50">Mostrando {{ alertHistoryPage.items.length }} de {{ alertHistoryPage.totalCount }}</span>
+              <div *ngIf="!historyLoading && alertHistoryPage"
+                class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top border-white-05">
+                <span class="text-xxs text-white-50">Mostrando {{ alertHistoryPage.items.length }} de {{
+                  alertHistoryPage.totalCount }}</span>
                 <div class="d-flex gap-2">
-                  <button class="btn btn-sm btn-dark text-xxs border-white-10" [disabled]="historySkipCount === 0" (click)="changeHistoryPage(-1)">
+                  <button class="btn btn-sm btn-dark text-xxs border-white-10" [disabled]="historySkipCount === 0"
+                    (click)="changeHistoryPage(-1)">
                     <ion-icon name="chevron-back-outline"></ion-icon> Anterior
                   </button>
-                  <button class="btn btn-sm btn-dark text-xxs border-white-10" [disabled]="(historySkipCount + 15) >= alertHistoryPage.totalCount" (click)="changeHistoryPage(1)">
+                  <button class="btn btn-sm btn-dark text-xxs border-white-10"
+                    [disabled]="(historySkipCount + 15) >= alertHistoryPage.totalCount" (click)="changeHistoryPage(1)">
                     Siguiente <ion-icon name="chevron-forward-outline"></ion-icon>
                   </button>
                 </div>
@@ -646,19 +730,23 @@
           <div class="col-6">
             <!-- Order Book Section -->
             <div class="side-panel bg-dark-deep mb-2">
-              <div class="panel-header p-2 border-bottom border-white-05 text-white fw-bold text-xs uppercase d-flex justify-content-between align-items-center">
+              <div
+                class="panel-header p-2 border-bottom border-white-05 text-white fw-bold text-xs uppercase d-flex justify-content-between align-items-center">
                 <div class="d-flex align-items-center gap-3">
                   <span>Libro de Órdenes</span>
                   <div class="view-filters">
-                    <div class="filter-btn filter-mixed" [class.active]="orderBookViewMode === 'mixed'" (click)="orderBookViewMode = 'mixed'">
+                    <div class="filter-btn filter-mixed" [class.active]="orderBookViewMode === 'mixed'"
+                      (click)="orderBookViewMode = 'mixed'">
                       <div class="bar"></div>
                       <div class="bar"></div>
                     </div>
-                    <div class="filter-btn filter-bids" [class.active]="orderBookViewMode === 'bids'" (click)="orderBookViewMode = 'bids'">
+                    <div class="filter-btn filter-bids" [class.active]="orderBookViewMode === 'bids'"
+                      (click)="orderBookViewMode = 'bids'">
                       <div class="bar"></div>
                       <div class="bar"></div>
                     </div>
-                    <div class="filter-btn filter-asks" [class.active]="orderBookViewMode === 'asks'" (click)="orderBookViewMode = 'asks'">
+                    <div class="filter-btn filter-asks" [class.active]="orderBookViewMode === 'asks'"
+                      (click)="orderBookViewMode = 'asks'">
                       <div class="bar"></div>
                       <div class="bar"></div>
                     </div>
@@ -678,7 +766,9 @@
                   <tbody>
                     <!-- Asks (Venta) - Balanceado 6 y 6 -->
                     <ng-container *ngIf="orderBookViewMode === 'mixed' || orderBookViewMode === 'asks'">
-                      <tr *ngFor="let ask of (orderBookViewMode === 'asks' ? orderBook.asks.slice(0, 18) : orderBook.asks.slice(0, 6).reverse())" class="text-danger text-xs">
+                      <tr
+                        *ngFor="let ask of (orderBookViewMode === 'asks' ? orderBook.asks.slice(0, 18) : orderBook.asks.slice(0, 6).reverse())"
+                        class="text-danger text-xs">
                         <td>{{ ask.price | number:'1.2-2' }}</td>
                         <td class="text-center text-white">{{ ask.amount | number:'1.3-3' }}</td>
                         <td class="text-end text-white-50">{{ ask.total | number:'1.2-2' }}</td>
@@ -695,7 +785,9 @@
 
                     <!-- Bids (Compra) - Balanceado 6 y 6 -->
                     <ng-container *ngIf="orderBookViewMode === 'mixed' || orderBookViewMode === 'bids'">
-                      <tr *ngFor="let bid of (orderBookViewMode === 'bids' ? orderBook.bids.slice(0, 18) : orderBook.bids.slice(0, 6))" class="text-success text-xs">
+                      <tr
+                        *ngFor="let bid of (orderBookViewMode === 'bids' ? orderBook.bids.slice(0, 18) : orderBook.bids.slice(0, 6))"
+                        class="text-success text-xs">
                         <td>{{ bid.price | number:'1.2-2' }}</td>
                         <td class="text-center text-white">{{ bid.amount | number:'1.3-3' }}</td>
                         <td class="text-end text-white-50">{{ bid.total | number:'1.2-2' }}</td>
@@ -708,43 +800,35 @@
 
             <!-- Trades Section -->
             <div class="side-panel bg-dark-deep mb-2">
-              <div class="panel-header p-2 border-bottom border-white-05 text-white fw-bold text-xs uppercase">Trades</div>
-              <div class="panel-content p-1" style="height: 200px; overflow-y: auto;">
+              <div class="panel-header p-2 border-bottom border-white-05 text-white fw-bold text-xs uppercase">Trades
+              </div>
+              <div class="panel-content p-1" style="height: 360px; overflow-y: auto;">
                 <table class="data-table-compact w-100">
-                   <thead><tr class="text-white-50" style="font-size: 9px;"><th class="text-start">Precio</th><th class="text-end">Monto</th><th class="text-end">Tiempo</th></tr></thead>
-                   <tbody>
-                      <tr *ngFor="let trade of recentTrades" class="text-xs">
-                        <td [class.text-danger]="trade.isBuyerMaker" [class.text-success]="!trade.isBuyerMaker" class="text-start">
-                          {{ trade.price | number:'1.2-2' }}
-                        </td>
-                        <td class="text-end text-white-50">{{ trade.amount | number:'1.3-3' }}</td>
-                        <td class="text-end text-white-50" style="font-size: 8px;">{{ trade.time | date:'HH:mm:ss' }}</td>
-                      </tr>
-                   </tbody>
+                  <thead>
+                    <tr class="text-white-50" style="font-size: 9px;">
+                      <th class="text-start">Precio</th>
+                      <th class="text-end">Monto</th>
+                      <th class="text-end">Tiempo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let trade of recentTrades" class="text-xs">
+                      <td [class.text-danger]="trade.isBuyerMaker" [class.text-success]="!trade.isBuyerMaker"
+                        class="text-start">
+                        {{ trade.price | number:'1.2-2' }}
+                      </td>
+                      <td class="text-end text-white-50">{{ trade.amount | number:'1.3-3' }}</td>
+                      <td class="text-end text-white-50" style="font-size: 8px;">{{ trade.time | date:'HH:mm:ss' }}</td>
+                    </tr>
+                  </tbody>
                 </table>
-              </div>
-            </div>
-
-            <!-- Ranking Panel (Relocated here) -->
-            <div class="side-ranking-panel bg-dark-deep p-2">
-              <div class="mb-2 border-bottom border-white-05 pb-1">
-                <span class="text-white-50 fw-bold" style="font-size: 9px;">🏆 TOP OPORTUNIDADES</span>
-              </div>
-              <div class="d-flex flex-column gap-1">
-                <div *ngFor="let opp of topOpportunities" 
-                     class="mini-opp-card p-2 rounded bg-dark-accent d-flex justify-content-between align-items-center pointer hover:bg-white-05"
-                     (click)="selectSymbol(opp.symbol)">
-                  <span class="text-white fw-bold" style="font-size: 10px;">{{ opp.symbol }}</span>
-                  <span class="text-success fw-bold text-xs">{{ opp.score }} pts</span>
-                </div>
               </div>
             </div>
           </div>
 
           <!-- Sub-col 2: Trading Panel -->
           <div class="col-6">
-            <app-trading-panel 
-              [symbol]="selectedTicker?.symbol || selectedSymbol"
+            <app-trading-panel [symbol]="selectedTicker?.symbol || selectedSymbol"
               [price]="selectedTicker?.lastPrice || 0">
             </app-trading-panel>
           </div>
@@ -762,15 +846,8 @@
   </app-dialog>
 
   <!-- TP/SL Modal -->
-  <app-tpsl-modal 
-    *ngIf="showTpSlModal && selectedTradeForModal" 
-    [trade]="selectedTradeForModal"
-    (close)="showTpSlModal = false"
-    (updated)="loadActiveTrades()">
+  <app-tpsl-modal *ngIf="showTpSlModal && selectedTradeForModal" [trade]="selectedTradeForModal"
+    (close)="showTpSlModal = false" (updated)="loadActiveTrades()">
   </app-tpsl-modal>
 
 </div>
-
-
-
-

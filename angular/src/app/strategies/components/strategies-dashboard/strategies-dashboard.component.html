@@ -105,11 +105,18 @@
         </div>
       </div>
 
-      <div class="card-footer" style="padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.05); margin-top: auto;">
-        <button class="action-btn" (click)="viewPerformance('standard')">
-          <ion-icon name="stats-chart-outline"></ion-icon>
-          Ver Rendimiento Base
-        </button>
+      <div class="card-footer" style="padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.05); margin-top: auto; display: flex; justify-content: space-between;">
+        <div class="footer-left">
+          <button class="action-btn" (click)="viewPerformance('standard')">
+            <ion-icon name="stats-chart-outline"></ion-icon>
+            Ver Rendimiento Base
+          </button>
+        </div>
+        <div class="footer-right">
+          <button class="icon-btn" title="Duplicar como plantilla" (click)="onDuplicate('00000000-0000-0000-0000-000000000000')">
+            <ion-icon name="copy-outline"></ion-icon>
+          </button>
+        </div>
       </div>
     </div>
 

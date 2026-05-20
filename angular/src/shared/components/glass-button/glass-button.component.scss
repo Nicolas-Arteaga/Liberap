@@ -1,91 +1,389 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;800;900&family=Rajdhani:wght@600;700&display=swap');
+
 :host {
   display: block;
   width: 100%;
 }
 
+// ── Fintech / Cyberpunk Institutional Color Tokens ──────────────────
+$cyan:       #00e5ff;
+$pink:       #e60067;
+$green:      #00e676;
+$warn:       #ff9100;
+$dark-matte: #080d18;
+
+// ── Shared metallic base texture for inner layer ────────────────────
+@mixin metal-bg($color) {
+  background:
+    // Top metallic sheen (thin highlight strip)
+    linear-gradient(
+      180deg,
+      rgba($color, 0.18) 0%,
+      rgba($color, 0.04) 10%,
+      transparent 30%
+    ),
+    // Diagonal micro-scan lines (subtle HUD grid)
+    repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 3px,
+      rgba($color, 0.015) 3px,
+      rgba($color, 0.015) 4px
+    ),
+    // Base dark matte
+    #09101e;
+}
+
+// ── Shared hover metallic texture ──────────────────────────────────
+@mixin metal-bg-hover($color) {
+  background:
+    linear-gradient(
+      180deg,
+      rgba($color, 0.30) 0%,
+      rgba($color, 0.08) 12%,
+      transparent 35%
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 3px,
+      rgba($color, 0.03) 3px,
+      rgba($color, 0.03) 4px
+    ),
+    #0b1222;
+}
+
+// ── Asymmetric border gradient (bright TL+BR, dark on sides) ────────
+@mixin border-gradient($color) {
+  background: linear-gradient(
+    135deg,
+    $color 0%,
+    rgba($color, 0.6) 20%,
+    rgba($color, 0.15) 40%,
+    rgba($color, 0.15) 60%,
+    rgba($color, 0.6) 80%,
+    $color 100%
+  );
+}
+
+@mixin border-gradient-hover($color) {
+  background: linear-gradient(
+    135deg,
+    white 0%,
+    $color 15%,
+    rgba($color, 0.5) 40%,
+    rgba($color, 0.5) 60%,
+    $color 85%,
+    white 100%
+  );
+}
+
+// ── Full cyberpunk button theme ────────────────────────────────────
+@mixin cyber-button-theme($color) {
+  // Outer border layer (bevel shape)
+  &::before {
+    @include border-gradient($color);
+  }
+
+  // Controlled drop-shadow (inherits clip-path shape)
+  filter: drop-shadow(0 0 3px rgba($color, 0.20));
+
+  // Inner metallic surface
+  &::after {
+    @include metal-bg($color);
+  }
+
+  .btn-label {
+    color: rgba($color, 0.92);
+    text-shadow: 0 0 8px rgba($color, 0.3);
+  }
+
+  .btn-icon-wrap {
+    color: $color;
+    .btn-divider {
+      background: rgba($color, 0.30);
+    }
+  }
+
+  .dashes {
+    color: rgba($color, 0.30);
+  }
+
+  // ── HOVER ──────────────────────────────────────────────────────
+  &:hover:not([disabled]) {
+    &::before {
+      @include border-gradient-hover($color);
+    }
+
+    filter: drop-shadow(0 0 6px rgba($color, 0.45));
+
+    &::after {
+      @include metal-bg-hover($color);
+    }
+
+    .btn-label {
+      color: #ffffff;
+      text-shadow: 0 0 10px rgba($color, 0.65);
+    }
+
+    .btn-icon-wrap {
+      color: #fff;
+      .btn-divider {
+        background: rgba($color, 0.55);
+      }
+    }
+
+    .dashes {
+      color: rgba($color, 0.60);
+    }
+  }
+
+  // ── ACTIVE ─────────────────────────────────────────────────────
+  &:active:not([disabled]) {
+    &::before {
+      background: $color;
+    }
+
+    filter: drop-shadow(0 0 2px rgba($color, 0.25));
+
+    &::after {
+      background: linear-gradient(180deg, rgba($color, 0.05) 0%, #060a13 100%);
+    }
+
+    .btn-label {
+      color: rgba($color, 0.75);
+      text-shadow: none;
+    }
+  }
+}
+
+// ── Solid filled variant (Ejecutar / Confirmar) ──────────────────
+@mixin cyber-button-solid($color) {
+  &::before {
+    background: linear-gradient(135deg, white 0%, $color 40%, rgba($color, 0.8) 60%, white 100%);
+  }
+
+  filter: drop-shadow(0 0 6px rgba($color, 0.30));
+
+  &::after {
+    background: linear-gradient(180deg, rgba($color, 0.90) 0%, rgba($color, 0.75) 100%);
+  }
+
+  .btn-label {
+    color: #000;
+    font-weight: 900;
+    text-shadow: none;
+  }
+
+  .btn-icon-wrap {
+    color: #000;
+    .btn-divider {
+      background: rgba(0, 0, 0, 0.25);
+    }
+  }
+
+  .dashes {
+    color: rgba(0, 0, 0, 0.30);
+  }
+
+  &:hover:not([disabled]) {
+    filter: drop-shadow(0 0 10px rgba($color, 0.55));
+
+    &::after {
+      background: $color;
+    }
+  }
+
+  &:active:not([disabled]) {
+    filter: drop-shadow(0 0 3px rgba($color, 0.25));
+
+    &::after {
+      background: rgba($color, 0.60);
+    }
+  }
+}
+
+// ── Base glass-btn structure ───────────────────────────────────────
 .glass-btn {
+  position: relative;
   width: 100%;
-  height: 46px;
-  border-radius: 15px;
-  background: linear-gradient(90deg, #00c4ad, #00d084);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: #ffffff;
-  font-size: 20px;
-  font-weight: 500;
+  height: 36px;
+
+  // All interactive states → transparent on the element itself;
+  // visual feedback lives exclusively in ::before / ::after (bevel-clipped)
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+
+  padding: 0 14px;
   cursor: pointer;
-  transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(10px);
-  position: relative;
-  overflow: hidden;
-  
-  /* Efecto hover minimalista */
-  &:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 196, 173, 0.3);
+  gap: 6px;
+  white-space: nowrap;
+  overflow: visible;
+  transition: filter 0.2s ease;
+
+  font-family: 'Orbitron', 'Rajdhani', sans-serif;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+
+  // ── Enforce transparent on ALL browser-painted focus/hover states ─
+  &:hover,
+  &:focus,
+  &:active,
+  &:focus-visible,
+  &:focus-within {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
   }
-  
-  &:active {
-    transform: translateY(0);
+
+  // ── Layer 1: Outer bevel border (octagonal clip) ──────────────
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    clip-path: polygon(
+      6px 0,
+      calc(100% - 6px) 0,
+      100% 6px,
+      100% calc(100% - 6px),
+      calc(100% - 6px) 100%,
+      6px 100%,
+      0 calc(100% - 6px),
+      0 6px
+    );
+    z-index: 1;
+    transition: background 0.2s ease;
   }
-  
-  /* Efecto de brillo en hover */
+
+  // ── Layer 2: Inner metallic surface (inset 1px octagonal clip) ─
   &::after {
     content: '';
     position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      rgba(255, 255, 255, 0.2),
-      transparent
+    inset: 1px;
+    clip-path: polygon(
+      5.5px 0,
+      calc(100% - 5.5px) 0,
+      100% 5.5px,
+      100% calc(100% - 5.5px),
+      calc(100% - 5.5px) 100%,
+      5.5px 100%,
+      0 calc(100% - 5.5px),
+      0 5.5px
     );
-    transition: left 0.5s ease;
+    z-index: 2;
+    transition: background 0.2s ease;
   }
-  
-  &:hover::after {
-    left: 100%;
+
+  // ── Child elements ────────────────────────────────────────────
+  .btn-icon-wrap {
+    display: flex;
+    align-items: center;
+    z-index: 3;
+    transition: color 0.2s ease;
+
+    ion-icon {
+      font-size: 13px;
+    }
+
+    .btn-divider {
+      display: block;
+      width: 1px;
+      height: 12px;
+      margin: 0 7px;
+      transition: background 0.2s ease;
+    }
+  }
+
+  .btn-label {
+    z-index: 3;
+    font-weight: 800;
+    transition: color 0.2s ease, text-shadow 0.2s ease;
+  }
+
+  .dashes {
+    position: absolute;
+    bottom: 2px;
+    right: 7px;
+    font-size: 5px;
+    letter-spacing: 1px;
+    font-family: monospace;
+    pointer-events: none;
+    z-index: 3;
+    transition: color 0.2s ease, opacity 0.2s ease;
+  }
+
+  // ── Default theme (cyan) ──────────────────────────────────────
+  @include cyber-button-theme($cyan);
+
+  // ── DISABLED STATE ────────────────────────────────────────────
+  &[disabled] {
+    opacity: 0.30;
+    cursor: not-allowed;
+    filter: none !important;
+
+    &::before {
+      background: rgba(#666, 0.4) !important;
+    }
+
+    &::after {
+      background: #0d1020 !important;
+    }
+
+    .btn-label {
+      color: #666 !important;
+      text-shadow: none !important;
+    }
+
+    .btn-icon-wrap {
+      color: #666 !important;
+      .btn-divider {
+        background: rgba(#666, 0.2) !important;
+      }
+    }
+
+    .dashes {
+      color: rgba(#666, 0.2) !important;
+    }
   }
 }
 
-/* ESTILO PARA SOLID (login) */
+// ── VARIANT: DANGER / PINK ──────────────────────────────────────
+.glass-btn.danger-btn,
+.glass-btn.pink-btn {
+  @include cyber-button-theme($pink);
+}
+
+// ── VARIANT: WARNING ────────────────────────────────────────────
+.glass-btn.warning-btn {
+  @include cyber-button-theme($warn);
+}
+
+// ── VARIANT: SUCCESS ────────────────────────────────────────────
+.glass-btn.success-btn {
+  @include cyber-button-theme($green);
+}
+
+// ── VARIANT: SOLID ──────────────────────────────────────────────
 .glass-btn.solid-btn {
-  background: #00C47D !important;
-  border: none !important;
-  backdrop-filter: none !important;
-  
-  &:hover {
-    background: #00E68F !important;
-    box-shadow: 0 4px 12px rgba(0, 196, 125, 0.3);
-  }
+  @include cyber-button-solid($green);
 }
 
-/* Responsive para móvil */
+// ── Responsive ──────────────────────────────────────────────────
 @media (max-width: 767px) {
   .glass-btn {
-    height: 44px;
-    font-size: 15px;
-  }
-}
-
-.glass-btn.danger-btn {
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  color: #f87171;
-  backdrop-filter: blur(10px);
-
-  &:hover {
-    background: rgba(239, 68, 68, 0.15);
-    border-color: rgba(239, 68, 68, 0.3);
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
-  }
-
-  &::after {
-    display: none;  
+    height: 38px;
+    font-size: 9px;
+    padding: 0 12px;
   }
 }

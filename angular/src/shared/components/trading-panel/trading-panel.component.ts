@@ -5,6 +5,15 @@ import { IonIcon } from '@ionic/angular/standalone';
 import { LeverageModalComponent } from '../leverage-modal/leverage-modal.component';
 import { SimulatedTradeService } from 'src/app/proxy/trading/simulated-trade.service';
 import { SignalDirection } from 'src/app/proxy/trading/signal-direction.enum';
+import { addIcons } from 'ionicons';
+import { 
+  cartOutline, 
+  arrowDownOutline, 
+  swapHorizontalOutline, 
+  caretDownOutline, 
+  informationCircleOutline, 
+  pieChartOutline 
+} from 'ionicons/icons';
 
 @Component({
   selector: 'app-trading-panel',
@@ -14,6 +23,16 @@ import { SignalDirection } from 'src/app/proxy/trading/signal-direction.enum';
   styleUrls: ['./trading-panel.component.scss']
 })
 export class TradingPanelComponent implements OnInit {
+  constructor() {
+    addIcons({ 
+      cartOutline, 
+      arrowDownOutline, 
+      swapHorizontalOutline, 
+      caretDownOutline, 
+      informationCircleOutline, 
+      pieChartOutline 
+    });
+  }
   @Input() symbol: string = 'BTCUSDT';
   @Input() balance: number = 0;
   @Input() price: number = 0;

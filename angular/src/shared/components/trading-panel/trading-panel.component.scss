@@ -1,11 +1,17 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;800;900&family=Rajdhani:wght@600;700&display=swap');
+
 :host {
   display: block;
   height: 100%;
 }
 
+* {
+  border-radius: 0 !important;
+}
+
 .trading-panel-container {
-  background: #1e2329;
-  font-family: 'Inter', sans-serif;
+  background: transparent !important;
+  font-family: 'Inter', 'JetBrains Mono', sans-serif;
 }
 
 .trade-type-tabs {
@@ -20,9 +26,10 @@
     z-index: 1;
 
     &.active {
-      color: #f0b90b;
+      color: #00f3ff;
       font-weight: 600;
-      border-bottom: 2px solid #f0b90b;
+      border-bottom: 2px solid #00f3ff;
+      text-shadow: 0 0 8px rgba(0, 243, 255, 0.4);
     }
     &:hover:not(.active) {
       color: #eaecef;
@@ -31,11 +38,12 @@
 }
 
 .input-group-binance {
-  background: #2b3139;
-  border: 1px solid transparent;
+  background: rgba(0, 243, 255, 0.05) !important;
+  border: 1px solid rgba(0, 243, 255, 0.15) !important;
   transition: all 0.2s;
   &:focus-within {
-    border-color: #f0b90b;
+    border-color: #00f3ff !important;
+    box-shadow: 0 0 8px rgba(0, 243, 255, 0.2);
   }
   
   input {
@@ -50,12 +58,13 @@
   .slider-dot {
     width: 5px;
     height: 5px;
-    background: #474d57;
-    border-radius: 1px;
+    background: rgba(0, 243, 255, 0.3);
+    border-radius: 0 !important;
     transform: rotate(45deg);
     margin: 0 auto;
     &.active {
-      background: #f0b90b;
+      background: #00f3ff;
+      box-shadow: 0 0 5px #00f3ff;
     }
   }
 }
@@ -63,26 +72,300 @@
 .form-check-input {
   width: 14px;
   height: 14px;
+  background-color: transparent !important;
+  border: 1px solid rgba(0, 243, 255, 0.3) !important;
   &:checked {
-    background-color: #f0b90b;
-    border-color: #f0b90b;
+    background-color: #00f3ff !important;
+    border-color: #00f3ff !important;
+    box-shadow: 0 0 8px rgba(0, 243, 255, 0.4);
   }
 }
 
-.btn-success {
-  background-color: #2ebd85;
-  border: none;
-  &:hover { background-color: #36d392; }
-}
+// ── Cyberpunk action buttons (COMPRAR/VENDER) ─────────────────────
+.cyberBtn {
+  position: relative;
+  height: 46px;
 
-.btn-danger {
-  background-color: #f6465d;
-  border: none;
-  &:hover { background-color: #ff5a71; }
+  // Parent element is FULLY transparent in all states —
+  // clip-path on pseudo-elements defines ALL visual shape
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  border-radius: 0 !important;
+
+  font-family: 'Orbitron', 'Rajdhani', sans-serif;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  overflow: visible;
+  transition: filter 0.2s ease;
+  white-space: nowrap;
+  width: 100%;
+  padding: 0;
+
+  // ── Eliminate ALL browser-painted square hover/focus states ──
+  &:hover,
+  &:focus,
+  &:active,
+  &:focus-visible,
+  &:focus-within {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+  }
+
+  // ── Layer 1: Outer octagonal border ───────────────────────────
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    clip-path: polygon(
+      10px 0,
+      calc(100% - 10px) 0,
+      100% 10px,
+      100% calc(100% - 10px),
+      calc(100% - 10px) 100%,
+      10px 100%,
+      0 calc(100% - 10px),
+      0 10px
+    );
+    z-index: 1;
+    transition: background 0.2s ease;
+  }
+
+  // ── Layer 2: Inner metallic surface ───────────────────────────
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 1.5px;
+    clip-path: polygon(
+      8.5px 0,
+      calc(100% - 8.5px) 0,
+      100% 8.5px,
+      100% calc(100% - 8.5px),
+      calc(100% - 8.5px) 100%,
+      8.5px 100%,
+      0 calc(100% - 8.5px),
+      0 8.5px
+    );
+    z-index: 2;
+    transition: background 0.2s ease;
+  }
+
+  // ── Dashes decoration bottom-right ──────────────────────────
+  .dashes {
+    position: absolute;
+    bottom: 4px;
+    right: 12px;
+    font-size: 7px;
+    letter-spacing: 2px;
+    font-family: monospace;
+    pointer-events: none;
+    opacity: 0.30;
+    z-index: 3;
+    transition: color 0.2s ease, opacity 0.2s ease;
+  }
+
+  // ── Icon + vertical divider ──────────────────────────────────
+  .btn-icon-wrap {
+    display: flex;
+    align-items: center;
+    padding-left: 12px;
+    flex-shrink: 0;
+    z-index: 3;
+    transition: color 0.2s ease;
+
+    ion-icon {
+      font-size: 15px;
+    }
+
+    .btn-divider {
+      display: block;
+      width: 1px;
+      height: 16px;
+      margin: 0 10px;
+      transition: background 0.2s ease;
+    }
+  }
+
+  // ── Label ────────────────────────────────────────────────────
+  .btn-label {
+    flex: 1;
+    text-align: center;
+    padding-right: 16px;
+    z-index: 3;
+    font-weight: 800;
+    transition: color 0.2s ease, text-shadow 0.2s ease;
+  }
+
+  // ── BUY (COMPRAR / LONG) — Electric Precision Cyan ──────────
+  &--buy {
+    // Normal border: asymmetric bright TL + BR, muted sides
+    &::before {
+      background: linear-gradient(
+        135deg,
+        #00e5ff 0%,
+        rgba(0, 229, 255, 0.55) 20%,
+        rgba(0, 229, 255, 0.15) 42%,
+        rgba(0, 229, 255, 0.15) 58%,
+        rgba(0, 229, 255, 0.55) 80%,
+        #00e5ff 100%
+      );
+    }
+
+    filter: drop-shadow(0 0 3px rgba(0, 229, 255, 0.22));
+
+    // Inner metallic surface — cyan tint + diagonal micro-grid + dark base
+    &::after {
+      background:
+        linear-gradient(180deg, rgba(0, 229, 255, 0.20) 0%, rgba(0, 229, 255, 0.04) 12%, transparent 32%),
+        repeating-linear-gradient(-45deg, transparent, transparent 3px, rgba(0, 229, 255, 0.018) 3px, rgba(0, 229, 255, 0.018) 4px),
+        #09101e;
+    }
+
+    .btn-icon-wrap {
+      color: #00e5ff;
+      .btn-divider { background: rgba(0, 229, 255, 0.30); }
+    }
+    .btn-label {
+      color: rgba(0, 229, 255, 0.90);
+      text-shadow: 0 0 8px rgba(0, 229, 255, 0.30);
+    }
+    .dashes { color: rgba(0, 229, 255, 0.30); }
+
+    // Hover
+    &:hover:not([disabled]) {
+      &::before {
+        background: linear-gradient(
+          135deg,
+          #fff 0%,
+          #00e5ff 15%,
+          rgba(0, 229, 255, 0.50) 40%,
+          rgba(0, 229, 255, 0.50) 60%,
+          #00e5ff 85%,
+          #fff 100%
+        );
+      }
+
+      filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.50));
+
+      &::after {
+        background:
+          linear-gradient(180deg, rgba(0, 229, 255, 0.32) 0%, rgba(0, 229, 255, 0.08) 14%, transparent 36%),
+          repeating-linear-gradient(-45deg, transparent, transparent 3px, rgba(0, 229, 255, 0.035) 3px, rgba(0, 229, 255, 0.035) 4px),
+          #0b1424;
+      }
+
+      .btn-icon-wrap {
+        color: #ffffff;
+        .btn-divider { background: rgba(0, 229, 255, 0.55); }
+      }
+      .btn-label {
+        color: #ffffff;
+        text-shadow: 0 0 12px rgba(0, 229, 255, 0.70);
+      }
+      .dashes { opacity: 0.65; color: #00e5ff; }
+    }
+
+    // Active (press)
+    &:active:not([disabled]) {
+      &::before { background: #00e5ff; }
+      filter: drop-shadow(0 0 2px rgba(0, 229, 255, 0.25));
+      &::after { background: linear-gradient(180deg, rgba(0, 229, 255, 0.05) 0%, #060a13 100%); }
+      .btn-label { color: rgba(0, 229, 255, 0.70); text-shadow: none; }
+    }
+  }
+
+  // ── SELL (VENDER / SHORT) — Dark High-Pressure Magenta ───────
+  &--sell {
+    // Normal border
+    &::before {
+      background: linear-gradient(
+        135deg,
+        #e60067 0%,
+        rgba(230, 0, 103, 0.55) 20%,
+        rgba(230, 0, 103, 0.15) 42%,
+        rgba(230, 0, 103, 0.15) 58%,
+        rgba(230, 0, 103, 0.55) 80%,
+        #e60067 100%
+      );
+    }
+
+    filter: drop-shadow(0 0 3px rgba(230, 0, 103, 0.22));
+
+    // Inner metallic surface — magenta tint
+    &::after {
+      background:
+        linear-gradient(180deg, rgba(230, 0, 103, 0.20) 0%, rgba(230, 0, 103, 0.04) 12%, transparent 32%),
+        repeating-linear-gradient(-45deg, transparent, transparent 3px, rgba(230, 0, 103, 0.018) 3px, rgba(230, 0, 103, 0.018) 4px),
+        #09101e;
+    }
+
+    .btn-icon-wrap {
+      color: #e60067;
+      .btn-divider { background: rgba(230, 0, 103, 0.30); }
+    }
+    .btn-label {
+      color: rgba(230, 0, 103, 0.92);
+      text-shadow: 0 0 8px rgba(230, 0, 103, 0.30);
+    }
+    .dashes { color: rgba(230, 0, 103, 0.30); }
+
+    // Hover
+    &:hover:not([disabled]) {
+      &::before {
+        background: linear-gradient(
+          135deg,
+          #fff 0%,
+          #e60067 15%,
+          rgba(230, 0, 103, 0.50) 40%,
+          rgba(230, 0, 103, 0.50) 60%,
+          #e60067 85%,
+          #fff 100%
+        );
+      }
+
+      filter: drop-shadow(0 0 8px rgba(230, 0, 103, 0.50));
+
+      &::after {
+        background:
+          linear-gradient(180deg, rgba(230, 0, 103, 0.32) 0%, rgba(230, 0, 103, 0.08) 14%, transparent 36%),
+          repeating-linear-gradient(-45deg, transparent, transparent 3px, rgba(230, 0, 103, 0.035) 3px, rgba(230, 0, 103, 0.035) 4px),
+          #150a12;
+      }
+
+      .btn-icon-wrap {
+        color: #ffffff;
+        .btn-divider { background: rgba(230, 0, 103, 0.55); }
+      }
+      .btn-label {
+        color: #ffffff;
+        text-shadow: 0 0 12px rgba(230, 0, 103, 0.70);
+      }
+      .dashes { opacity: 0.65; color: #e60067; }
+    }
+
+    // Active (press)
+    &:active:not([disabled]) {
+      &::before { background: #e60067; }
+      filter: drop-shadow(0 0 2px rgba(230, 0, 103, 0.25));
+      &::after { background: linear-gradient(180deg, rgba(230, 0, 103, 0.05) 0%, #060a13 100%); }
+      .btn-label { color: rgba(230, 0, 103, 0.70); text-shadow: none; }
+    }
+  }
 }
 
 .text-xs { font-size: 11px; }
-.bg-dark-accent { background-color: #2b3139; }
-.border-white-05 { border-color: rgba(255,255,255,0.05) !important; }
+.bg-dark-accent { background-color: transparent !important; }
+.border-white-05 { border-color: rgba(0, 243, 255, 0.15) !important; }
 .pointer { cursor: pointer; }
 .outline-none { outline: none; }

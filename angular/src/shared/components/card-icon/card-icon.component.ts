@@ -17,5 +17,7 @@ export class CardIconComponent {
   @Input() status: 'al-dia' | 'vencida' | 'proximo' | null = null;
   @Input() statusLabel?: string;
   @Input() useCardContentBg = false;
-
+  @Input() cardNumber?: string;
+  @Input() showChevron = false;
+  @Input() chevronColor = '#00e5ff';
 }
