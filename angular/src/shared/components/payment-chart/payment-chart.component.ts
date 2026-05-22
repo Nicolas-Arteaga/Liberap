@@ -1,4 +1,4 @@
-import { Component, Input, AfterViewInit, ElementRef, ViewChildren, QueryList } from '@angular/core';
+import { Component, Input, AfterViewInit, ElementRef, ViewChildren, QueryList, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 export interface ChartData {
@@ -10,12 +10,17 @@ export interface ChartData {
 @Component({
   selector: 'app-payment-chart',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule],
   templateUrl: './payment-chart.component.html',
   styleUrls: ['./payment-chart.component.scss']
 })
 export class PaymentChartComponent implements AfterViewInit {
   @Input() data: ChartData[] = [];
+
+  trackByFn(index: number, item: ChartData): string {
+    return `${index}-${item.month}-${item.amount}`;
+  }
   
   // Escalamiento basado en el PnL real (pueden ser negativos)
   get minAmount(): number {

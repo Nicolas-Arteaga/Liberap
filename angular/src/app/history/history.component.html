@@ -56,34 +56,29 @@
       </div>
     </app-card-content>
 
-    <!-- Filtros -->
-    <div class="row g-3 mb-4">
-      <div class="col-12 col-md-4">
-        <app-label class="text-white-50 small mb-3 mt-3 d-block">Tipo de Trade</app-label>
-        <app-select
-          [options]="tradeOptions"
-          placeholder="Tipo de trade"
-          [(value)]="tradeType"
-          (valueChange)="resetPage()">
-        </app-select>
+    <!-- Filtro por Estrategia -->
+    <div class="strategy-filter-section mb-4">
+      <div class="strategy-filter-label">
+        <ion-icon name="filter-outline"></ion-icon>
+        <span>Filtrar por Estrategia</span>
       </div>
-      <div class="col-12 col-md-4">
-        <app-label class="text-white-50 small mb-3 mt-3 d-block">Periodo</app-label>
-        <app-select
-          [options]="dateOptions"
-          placeholder="Seleccionar periodo"
-          [(value)]="dateRange"
-          (valueChange)="resetPage()">
-        </app-select>
-      </div>
-      <div class="col-12 col-md-4">
-        <app-label class="text-white-50 small mb-3 mt-3 d-block">Estrategia</app-label>
-        <app-select
-          [options]="strategyOptions"
-          placeholder="Seleccionar estrategia"
-          [(value)]="strategyFilter"
-          (valueChange)="resetPage()">
-        </app-select>
+      <div class="strategy-chips-wrapper">
+        <button
+          class="strategy-chip"
+          [class.active]="strategyFilter === 'all'"
+          (click)="setStrategyFilter('all')">
+          <ion-icon name="apps-outline"></ion-icon>
+          Todas
+        </button>
+        <button
+          *ngFor="let opt of strategyChipOptions; trackBy: trackByStrategyId"
+          class="strategy-chip"
+          [class.active]="strategyFilter === opt.value"
+          [style.--chip-color]="opt.color"
+          (click)="setStrategyFilter(opt.value)">
+          <span class="chip-dot"></span>
+          {{ opt.label }}
+        </button>
       </div>
     </div>
 
@@ -95,7 +90,7 @@
       <app-card-content class="payment-history-card">
         
         <div *ngIf="filteredTrades.length > 0; else noTrades">
-          <div *ngFor="let trade of paginatedTrades; let last = last" 
+          <div *ngFor="let trade of paginatedTrades; trackBy: trackByTradeId; let last = last"
                class="payment-item d-flex align-items-start position-relative">
             
             <!-- Contenedor de círculo -->

@@ -7,7 +7,7 @@
       <div class="chart-connection-line"></div>
       
       <!-- Barras individuales -->
-      <div *ngFor="let item of data; let i = index" 
+      <div *ngFor="let item of data; let i = index; trackBy: trackByFn" 
            class="chart-column"
            [class.last-bar]="i === data.length - 1"
            [style]="{
