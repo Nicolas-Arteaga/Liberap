@@ -362,7 +362,7 @@
                 <div class="threshold-row">
                   <span class="threshold-label">RSI Superior ≥</span>
                   <input class="threshold-input" type="number"
-                         [(ngModel)]="vetoRsiHigh" min="70" max="99"
+                         [(ngModel)]="model.maxRsiLong" min="70" max="99"
                          [style.border-color]="'#FF4D4D44'"
                          [style.color]="'#FF4D4D'">
                   <span class="threshold-unit">→ bloquea LONG</span>
@@ -370,7 +370,7 @@
                 <div class="threshold-row">
                   <span class="threshold-label">RSI Inferior ≤</span>
                   <input class="threshold-input" type="number"
-                         [(ngModel)]="vetoRsiLow" min="1" max="30"
+                         [(ngModel)]="model.minRsiShort" min="1" max="30"
                          [style.border-color]="'#00C47D44'"
                          [style.color]="'#00C47D'">
                   <span class="threshold-unit">→ bloquea SHORT</span>

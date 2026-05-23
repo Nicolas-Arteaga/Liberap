@@ -23,10 +23,6 @@ export class StrategyEditorComponent implements OnInit {
   isLoading = false;
   activeTab: 'identity' | 'filters' | 'risk' | 'advanced' | 'preview' = 'identity';
 
-  // RSI VETO thresholds — stored locally, applied by agent config
-  vetoRsiHigh = 85;
-  vetoRsiLow  = 15;
-
   model: CreateUpdateStrategyProfileDto = {
     name: '',
     description: '',

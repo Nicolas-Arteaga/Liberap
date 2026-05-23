@@ -55,9 +55,10 @@ VIRTUAL_CAPITAL_BASE = 10000.0
 RISK_PER_TRADE_PCT = 0.015
 # LSE / sizing por riesgo respecto al stop estructural (no margen fijo % equity)
 EQUITY_RISK_PCT_FOR_STOP = float(os.getenv("EQUITY_RISK_PCT_FOR_STOP", "0.01"))
-MIN_RR_DEFAULT = float(os.getenv("MIN_RR_DEFAULT", "1.5"))
+MIN_RR_DEFAULT = float(os.getenv("MIN_RR_DEFAULT", "2.5"))
 MIN_RR_NEXUS = float(os.getenv("MIN_RR_NEXUS", str(MIN_RR_DEFAULT)))
 MIN_RR_AGGRESSIVE_LSE = float(os.getenv("MIN_RR_AGGRESSIVE_LSE", "1.2"))
+LSE_MIN_RR = 3.0  # Sube el requisito mínimo de R:R para LSE (contratendencia)
 MIN_STOP_ATR_MULT = float(os.getenv("MIN_STOP_ATR_MULT", "0.5"))
 MIN_STOP_PCT_OF_PRICE = float(os.getenv("MIN_STOP_PCT_OF_PRICE", "0.002"))
 MAX_ENTRY_SLIPPAGE_PCT = float(os.getenv("MAX_ENTRY_SLIPPAGE_PCT", "0.002"))
@@ -87,7 +88,7 @@ AGENT_MAX_CANDIDATES_PER_CYCLE = int(os.getenv("AGENT_MAX_CANDIDATES_PER_CYCLE",
 AGENT_MAX_RANK_FOR_NEXUS_FALLBACK = int(os.getenv("AGENT_MAX_RANK_FOR_NEXUS_FALLBACK", "0"))
 
 MAX_OPEN_POSITIONS = 3              # 3 posiciones simultáneas para scalping
-MIN_ENTRY_NEXUS  = float(os.getenv("MIN_ENTRY_NEXUS",  "70.0"))  # Nexus mínimo para abrir slot libre
+MIN_ENTRY_NEXUS  = float(os.getenv("MIN_ENTRY_NEXUS",  "76.0"))  # Nexus mínimo para abrir slot libre (Antes 70.0)
 MIN_UPGRADE_NEXUS = float(os.getenv("MIN_UPGRADE_NEXUS", "80.0"))  # Nexus mínimo para reemplazar la peor posición
 MAX_TRADES_PER_DAY = 100
 MAX_POSITION_DURATION_HOURS = 48
@@ -95,20 +96,31 @@ MAX_TRADE_DURATION_CANDLES = int(os.getenv("MAX_TRADE_DURATION_CANDLES", "8"))
 DEFAULT_LEVERAGE = 1
 
 # 4. Intelligence Thresholds
-MIN_NEXUS_CONFIDENCE = 75.0          # antes 70 — menos trades, más certeza en 15m
+MIN_NEXUS_CONFIDENCE = 76.0          # (Antes 75.0) — Exige más certeza, capturando ganadores PLAY y FIDA
 MIN_SCAR_SCORE = 4
-MIN_CONFLUENCE_SCORE = 45.0          # antes 50 — prod 24h: conf 50-55 = 14-22% WR; conf 55+ = 43% WR
+MIN_CONFLUENCE_SCORE = 60.0          # (Antes 55.0) — Evita picoteo sangrante de baja confluencia (<60)
 LSE_WARNING_OVERRIDE_SCORE = float(os.getenv("LSE_WARNING_OVERRIDE_SCORE", "85.0"))
 MIN_ESTIMATED_RANGE_PCT = float(os.getenv("MIN_ESTIMATED_RANGE_PCT", "0.8"))  # calibración LSE inicial — subir progresivamente según resultados
+
+# --- CALIBRACIÓN DE VOLATILIDAD Y SEGURIDAD MÁXIMA ---
+MAX_ESTIMATED_RANGE_PCT = 15.0         # Deja respirar a bombas reales (FIDA/PLAY) hasta 15% en 15m
+MAX_STOP_LOSS_PCT = 9.0               # Máximo stop porcentual absoluto de 9% para evitar pérdidas catastróficas
+MAX_RSI_LONG_LIMIT = 75.0             # Nadie compra con RSI > 75. Evita comprar el clímax del pump.
+TIER3_MIN_CONFLUENCE_SCORE = 65.0     # Exclusivo Tier 3: exige confluencia perfecta para entrar
+
+# --- REGLA sniper DE ALTA VOLATILIDAD ---
+HIGH_VOLATILITY_RANGE_THRESHOLD = 7.0  # Rango >= 7% activa la regla Sniper
+HIGH_VOLATILITY_MIN_CONFLUENCE = 90.0   # Requiere confluencia extrema de 90+ para monedas explosivas
 
 # 5. Take Profit / Stop Loss — Fat Tail Strategy (asimétrica)
 # SL amplio: 0.8× el rango estimado para que el ruido de 15m no active el stop.
 # TP agresivo: 3.0× deja correr al 15% de trades ganadores hasta su potencial real.
-TP_MULTIPLIER = 3.0                  # antes 1.5 — captura el movimiento completo
-SL_MULTIPLIER = 0.8                  # antes 0.4 — el doble de espacio, evita ser sacado por ruido
+# TP_MULTIPLIER = 3.5 (Aumenta para exprimir los ganadores masivos)
+TP_MULTIPLIER = 3.5                  
+SL_MULTIPLIER = 0.6                  
 # Topes máximos de multiplicador TP por tipo de setup Nexus.
 # TF puede correr hasta 3× el SL. MR tiene menos recorrido histórico, cap más conservador.
-TP_MULT_TREND_FOLLOWING_MAX = float(os.getenv("TP_MULT_TREND_FOLLOWING_MAX", "3.0"))
+TP_MULT_TREND_FOLLOWING_MAX = float(os.getenv("TP_MULT_TREND_FOLLOWING_MAX", "3.2"))
 TP_MULT_MEAN_REVERSION_MAX = float(os.getenv("TP_MULT_MEAN_REVERSION_MAX", "2.0"))
 
 # Paths

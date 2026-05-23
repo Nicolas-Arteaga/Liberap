@@ -96,9 +96,9 @@ def validate_lse_setup(
 
         # Usar umbral del profile si existe
         if profile:
-            min_rr = float(profile.get("minRR", 1.5))
+            min_rr = float(profile.get("minRR", getattr(config, "LSE_MIN_RR", 3.0)))
         else:
-            min_rr = float(getattr(config, "MIN_RR_DEFAULT", 1.5))
+            min_rr = float(getattr(config, "LSE_MIN_RR", 3.0))
             dm = str(candidate.get("lse_detection_mode") or "").lower()
             if dm == "aggressive":
                 min_rr = float(getattr(config, "MIN_RR_AGGRESSIVE_LSE", 2.0))
@@ -214,10 +214,10 @@ def validate_nexus_confluence_setup(
 
     # ── VETO #6: RSI Extreme Exhaustion (Parametrizado por Profile) ──────
     if profile:
-        max_rsi_long = float(profile.get("maxRsiLong", 85.0))
+        max_rsi_long = float(profile.get("maxRsiLong", getattr(config, "MAX_RSI_LONG_LIMIT", 75.0)))
         min_rsi_short = float(profile.get("minRsiShort", 15.0))
     else:
-        max_rsi_long = 85.0
+        max_rsi_long = float(getattr(config, "MAX_RSI_LONG_LIMIT", 75.0))
         min_rsi_short = 15.0
 
     if side == 0 and rsi_14 > max_rsi_long:
@@ -255,8 +255,16 @@ def validate_nexus_confluence_setup(
 
     # ── VETO #5: Bearish Rejection at Top ──────────────────────────────
     if side == 0:
-        if (upthrust_detected or upper_wick_ratio > 0.35) and macd_hist < 0 and rsi_14 > 65:
-            return False, "bearish_rejection_at_top", metrics
+        # Si la mecha superior es > 35% del tamaño total de la vela y el RSI es > 70
+        # es una trampa de liquidez. No importa el score de la IA.
+        if upper_wick_ratio > 0.35 and rsi_14 > 70:
+            logger.info("[VETO] CLIMAX_REJECTION — %s | Wick=%.2f RSI=%.1f", candidate.get("symbol"), upper_wick_ratio, rsi_14)
+            return False, "climax_rejection_long", metrics
+        
+        # Si se detectó Upthrust (patrón de reversión de Wyckoff) y RSI > 70
+        if upthrust_detected and rsi_14 > 70:
+            logger.info("[VETO] UPTHRUST_REJECTION — %s | Upthrust detected and RSI=%.1f", candidate.get("symbol"), rsi_14)
+            return False, "upthrust_rejection", metrics
 
     if candle_body_ratio < 0.05:
         return False, "no_body_no_trade", metrics
@@ -410,6 +418,98 @@ def validate_pre_trade(
     Punto único de entrada: LSE (con bloqueo reasoning) o Nexus/SCAR.
     Si se pasa 'profile', usa sus umbrales. Si no, usa config.py (Legacy).
     """
+    symbol = candidate.get("symbol", "?")
+
+    # ── VETO GLOBAL: Rango Estimado Máximo (MAX_ESTIMATED_RANGE_PCT) ──
+    estimated_range_pct = float(candidate.get("estimated_range_pct", 0) or 0)
+    max_range_pct = float(profile.get("maxEstimatedRangePct", getattr(config, "MAX_ESTIMATED_RANGE_PCT", 7.0))) if profile else float(getattr(config, "MAX_ESTIMATED_RANGE_PCT", 7.0))
+    if max_range_pct > 0 and estimated_range_pct > max_range_pct:
+        logger.info(
+            "[VETO] range_too_large — %s | range=%.2f%% > limit=%.1f%% (Evita hiper-volatilidad)",
+            symbol, estimated_range_pct, max_range_pct
+        )
+        return False, "range_too_large", {"estimated_range_pct": estimated_range_pct, "max_limit": max_range_pct}
+
+    # ── VETO GLOBAL: Stop Loss Porcentual Máximo (MAX_STOP_LOSS_PCT) ──
+    max_sl_pct = float(profile.get("maxStopLossPct", getattr(config, "MAX_STOP_LOSS_PCT", 4.0))) if profile else float(getattr(config, "MAX_STOP_LOSS_PCT", 4.0))
+    
+    # Calcular SL % correspondiente
+    if candidate.get("source") == "LSE":
+        entry_price = float(candidate.get("lse_entry_price", 0) or 0)
+        sl_price = float(candidate.get("lse_stop_loss", 0) or 0)
+        if entry_price > 0 and sl_price > 0:
+            sl_pct = abs(entry_price - sl_price) / entry_price * 100
+        else:
+            sl_pct = 0.0
+    else:
+        range_pct = float(candidate.get("estimated_range_pct", 2.0) or 2.0) / 100.0
+        sl_dist = range_pct * (float(profile.get("slMultiplier", config.SL_MULTIPLIER)) if profile else config.SL_MULTIPLIER)
+        sl_pct = sl_dist * 100
+
+    if max_sl_pct > 0 and sl_pct > max_sl_pct:
+        logger.info(
+            "[VETO] stop_loss_too_expensive — %s | sl_pct=%.2f%% > limit=%.1f%% (Evita stop carísimo)",
+            symbol, sl_pct, max_sl_pct
+        )
+        return False, "stop_loss_too_expensive", {"sl_pct": sl_pct, "max_limit": max_sl_pct}
+
+    # ── VALIDACIONES Y FILTRADO POR TIERS PARA NEXUS / BRIDGE ──
+    if candidate.get("source") != "LSE":
+        # Detectar Tier
+        tier = "N/A"
+        if symbol in getattr(config, "WATCHLIST_TIER1", []):
+            tier = "T1"
+        elif symbol in getattr(config, "WATCHLIST_TIER2", []):
+            tier = "T2"
+        elif symbol in getattr(config, "WATCHLIST_TIER3", []):
+            tier = "T3"
+
+        # Regla A: Desactivar Trend Following en Tier 3
+        nexus_conf = float(candidate.get("nexus_confidence", 0) or 0)
+        is_trend_following = 60 < nexus_conf <= 80
+        if tier == "T3" and is_trend_following:
+            logger.info(
+                "[VETO] disabled_signal_for_tier — %s | Trend Following desactivado en Tier 3",
+                symbol
+            )
+            return False, "disabled_signal_for_tier", {"tier": tier, "nexus_confidence": nexus_conf}
+
+        confluence_score = float(candidate.get("confluence_score", 0) or 0)
+
+        # Regla de Oro (Veto Dinámico de Volatilidad / Confluencia):
+        vol_threshold = float(getattr(config, "HIGH_VOLATILITY_RANGE_THRESHOLD", 7.0))
+        if estimated_range_pct >= vol_threshold:
+            high_vol_min_conf = float(profile.get("highVolMinConfluence", getattr(config, "HIGH_VOLATILITY_MIN_CONFLUENCE", 90.0))) if profile else float(getattr(config, "HIGH_VOLATILITY_MIN_CONFLUENCE", 90.0))
+            if confluence_score < high_vol_min_conf:
+                logger.info(
+                    "[VETO] high_volatility_low_confluence — %s | Range=%.2f%% >= %.1f%% requires confluence >= %.1f (has %.1f)",
+                    symbol, estimated_range_pct, vol_threshold, high_vol_min_conf, confluence_score
+                )
+                return False, "high_volatility_low_confluence", {
+                    "confluence_score": confluence_score,
+                    "min_limit": high_vol_min_conf,
+                    "estimated_range_pct": estimated_range_pct
+                }
+        else:
+            # Rango estándar (< 7%): Validar contra el piso correspondiente
+            # Regla B: Subir MIN_CONFLUENCE_SCORE a 65.0 exclusivamente para Tier 3
+            tier3_min_conf = float(profile.get("tier3MinConfluenceScore", getattr(config, "TIER3_MIN_CONFLUENCE_SCORE", 65.0))) if profile else float(getattr(config, "TIER3_MIN_CONFLUENCE_SCORE", 65.0))
+            if tier == "T3" and confluence_score < tier3_min_conf:
+                logger.info(
+                    "[VETO] low_confluence_for_tier3 — %s | Score=%.1f < limit=%.1f en Tier 3",
+                    symbol, confluence_score, tier3_min_conf
+                )
+                return False, "low_confluence_for_tier3", {"confluence_score": confluence_score, "min_limit": tier3_min_conf}
+
+            # Regla C: Filtro estándar general para Tier 1 y 2
+            std_min_conf = float(profile.get("minConfluenceScore", getattr(config, "MIN_CONFLUENCE_SCORE", 60.0))) if profile else float(getattr(config, "MIN_CONFLUENCE_SCORE", 60.0))
+            if confluence_score < std_min_conf:
+                logger.info(
+                    "[VETO] low_confluence — %s | Score=%.1f < limit=%.1f",
+                    symbol, confluence_score, std_min_conf
+                )
+                return False, "low_confluence", {"confluence_score": confluence_score, "min_limit": std_min_conf}
+
     if candidate.get("source") == "LSE":
         if lse_reasoning_blocks_trade(candidate):
             return False, "lse_warning_block", {}
