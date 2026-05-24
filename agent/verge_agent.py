@@ -48,6 +48,9 @@ LSE_DUAL_SCAN = getattr(config, "LSE_DUAL_SCAN", True)
 LSE_ENTRY_MODE = getattr(config, "LSE_ENTRY_MODE", "conservative")
 if LSE_ENTRY_MODE not in ("conservative", "aggressive"):
     LSE_ENTRY_MODE = "conservative"
+
+# Scalping Clone — sentinel GUID for the hardcoded clone profile (not stored in DB)
+CLONE_PROFILE_ID = "00000000-0000-0000-0000-000000000001"
 LSE_HTTP_TIMEOUT_SEC = int(getattr(config, "LSE_HTTP_TIMEOUT_SEC", 360))
 LSE_MAX_SYMBOLS_PER_CYCLE = int(getattr(config, "LSE_MAX_SYMBOLS_PER_CYCLE", 200))
 LSE_BATCH_TOP_K = int(getattr(config, "LSE_BATCH_TOP_K", 10))
@@ -234,8 +237,25 @@ class VergeAgent:
             "isActive": True
         }
 
-        # The active profiles list will ALWAYS include Standard Scalping + any DB profile
-        self.active_profiles = [legacy_profile] + db_profiles
+        # Define the virtual clone profile for "Scalping Clone" (auto-clones Standard Scalping trades with -1 USDT SL)
+        self.clone_profile = {
+            "id": CLONE_PROFILE_ID,
+            "name": "Scalping Clone",
+            "minConfluenceScore": config.MIN_CONFLUENCE_SCORE,
+            "minNexusConfidence": getattr(config, "MIN_ENTRY_NEXUS", 70.0),
+            "tpMultiplier": getattr(config, "TP_MULTIPLIER", 2.0),
+            "slMultiplier": getattr(config, "SL_MULTIPLIER", 1.0),
+            "marginPerTrade": getattr(config, "MAX_MARGIN_PER_TRADE_USD", 150),
+            "maxOpenPositions": config.MAX_OPEN_POSITIONS,
+            "allowLong": True,
+            "allowShort": True,
+            "allowedSources": ["nexus", "scar", "redis_bridge"],
+            "isActive": True
+        }
+
+        # The active profiles list includes Standard Scalping + Scalping Clone + any DB profile
+        # Each profile evaluates candidates independently with its own slot limit
+        self.active_profiles = [legacy_profile, self.clone_profile] + db_profiles
         
         logger.info(f"Active strategies this cycle: {[p['name'] for p in self.active_profiles]}")
 
@@ -370,6 +390,17 @@ class VergeAgent:
             # Avoid duplicate symbols already found in internal scan
             existing_syms = {c["symbol"] for c in candidates}
             if nc["symbol"] not in existing_syms:
+                # Pre-validate NEXUS-TOP candidate before injection (consistent with scan flow)
+                try:
+                    nc_px = nc.get("price_at_signal") or self.fetcher.get_current_price(nc["symbol"])
+                    if nc_px:
+                        v_ok, v_code, v_metrics = validate_pre_trade(nc, nc_px)
+                        if not v_ok:
+                            logger.info(f"[NEXUS-TOP] VETO {nc['symbol']}: {v_code} — descartado.")
+                            continue
+                except Exception as e:
+                    logger.warning(f"[NEXUS-TOP] Error validando {nc['symbol']}: {e}")
+
                 candidates.append(nc)
                 logger.info(
                     "[NEXUS-TOP] Injected: %s | Nexus=%.1f%% | Dir=%s",
@@ -1437,6 +1468,19 @@ class VergeAgent:
         if profile and profile.get("id"):
             pos_details["strategy_profile_id"] = profile["id"]
 
+        # ── If this is the Scalping Clone profile, force -1 USDT SL ──
+        if profile and profile.get("id") == CLONE_PROFILE_ID:
+            entry_price = float(pos_details.get("entry_price", 0))
+            margin = float(pos_details.get("margin", 150))
+            leverage = float(pos_details.get("leverage", 1))
+            side = int(pos_details.get("side", 0))
+            if entry_price > 0 and margin * leverage > 0:
+                loss_pct = 1.0 / (margin * leverage)
+                if side == 0:  # LONG
+                    pos_details["sl_price"] = round(entry_price * (1 - loss_pct), 8)
+                else:  # SHORT
+                    pos_details["sl_price"] = round(entry_price * (1 + loss_pct), 8)
+
         if setup_metrics:
             sz = pos_details.get("lse_sizing") or pos_details.get("nexus_sizing") or {}
             if sz:
@@ -1495,9 +1539,15 @@ class VergeAgent:
             logger.error("[LIMIT] No se pudo conectar al backend para verificar posiciones activas. Abortando trade.")
             return False
 
-        # Evitar duplicar margen en el mismo símbolo
-        if any(t.get("symbol") == symbol for t in active_trades):
-            logger.info(f"[SKIP] Ya existe una posición activa para {symbol} en el backend. Evitando duplicar margen.")
+        # Evitar duplicar margen en el mismo símbolo dentro del mismo perfil
+        # (Permite que distintos perfiles abran el mismo símbolo de forma independiente)
+        p_id = profile.get("id") if profile else None
+        if any(
+            t.get("symbol") == symbol and
+            t.get("strategyProfileId", t.get("strategy_profile_id")) == p_id
+            for t in active_trades
+        ):
+            logger.info(f"[SKIP] Ya existe una posición activa para {symbol} en el perfil '{profile.get('name', 'Legacy') if profile else 'Standard Scalping'}'. Evitando duplicar margen.")
             return False
 
         # El límite se calcula por perfil para que las 5 estrategias operen de forma independiente
@@ -1580,9 +1630,73 @@ class VergeAgent:
                     "margin": pos_details.get("margin"),
                 }
             )
+
             return True
 
         return False
+
+    def _open_clone_trade(self, orig_trade_id: str, candidate: dict, orig_pos_details: dict, entry_reason: str, nexus_group: str) -> bool:
+        """
+        Opens a clone trade for Scalping Clone with the exact same parameters as the
+        Standard Scalping trade, EXCEPT the SL is recalculated to lose exactly -1 USDT.
+        Skips all validation filters — the trade was already validated by Standard Scalping.
+        """
+        symbol = candidate["symbol"]
+
+        # ── Check clone profile slot limit ──
+        clone_max = int(self.clone_profile.get("maxOpenPositions", config.MAX_OPEN_POSITIONS))
+        clone_active = [
+            t for t in (self.positions.get_active_trades() or [])
+            if t.get("strategyProfileId", t.get("strategy_profile_id")) == CLONE_PROFILE_ID
+        ]
+        if len(clone_active) >= clone_max:
+            logger.info(f"[CLONE] Profile Scalping Clone is full ({len(clone_active)}/{clone_max}). Skipping clone for {symbol}.")
+            return False
+
+        clone_pos = dict(orig_pos_details)
+        clone_pos.pop("agent_decision_json", None)
+        clone_pos["strategy_profile_id"] = CLONE_PROFILE_ID
+
+        # ── Recalculate SL to lose exactly -1 USDT ──
+        entry_price = float(orig_pos_details.get("entry_price", 0))
+        margin = float(orig_pos_details.get("margin", 150))
+        leverage = float(orig_pos_details.get("leverage", 1))
+        side = int(orig_pos_details.get("side", 0))
+
+        if entry_price > 0 and margin * leverage > 0:
+            loss_pct = 1.0 / (margin * leverage)  # Price movement % for $1 loss
+            if side == 0:  # LONG
+                clone_pos["sl_price"] = round(entry_price * (1 - loss_pct), 8)
+            else:  # SHORT
+                clone_pos["sl_price"] = round(entry_price * (1 + loss_pct), 8)
+
+        logger.info(f"[CLONE] Opening clone trade for {symbol} | entry={entry_price} | margin={margin}x{leverage} | SL={clone_pos.get('sl_price')} (-1 USDT)")
+        clone_result = self.positions.open_trade(clone_pos)
+
+        if clone_result:
+            clone_id = clone_result.get("id")
+            clone_local = {
+                "trade_id": clone_id,
+                "symbol": symbol,
+                "opened_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                "entry_reason": f"[CLONE] {entry_reason}",
+                "nexus_group": nexus_group,
+                "tier": self._get_tier_for_symbol(symbol),
+                **candidate,
+                **clone_pos,
+                "cloned_from": orig_trade_id,
+                "strategy_profile_id": CLONE_PROFILE_ID,
+            }
+            self.state.add_position(clone_local)
+            self.state.record_trade_action(symbol)
+            if candidate.get("source") == "LSE":
+                self.state.register_lse_symbol_cooldown(symbol, candidate.get("lse_timeframe") or "1h")
+            self.report.log_trade_opened(clone_local)
+            logger.info(f"[CLONE] ✅ Clone trade {clone_id} opened for {symbol}")
+            return True
+        else:
+            logger.warning(f"[CLONE] ❌ Failed to open clone trade for {symbol}")
+            return False
 
     # ─────────────────────────────────────────────────────────
     # Position management

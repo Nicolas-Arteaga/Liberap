@@ -16,6 +16,7 @@ export interface AgentLog {
 export class AgentSignalrService {
   private authService = inject(AuthService);
   private hubConnection: signalR.HubConnection | undefined;
+  private connectionPromise: Promise<void> | null = null;
 
   private logSubject = new Subject<AgentLog>();
   logs$ = this.logSubject.asObservable();
@@ -24,12 +25,29 @@ export class AgentSignalrService {
   state$ = this.stateSubject.asObservable();
 
   async startConnection() {
+    // Si ya hay una conexión en progreso (cualquier estado), esperar sin duplicar
+    if (this.connectionPromise) {
+      await this.connectionPromise;
+      return;
+    }
+
+    // Si ya estaba conectado, ok
     if (this.hubConnection?.state === signalR.HubConnectionState.Connected) return;
 
     const apiUrl = environment.apis?.default?.url || 'https://localhost:44396';
     const hubUrl = `${apiUrl}/signalr-hubs/agent`;
 
-    this.hubConnection = new signalR.HubConnectionBuilder()
+    // Marcar promesa ANTES de crear el builder para tapar cualquier race condition
+    this.connectionPromise = this._buildAndStart(hubUrl);
+    try {
+      await this.connectionPromise;
+    } finally {
+      this.connectionPromise = null;
+    }
+  }
+
+  private async _buildAndStart(hubUrl: string): Promise<void> {
+    const connection = new signalR.HubConnectionBuilder()
       .withUrl(hubUrl, {
         accessTokenFactory: () => this.authService.getToken() || ''
       })
@@ -37,7 +55,7 @@ export class AgentSignalrService {
       .configureLogging(signalR.LogLevel.Information)
       .build();
 
-    this.hubConnection.on('ReceiveAgentLog', (message: string, color?: string) => {
+    connection.on('ReceiveAgentLog', (message: string, color?: string) => {
       this.logSubject.next({
         message,
         color,
@@ -45,11 +63,12 @@ export class AgentSignalrService {
       });
     });
 
-    this.hubConnection.on('ServerStateChanged', (state: string) => {
+    connection.on('ServerStateChanged', (state: string) => {
       this.stateSubject.next(state);
     });
 
-    await this.hubConnection.start();
+    this.hubConnection = connection;
+    await connection.start();
   }
 
   async stopConnection() {

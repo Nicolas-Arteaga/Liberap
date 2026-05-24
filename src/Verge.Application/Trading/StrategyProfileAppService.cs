@@ -19,6 +19,8 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
         _repo = repo;
     }
 
+    private static readonly Guid CloneProfileId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
     [HttpGet]
     public async Task<List<StrategyProfileDto>> GetListAsync()
     {
@@ -34,6 +36,17 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
             Name = "Standard Scalping",
             Description = "Estrategia predeterminada de la app (Scalping)",
             Color = "#3B82F6",
+            IsActive = true
+        });
+
+        // Add virtual Scalping Clone profile (auto-clones Standard Scalping trades with -1 USDT SL)
+        dtos.Insert(1, new StrategyProfileDto
+        {
+            Id = CloneProfileId,
+            UserId = userId,
+            Name = "Scalping Clone",
+            Description = "Copia automática de Standard Scalping con SL de -1 USDT",
+            Color = "#FF6B6B",
             IsActive = true
         });
 
@@ -55,6 +68,19 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
                 IsActive = true
             };
         }
+
+        if (id == CloneProfileId)
+        {
+            return new StrategyProfileDto
+            {
+                Id = CloneProfileId,
+                UserId = CurrentUser.Id!.Value,
+                Name = "Scalping Clone",
+                Description = "Copia automática de Standard Scalping con SL de -1 USDT",
+                Color = "#FF6B6B",
+                IsActive = true
+            };
+        }
         var profile = await _repo.GetAsync(id);
         EnsureOwnership(profile);
         return MapToDto(profile);
@@ -73,7 +99,8 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
     [HttpPut]
     public async Task<StrategyProfileDto> UpdateAsync(Guid id, CreateUpdateStrategyProfileDto input)
     {
-        if (id == Guid.Empty) throw new UserFriendlyException("No se puede editar la estrategia predeterminada.");
+        if (id == Guid.Empty || id == CloneProfileId)
+            throw new UserFriendlyException("No se puede editar una estrategia virtual del sistema.");
         var profile = await _repo.GetAsync(id);
         EnsureOwnership(profile);
         ApplyInput(profile, input);
@@ -84,7 +111,8 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
     [HttpDelete]
     public async Task DeleteAsync(Guid id)
     {
-        if (id == Guid.Empty) throw new UserFriendlyException("No se puede eliminar la estrategia predeterminada.");
+        if (id == Guid.Empty || id == CloneProfileId)
+            throw new UserFriendlyException("No se puede eliminar una estrategia virtual del sistema.");
         var profile = await _repo.GetAsync(id);
         EnsureOwnership(profile);
         await _repo.DeleteAsync(profile, autoSave: true);

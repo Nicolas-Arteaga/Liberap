@@ -20,6 +20,7 @@ public class AgentProcessManager : ISingletonDependency
     private readonly IConfiguration _configuration;
     private readonly ConcurrentDictionary<string, Process> _processes = new();
     private readonly ConcurrentDictionary<string, DateTime> _startTimes = new();
+    private readonly SemaphoreSlim _startLock = new(1, 1);
 
     public AgentProcessManager(
         IHubContext<AgentHub> hubContext,
@@ -34,6 +35,7 @@ public class AgentProcessManager : ISingletonDependency
     public async Task StartProcessAsync(string name, string scriptName,
         System.Collections.Generic.Dictionary<string, string>? extraEnv = null)
     {
+        await _startLock.WaitAsync();
         try
         {
             if (IsProcessRunning(name))
@@ -133,6 +135,10 @@ public class AgentProcessManager : ISingletonDependency
         {
             _logger.LogError(ex, "Failed to start {Name}", name);
             await _hubContext.Clients.All.SendAsync("ReceiveAgentLog", $"❌ ERROR FATAL al iniciar {name}: {ex.Message}", "#ef4444");
+        }
+        finally
+        {
+            _startLock.Release();
         }
     }
 

@@ -88,11 +88,12 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
             }
         }
 
-        // 2.5. SMART POSITION MANAGEMENT: If position exists, ADD to it (Average Price) instead of blocking
+        // 2.5. SMART POSITION MANAGEMENT: If position exists for this strategy profile, ADD to it (Average Price) instead of blocking
         var existingTrade = await _tradeRepo.FirstOrDefaultAsync(t => 
             t.UserId == userId && 
             t.Symbol == symbol && 
-            t.Status == TradeStatus.Open);
+            t.Status == TradeStatus.Open &&
+            t.StrategyProfileId == input.StrategyProfileId);
 
         if (existingTrade != null)
         {

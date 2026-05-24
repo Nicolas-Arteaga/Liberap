@@ -499,11 +499,13 @@ export class AgentComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   startAgent() {
     if (this.systemState !== 'SERVER_READY') return;
+    this.systemState = 'STARTING_SERVER'; // Bloquea doble click inmediatamente
     this.addLog('Iniciando Agente en el servidor...', '#64748b');
     this.agentService.startAgent().subscribe({
       next: () => {},
       error: (err) => {
         this.addLog('❌ ERROR al iniciar agente: ' + (err.message || 'Error desconocido'), '#ef4444');
+        this.systemState = 'SERVER_READY'; // Re-habilita botón si falló
       }
     });
   }
