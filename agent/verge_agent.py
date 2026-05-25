@@ -1641,6 +1641,32 @@ class VergeAgent:
             logger.info(f"[CLONE] Profile Scalping Clone is full ({len(clone_active)}/{clone_max}). Skipping clone for {symbol}.")
             return False
 
+        # ── CLONE PROTECTION: Block coexistence in same symbol ──
+        # If Standard Scalping already has this symbol open, Clone cannot open it
+        standard_active = [
+            t for t in (self.positions.get_active_trades() or [])
+            if t.get("symbol") == symbol and
+            t.get("strategyProfileId", t.get("strategy_profile_id")) != CLONE_PROFILE_ID
+        ]
+        if len(standard_active) > 0:
+            logger.warning(f"[CLONE] VETO {symbol}: Standard Scalping already has {len(standard_active)} position(s) open. Skipping clone to avoid double exposure.")
+            return False
+
+        # ── CLONE PROTECTION: Stricter validation than Standard ──
+        # Clone requires higher quality signals than Standard
+        confluence = float(candidate.get("confluence_score", 0) or 0)
+        clone_min_confluence = getattr(config, "MIN_CONFLUENCE_SCORE", 60.0) + 10.0  # 10 points higher than Standard
+        if confluence < clone_min_confluence:
+            logger.warning(f"[CLONE] VETO {symbol}: Confluence {confluence} < Clone minimum {clone_min_confluence}. Skipping clone.")
+            return False
+
+        # Clone should avoid extremely volatile tokens (range > 10%)
+        estimated_range = float(candidate.get("estimated_range_pct", 0) or 0)
+        clone_max_range = getattr(config, "MAX_ESTIMATED_RANGE_PCT", 15.0) - 5.0  # 5% lower than Standard
+        if estimated_range > clone_max_range:
+            logger.warning(f"[CLONE] VETO {symbol}: Range {estimated_range}% > Clone maximum {clone_max_range}%. Skipping clone.")
+            return False
+
         clone_pos = dict(orig_pos_details)
         clone_pos.pop("agent_decision_json", None)
         clone_pos["strategy_profile_id"] = CLONE_PROFILE_ID
@@ -1654,6 +1680,14 @@ class VergeAgent:
 
         if entry_price > 0:
             sl_dist = range_pct * (config.SL_MULTIPLIER * 2)  # 2x Standard Scalping SL
+            sl_pct = sl_dist * 100  # Convert to percentage for ceiling check
+
+            # ── CLONE PROTECTION: SL ceiling check ──
+            clone_max_sl_pct = getattr(config, "CLONE_MAX_STOP_LOSS_PCT", 5.0)
+            if sl_pct > clone_max_sl_pct:
+                logger.warning(f"[CLONE] VETO {symbol}: SL {sl_pct:.2f}% exceeds Clone ceiling {clone_max_sl_pct}%. Skipping clone.")
+                return False
+
             if side == 0:  # LONG
                 clone_pos["sl_price"] = round(entry_price * (1 - sl_dist), 8)
             else:  # SHORT
@@ -1727,11 +1761,17 @@ class VergeAgent:
             # For LONG: track lowest price seen. For SHORT: track highest price seen.
             prev_adverse = pos.get("max_adverse_price")
             if side == 0:  # LONG
-                if prev_adverse is None or current_price < prev_adverse:
+                if prev_adverse is None:
+                    pos["max_adverse_price"] = pos.get("entry_price") or current_price
+                    logger.info(f" [MAE] {symbol} LONG init max_adverse_price from entry={pos['max_adverse_price']}")
+                elif current_price < prev_adverse:
                     pos["max_adverse_price"] = current_price
                     logger.info(f" [MAE] {symbol} LONG updated max_adverse_price: {current_price}")
             else:  # SHORT
-                if prev_adverse is None or current_price > prev_adverse:
+                if prev_adverse is None:
+                    pos["max_adverse_price"] = pos.get("entry_price") or current_price
+                    logger.info(f" [MAE] {symbol} SHORT init max_adverse_price from entry={pos['max_adverse_price']}")
+                elif current_price > prev_adverse:
                     pos["max_adverse_price"] = current_price
                     logger.info(f" [MAE] {symbol} SHORT updated max_adverse_price: {current_price}")
 

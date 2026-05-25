@@ -16,5 +16,5 @@ public interface ISimulatedTradeAppService : IApplicationService
     Task<SimulationPerformanceDto> GetPerformanceStatsAsync();
     Task<List<SimulatedTradeDto>> GetRecentTradesAsync(int limit = 20);
     Task UpdateTpSlAsync(Guid tradeId, UpdateTpSlInputDto input);
-    Task UpdateMaxAdversePriceAsync(Guid tradeId, decimal maxAdversePrice);
+    Task UpdateMaxAdversePriceAsync(Guid tradeId, UpdateMaxAdversePriceInputDto input);
 }

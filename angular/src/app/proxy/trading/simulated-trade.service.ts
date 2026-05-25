@@ -1,4 +1,4 @@
-import type { OpenTradeInputDto, SimulatedTradeDto, SimulationPerformanceDto, UpdateTpSlInputDto } from './dtos/models';
+import type { OpenTradeInputDto, SimulatedTradeDto, SimulationPerformanceDto, UpdateMaxAdversePriceInputDto, UpdateTpSlInputDto } from './dtos/models';
 import { RestService, Rest } from '@abp/ng.core';
 import { Injectable, inject } from '@angular/core';
 
@@ -77,11 +77,11 @@ export class SimulatedTradeService {
     { apiName: this.apiName,...config });
   
 
-  updateMaxAdversePrice = (tradeId: string, maxAdversePrice: number, config?: Partial<Rest.Config>) =>
+  updateMaxAdversePrice = (tradeId: string, input: UpdateMaxAdversePriceInputDto, config?: Partial<Rest.Config>) =>
     this.restService.request<any, void>({
       method: 'PUT',
       url: `/api/app/simulated-trade/max-adverse-price/${tradeId}`,
-      params: { maxAdversePrice },
+      body: input,
     },
     { apiName: this.apiName,...config });
   

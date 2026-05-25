@@ -90,3 +90,8 @@ public class UpdateTpSlInputDto
     public decimal? TpPrice { get; set; }
     public decimal? SlPrice { get; set; }
 }
+
+public class UpdateMaxAdversePriceInputDto
+{
+    public decimal MaxAdversePrice { get; set; }
+}

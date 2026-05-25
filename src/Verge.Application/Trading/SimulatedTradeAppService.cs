@@ -500,7 +500,7 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
             trade.Symbol, trade.TpPrice, trade.SlPrice);
     }
 
-    public async Task UpdateMaxAdversePriceAsync(Guid tradeId, decimal maxAdversePrice)
+    public async Task UpdateMaxAdversePriceAsync(Guid tradeId, UpdateMaxAdversePriceInputDto input)
     {
         var userId = CurrentUser.Id!.Value;
         var trade = await _tradeRepo.GetAsync(tradeId);
@@ -508,11 +508,11 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         if (trade.UserId != userId)
             throw new UserFriendlyException("You don't have permission to update this trade.");
 
-        trade.MaxAdversePrice = maxAdversePrice;
+        trade.MaxAdversePrice = input.MaxAdversePrice;
         await _tradeRepo.UpdateAsync(trade, autoSave: true);
 
         Logger.LogInformation("📉 [Simulation] MaxAdversePrice recorded for {Symbol}: {Price}",
-            trade.Symbol, maxAdversePrice);
+            trade.Symbol, input.MaxAdversePrice);
     }
 
     private static SimulatedTradeDto MapToDto(SimulatedTrade t) => new SimulatedTradeDto

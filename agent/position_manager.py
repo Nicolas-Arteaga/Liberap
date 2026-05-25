@@ -113,9 +113,8 @@ class PositionManager:
             logger.error(" Cannot update MaxAdversePrice: No valid auth token.")
             return False
 
-        url = f"{self.base_url}/api/app/simulated-trade/update-max-adverse-price"
+        url = f"{self.base_url}/api/app/simulated-trade/max-adverse-price/{trade_id}"
         payload = {
-            "tradeId": trade_id,
             "maxAdversePrice": max_adverse_price
         }
         try:

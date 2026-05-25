@@ -3301,10 +3301,10 @@
                       "defaultValue": null
                     },
                     {
-                      "name": "maxAdversePrice",
-                      "typeAsString": "System.Decimal, System.Private.CoreLib",
-                      "type": "System.Decimal",
-                      "typeSimple": "number",
+                      "name": "input",
+                      "typeAsString": "Verge.Trading.DTOs.UpdateMaxAdversePriceInputDto, Verge.Application.Contracts",
+                      "type": "Verge.Trading.DTOs.UpdateMaxAdversePriceInputDto",
+                      "typeSimple": "Verge.Trading.DTOs.UpdateMaxAdversePriceInputDto",
                       "isOptional": false,
                       "defaultValue": null
                     }
@@ -3546,8 +3546,8 @@
               "allowAnonymous": null,
               "implementFrom": "Verge.Trading.ISimulatedTradeAppService"
             },
-            "UpdateMaxAdversePriceAsyncByTradeIdAndMaxAdversePrice": {
-              "uniqueName": "UpdateMaxAdversePriceAsyncByTradeIdAndMaxAdversePrice",
+            "UpdateMaxAdversePriceAsyncByTradeIdAndInput": {
+              "uniqueName": "UpdateMaxAdversePriceAsyncByTradeIdAndInput",
               "name": "UpdateMaxAdversePriceAsync",
               "httpMethod": "PUT",
               "url": "api/app/simulated-trade/max-adverse-price/{tradeId}",
@@ -3562,10 +3562,10 @@
                   "defaultValue": null
                 },
                 {
-                  "name": "maxAdversePrice",
-                  "typeAsString": "System.Decimal, System.Private.CoreLib",
-                  "type": "System.Decimal",
-                  "typeSimple": "number",
+                  "name": "input",
+                  "typeAsString": "Verge.Trading.DTOs.UpdateMaxAdversePriceInputDto, Verge.Application.Contracts",
+                  "type": "Verge.Trading.DTOs.UpdateMaxAdversePriceInputDto",
+                  "typeSimple": "Verge.Trading.DTOs.UpdateMaxAdversePriceInputDto",
                   "isOptional": false,
                   "defaultValue": null
                 }
@@ -3584,15 +3584,15 @@
                   "descriptorName": ""
                 },
                 {
-                  "nameOnMethod": "maxAdversePrice",
-                  "name": "maxAdversePrice",
+                  "nameOnMethod": "input",
+                  "name": "input",
                   "jsonName": null,
-                  "type": "System.Decimal",
-                  "typeSimple": "number",
+                  "type": "Verge.Trading.DTOs.UpdateMaxAdversePriceInputDto",
+                  "typeSimple": "Verge.Trading.DTOs.UpdateMaxAdversePriceInputDto",
                   "isOptional": false,
                   "defaultValue": null,
                   "constraintTypes": null,
-                  "bindingSourceId": "ModelBinding",
+                  "bindingSourceId": "Body",
                   "descriptorName": ""
                 }
               ],
@@ -11903,6 +11903,27 @@
           "jsonName": null,
           "type": "System.Int32?",
           "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.DTOs.UpdateMaxAdversePriceInputDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "MaxAdversePrice",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
           "isRequired": false,
           "minLength": null,
           "maxLength": null,

@@ -215,6 +215,10 @@ export interface TradingSignalDto extends EntityDto<string> {
   score?: number;
 }
 
+export interface UpdateMaxAdversePriceInputDto {
+  maxAdversePrice: number;
+}
+
 export interface UpdateTpSlInputDto {
   tpPrice?: number;
   slPrice?: number;
