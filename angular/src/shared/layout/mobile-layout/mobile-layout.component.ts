@@ -17,7 +17,9 @@ import {
   analyticsOutline,
   notificationsOutline,
   settingsOutline,
-  personOutline
+  personOutline,
+  radioOutline,
+  flashOutline
 } from 'ionicons/icons';
 import { Subscription, Observable } from 'rxjs';
 import { map, filter } from 'rxjs/operators';
@@ -93,7 +95,8 @@ export class MobileLayoutComponent implements OnInit, AfterViewInit, OnDestroy {
     addIcons({
       homeOutline, pulseOutline, hardwareChipOutline, gridOutline,
       briefcaseOutline, listOutline, analyticsOutline,
-      notificationsOutline, settingsOutline, personOutline
+      notificationsOutline, settingsOutline, personOutline,
+      radioOutline, flashOutline
     });
   }
 

@@ -1016,6 +1016,22 @@
                     "type": "System.Void",
                     "typeSimple": "System.Void"
                   }
+                },
+                {
+                  "name": "GetGhostAgentsAsync",
+                  "parametersOnMethod": [],
+                  "returnValue": {
+                    "type": "System.Object",
+                    "typeSimple": "object"
+                  }
+                },
+                {
+                  "name": "PurgeGhostAgentsAsync",
+                  "parametersOnMethod": [],
+                  "returnValue": {
+                    "type": "System.Void",
+                    "typeSimple": "System.Void"
+                  }
                 }
               ]
             }
@@ -1282,6 +1298,36 @@
                   "descriptorName": ""
                 }
               ],
+              "returnValue": {
+                "type": "System.Void",
+                "typeSimple": "System.Void"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Agent.IAgentAppService"
+            },
+            "GetGhostAgentsAsync": {
+              "uniqueName": "GetGhostAgentsAsync",
+              "name": "GetGhostAgentsAsync",
+              "httpMethod": "GET",
+              "url": "api/app/agent/ghost-agents",
+              "supportedVersions": [],
+              "parametersOnMethod": [],
+              "parameters": [],
+              "returnValue": {
+                "type": "System.Object",
+                "typeSimple": "object"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Agent.IAgentAppService"
+            },
+            "PurgeGhostAgentsAsync": {
+              "uniqueName": "PurgeGhostAgentsAsync",
+              "name": "PurgeGhostAgentsAsync",
+              "httpMethod": "POST",
+              "url": "api/app/agent/purge-ghost-agents",
+              "supportedVersions": [],
+              "parametersOnMethod": [],
+              "parameters": [],
               "returnValue": {
                 "type": "System.Void",
                 "typeSimple": "System.Void"
@@ -3242,6 +3288,31 @@
                     "type": "System.Void",
                     "typeSimple": "System.Void"
                   }
+                },
+                {
+                  "name": "UpdateMaxAdversePriceAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "tradeId",
+                      "typeAsString": "System.Guid, System.Private.CoreLib",
+                      "type": "System.Guid",
+                      "typeSimple": "string",
+                      "isOptional": false,
+                      "defaultValue": null
+                    },
+                    {
+                      "name": "maxAdversePrice",
+                      "typeAsString": "System.Decimal, System.Private.CoreLib",
+                      "type": "System.Decimal",
+                      "typeSimple": "number",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "System.Void",
+                    "typeSimple": "System.Void"
+                  }
                 }
               ]
             }
@@ -3465,6 +3536,63 @@
                   "defaultValue": null,
                   "constraintTypes": null,
                   "bindingSourceId": "Body",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "System.Void",
+                "typeSimple": "System.Void"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.ISimulatedTradeAppService"
+            },
+            "UpdateMaxAdversePriceAsyncByTradeIdAndMaxAdversePrice": {
+              "uniqueName": "UpdateMaxAdversePriceAsyncByTradeIdAndMaxAdversePrice",
+              "name": "UpdateMaxAdversePriceAsync",
+              "httpMethod": "PUT",
+              "url": "api/app/simulated-trade/max-adverse-price/{tradeId}",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "tradeId",
+                  "typeAsString": "System.Guid, System.Private.CoreLib",
+                  "type": "System.Guid",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null
+                },
+                {
+                  "name": "maxAdversePrice",
+                  "typeAsString": "System.Decimal, System.Private.CoreLib",
+                  "type": "System.Decimal",
+                  "typeSimple": "number",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "tradeId",
+                  "name": "tradeId",
+                  "jsonName": null,
+                  "type": "System.Guid",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": [],
+                  "bindingSourceId": "Path",
+                  "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "maxAdversePrice",
+                  "name": "maxAdversePrice",
+                  "jsonName": null,
+                  "type": "System.Decimal",
+                  "typeSimple": "number",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
                   "descriptorName": ""
                 }
               ],
@@ -11055,6 +11183,18 @@
           "jsonName": null,
           "type": "System.Guid?",
           "typeSimple": "string?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "MaxAdversePrice",
+          "jsonName": null,
+          "type": "System.Decimal?",
+          "typeSimple": "number?",
           "isRequired": false,
           "minLength": null,
           "maxLength": null,

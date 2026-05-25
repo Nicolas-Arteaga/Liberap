@@ -156,14 +156,31 @@
 
     <!-- Row 2 -->
     <div class="actions-grid px-0 mt-2">
-      <app-card-icon icon="stats-chart-outline" variant="stacked" [useCardContentBg]="true" routerLink="/dashboard-advanced" cardNumber="04" [showChevron]="true" chevronColor="#00e5ff">
+      <app-card-icon icon="radio-outline" variant="stacked" [useCardContentBg]="true" routerLink="/market-radar" cardNumber="04" [showChevron]="true" chevronColor="#00e5ff">
+        <div class="d-flex flex-column">
+          <p class="text-white" style="font-size:10px; font-weight:800; font-family:'Orbitron',sans-serif; letter-spacing:0.06em; text-transform:uppercase; margin:0;">RADAR</p>
+          <small style="font-family:'Share Tech Mono',monospace; font-size:8px; color:rgba(0,243,255,0.4); margin-top:2px;">Explora oportunidades del mercado</small>
+        </div>
+      </app-card-icon>
+
+      <app-card-icon icon="flash-outline" variant="stacked" [useCardContentBg]="true" routerLink="/liquidity-engine" cardNumber="05" [showChevron]="true" chevronColor="#ff4466">
+        <div class="d-flex flex-column">
+          <p class="text-white" style="font-size:10px; font-weight:800; font-family:'Orbitron',sans-serif; letter-spacing:0.06em; text-transform:uppercase; margin:0;">LSE</p>
+          <small style="font-family:'Share Tech Mono',monospace; font-size:8px; color:rgba(0,243,255,0.4); margin-top:2px;">Liquidity Search Engine</small>
+        </div>
+      </app-card-icon>
+
+      <app-card-icon icon="stats-chart-outline" variant="stacked" [useCardContentBg]="true" routerLink="/dashboard-advanced" cardNumber="06" [showChevron]="true" chevronColor="#00e5ff">
         <div class="d-flex flex-column">
           <p class="text-white" style="font-size:10px; font-weight:800; font-family:'Orbitron',sans-serif; letter-spacing:0.06em; text-transform:uppercase; margin:0;">DASHBOARD AVANZADO</p>
           <small style="font-family:'Share Tech Mono',monospace; font-size:8px; color:rgba(0,243,255,0.4); margin-top:2px;">Métricas, rendimiento y análisis profundo</small>
         </div>
       </app-card-icon>
+    </div>
 
-      <app-card-icon icon="time-outline" variant="stacked" [useCardContentBg]="true" routerLink="/history" cardNumber="05" [showChevron]="true" chevronColor="#ff4466">
+    <!-- Row 3 -->
+    <div class="actions-grid px-0 mt-2">
+      <app-card-icon icon="time-outline" variant="stacked" [useCardContentBg]="true" routerLink="/history" cardNumber="07" [showChevron]="true" chevronColor="#ff4466">
         <div class="d-flex flex-column">
           <p class="text-white" style="font-size:10px; font-weight:800; font-family:'Orbitron',sans-serif; letter-spacing:0.06em; text-transform:uppercase; margin:0;">HISTORIAL</p>
           <small style="font-family:'Share Tech Mono',monospace; font-size:8px; color:rgba(0,243,255,0.4); margin-top:2px;">Revisa tus operaciones anteriores</small>
@@ -171,7 +188,7 @@
       </app-card-icon>
 
       <app-card-icon icon="settings-outline" variant="stacked" [useCardContentBg]="true"
-        (click)="navigateToStrategies()" class="cursor-pointer" cardNumber="06" [showChevron]="true" chevronColor="#00e5ff">
+        (click)="navigateToStrategies()" class="cursor-pointer" cardNumber="08" [showChevron]="true" chevronColor="#00e5ff">
         <div class="d-flex flex-column">
           <p class="text-white" style="font-size:10px; font-weight:800; font-family:'Orbitron',sans-serif; letter-spacing:0.06em; text-transform:uppercase; margin:0;">ESTRATEGIA</p>
           <small style="font-family:'Share Tech Mono',monospace; font-size:8px; color:rgba(0,243,255,0.4); margin-top:2px;">Configura y optimiza tus estrategias</small>

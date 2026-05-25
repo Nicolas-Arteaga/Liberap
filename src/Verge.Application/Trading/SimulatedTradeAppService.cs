@@ -308,6 +308,46 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
                     trade.UnrealizedPnl = 0;
                     trade.ROIPercentage = 0;
 
+                    // Calculate and save MaxAdversePrice if not already set
+                    if (!trade.MaxAdversePrice.HasValue)
+                    {
+                        // Try to get the real MAE from the Python agent
+                        try
+                        {
+                            using var httpClient = new HttpClient();
+                            httpClient.Timeout = TimeSpan.FromSeconds(2);
+                            var agentUrl = $"http://127.0.0.1:8002/position/{tradeId}/max-adverse-price";
+                            var response = await httpClient.GetAsync(agentUrl);
+
+                            if (response.IsSuccessStatusCode)
+                            {
+                                var content = await response.Content.ReadAsStringAsync();
+                                var agentData = System.Text.Json.JsonDocument.Parse(content);
+                                var maxAdv = agentData.RootElement.GetProperty("maxAdversePrice");
+
+                                if (maxAdv.ValueKind != System.Text.Json.JsonValueKind.Null)
+                                {
+                                    trade.MaxAdversePrice = maxAdv.GetDecimal();
+                                    Logger.LogInformation("📉 [Simulation] MaxAdversePrice retrieved from agent for manual close {Symbol}: {Price}",
+                                        trade.Symbol, trade.MaxAdversePrice);
+                                }
+                                else
+                                {
+                                    Logger.LogWarning("⚠️ [Simulation] Agent returned null MaxAdversePrice for {Symbol}", trade.Symbol);
+                                }
+                            }
+                            else
+                            {
+                                Logger.LogWarning("⚠️ [Simulation] Failed to get MaxAdversePrice from agent for {Symbol}: {StatusCode}",
+                                    trade.Symbol, response.StatusCode);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.LogWarning(ex, "⚠️ [Simulation] Error getting MaxAdversePrice from agent for {Symbol}", trade.Symbol);
+                        }
+                    }
+
                     await tRepo.UpdateAsync(trade, autoSave: true);
                     
                     // 4. Return margin + entryFee + realizedPnl to user balance
@@ -382,31 +422,43 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
     {
         var userId = CurrentUser.Id!.Value;
         var trades = await _tradeRepo.GetListAsync(t => t.UserId == userId && t.Status != TradeStatus.Open);
-        
+
+        // Get active strategies to filter trades
+        var strategyProfileRepo = LazyServiceProvider.LazyGetRequiredService<IRepository<StrategyProfile, Guid>>();
+        var activeStrategies = await strategyProfileRepo.GetListAsync(s => s.UserId == userId && s.IsActive);
+        var activeStrategyIds = activeStrategies.Select(s => s.Id).ToHashSet();
+
+        // Filter trades: include trades with no strategy (default) OR trades from active strategies
+        var filteredTrades = trades.Where(t => 
+            !t.StrategyProfileId.HasValue || 
+            t.StrategyProfileId.Value == Guid.Empty || 
+            activeStrategyIds.Contains(t.StrategyProfileId.Value)
+        ).ToList();
+
         var stats = new SimulationPerformanceDto();
-        if (!trades.Any())
+        if (!filteredTrades.Any())
         {
             stats.EquityCurve.Add(new EquityPointDto { Timestamp = DateTime.UtcNow, Balance = 10000 });
             return stats;
         }
 
-        stats.TotalTrades = trades.Count;
-        stats.TotalGain = trades.Sum(t => t.RealizedPnl ?? 0);
-        var wins = trades.Count(t => t.Status == TradeStatus.Win);
+        stats.TotalTrades = filteredTrades.Count;
+        stats.TotalGain = filteredTrades.Sum(t => t.RealizedPnl ?? 0);
+        var wins = filteredTrades.Count(t => t.Status == TradeStatus.Win);
         stats.WinRate = stats.TotalTrades > 0 ? (decimal)wins / stats.TotalTrades * 100 : 0;
         stats.AvgPerTrade = stats.TotalTrades > 0 ? stats.TotalGain / stats.TotalTrades : 0;
 
         // Corrected Equity Curve: Initial 10k + cumulative realized PnL
         decimal currentBalance = 10000;
-        stats.EquityCurve.Add(new EquityPointDto { Timestamp = trades.Min(t => t.OpenedAt).AddMinutes(-1), Balance = currentBalance });
+        stats.EquityCurve.Add(new EquityPointDto { Timestamp = filteredTrades.Min(t => t.OpenedAt).AddMinutes(-1), Balance = currentBalance });
 
-        foreach (var trade in trades.OrderBy(t => t.ClosedAt))
+        foreach (var trade in filteredTrades.OrderBy(t => t.ClosedAt))
         {
             currentBalance += (trade.RealizedPnl ?? 0);
-            stats.EquityCurve.Add(new EquityPointDto 
-            { 
-                Timestamp = trade.ClosedAt ?? trade.OpenedAt, 
-                Balance = currentBalance 
+            stats.EquityCurve.Add(new EquityPointDto
+            {
+                Timestamp = trade.ClosedAt ?? trade.OpenedAt,
+                Balance = currentBalance
             });
         }
 
@@ -418,6 +470,7 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
     {
         var userId = CurrentUser.Id!.Value;
         var trades = await _tradeRepo.GetListAsync(t => t.UserId == userId);
+
         return trades.OrderByDescending(t => t.OpenedAt)
                      .Take(limit)
                      .Select(MapToDto)
@@ -445,6 +498,21 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         
         Logger.LogInformation("🎯 [Simulation] TP/SL updated for {Symbol}: TP {Tp}, SL {Sl}", 
             trade.Symbol, trade.TpPrice, trade.SlPrice);
+    }
+
+    public async Task UpdateMaxAdversePriceAsync(Guid tradeId, decimal maxAdversePrice)
+    {
+        var userId = CurrentUser.Id!.Value;
+        var trade = await _tradeRepo.GetAsync(tradeId);
+
+        if (trade.UserId != userId)
+            throw new UserFriendlyException("You don't have permission to update this trade.");
+
+        trade.MaxAdversePrice = maxAdversePrice;
+        await _tradeRepo.UpdateAsync(trade, autoSave: true);
+
+        Logger.LogInformation("📉 [Simulation] MaxAdversePrice recorded for {Symbol}: {Price}",
+            trade.Symbol, maxAdversePrice);
     }
 
     private static SimulatedTradeDto MapToDto(SimulatedTrade t) => new SimulatedTradeDto
@@ -476,7 +544,8 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         TradingSignalId = t.TradingSignalId,
         Exchange = t.Exchange,
         AgentDecisionJson = t.AgentDecisionJson,
-        StrategyProfileId = t.StrategyProfileId
+        StrategyProfileId = t.StrategyProfileId,
+        MaxAdversePrice = t.MaxAdversePrice
     };
 
     /// <summary>

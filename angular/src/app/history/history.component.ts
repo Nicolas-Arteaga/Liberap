@@ -205,12 +205,12 @@ export class HistoryComponent {
   private recomputeAll() {
     // 1. Filter
     const filtered = this.strategyFilter === 'all'
-      ? this.realTrades
+      ? this.realTrades.filter(t => this.isStrategyActive(t.strategyProfileId))
       : this.realTrades.filter(t => {
           if (this.strategyFilter === '00000000-0000-0000-0000-000000000000') {
-            return !t.strategyProfileId || t.strategyProfileId === '00000000-0000-0000-0000-000000000000';
+            return (!t.strategyProfileId || t.strategyProfileId === '00000000-0000-0000-0000-000000000000') && this.isStrategyActive(t.strategyProfileId);
           }
-          return t.strategyProfileId === this.strategyFilter;
+          return t.strategyProfileId === this.strategyFilter && this.isStrategyActive(t.strategyProfileId);
         });
 
     this._filteredTrades = filtered;
@@ -306,6 +306,14 @@ export class HistoryComponent {
     return this.strategyMap.get(id)?.color || '#00C47D';
   }
 
+  isStrategyActive(id?: string): boolean {
+    if (!id || id === '00000000-0000-0000-0000-000000000000') return true;
+    const strategy = this.strategyMap.get(id);
+    // Si la estrategia no existe en el map, mostrar los trades (fallback seguro)
+    if (!strategy) return true;
+    return strategy.isActive;
+  }
+
   formatCurrency(amount: number): string {
     const sign = amount < 0 ? '-' : amount > 0 ? '+' : '';
     return `${sign}$${Math.abs(amount).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -323,6 +331,38 @@ export class HistoryComponent {
 
   private formatDateLabel(date: string): string {
     return new Date(date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+  }
+
+  getMaxAdversePriceDisplay(trade: SimulatedTradeDto): string {
+    if (!trade.maxAdversePrice) return '';
+    
+    // Calcular la distancia adversa en USDT desde el entry price
+    let adverseDistance: number;
+    if (trade.side === 0) {
+      // LONG: adverse es menor que entry (bajó)
+      adverseDistance = trade.maxAdversePrice - trade.entryPrice;
+    } else {
+      // SHORT: adverse es mayor que entry (subió)
+      adverseDistance = trade.entryPrice - trade.maxAdversePrice;
+    }
+    
+    const sign = adverseDistance < 0 ? '-' : '';
+    return `${sign}$${Math.abs(adverseDistance).toFixed(2)}`;
+  }
+
+  getMaxAdversePriceColor(trade: SimulatedTradeDto): string {
+    if (!trade.maxAdversePrice) return '';
+    
+    // Calcular la distancia adversa
+    let adverseDistance: number;
+    if (trade.side === 0) {
+      adverseDistance = trade.maxAdversePrice - trade.entryPrice;
+    } else {
+      adverseDistance = trade.entryPrice - trade.maxAdversePrice;
+    }
+    
+    // Si la distancia es negativa (adversa), mostrar en warning
+    return adverseDistance < 0 ? 'text-warning' : 'text-white-50';
   }
 
   viewInChart(symbol: string): void {

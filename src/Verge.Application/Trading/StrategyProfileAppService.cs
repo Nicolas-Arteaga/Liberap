@@ -39,14 +39,14 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
             IsActive = true
         });
 
-        // Add virtual Scalping Clone profile (auto-clones Standard Scalping trades with -1 USDT SL)
+        // Add virtual Scalping Clone profile (auto-clones Standard Scalping trades with 2x SL)
         dtos.Insert(1, new StrategyProfileDto
         {
             Id = CloneProfileId,
             UserId = userId,
             Name = "Scalping Clone",
-            Description = "Copia automática de Standard Scalping con SL de -1 USDT",
-            Color = "#FF6B6B",
+            Description = "Copia automática de Standard Scalping con SL doble (1.2x)",
+            Color = "rgb(67, 182, 0)",
             IsActive = true
         });
 
@@ -76,7 +76,7 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
                 Id = CloneProfileId,
                 UserId = CurrentUser.Id!.Value,
                 Name = "Scalping Clone",
-                Description = "Copia automática de Standard Scalping con SL de -1 USDT",
+                Description = "Copia automática de Standard Scalping con SL doble (1.2x)",
                 Color = "#FF6B6B",
                 IsActive = true
             };

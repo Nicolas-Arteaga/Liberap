@@ -77,6 +77,15 @@ export class SimulatedTradeService {
     { apiName: this.apiName,...config });
   
 
+  updateMaxAdversePrice = (tradeId: string, maxAdversePrice: number, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'PUT',
+      url: `/api/app/simulated-trade/max-adverse-price/${tradeId}`,
+      params: { maxAdversePrice },
+    },
+    { apiName: this.apiName,...config });
+  
+
   updateTpSl = (tradeId: string, input: UpdateTpSlInputDto, config?: Partial<Rest.Config>) =>
     this.restService.request<any, void>({
       method: 'PUT',

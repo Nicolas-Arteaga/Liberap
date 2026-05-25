@@ -52,6 +52,13 @@ public class SimulatedTrade : FullAuditedAggregateRoot<Guid>
     public string? AgentDecisionJson { get; set; }
 
     /// <summary>
+    /// The farthest adverse price reached during the trade.
+    /// For LONG: the lowest price seen. For SHORT: the highest price seen.
+    /// Null if tracking wasn't available (legacy trades).
+    /// </summary>
+    public decimal? MaxAdversePrice { get; set; }
+
+    /// <summary>
     /// Links this trade to the StrategyProfile that generated it.
     /// Null for trades opened before multi-strategy was implemented.
     /// </summary>

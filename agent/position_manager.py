@@ -103,6 +103,35 @@ class PositionManager:
             logger.error(f" Connection error while updating TP/SL: {e}")
             return False
 
+    def update_max_adverse_price(self, trade_id: str, max_adverse_price: float) -> bool:
+        """
+        Records the farthest adverse price reached for a trade.
+        For LONG: the lowest price seen. For SHORT: the highest price seen.
+        """
+        headers = self.auth_manager.get_auth_headers()
+        if not headers:
+            logger.error(" Cannot update MaxAdversePrice: No valid auth token.")
+            return False
+
+        url = f"{self.base_url}/api/app/simulated-trade/update-max-adverse-price"
+        payload = {
+            "tradeId": trade_id,
+            "maxAdversePrice": max_adverse_price
+        }
+        try:
+            logger.info(f" Recording MaxAdversePrice for {trade_id}: {max_adverse_price}")
+            logger.info(f" PUT URL: {url}")
+            logger.info(f" Payload: {payload}")
+            response = requests.put(url, json=payload, headers=headers, verify=False, timeout=15)
+            logger.info(f" Response status: {response.status_code}")
+            logger.info(f" Response body: {response.text}")
+            if response.status_code not in [200, 204]:
+                logger.error(f" Backend rejected MaxAdversePrice update. Status: {response.status_code}, Body: {response.text}")
+            return response.status_code == 200 or response.status_code == 204
+        except Exception as e:
+            logger.error(f" Connection error updating MaxAdversePrice: {e}")
+            return False
+
     def get_active_trades(self) -> list:
         """
         Retrieves active trades from the backend to sync state if needed.

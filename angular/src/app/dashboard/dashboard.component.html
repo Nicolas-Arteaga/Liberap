@@ -617,7 +617,7 @@
         <!-- Institutional Console (Events, Whales, etc.) -->
         <div class="institutional-console bg-dark-deep border-top border-white-05 overflow-hidden">
           <div class="console-tabs d-flex border-bottom border-white-05 bg-dark-soft">
-            <div *ngFor="let tab of ['events', 'whales', 'liquidations', 'scanner', 'performance', 'history']"
+            <div *ngFor="let tab of ['scanner', 'events', 'whales', 'liquidations', 'performance', 'history']"
               class="tab-item py-2 px-4 pointer text-xs uppercase" [class.active]="activeTab === tab"
               (click)="setTab(tab)">
               {{ tab }}

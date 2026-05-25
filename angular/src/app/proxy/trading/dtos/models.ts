@@ -144,6 +144,7 @@ export interface SimulatedTradeDto extends EntityDto<string> {
   exchange?: string;
   agentDecisionJson?: string;
   strategyProfileId?: string;
+  maxAdversePrice?: number;
 }
 
 export interface SimulationPerformanceDto {

@@ -38,6 +38,12 @@ public class SimulatedTradeDto : EntityDto<Guid>
 
     /// <summary>Which strategy profile generated this trade. Null for legacy trades.</summary>
     public Guid? StrategyProfileId { get; set; }
+
+    /// <summary>
+    /// The farthest adverse price reached during the trade.
+    /// LONG: lowest price seen. SHORT: highest price seen.
+    /// </summary>
+    public decimal? MaxAdversePrice { get; set; }
 }
 
 public class OpenTradeInputDto

@@ -102,7 +102,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   AnalysisLogType = AnalysisLogType; // Expose enum to template
 
   // Tabs & Categorized Data (Institutional Overhaul)
-  activeTab: 'events' | 'whales' | 'liquidations' | 'scanner' | 'performance' | 'history' = 'events';
+  activeTab: 'scanner' | 'events' | 'whales' | 'liquidations' | 'performance' | 'history' = 'scanner';
   whaleLogs: any[] = [];
   liquidationLogs: any[] = [];
   scannerData: Map<string, any> = new Map(); // Real-time grid data
@@ -1257,17 +1257,17 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loadLivePerformance();
 
     this.refreshInterval = setInterval(() => {
-      // Ya NO llamamos a checkActiveSession() incondicionalmente cada 10s
-      // porque SignalR nos avisa de los cambios de estado.
-      // Solo refrescamos los logs y datos si estamos en cacería.
+      // Siempre actualizar las velas del gráfico en tiempo real
+      this.loadData();
+
+      // Los demás datos solo si estamos en cacería
       if (this.isHunting) {
-        this.loadData();
         this.loadAnalysisLogs();
         this.loadLivePerformance();
         this.loadOrderBook();
         this.loadRecentTrades();
       }
-    }, 10000);
+    }, 5000); // Reducido a 5 segundos para actualización más fluida
   }
 
   loadLivePerformance() {

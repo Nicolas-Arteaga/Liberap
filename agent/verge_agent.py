@@ -6,6 +6,7 @@ import json
 import copy
 import config
 import requests
+import asyncio
 from datetime import datetime, timezone
 
 # ---------------------------------------------------------
@@ -237,14 +238,14 @@ class VergeAgent:
             "isActive": True
         }
 
-        # Define the virtual clone profile for "Scalping Clone" (auto-clones Standard Scalping trades with -1 USDT SL)
+        # Define the virtual clone profile for "Scalping Clone" (auto-clones Standard Scalping trades with 2x SL)
         self.clone_profile = {
             "id": CLONE_PROFILE_ID,
             "name": "Scalping Clone",
             "minConfluenceScore": config.MIN_CONFLUENCE_SCORE,
             "minNexusConfidence": getattr(config, "MIN_ENTRY_NEXUS", 70.0),
             "tpMultiplier": getattr(config, "TP_MULTIPLIER", 2.0),
-            "slMultiplier": getattr(config, "SL_MULTIPLIER", 1.0),
+            "slMultiplier": getattr(config, "SL_MULTIPLIER", 1.0) * 2,  # 2x Standard Scalping SL
             "marginPerTrade": getattr(config, "MAX_MARGIN_PER_TRADE_USD", 150),
             "maxOpenPositions": config.MAX_OPEN_POSITIONS,
             "allowLong": True,
@@ -1468,19 +1469,6 @@ class VergeAgent:
         if profile and profile.get("id"):
             pos_details["strategy_profile_id"] = profile["id"]
 
-        # ── If this is the Scalping Clone profile, force -1 USDT SL ──
-        if profile and profile.get("id") == CLONE_PROFILE_ID:
-            entry_price = float(pos_details.get("entry_price", 0))
-            margin = float(pos_details.get("margin", 150))
-            leverage = float(pos_details.get("leverage", 1))
-            side = int(pos_details.get("side", 0))
-            if entry_price > 0 and margin * leverage > 0:
-                loss_pct = 1.0 / (margin * leverage)
-                if side == 0:  # LONG
-                    pos_details["sl_price"] = round(entry_price * (1 - loss_pct), 8)
-                else:  # SHORT
-                    pos_details["sl_price"] = round(entry_price * (1 + loss_pct), 8)
-
         if setup_metrics:
             sz = pos_details.get("lse_sizing") or pos_details.get("nexus_sizing") or {}
             if sz:
@@ -1657,20 +1645,21 @@ class VergeAgent:
         clone_pos.pop("agent_decision_json", None)
         clone_pos["strategy_profile_id"] = CLONE_PROFILE_ID
 
-        # ── Recalculate SL to lose exactly -1 USDT ──
+        # ── Recalculate SL using 2x multiplier (1.2x instead of 0.6x) ──
         entry_price = float(orig_pos_details.get("entry_price", 0))
         margin = float(orig_pos_details.get("margin", 150))
         leverage = float(orig_pos_details.get("leverage", 1))
         side = int(orig_pos_details.get("side", 0))
+        range_pct = float(orig_pos_details.get("estimated_range_pct", 2.0) or 2.0) / 100.0
 
-        if entry_price > 0 and margin * leverage > 0:
-            loss_pct = 1.0 / (margin * leverage)  # Price movement % for $1 loss
+        if entry_price > 0:
+            sl_dist = range_pct * (config.SL_MULTIPLIER * 2)  # 2x Standard Scalping SL
             if side == 0:  # LONG
-                clone_pos["sl_price"] = round(entry_price * (1 - loss_pct), 8)
+                clone_pos["sl_price"] = round(entry_price * (1 - sl_dist), 8)
             else:  # SHORT
-                clone_pos["sl_price"] = round(entry_price * (1 + loss_pct), 8)
+                clone_pos["sl_price"] = round(entry_price * (1 + sl_dist), 8)
 
-        logger.info(f"[CLONE] Opening clone trade for {symbol} | entry={entry_price} | margin={margin}x{leverage} | SL={clone_pos.get('sl_price')} (-1 USDT)")
+        logger.info(f"[CLONE] Opening clone trade for {symbol} | entry={entry_price} | margin={margin}x{leverage} | SL={clone_pos.get('sl_price')} (2x Standard)")
         clone_result = self.positions.open_trade(clone_pos)
 
         if clone_result:
@@ -1733,6 +1722,18 @@ class VergeAgent:
             current_price = self.fetcher.get_current_price(symbol)
             if current_price <= 0:
                 continue
+
+            # ── Track max adverse price (extreme opposite price) ──
+            # For LONG: track lowest price seen. For SHORT: track highest price seen.
+            prev_adverse = pos.get("max_adverse_price")
+            if side == 0:  # LONG
+                if prev_adverse is None or current_price < prev_adverse:
+                    pos["max_adverse_price"] = current_price
+                    logger.info(f" [MAE] {symbol} LONG updated max_adverse_price: {current_price}")
+            else:  # SHORT
+                if prev_adverse is None or current_price > prev_adverse:
+                    pos["max_adverse_price"] = current_price
+                    logger.info(f" [MAE] {symbol} SHORT updated max_adverse_price: {current_price}")
 
             should_close = False
             close_reason = ""
@@ -1804,6 +1805,17 @@ class VergeAgent:
 
             if should_close:
                 logger.info(f"Closing {symbol}: {close_reason} @ {current_price}")
+
+                # ── Sync max adverse price to backend before closing ──
+                max_adv = pos.get("max_adverse_price")
+                logger.info(f" [MAE] Before closing trade {trade_id}, max_adverse_price = {max_adv}")
+                if max_adv is not None:
+                    logger.info(f" [MAE] Calling update_max_adverse_price for {trade_id}: {max_adv}")
+                    result = self.positions.update_max_adverse_price(trade_id, float(max_adv))
+                    logger.info(f" [MAE] update_max_adverse_price result: {result}")
+                else:
+                    logger.warning(f" [MAE] max_adverse_price is None for trade {trade_id}, skipping update")
+
                 success = self.positions.close_trade(trade_id)
 
                 if success:
@@ -1897,6 +1909,78 @@ class VergeAgent:
                     self.state.update_position_tpsl(trade_id, payload["tpPrice"], payload["slPrice"])
 
 
+# --- HTTP SERVER FOR MANUAL CLOSURE SUPPORT ---
+_agent_instance = None
+
+def _build_agent_response(path, agent):
+    """Build HTTP response for agent state queries."""
+    if path.startswith('/position/') and '/max-adverse-price' in path:
+        # Extract trade_id from path: /position/{trade_id}/max-adverse-price
+        parts = path.split('/')
+        if len(parts) >= 3:
+            trade_id = parts[2]
+            positions = agent.state.get_open_positions()
+            pos = next((p for p in positions if p.get("trade_id") == trade_id), None)
+            if pos:
+                max_adv = pos.get("max_adverse_price")
+                return {"tradeId": trade_id, "maxAdversePrice": max_adv}
+            else:
+                return {"tradeId": trade_id, "maxAdversePrice": None, "error": "Position not found"}
+    return None
+
+async def handle_agent_request(reader, writer, agent):
+    """Handle HTTP requests for agent state."""
+    try:
+        request_line = await asyncio.wait_for(reader.readline(), timeout=5.0)
+        if not request_line:
+            return
+        # Drain remaining headers
+        while True:
+            hdr = await asyncio.wait_for(reader.readline(), timeout=2.0)
+            if hdr in (b'\r\n', b'\n', b''):
+                break
+
+        parts = request_line.decode(errors='replace').split()
+        path = parts[1].split('?')[0] if len(parts) > 1 else '/'
+        logger.info(f" [HTTP] GET {path}")
+
+        data = _build_agent_response(path, agent)
+        if data is None:
+            body = b'{"error": "Not found"}'
+            status_line = b"HTTP/1.1 404 Not Found\r\n"
+        else:
+            body = json.dumps(data).encode('utf-8')
+            status_line = b"HTTP/1.1 200 OK\r\n"
+
+        response = (
+            status_line +
+            b"Content-Type: application/json\r\n"
+            b"Access-Control-Allow-Origin: *\r\n"
+            b"Connection: close\r\n" +
+            f"Content-Length: {len(body)}\r\n\r\n".encode()
+        )
+        writer.write(response + body)
+        await writer.drain()
+    except Exception as e:
+        logger.error(f" [HTTP] Error handling request: {e}")
+    finally:
+        try:
+            writer.close()
+            await writer.wait_closed()
+        except Exception:
+            pass
+
+async def run_agent_http_server(agent):
+    """Run HTTP server for agent state queries."""
+    server = await asyncio.start_server(
+        lambda r, w: handle_agent_request(r, w, agent),
+        '127.0.0.1', 8002
+    )
+    logger.info("🌐 Agent HTTP server ready on port 8002 (127.0.0.1)")
+    async with server:
+        await server.serve_forever()
+
+
 if __name__ == "__main__":
     import os
     import sys
@@ -1927,6 +2011,15 @@ if __name__ == "__main__":
         atexit.register(cleanup)
 
         agent = VergeAgent()
+
+        # Start HTTP server in background thread
+        import threading
+        http_thread = threading.Thread(
+            target=lambda: asyncio.run(run_agent_http_server(agent)),
+            daemon=True
+        )
+        http_thread.start()
+
         agent.run()
     except KeyboardInterrupt:
         print("\nDeteniendo agente...")
