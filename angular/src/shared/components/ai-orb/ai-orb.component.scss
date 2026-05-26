@@ -1,0 +1,16 @@
+.ai-orb-container {
+  width: 120px;
+  height: 120px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  background: #050816;
+  
+  canvas {
+    display: block;
+    width: 120px;
+    height: 120px;
+    background: #050816;
+  }
+}

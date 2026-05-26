@@ -113,6 +113,35 @@ TIER3_MIN_CONFLUENCE_SCORE = 65.0     # Exclusivo Tier 3: exige confluencia perf
 HIGH_VOLATILITY_RANGE_THRESHOLD = 7.0  # Rango >= 7% activa la regla Sniper
 HIGH_VOLATILITY_MIN_CONFLUENCE = 90.0   # Requiere confluencia extrema de 90+ para monedas explosivas
 
+# ==========================================
+# BTC TRIPLE LAYER DEFENSE - MACRO RISK SYSTEM
+# ==========================================
+
+# --- Capa 1: BTC Macro Filter (Régimen + Flash Crash) ---
+BTC_DUMP_THRESHOLD_5M = float(os.getenv("BTC_DUMP_THRESHOLD_5M", "-0.8"))   # % caída 5m para DUMPING
+BTC_DUMP_THRESHOLD_15M = float(os.getenv("BTC_DUMP_THRESHOLD_15M", "-1.5")) # % caída 15m para DUMPING
+BTC_PUMP_THRESHOLD_5M = float(os.getenv("BTC_PUMP_THRESHOLD_5M", "0.8"))    # % subida 5m para BULLISH
+BTC_REGIME_CACHE_SEC = int(os.getenv("BTC_REGIME_CACHE_SEC", "60"))        # Caché de régimen (segundos)
+BTC_FLASH_CRASH_PCT_1H = float(os.getenv("BTC_FLASH_CRASH_PCT_1H", "-3.0")) # % caída 1h para flash crash
+BTC_FLASH_CRASH_PAUSE_M = int(os.getenv("BTC_FLASH_CRASH_PAUSE_M", "120"))  # Pausa tras flash crash (minutos)
+
+# --- Capa 2: Bloqueo Inteligente + Decouple + Macro Exit ---
+BTC_EXIT_DUMP_5M = float(os.getenv("BTC_EXIT_DUMP_5M", "-0.7"))              # % dump 5m para trigger salida
+BTC_EXIT_DUMP_15M = float(os.getenv("BTC_EXIT_DUMP_15M", "-1.5"))            # % dump 15m para trigger salida
+BTC_MIN_ROI_TO_PROTECT = float(os.getenv("BTC_MIN_ROI_TO_PROTECT", "10.0"))  # % ROI mínimo sobre margin para activar
+BTC_DECOUPLE_MIN_VOLUME_RATIO = float(os.getenv("BTC_DECOUPLE_MIN_VOLUME_RATIO", "2.5"))  # VolumeRatio mínimo para excepción
+BTC_DECOUPLE_MIN_NEXUS = float(os.getenv("BTC_DECOUPLE_MIN_NEXUS", "80.0"))  # Nexus mínimo para excepción decouple
+
+# --- Capa 3: Correlación Rolling y Penalización Nexus ---
+BTC_CORR_WINDOW_CANDLES = int(os.getenv("BTC_CORR_WINDOW_CANDLES", "20"))     # Ventana de velas para correlación
+BTC_CORR_CACHE_MINUTES = int(os.getenv("BTC_CORR_CACHE_MINUTES", "5"))        # Caché de correlación (minutos)
+BTC_CORR_HIGH_THRESHOLD = float(os.getenv("BTC_CORR_HIGH_THRESHOLD", "0.8")) # Umbral alta correlación
+BTC_CORR_MED_THRESHOLD = float(os.getenv("BTC_CORR_MED_THRESHOLD", "0.6"))   # Umbral media correlación
+BTC_CORR_LOW_THRESHOLD = float(os.getenv("BTC_CORR_LOW_THRESHOLD", "0.4"))   # Umbral baja correlación
+BTC_CORR_PENALTY_HIGH = float(os.getenv("BTC_CORR_PENALTY_HIGH", "0.60"))    # Penalización alta correlación
+BTC_CORR_PENALTY_MED = float(os.getenv("BTC_CORR_PENALTY_MED", "0.75"))      # Penalización media correlación
+BTC_CORR_PENALTY_LOW = float(os.getenv("BTC_CORR_PENALTY_LOW", "0.88"))      # Penalización baja correlación
+
 # 5. Take Profit / Stop Loss — Fat Tail Strategy (asimétrica)
 # SL amplio: 0.8× el rango estimado para que el ruido de 15m no active el stop.
 # TP agresivo: 3.0× deja correr al 15% de trades ganadores hasta su potencial real.

@@ -15,6 +15,13 @@ class ReportEngine:
     def __init__(self):
         self.csv_file = config.TRADES_LOG_FILE
         self._ensure_csv_exists()
+        
+        # ── BTC Triple Layer Defense Metrics ──
+        self.btc_trades_blocked = 0
+        self.btc_decouple_allowed = 0
+        self.btc_flash_crashes = 0
+        self.btc_exits_triggered = 0
+        self.btc_exits_roi_values = []
 
     def _ensure_csv_exists(self):
         if not os.path.exists(self.csv_file):
@@ -142,3 +149,35 @@ class ReportEngine:
             requests.post(url, json=payload, timeout=5)
         except Exception as e:
             logger.error(f"Telegram error: {e}")
+
+    # ── BTC Triple Layer Defense Metrics Methods ──
+    def record_btc_trade_blocked(self):
+        """Record a trade blocked by BTC DUMPING without decouple."""
+        self.btc_trades_blocked += 1
+
+    def record_btc_decouple_allowed(self):
+        """Record a trade allowed by BTC decouple exception."""
+        self.btc_decouple_allowed += 1
+
+    def record_btc_flash_crash(self):
+        """Record a flash crash detection."""
+        self.btc_flash_crashes += 1
+
+    def record_btc_exit_triggered(self, roi_pct: float):
+        """Record a macro exit trigger with ROI."""
+        self.btc_exits_triggered += 1
+        self.btc_exits_roi_values.append(roi_pct)
+
+    def get_btc_metrics(self) -> dict:
+        """Return BTC metrics for daily stats."""
+        avg_roi = sum(self.btc_exits_roi_values) / len(self.btc_exits_roi_values) if self.btc_exits_roi_values else 0.0
+        total_roi_saved = sum(self.btc_exits_roi_values)
+        
+        return {
+            "btc_trades_blocked": self.btc_trades_blocked,
+            "btc_decouple_allowed": self.btc_decouple_allowed,
+            "btc_flash_crashes": self.btc_flash_crashes,
+            "btc_exits_triggered": self.btc_exits_triggered,
+            "btc_exits_avg_roi": round(avg_roi, 2),
+            "btc_exits_roi_saved": round(total_roi_saved, 2),
+        }

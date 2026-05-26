@@ -412,11 +412,12 @@ def validate_nexus_confluence_setup(
 
 
 def validate_pre_trade(
-    candidate: dict, current_price: float, profile: dict = None
+    candidate: dict, current_price: float, profile: dict = None, btc_filter=None, btc_corr=None
 ) -> Tuple[bool, str, Dict[str, Any]]:
     """
     Punto único de entrada: LSE (con bloqueo reasoning) o Nexus/SCAR.
     Si se pasa 'profile', usa sus umbrales. Si no, usa config.py (Legacy).
+    Si se pasan btc_filter y btc_corr, aplica penalización de correlación BTC.
     """
     symbol = candidate.get("symbol", "?")
 
@@ -475,6 +476,19 @@ def validate_pre_trade(
             return False, "disabled_signal_for_tier", {"tier": tier, "nexus_confidence": nexus_conf}
 
         confluence_score = float(candidate.get("confluence_score", 0) or 0)
+
+        # ── BTC CORRELATION PENALTY (Capa 3) ──
+        # Penalizar score de confluencia cuando BTC está en DUMPING y la alt tiene alta correlación
+        raw_confluence_score = confluence_score
+        if btc_filter and btc_corr and candidate.get("source") != "LSE":
+            btc_regime = btc_filter.get_regime()
+            if btc_regime == "DUMPING":
+                penalty = btc_corr.get_score_penalty(symbol, btc_regime)
+                if penalty < 1.0:
+                    confluence_score = raw_confluence_score * penalty
+                    logger.info(f"[BTC-CORR] {symbol} nexus penalizado {raw_confluence_score:.1f}→{confluence_score:.1f} (penalty={penalty:.2f} régimen={btc_regime})")
+                    # Actualizar el candidate con el score penalizado para validaciones subsiguientes
+                    candidate["confluence_score"] = confluence_score
 
         # Regla de Oro (Veto Dinámico de Volatilidad / Confluencia):
         vol_threshold = float(getattr(config, "HIGH_VOLATILITY_RANGE_THRESHOLD", 7.0))

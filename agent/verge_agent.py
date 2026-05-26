@@ -32,6 +32,8 @@ from report_engine import ReportEngine
 from setup_validator import validate_pre_trade
 from circuit_breaker import get_breakers
 from redis_signal_bridge import RedisSignalBridge
+from btc_macro_filter import BTCMacroFilter
+from btc_correlation import BTCCorrelation
 
 # LSE: LiquiditySweepEngine — runs BEFORE Nexus-15 to catch sweeps early
 # The LSE Python service endpoint is part of the same python-service container.
@@ -89,6 +91,8 @@ class VergeAgent:
         self.risk      = RiskManager(self.fetcher)
         self.positions = PositionManager(self.auth)
         self.report    = ReportEngine()
+        self.btc_filter = BTCMacroFilter(self.fetcher)
+        self.btc_corr   = BTCCorrelation(self.fetcher, self.btc_filter)
         self.active_profiles = []
 
         self._tier3_index = 0
@@ -154,6 +158,26 @@ class VergeAgent:
         setup_metrics: Optional[dict] = None,
         setup_skip: Optional[str] = None,
     ) -> str:
+        # ── BTC Context for AgentDecisionJson ──
+        btc_regime = self.btc_filter.get_regime()
+        pct_5m = self.btc_filter.get_dump_pct(5)
+        pct_15m = self.btc_filter.get_dump_pct(15)
+        pct_1h = self.btc_filter.get_dump_pct(60)
+        symbol = candidate.get("symbol", "")
+        corr = self.btc_corr.get_correlation(symbol) if symbol else 0.0
+        penalty = self.btc_corr.get_score_penalty(symbol, btc_regime) if symbol else 1.0
+        is_flash_crash = self.btc_filter.is_flash_crash()
+        
+        btc_context = {
+            "regime": btc_regime,
+            "pct_5m": pct_5m,
+            "pct_15m": pct_15m,
+            "pct_1h": pct_1h,
+            "correlation": corr,
+            "penalty": penalty,
+            "flash_crash": is_flash_crash,
+        }
+        
         snap = {
             "schema_version": 1,
             "agent_version": "risk_v5",
@@ -166,6 +190,7 @@ class VergeAgent:
                 "setup_validation": setup_skip or "ok",
                 "setup_metrics": self._json_safe_for_audit(copy.deepcopy(setup_metrics or {})),
             },
+            "btc_context": btc_context,
             "candidate": self._json_safe_for_audit(copy.deepcopy(candidate)),
             "position_sizing": self._json_safe_for_audit(copy.deepcopy(pos_details)),
         }
@@ -202,6 +227,15 @@ class VergeAgent:
     # ─────────────────────────────────────────────────────────
     def loop_cycle(self):
         logger.debug("[TRACE] Entering loop_cycle")
+        
+        # ── BTC FLASH CRASH PAUSE (Capa B) ──
+        # Pausar el agente si BTC cayó más de 3% en 1h (flash crash)
+        if self.btc_filter.is_flash_crash():
+            logger.warning("[BTC-FLASH] Flash crash detectado — agente pausado 2 horas")
+            self.report.record_btc_flash_crash()
+            time.sleep(config.BTC_FLASH_CRASH_PAUSE_M * 60)
+            return
+        
         try:
             config.refresh_watchlist()
         except Exception as e:
@@ -355,7 +389,7 @@ class VergeAgent:
                     # Usamos price_at_signal (last_close de Nexus) para validar sin latencia REST
                     px_val = enriched.get("price_at_signal") or self.fetcher.get_current_price(symbol)
                     if px_val:
-                        v_ok, v_code, v_metrics = validate_pre_trade(enriched, px_val)
+                        v_ok, v_code, v_metrics = validate_pre_trade(enriched, px_val, btc_filter=self.btc_filter, btc_corr=self.btc_corr)
                         if v_ok:
                             if "smc_bonus" in v_metrics:
                                 bonus = float(v_metrics["smc_bonus"])
@@ -395,7 +429,7 @@ class VergeAgent:
                 try:
                     nc_px = nc.get("price_at_signal") or self.fetcher.get_current_price(nc["symbol"])
                     if nc_px:
-                        v_ok, v_code, v_metrics = validate_pre_trade(nc, nc_px)
+                        v_ok, v_code, v_metrics = validate_pre_trade(nc, nc_px, btc_filter=self.btc_filter, btc_corr=self.btc_corr)
                         if not v_ok:
                             logger.info(f"[NEXUS-TOP] VETO {nc['symbol']}: {v_code} — descartado.")
                             continue
@@ -549,7 +583,7 @@ class VergeAgent:
             }
 
             # ── BONUS SMC: Aplicar bonus de calidad antes del ranking (Bridge) ──
-            v_ok, v_code, v_metrics = validate_pre_trade(bridge_cand, current_px)
+            v_ok, v_code, v_metrics = validate_pre_trade(bridge_cand, current_px, btc_filter=self.btc_filter, btc_corr=self.btc_corr)
             if v_ok:
                 if "smc_bonus" in v_metrics:
                     bonus = float(v_metrics["smc_bonus"])
@@ -1453,7 +1487,7 @@ class VergeAgent:
             import time
             candidate["scored_at_age_s"] = time.time() - candidate["scored_at"]
 
-        ok, code, setup_metrics = validate_pre_trade(candidate, market_px, profile=profile)
+        ok, code, setup_metrics = validate_pre_trade(candidate, market_px, profile=profile, btc_filter=self.btc_filter, btc_corr=self.btc_corr)
         if not ok:
             logger.info("[SKIP] %s — %s | profile=%s | metrics=%s", code, symbol, profile.get("name") if profile else "Legacy", setup_metrics)
             return False
@@ -1583,6 +1617,45 @@ class VergeAgent:
                     f"[SKIP] Nexus={nexus_conf_pct:.1f}% < {min_entry_nexus}% mínimo para slot libre."
                 )
                 return False
+
+        # ── BTC INTELLIGENT BLOCKING (Capa C) ──
+        # Bloquear LONGs cuando BTC está en DUMPING, excepto si hay desacople institucional real
+        side = candidate.get("side", 0)
+        btc_regime = self.btc_filter.get_regime()
+        
+        if side == 0:  # LONG
+            # Evaluar desacople institucional real
+            # Los campos pueden estar en el nivel raíz o anidados en agent_audit_context.nexus15.features
+            features = candidate.get("agent_audit_context", {}).get("nexus15", {}).get("features", {})
+            volume_ratio = candidate.get("volume_ratio") or features.get("volume_ratio_20", 0)
+            cvd_delta = candidate.get("cvd_delta") or features.get("cvd_delta", 0)
+            nexus_confidence = candidate.get("nexus_confidence", 0) or candidate.get("confluence_score", 0)
+            
+            btc_decouple = (
+                volume_ratio > config.BTC_DECOUPLE_MIN_VOLUME_RATIO and
+                cvd_delta > 0 and
+                nexus_confidence >= config.BTC_DECOUPLE_MIN_NEXUS
+            )
+            
+            if btc_regime == "DUMPING":
+                if btc_decouple:
+                    logger.info(f"[BTC-DECOUPLE] {symbol} permitido — VR={volume_ratio:.2f} CVD={cvd_delta:+.0f} Nexus={nexus_confidence:.1f}%")
+                    self.report.record_btc_decouple_allowed()
+                else:
+                    logger.warning(f"[BTC-BLOCK] {symbol} LONG bloqueado — DUMPING sin desacople institucional (regime={btc_regime})")
+                    self.report.record_btc_trade_blocked()
+                    return False
+            
+            # Scalping Clone: bloqueo adicional en NEUTRAL + tendencia 1h DOWN (sin excepción decouple)
+            profile_name = profile.get("name", "") if profile else ""
+            if profile_name == "Scalping Clone" and btc_regime in ["DUMPING", "NEUTRAL"]:
+                if self.btc_filter.get_btc_trend_1h() == "DOWN" and not btc_decouple:
+                    logger.warning(f"[BTC-BLOCK-CLONE] {symbol} Clone bloqueado — 1h DOWN + régimen {btc_regime}")
+                    self.report.record_btc_trade_blocked()
+                    return False
+        elif side == 1:  # SHORT
+            # SHORTs: no bloquear, el dump de BTC los favorece. Solo loggear contexto.
+            logger.info(f"[BTC-INFO] {symbol} SHORT con régimen BTC={btc_regime}")
 
         logger.info(f"Opening {candidate['trade_direction']} on {symbol}. Margin: {pos_details['margin']}")
         trade_result = self.positions.open_trade(pos_details)
@@ -1777,15 +1850,33 @@ class VergeAgent:
 
             should_close = False
             close_reason = ""
+            close_tag = "[CLOSE-NORMAL]"  # Default tag
 
             ft_exit = self._lse_follow_through_exit_reason(pos)
             if ft_exit:
                 should_close, close_reason = True, ft_exit
             elif side == 0:  # LONG
-                if current_price >= tp:
-                    should_close, close_reason = True, "Take Profit reached"
-                elif current_price <= sl:
-                    should_close, close_reason = True, "Stop Loss reached"
+                # ── BTC MACRO EXIT TRIGGER (Capa D) ──
+                # Si BTC dumpea y estamos en profit, cerrar proactivamente para proteger ganancias
+                dump_5m = self.btc_filter.get_dump_pct(5)
+                dump_15m = self.btc_filter.get_dump_pct(15)
+                entry_price = pos.get("entry_price", 0)
+                margin = pos.get("margin", 0)
+                
+                if entry_price > 0 and margin > 0:
+                    roi_pct = ((current_price - entry_price) / entry_price) * 100
+                    if roi_pct >= config.BTC_MIN_ROI_TO_PROTECT:
+                        if dump_5m < config.BTC_EXIT_DUMP_5M or dump_15m < config.BTC_EXIT_DUMP_15M:
+                            logger.warning(f"[CLOSE-BTC-EXIT] {symbol} cerrando proactivamente - ROI={roi_pct:.1f}% dump5m={dump_5m:.2f}% dump15m={dump_15m:.2f}%")
+                            should_close, close_reason = True, f"BTC Macro Exit (ROI={roi_pct:.1f}%, dump5m={dump_5m:.2f}%)"
+                            close_tag = "[CLOSE-BTC-EXIT]"
+                            self.report.record_btc_exit_triggered(roi_pct)
+                
+                if not should_close:
+                    if current_price >= tp:
+                        should_close, close_reason = True, "Take Profit reached"
+                    elif current_price <= sl:
+                        should_close, close_reason = True, "Stop Loss reached"
             else:  # SHORT
                 if current_price <= tp:
                     should_close, close_reason = True, "Take Profit reached"
@@ -1844,7 +1935,7 @@ class VergeAgent:
                     continue
 
             if should_close:
-                logger.info(f"Closing {symbol}: {close_reason} @ {current_price}")
+                logger.info(f"{close_tag} Closing {symbol}: {close_reason} @ {current_price}")
 
                 # ── Sync max adverse price to backend before closing ──
                 max_adv = pos.get("max_adverse_price")

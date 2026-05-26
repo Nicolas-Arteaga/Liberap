@@ -45,21 +45,18 @@
     overflow-y: auto;
     position: relative; /* For absolute background */
     
-    .sidebar-bg-kraken {
+    .sidebar-bg-ai-orb {
       position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
+      bottom: 60px; /* Más abajo */
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120px;
+      height: 120px;
       z-index: 0; /* Background layer */
       pointer-events: none;
       overflow: hidden;
-      
-      .kraken-canvas-el {
-        width: 100%;
-        height: 100%;
-        display: block;
-      }
+      background: #050816;
+      border-radius: 50%;
     }
     
     &::-webkit-scrollbar {
