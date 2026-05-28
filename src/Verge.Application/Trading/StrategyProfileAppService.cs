@@ -36,7 +36,29 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
             Name = "Standard Scalping",
             Description = "Estrategia predeterminada de la app (Scalping)",
             Color = "#3B82F6",
-            IsActive = true
+            IsActive = true,
+            MinConfluenceScore = 60f,
+            MinNexusConfidence = 76f,
+            MaxRsiLong = 75f,
+            MinRsiShort = 20f,
+            MaxMa7DistancePct = 3.5f,
+            AllowedSources = "LSE,Nexus,Bridge",
+            AllowLong = true,
+            AllowShort = true,
+            MarginPerTrade = 150m,
+            TpMultiplier = 3.5f,
+            SlMultiplier = 0.6f,
+            MinRR = 2.5f,
+            MaxOpenPositions = 3,
+            MaxTradeDurationCandles = 8,
+            ExtremeRsiVeto = true,
+            MaxEntrySlippagePct = 0.002f,
+            LseMaxEntrySlippagePct = 0.20f,
+            MinTpDistancePct = 0.003f,
+            MinSlDistancePct = 0.002f,
+            MinEstimatedRangePct = 0.8f,
+            MaxNexusSignalAgeSeconds = 120f,
+            NexusMaxPriceDriftPct = 0.025f
         });
 
         // Add virtual Scalping Clone profile (auto-clones Standard Scalping trades with 2x SL)
@@ -47,7 +69,29 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
             Name = "Scalping Clone",
             Description = "Copia automática de Standard Scalping con SL doble (1.2x)",
             Color = "rgb(67, 182, 0)",
-            IsActive = true
+            IsActive = true,
+            MinConfluenceScore = 60f,
+            MinNexusConfidence = 76f,
+            MaxRsiLong = 75f,
+            MinRsiShort = 20f,
+            MaxMa7DistancePct = 3.5f,
+            AllowedSources = "LSE,Nexus,Bridge",
+            AllowLong = true,
+            AllowShort = true,
+            MarginPerTrade = 150m,
+            TpMultiplier = 3.5f,
+            SlMultiplier = 1.2f, // 2x Standard Scalping SL
+            MinRR = 2.5f,
+            MaxOpenPositions = 3,
+            MaxTradeDurationCandles = 8,
+            ExtremeRsiVeto = true,
+            MaxEntrySlippagePct = 0.002f,
+            LseMaxEntrySlippagePct = 0.20f,
+            MinTpDistancePct = 0.003f,
+            MinSlDistancePct = 0.002f,
+            MinEstimatedRangePct = 0.8f,
+            MaxNexusSignalAgeSeconds = 120f,
+            NexusMaxPriceDriftPct = 0.025f
         });
 
         return dtos;
@@ -65,7 +109,29 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
                 Name = "Standard Scalping",
                 Description = "Estrategia predeterminada de la app (Scalping)",
                 Color = "#3B82F6",
-                IsActive = true
+                IsActive = true,
+                MinConfluenceScore = 60f,
+                MinNexusConfidence = 76f,
+                MaxRsiLong = 75f,
+                MinRsiShort = 20f,
+                MaxMa7DistancePct = 3.5f,
+                AllowedSources = "LSE,Nexus,Bridge",
+                AllowLong = true,
+                AllowShort = true,
+                MarginPerTrade = 150m,
+                TpMultiplier = 3.5f,
+                SlMultiplier = 0.6f,
+                MinRR = 2.5f,
+                MaxOpenPositions = 3,
+                MaxTradeDurationCandles = 8,
+                ExtremeRsiVeto = true,
+                MaxEntrySlippagePct = 0.002f,
+                LseMaxEntrySlippagePct = 0.20f,
+                MinTpDistancePct = 0.003f,
+                MinSlDistancePct = 0.002f,
+                MinEstimatedRangePct = 0.8f,
+                MaxNexusSignalAgeSeconds = 120f,
+                NexusMaxPriceDriftPct = 0.025f
             };
         }
 
@@ -77,8 +143,30 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
                 UserId = CurrentUser.Id!.Value,
                 Name = "Scalping Clone",
                 Description = "Copia automática de Standard Scalping con SL doble (1.2x)",
-                Color = "#FF6B6B",
-                IsActive = true
+                Color = "rgb(67, 182, 0)",
+                IsActive = true,
+                MinConfluenceScore = 60f,
+                MinNexusConfidence = 76f,
+                MaxRsiLong = 75f,
+                MinRsiShort = 20f,
+                MaxMa7DistancePct = 3.5f,
+                AllowedSources = "LSE,Nexus,Bridge",
+                AllowLong = true,
+                AllowShort = true,
+                MarginPerTrade = 150m,
+                TpMultiplier = 3.5f,
+                SlMultiplier = 1.2f, // 2x Standard Scalping SL
+                MinRR = 2.5f,
+                MaxOpenPositions = 3,
+                MaxTradeDurationCandles = 8,
+                ExtremeRsiVeto = true,
+                MaxEntrySlippagePct = 0.002f,
+                LseMaxEntrySlippagePct = 0.20f,
+                MinTpDistancePct = 0.003f,
+                MinSlDistancePct = 0.002f,
+                MinEstimatedRangePct = 0.8f,
+                MaxNexusSignalAgeSeconds = 120f,
+                NexusMaxPriceDriftPct = 0.025f
             };
         }
         var profile = await _repo.GetAsync(id);
