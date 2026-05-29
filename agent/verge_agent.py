@@ -52,6 +52,8 @@ LSE_ENTRY_MODE = getattr(config, "LSE_ENTRY_MODE", "conservative")
 if LSE_ENTRY_MODE not in ("conservative", "aggressive"):
     LSE_ENTRY_MODE = "conservative"
 
+# Standard Scalping — sentinel GUID for the legacy hardcoded profile (not stored in DB)
+STANDARD_PROFILE_ID = "00000000-0000-0000-0000-000000000000"
 # Scalping Clone — sentinel GUID for the hardcoded clone profile (not stored in DB)
 CLONE_PROFILE_ID = "00000000-0000-0000-0000-000000000001"
 LSE_HTTP_TIMEOUT_SEC = int(getattr(config, "LSE_HTTP_TIMEOUT_SEC", 360))
@@ -255,10 +257,11 @@ class VergeAgent:
         # 1. Sync profiles and monitor open positions
         logger.info("[Step 1/6] Syncing strategy profiles and checking positions...")
         db_profiles = self.positions.get_strategy_profiles() or []
+        db_profiles = [p for p in db_profiles if p.get("name") not in ("Standard Scalping", "Scalping Clone")]
         
         # Define the virtual legacy profile for "Standard Scalping"
         legacy_profile = {
-            "id": None,
+            "id": STANDARD_PROFILE_ID,
             "name": "Standard Scalping",
             "minConfluenceScore": config.MIN_CONFLUENCE_SCORE,
             "minNexusConfidence": getattr(config, "MIN_ENTRY_NEXUS", 70.0),
@@ -713,11 +716,19 @@ class VergeAgent:
             
             # Check slot availability for this profile
             p_max_pos = int(profile.get("maxOpenPositions", config.MAX_OPEN_POSITIONS))
-            # Fix 3: Contador robusto para camelCase (API) y snake_case (Local)
-            p_active_count = len([
-                t for t in active_trades 
-                if t.get("strategyProfileId", t.get("strategy_profile_id")) == p_id
-            ])
+            # Fix: Standard Scalping usa STANDARD_PROFILE_ID; trades legacy con null también le pertenecen.
+            p_id = profile.get("id")
+            if p_id == STANDARD_PROFILE_ID:
+                p_active_count = len([
+                    t for t in active_trades
+                    if t.get("strategyProfileId", t.get("strategy_profile_id")) in (STANDARD_PROFILE_ID, None)
+                    and t.get("strategyProfileId", t.get("strategy_profile_id")) != CLONE_PROFILE_ID
+                ])
+            else:
+                p_active_count = len([
+                    t for t in active_trades
+                    if t.get("strategyProfileId", t.get("strategy_profile_id")) == p_id
+                ])
             
             if p_active_count >= p_max_pos:
                 logger.info(f"[LIMIT] Profile {p_name} is full ({p_active_count}/{p_max_pos}). Skipping new trades.")
@@ -1564,9 +1575,11 @@ class VergeAgent:
         # Evitar duplicar margen en el mismo símbolo dentro del mismo perfil
         # (Permite que distintos perfiles abran el mismo símbolo de forma independiente)
         p_id = profile.get("id") if profile else None
+        # Para Standard Scalping: los trades legacy con strategyProfileId=null también le pertenecen
+        std_ids = (STANDARD_PROFILE_ID, None) if p_id == STANDARD_PROFILE_ID else (p_id,)
         if any(
             t.get("symbol") == symbol and
-            t.get("strategyProfileId", t.get("strategy_profile_id")) == p_id
+            t.get("strategyProfileId", t.get("strategy_profile_id")) in std_ids
             for t in active_trades
         ):
             logger.info(f"[SKIP] Ya existe una posición activa para {symbol} en el perfil '{profile.get('name', 'Legacy') if profile else 'Standard Scalping'}'. Evitando duplicar margen.")
@@ -1575,10 +1588,18 @@ class VergeAgent:
         # El límite se calcula por perfil para que las 5 estrategias operen de forma independiente
         p_max_pos = int(profile.get("maxOpenPositions", config.MAX_OPEN_POSITIONS)) if profile else config.MAX_OPEN_POSITIONS
         p_id = profile.get("id") if profile else None
-        p_active_count = len([
-            t for t in active_trades
-            if t.get("strategyProfileId", t.get("strategy_profile_id")) == p_id
-        ])
+        # Fix: Standard Scalping usa STANDARD_PROFILE_ID; trades legacy con null también le pertenecen.
+        if p_id == STANDARD_PROFILE_ID:
+            p_active_count = len([
+                t for t in active_trades
+                if t.get("strategyProfileId", t.get("strategy_profile_id")) in (STANDARD_PROFILE_ID, None)
+                and t.get("strategyProfileId", t.get("strategy_profile_id")) != CLONE_PROFILE_ID
+            ])
+        else:
+            p_active_count = len([
+                t for t in active_trades
+                if t.get("strategyProfileId", t.get("strategy_profile_id")) == p_id
+            ])
 
         if p_active_count >= p_max_pos:
             if is_lse:
@@ -1692,6 +1713,19 @@ class VergeAgent:
                 }
             )
 
+            # ── Auto-cloning for Standard Scalping ──
+            is_standard = False
+            if profile is None:
+                is_standard = True
+            elif profile.get("id") in (None, STANDARD_PROFILE_ID) or profile.get("name") == "Standard Scalping":
+                is_standard = True
+
+            if is_standard:
+                try:
+                    self._open_clone_trade(str(trade_id) if trade_id else "", candidate, pos_details, entry_reason, nexus_group)
+                except Exception as ex:
+                    logger.error(f"[CLONE] Failed to auto-clone trade for {symbol}: {ex}")
+
             return True
 
         return False
@@ -1699,7 +1733,8 @@ class VergeAgent:
     def _open_clone_trade(self, orig_trade_id: str, candidate: dict, orig_pos_details: dict, entry_reason: str, nexus_group: str) -> bool:
         """
         Opens a clone trade for Scalping Clone with the exact same parameters as the
-        Standard Scalping trade, EXCEPT the SL is recalculated to lose exactly -1 USDT.
+        Standard Scalping trade, EXCEPT the SL/TP are recalculated using the Scalping Clone profile
+        (which uses double SL and proportional TP).
         Skips all validation filters — the trade was already validated by Standard Scalping.
         """
         symbol = candidate["symbol"]
@@ -1714,59 +1749,26 @@ class VergeAgent:
             logger.info(f"[CLONE] Profile Scalping Clone is full ({len(clone_active)}/{clone_max}). Skipping clone for {symbol}.")
             return False
 
-        # ── CLONE PROTECTION: Block coexistence in same symbol ──
-        # If Standard Scalping already has this symbol open, Clone cannot open it
-        standard_active = [
-            t for t in (self.positions.get_active_trades() or [])
-            if t.get("symbol") == symbol and
-            t.get("strategyProfileId", t.get("strategy_profile_id")) != CLONE_PROFILE_ID
-        ]
-        if len(standard_active) > 0:
-            logger.warning(f"[CLONE] VETO {symbol}: Standard Scalping already has {len(standard_active)} position(s) open. Skipping clone to avoid double exposure.")
+        balance = self.positions.get_virtual_balance() or config.VIRTUAL_CAPITAL_BASE
+        clone_pos = self.risk.calculate_position(symbol, candidate, available_balance=balance, profile=self.clone_profile)
+        if not clone_pos:
+            logger.warning(f"[CLONE] Failed to calculate clone position for {symbol}. Skipping clone.")
             return False
 
-        # ── CLONE PROTECTION: Stricter validation than Standard ──
-        # Clone requires higher quality signals than Standard
-        confluence = float(candidate.get("confluence_score", 0) or 0)
-        clone_min_confluence = getattr(config, "MIN_CONFLUENCE_SCORE", 60.0) + 10.0  # 10 points higher than Standard
-        if confluence < clone_min_confluence:
-            logger.warning(f"[CLONE] VETO {symbol}: Confluence {confluence} < Clone minimum {clone_min_confluence}. Skipping clone.")
-            return False
-
-        # Clone should avoid extremely volatile tokens (range > 10%)
-        estimated_range = float(candidate.get("estimated_range_pct", 0) or 0)
-        clone_max_range = getattr(config, "MAX_ESTIMATED_RANGE_PCT", 15.0) - 5.0  # 5% lower than Standard
-        if estimated_range > clone_max_range:
-            logger.warning(f"[CLONE] VETO {symbol}: Range {estimated_range}% > Clone maximum {clone_max_range}%. Skipping clone.")
-            return False
-
-        clone_pos = dict(orig_pos_details)
         clone_pos.pop("agent_decision_json", None)
         clone_pos["strategy_profile_id"] = CLONE_PROFILE_ID
 
-        # ── Recalculate SL using 2x multiplier (1.2x instead of 0.6x) ──
-        entry_price = float(orig_pos_details.get("entry_price", 0))
-        margin = float(orig_pos_details.get("margin", 150))
-        leverage = float(orig_pos_details.get("leverage", 1))
-        side = int(orig_pos_details.get("side", 0))
-        range_pct = float(orig_pos_details.get("estimated_range_pct", 2.0) or 2.0) / 100.0
-
-        if entry_price > 0:
-            sl_dist = range_pct * (config.SL_MULTIPLIER * 2)  # 2x Standard Scalping SL
-            sl_pct = sl_dist * 100  # Convert to percentage for ceiling check
-
-            # ── CLONE PROTECTION: SL ceiling check ──
+        # ── CLONE PROTECTION: SL ceiling check ──
+        entry_price = float(clone_pos.get("entry_price", 0))
+        sl_price = float(clone_pos.get("sl_price", 0))
+        if entry_price > 0 and sl_price > 0:
+            sl_pct = abs(entry_price - sl_price) / entry_price * 100.0
             clone_max_sl_pct = getattr(config, "CLONE_MAX_STOP_LOSS_PCT", 5.0)
             if sl_pct > clone_max_sl_pct:
                 logger.warning(f"[CLONE] VETO {symbol}: SL {sl_pct:.2f}% exceeds Clone ceiling {clone_max_sl_pct}%. Skipping clone.")
                 return False
 
-            if side == 0:  # LONG
-                clone_pos["sl_price"] = round(entry_price * (1 - sl_dist), 8)
-            else:  # SHORT
-                clone_pos["sl_price"] = round(entry_price * (1 + sl_dist), 8)
-
-        logger.info(f"[CLONE] Opening clone trade for {symbol} | entry={entry_price} | margin={margin}x{leverage} | SL={clone_pos.get('sl_price')} (2x Standard)")
+        logger.info(f"[CLONE] Opening clone trade for {symbol} | entry={entry_price} | margin={clone_pos.get('margin')}x{clone_pos.get('leverage')} | SL={clone_pos.get('sl_price')} | TP={clone_pos.get('tp_price')} (Independent Scalping Clone calculation)")
         clone_result = self.positions.open_trade(clone_pos)
 
         if clone_result:
@@ -1825,6 +1827,8 @@ class VergeAgent:
             side     = pos["side"]
             tp       = pos["tp_price"]
             sl       = pos["sl_price"]
+            entry_price = float(pos.get("entry_price", 0))
+            margin = float(pos.get("margin", 0))
 
             current_price = self.fetcher.get_current_price(symbol)
             if current_price <= 0:
@@ -1848,6 +1852,16 @@ class VergeAgent:
                     pos["max_adverse_price"] = current_price
                     logger.info(f" [MAE] {symbol} SHORT updated max_adverse_price: {current_price}")
 
+            # ── Track max profit price (best price seen in favor of the trade) ──
+            # For LONG: highest price seen. For SHORT: lowest price seen.
+            prev_profit = pos.get("max_profit_price")
+            if side == 0:  # LONG
+                if prev_profit is None or current_price > prev_profit:
+                    pos["max_profit_price"] = current_price
+            else:  # SHORT
+                if prev_profit is None or current_price < prev_profit:
+                    pos["max_profit_price"] = current_price
+
             should_close = False
             close_reason = ""
             close_tag = "[CLOSE-NORMAL]"  # Default tag
@@ -1860,8 +1874,6 @@ class VergeAgent:
                 # Si BTC dumpea y estamos en profit, cerrar proactivamente para proteger ganancias
                 dump_5m = self.btc_filter.get_dump_pct(5)
                 dump_15m = self.btc_filter.get_dump_pct(15)
-                entry_price = pos.get("entry_price", 0)
-                margin = pos.get("margin", 0)
                 
                 if entry_price > 0 and margin > 0:
                     roi_pct = ((current_price - entry_price) / entry_price) * 100
@@ -1877,11 +1889,51 @@ class VergeAgent:
                         should_close, close_reason = True, "Take Profit reached"
                     elif current_price <= sl:
                         should_close, close_reason = True, "Stop Loss reached"
+
+                # ── REGLA DE LA COSECHA INTELIGENTE (Trailing Stop Proporcional) ──
+                # Se activa cuando el trade recorre el 50% del camino al TP.
+                # Protege el 75% del profit máximo alcanzado (buffer del 25% para respirar).
+                if not should_close and entry_price > 0 and tp > entry_price:
+                    tp_dist = tp - entry_price
+                    activation_price = entry_price + (tp_dist * 0.50)  # 50% del camino al TP
+                    max_profit_price = pos.get("max_profit_price") or current_price
+                    max_profit_pct = (max_profit_price - entry_price) / entry_price
+                    if max_profit_pct > 0 and max_profit_price >= activation_price:
+                        # El buffer es el 25% del profit máximo alcanzado
+                        buffer_pct = max_profit_pct * 0.25
+                        # El trailing SL protege el 75% del profit máximo
+                        trailing_sl_price = entry_price * (1 + max_profit_pct - buffer_pct)
+                        if current_price <= trailing_sl_price:
+                            profit_protected_pct = (max_profit_pct - buffer_pct) * 100
+                            logger.info(
+                                "[COSECHA] %s trailing stop activado | max_profit=%.2f%% | buffer=%.2f%% | trailing_sl=%.8f | current=%.8f | profit_protegido=%.2f%%",
+                                symbol, max_profit_pct * 100, buffer_pct * 100, trailing_sl_price, current_price, profit_protected_pct
+                            )
+                            should_close, close_reason = True, f"Cosecha Inteligente (profit protegido={profit_protected_pct:.1f}%)"
+                            close_tag = "[COSECHA]"
             else:  # SHORT
                 if current_price <= tp:
                     should_close, close_reason = True, "Take Profit reached"
                 elif current_price >= sl:
                     should_close, close_reason = True, "Stop Loss reached"
+
+                # ── REGLA DE LA COSECHA INTELIGENTE (SHORT) ──
+                if not should_close and entry_price > 0 and tp < entry_price:
+                    tp_dist = entry_price - tp
+                    activation_price = entry_price - (tp_dist * 0.50)  # 50% del camino al TP
+                    max_profit_price = pos.get("max_profit_price") or current_price
+                    max_profit_pct = (entry_price - max_profit_price) / entry_price
+                    if max_profit_pct > 0 and max_profit_price <= activation_price:
+                        buffer_pct = max_profit_pct * 0.25
+                        trailing_sl_price = entry_price * (1 - max_profit_pct + buffer_pct)
+                        if current_price >= trailing_sl_price:
+                            profit_protected_pct = (max_profit_pct - buffer_pct) * 100
+                            logger.info(
+                                "[COSECHA] %s SHORT trailing stop activado | max_profit=%.2f%% | buffer=%.2f%% | trailing_sl=%.8f | current=%.8f | profit_protegido=%.2f%%",
+                                symbol, max_profit_pct * 100, buffer_pct * 100, trailing_sl_price, current_price, profit_protected_pct
+                            )
+                            should_close, close_reason = True, f"Cosecha Inteligente (profit protegido={profit_protected_pct:.1f}%)"
+                            close_tag = "[COSECHA]"
 
             opened_at_str = pos["opened_at"].replace("Z", "+00:00")
             opened_at = datetime.fromisoformat(opened_at_str)
@@ -2005,19 +2057,19 @@ class VergeAgent:
                 sync_pos = {
                     "trade_id": trade_id,
                     "symbol": symbol,
-                    "opened_at": trade.get("openedAt", datetime.utcnow().isoformat()),
+                    "opened_at": trade.get("openedAt") or trade.get("opened_at") or trade.get("OpenedAt") or datetime.utcnow().isoformat(),
                     "side": trade["side"],
                     "entry_price": float(trade["entryPrice"]),
-                    "tp_price": float(trade.get("tpPrice", 0)),
-                    "sl_price": float(trade.get("slPrice", 0)),
+                    "tp_price": float(trade.get("tpPrice") or trade.get("tp_price") or trade.get("TpPrice") or 0),
+                    "sl_price": float(trade.get("slPrice") or trade.get("sl_price") or trade.get("SlPrice") or 0),
                     "leverage": trade["leverage"],
                     "margin": float(trade["margin"])
                 }
                 self.state.add_position(sync_pos)
 
             # 2. Repair TP/SL if missing
-            tp = trade.get("tpPrice")
-            sl = trade.get("slPrice")
+            tp = trade.get("tpPrice") if trade.get("tpPrice") is not None else trade.get("tp_price")
+            sl = trade.get("slPrice") if trade.get("slPrice") is not None else trade.get("sl_price")
 
             if tp is None or sl is None or tp == 0 or sl == 0:
                 logger.info(f"🔧 Repairing TP/SL for {symbol} ({trade_id})...")

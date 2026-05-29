@@ -6,11 +6,44 @@ from __future__ import annotations
 
 import logging
 import time
+import requests
 from typing import Any, Dict, Tuple
 
 import config
 
 logger = logging.getLogger("SetupValidator")
+
+# --- 24h Ticker Cache (Thread-Safe Symmetrical Veto Provider) ---
+_TICKER_CACHE: Dict[str, float] = {}
+_LAST_TICKER_FETCH = 0.0
+_TICKER_CACHE_TTL = 300.0  # 5 minutos cache TTL
+
+def _fetch_24h_price_change_percent(symbol: str) -> float:
+    """
+    Fetches the 24h price change percent for a symbol, with a global cache.
+    Returns the change percent (e.g. +30.5 or -12.4).
+    """
+    global _TICKER_CACHE, _LAST_TICKER_FETCH
+    now = time.time()
+    if not _TICKER_CACHE or (now - _LAST_TICKER_FETCH) > _TICKER_CACHE_TTL:
+        try:
+            url = "https://fapi.binance.com/fapi/v1/ticker/24hr"
+            resp = requests.get(url, timeout=5)
+            if resp.status_code == 200:
+                data = resp.json()
+                new_cache = {}
+                for x in data:
+                    sym = x.get("symbol")
+                    pct = x.get("priceChangePercent")
+                    if sym and pct is not None:
+                        new_cache[sym] = float(pct)
+                _TICKER_CACHE = new_cache
+                _LAST_TICKER_FETCH = now
+                logger.info(f"[TICKER-CACHE] Refreshed 24h ticker cache. {len(_TICKER_CACHE)} symbols cached.")
+        except Exception as e:
+            logger.warning(f"[TICKER-CACHE] Error refreshing 24h ticker: {e}")
+            
+    return _TICKER_CACHE.get(symbol, 0.0)
 
 
 def _effective_tick(ref_price: float) -> float:
@@ -420,6 +453,25 @@ def validate_pre_trade(
     Si se pasan btc_filter y btc_corr, aplica penalización de correlación BTC.
     """
     symbol = candidate.get("symbol", "?")
+    side = int(candidate.get("side", 0))
+
+    # ── VETO GLOBAL: Agotamiento Diario (MAX_DAILY_PUMP/DUMP) ──
+    # Si ya subió más del 30% en el día, vetamos LONG. Si cayó más del 30%, vetamos SHORT.
+    daily_change_pct = _fetch_24h_price_change_percent(symbol)
+    max_daily_pump = float(getattr(config, "MAX_DAILY_PUMP_LONG_LIMIT", 30.0))
+    max_daily_dump = float(getattr(config, "MAX_DAILY_DUMP_SHORT_LIMIT", -30.0))
+
+    if side == 0 and daily_change_pct >= max_daily_pump:
+        logger.warning(
+            f"❌ [VETO-DAILY-PUMP] {symbol} rechazado para LONG. Cambio 24h: {daily_change_pct:.2f}% >= Límite {max_daily_pump}% (Agotamiento del pump)"
+        )
+        return False, "daily_pump_exhaustion_long", {"daily_change_pct": daily_change_pct, "limit": max_daily_pump}
+
+    if side == 1 and daily_change_pct <= max_daily_dump:
+        logger.warning(
+            f"❌ [VETO-DAILY-DUMP] {symbol} rechazado para SHORT. Cambio 24h: {daily_change_pct:.2f}% <= Límite {max_daily_dump}% (Agotamiento del dump)"
+        )
+        return False, "daily_dump_exhaustion_short", {"daily_change_pct": daily_change_pct, "limit": max_daily_dump}
 
     # ── VETO GLOBAL: Rango Estimado Máximo (MAX_ESTIMATED_RANGE_PCT) ──
     estimated_range_pct = float(candidate.get("estimated_range_pct", 0) or 0)

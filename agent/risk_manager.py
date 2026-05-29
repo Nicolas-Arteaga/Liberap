@@ -158,6 +158,26 @@ class RiskManager:
 
         sl_distance_price = cp * sl_distance_pct
 
+        # Calcular base SL sin el multiplicador de Clone para el Take Profit
+        if profile and profile.get("name") == "Scalping Clone":
+            base_sl_mult = float(getattr(config, "SL_MULTIPLIER", 0.6))
+        elif profile:
+            base_sl_mult = float(profile.get("slMultiplier", 0.6))
+        else:
+            base_sl_mult = float(getattr(config, "SL_MULTIPLIER", 0.6))
+
+        if atr_f > 0 and (atr_f / cp) <= 0.20:
+            base_sl_distance_pct = (atr_f * base_sl_mult) / cp
+        elif est_range_f > 0:
+            base_sl_distance_pct = (est_range_f / 100.0) * base_sl_mult
+        else:
+            base_sl_distance_pct = 0.015 * base_sl_mult
+
+        if base_sl_distance_pct < min_sl_pct:
+            base_sl_distance_pct = min_sl_pct
+
+        base_sl_distance_price = cp * base_sl_distance_pct
+
         # Limitar RR según setup_type (caps hard por tipo de señal)
         if profile:
             rr_target = float(profile.get("tpMultiplier", 3.0))
@@ -182,7 +202,17 @@ class RiskManager:
             rr_target,
         )
 
-        tp_distance_price = sl_distance_price * rr_target
+        base_tp_distance_price = base_sl_distance_price * rr_target
+
+        if profile and profile.get("name") == "Scalping Clone":
+            boost = float(getattr(config, "CLONE_TP_BOOST", 1.3))
+            tp_distance_price = base_tp_distance_price * boost
+            logger.info(
+                "[CLONE-TP] Decoupled Clone TP. standard_tp_dist=%.6f | clone_boost=%.2f | effective_tp_dist=%.6f",
+                base_tp_distance_price, boost, tp_distance_price
+            )
+        else:
+            tp_distance_price = sl_distance_price * rr_target
 
         side = int(signal_data.get("side", 0))
 

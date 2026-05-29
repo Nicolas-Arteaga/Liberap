@@ -41,13 +41,15 @@ class BTCMacroFilter:
                 return "NEUTRAL"
             
             # Calcular % cambio 5m (usando velas 1m)
-            current_price_1m = float(candles_1m[-1]["close"])  # Close
-            price_5m_ago = float(candles_1m[0]["close"]) if len(candles_1m) >= 5 else current_price_1m
+            current_price_1m = float(candles_1m[-1]["close"])  # Close actual
+            # -6 es la vela que cerró hace 5 min exactos (index -1 es la vela actual en desarrollo)
+            price_5m_ago = float(candles_1m[-6]["close"]) if len(candles_1m) >= 6 else float(candles_1m[0]["close"])
             pct_5m = ((current_price_1m - price_5m_ago) / price_5m_ago) * 100
             
             # Calcular % cambio 15m (usando velas 5m)
-            current_price_5m = float(candles_5m[-1]["close"])  # Close
-            price_15m_ago = float(candles_5m[0]["close"]) if len(candles_5m) >= 3 else current_price_5m
+            current_price_5m = float(candles_5m[-1]["close"])  # Close actual
+            # -4 es la vela que cerró hace 15 min exactos (3 velas de 5m atrás)
+            price_15m_ago = float(candles_5m[-4]["close"]) if len(candles_5m) >= 4 else float(candles_5m[0]["close"])
             pct_15m = ((current_price_5m - price_15m_ago) / price_15m_ago) * 100
             
             # Determinar régimen
