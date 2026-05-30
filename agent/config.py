@@ -109,6 +109,12 @@ CLONE_MAX_STOP_LOSS_PCT = 5.0         # Techo absoluto para Scalping Clone (usa 
 MAX_RSI_LONG_LIMIT = 75.0             # Nadie compra con RSI > 75. Evita comprar el clímax del pump.
 TIER3_MIN_CONFLUENCE_SCORE = 65.0     # Exclusivo Tier 3: exige confluencia perfecta para entrar
 
+# --- FILTROS DE FRANCOTIRADOR (Sniper Mode) ---
+POST_PUMP_MA7_DISTANCE_PCT = 1.2      # Forzamos que el límite global sea 1.2% (espera pullback)
+MAX_NEXUS_SIGNAL_AGE_SECONDS = 60     # Las señales mueren al minuto (solo señales frescas)
+NEXUS_MAX_PRICE_DRIFT_PCT = 0.002     # Si el precio se movió 0.2%, la señal ya no sirve
+MAX_DAILY_PUMP_LONG_LIMIT = 25.0      # Bajamos a 25% para ser más estrictos (evita HMSTR)
+
 # --- REGLA sniper DE ALTA VOLATILIDAD ---
 HIGH_VOLATILITY_RANGE_THRESHOLD = 7.0  # Rango >= 7% activa la regla Sniper
 HIGH_VOLATILITY_MIN_CONFLUENCE = 90.0   # Requiere confluencia extrema de 90+ para monedas explosivas
@@ -149,7 +155,7 @@ BTC_CORR_PENALTY_LOW = float(os.getenv("BTC_CORR_PENALTY_LOW", "0.88"))      # P
 TP_MULTIPLIER = 3.5                  
 SL_MULTIPLIER = 0.6                  
 CLONE_TP_BOOST = 1.3  # Multiplicador del TP estándar para el Scalping Clone (mejor TP que standard, pero no el doble)
-MAX_DAILY_PUMP_LONG_LIMIT = float(os.getenv("MAX_DAILY_PUMP_LONG_LIMIT", "30.0"))  # % máx de subida en 24h para permitir LONGs (Veto FOMO de techo)
+MAX_DAILY_PUMP_LONG_LIMIT = float(os.getenv("MAX_DAILY_PUMP_LONG_LIMIT", "25.0"))  # % máx de subida en 24h para permitir LONGs (Veto FOMO de techo) - Bajado a 25%
 MAX_DAILY_DUMP_SHORT_LIMIT = float(os.getenv("MAX_DAILY_DUMP_SHORT_LIMIT", "-30.0"))  # % máx de caída en 24h para permitir SHORTs (Veto FOMO de piso)
 # Topes máximos de multiplicador TP por tipo de setup Nexus.
 # TF puede correr hasta 3× el SL. MR tiene menos recorrido histórico, cap más conservador.

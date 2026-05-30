@@ -456,9 +456,9 @@ def validate_pre_trade(
     side = int(candidate.get("side", 0))
 
     # ── VETO GLOBAL: Agotamiento Diario (MAX_DAILY_PUMP/DUMP) ──
-    # Si ya subió más del 30% en el día, vetamos LONG. Si cayó más del 30%, vetamos SHORT.
+    # Si ya subió más del 25% en el día, vetamos LONG. Si cayó más del 30%, vetamos SHORT.
     daily_change_pct = _fetch_24h_price_change_percent(symbol)
-    max_daily_pump = float(getattr(config, "MAX_DAILY_PUMP_LONG_LIMIT", 30.0))
+    max_daily_pump = float(getattr(config, "MAX_DAILY_PUMP_LONG_LIMIT", 25.0))  # Bajado a 25% para ser más estrictos
     max_daily_dump = float(getattr(config, "MAX_DAILY_DUMP_SHORT_LIMIT", -30.0))
 
     if side == 0 and daily_change_pct >= max_daily_pump:

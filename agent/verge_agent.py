@@ -259,32 +259,38 @@ class VergeAgent:
         db_profiles = self.positions.get_strategy_profiles() or []
         db_profiles = [p for p in db_profiles if p.get("name") not in ("Standard Scalping", "Scalping Clone")]
         
-        # Define the virtual legacy profile for "Standard Scalping"
+        # Define the virtual legacy profile for "Standard Scalping" (Sniper Mode)
         legacy_profile = {
             "id": STANDARD_PROFILE_ID,
             "name": "Standard Scalping",
             "minConfluenceScore": config.MIN_CONFLUENCE_SCORE,
-            "minNexusConfidence": getattr(config, "MIN_ENTRY_NEXUS", 70.0),
+            "minNexusConfidence": 76.0,  # Subido a 76% para máxima calidad
             "tpMultiplier": getattr(config, "TP_MULTIPLIER", 2.0),
             "slMultiplier": getattr(config, "SL_MULTIPLIER", 1.0),
             "marginPerTrade": getattr(config, "MAX_MARGIN_PER_TRADE_USD", 150),
             "maxOpenPositions": config.MAX_OPEN_POSITIONS,
+            "maxMa7DistancePct": 1.2,          # EL SECRETO: Filtro de proximidad a la media (evita FOMO)
+            "maxNexusSignalAgeSeconds": 60,    # Solo señales frescas (60s)
+            "nexusMaxPriceDriftPct": 0.002,    # Máximo movimiento de 0.2% desde la señal
             "allowLong": True,
             "allowShort": True,
             "allowedSources": ["nexus", "scar", "redis_bridge"],
             "isActive": True
         }
 
-        # Define the virtual clone profile for "Scalping Clone" (auto-clones Standard Scalping trades with 2x SL)
+        # Define the virtual clone profile for "Scalping Clone" (Sniper Mode + Tank SL)
         self.clone_profile = {
             "id": CLONE_PROFILE_ID,
             "name": "Scalping Clone",
             "minConfluenceScore": config.MIN_CONFLUENCE_SCORE,
-            "minNexusConfidence": getattr(config, "MIN_ENTRY_NEXUS", 70.0),
+            "minNexusConfidence": 76.0,  # Subido a 76% para máxima calidad
             "tpMultiplier": getattr(config, "TP_MULTIPLIER", 2.0),
-            "slMultiplier": getattr(config, "SL_MULTIPLIER", 1.0) * 2,  # 2x Standard Scalping SL
+            "slMultiplier": getattr(config, "SL_MULTIPLIER", 1.0) * 2,  # 2x Standard Scalping SL (Tanque)
             "marginPerTrade": getattr(config, "MAX_MARGIN_PER_TRADE_USD", 150),
             "maxOpenPositions": config.MAX_OPEN_POSITIONS,
+            "maxMa7DistancePct": 1.2,          # COPIADO: El Clone ahora también espera el pullback
+            "maxNexusSignalAgeSeconds": 60,    # COPIADO: Evita entrar en datos viejos
+            "nexusMaxPriceDriftPct": 0.002,    # COPIADO: Máximo 0.2% drift
             "allowLong": True,
             "allowShort": True,
             "allowedSources": ["nexus", "scar", "redis_bridge"],
