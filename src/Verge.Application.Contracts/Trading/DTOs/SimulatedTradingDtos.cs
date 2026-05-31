@@ -44,6 +44,28 @@ public class SimulatedTradeDto : EntityDto<Guid>
     /// LONG: lowest price seen. SHORT: highest price seen.
     /// </summary>
     public decimal? MaxAdversePrice { get; set; }
+
+    /// <summary>
+    /// The farthest favorable price reached during the trade.
+    /// LONG: highest price seen. SHORT: lowest price seen.
+    /// </summary>
+    public decimal? MaxFavorablePrice { get; set; }
+
+    /// <summary>
+    /// Why the trade was closed: "tp_hit", "sl_hit", "btc_dump", "timeout", "manual", "trailing_stop", "regime_change"
+    /// </summary>
+    public string? ExitReason { get; set; }
+
+    /// <summary>
+    /// Distance from entry price to MA7 at entry time (percentage). Used for Sniper filter validation.
+    /// Example: 0.8 means price was 0.8% away from MA7 when entering.
+    /// </summary>
+    public decimal? Ma7DistancePctAtEntry { get; set; }
+
+    /// <summary>
+    /// BTC price at the moment this trade was closed. Used for BTC correlation analysis.
+    /// </summary>
+    public decimal? BtcPriceAtClose { get; set; }
 }
 
 public class OpenTradeInputDto
@@ -63,6 +85,9 @@ public class OpenTradeInputDto
 
     /// <summary>Which strategy profile triggered this trade. Used to group results per strategy.</summary>
     public Guid? StrategyProfileId { get; set; }
+
+    /// <summary>Distance from entry price to MA7 at entry time (percentage). For Sniper filter validation.</summary>
+    public decimal? Ma7DistancePctAtEntry { get; set; }
 }
 
 public class CloseTradeInputDto

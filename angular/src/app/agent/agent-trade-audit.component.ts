@@ -1,11 +1,13 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { SimulatedTradeService } from '../proxy/trading/simulated-trade.service';
 import type { SimulatedTradeDto, StrategyProfileDto } from '../proxy/trading/dtos/models';
 import { TradeStatus } from '../proxy/trading/trade-status.enum';
 import { StrategyProfileService } from '../strategies/services/strategy-profile.service';
+import { PaginatorComponent } from '../shared/components/paginator/paginator.component';
 
 export interface AgentDecisionSnapshot {
   schema_version?: number;
@@ -31,7 +33,7 @@ export interface VersionStats {
 @Component({
   selector: 'app-agent-trade-audit',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, PaginatorComponent],
   templateUrl: './agent-trade-audit.component.html',
   styleUrls: ['./agent-trade-audit.component.scss'],
 })
@@ -46,7 +48,49 @@ export class AgentTradeAuditComponent implements OnInit {
   showRawJson = signal(false);
   strategies = signal<StrategyProfileDto[]>([]);
 
+  // Filtros
+  strategyFilter = signal<string | null>(null);
+  symbolFilter = signal<string | null>(null);
+  statusFilter = signal<TradeStatus | null>(null);
+  resultFilter = signal<'win' | 'loss' | null>(null);
+  startDateFilter = signal<string | null>(null);
+  endDateFilter = signal<string | null>(null);
+
+  // Paginación
+  currentPage = signal(1);
+  pageSize = signal(10);
+  totalItems = signal(0);
+  pagedRows = signal<SimulatedTradeDto[]>([]);
+
+  // Modal
+  selectedForModal = signal<SimulatedTradeDto | null>(null);
+  showRawJsonInModal = signal(false);
+
+  // Descarga por estrategia
+  downloadStrategyId = signal<string | null>(null);
+
+  // Ordenamiento
+  sortField = signal<string>('openedAt');
+  sortDirection = signal<'asc' | 'desc'>('desc');
+
   readonly TradeStatus = TradeStatus;
+  readonly Math = Math; // Expose Math to template for TP validation
+
+  formatExitReason(reason: string): string {
+    const map: Record<string, string> = {
+      'tp_hit': '✅ TP Alcanzado',
+      'sl_hit': '❌ SL Alcanzado',
+      'btc_dump': '🔴 BTC Dump (salida preventiva)',
+      'trailing_stop': '🟡 Trailing Stop (Cosecha)',
+      'timeout': '⏱️ Timeout',
+      'lse_exit': '🔵 LSE Exit',
+      'regime_change': '🔄 Cambio de Régimen',
+      'manual_profit': '💚 Cierre Manual (Profit)',
+      'manual_loss': '🔴 Cierre Manual (Loss)',
+      'unknown': '❓ Desconocido',
+    };
+    return map[reason] || reason;
+  }
 
   parsedSelected = computed(() => this.parseSnapshot(this.selected()));
 
@@ -99,6 +143,7 @@ export class AgentTradeAuditComponent implements OnInit {
           return tb - ta;
         });
         this.allRows.set(merged);
+        this.applyFilters();
         this.loading.set(false);
       },
       error: err => {
@@ -106,6 +151,132 @@ export class AgentTradeAuditComponent implements OnInit {
         this.loadError.set(err?.error?.error?.message || err?.message || 'No se pudo cargar el historial.');
       },
     });
+  }
+
+  applyFilters(): void {
+    let filtered = [...this.allRows()];
+
+    // Filtro por estrategia
+    if (this.strategyFilter()) {
+      filtered = filtered.filter(t => t.strategyProfileId === this.strategyFilter());
+    }
+
+    // Filtro por símbolo
+    if (this.symbolFilter()) {
+      const sym = this.symbolFilter()!.toUpperCase();
+      filtered = filtered.filter(t => t.symbol?.toUpperCase().includes(sym));
+    }
+
+    // Filtro por estado
+    if (this.statusFilter() !== null) {
+      filtered = filtered.filter(t => t.status === this.statusFilter());
+    }
+
+    // Filtro por resultado
+    if (this.resultFilter() === 'win') {
+      filtered = filtered.filter(t => t.status === TradeStatus.Win);
+    } else if (this.resultFilter() === 'loss') {
+      filtered = filtered.filter(t => t.status === TradeStatus.Loss);
+    }
+
+    // Filtro por fecha inicio
+    if (this.startDateFilter()) {
+      const start = new Date(this.startDateFilter()!).getTime();
+      filtered = filtered.filter(t => new Date(t.openedAt ?? 0).getTime() >= start);
+    }
+
+    // Filtro por fecha fin
+    if (this.endDateFilter()) {
+      const end = new Date(this.endDateFilter()!);
+      end.setHours(23, 59, 59, 999);
+      const endTime = end.getTime();
+      filtered = filtered.filter(t => new Date(t.openedAt ?? 0).getTime() <= endTime);
+    }
+
+    // Ordenamiento
+    const field = this.sortField();
+    const dir = this.sortDirection() === 'asc' ? 1 : -1;
+    filtered.sort((a, b) => {
+      let valA: any;
+      let valB: any;
+
+      switch (field) {
+        case 'openedAt':
+          valA = new Date(a.openedAt ?? 0).getTime();
+          valB = new Date(b.openedAt ?? 0).getTime();
+          break;
+        case 'symbol':
+          valA = a.symbol?.toUpperCase() || '';
+          valB = b.symbol?.toUpperCase() || '';
+          break;
+        case 'strategy':
+          valA = this.getStrategyName(a);
+          valB = this.getStrategyName(b);
+          break;
+        case 'pnl':
+          valA = a.realizedPnl ?? 0;
+          valB = b.realizedPnl ?? 0;
+          break;
+        default:
+          valA = new Date(a.openedAt ?? 0).getTime();
+          valB = new Date(b.openedAt ?? 0).getTime();
+      }
+
+      if (valA < valB) return -1 * dir;
+      if (valA > valB) return 1 * dir;
+      return 0;
+    });
+
+    // Actualizar total
+    this.totalItems.set(filtered.length);
+
+    // Paginación
+    const start = (this.currentPage() - 1) * this.pageSize();
+    const end = start + this.pageSize();
+    this.pagedRows.set(filtered.slice(start, end));
+  }
+
+  clearFilters(): void {
+    this.strategyFilter.set(null);
+    this.symbolFilter.set(null);
+    this.statusFilter.set(null);
+    this.resultFilter.set(null);
+    this.startDateFilter.set(null);
+    this.endDateFilter.set(null);
+    this.currentPage.set(1);
+    this.applyFilters();
+  }
+
+  onPageChange(page: number): void {
+    this.currentPage.set(page);
+    this.applyFilters();
+  }
+
+  onPageSizeChange(size: number): void {
+    this.pageSize.set(size);
+    this.currentPage.set(1);
+    this.applyFilters();
+  }
+
+  sortBy(field: string): void {
+    if (this.sortField() === field) {
+      this.sortDirection.set(this.sortDirection() === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.sortField.set(field);
+      this.sortDirection.set('desc');
+    }
+    this.currentPage.set(1);
+    this.applyFilters();
+  }
+
+  openDetail(trade: SimulatedTradeDto): void {
+    this.selectedForModal.set(trade);
+    this.showRawJsonInModal.set(false);
+  }
+
+  closeModal(): void {
+    this.selectedForModal.set(null);
+    this.showRawJsonInModal.set(false);
   }
 
   /** Hay texto guardado por el agente al abrir (columna AgentDecisionJson). */
@@ -580,6 +751,117 @@ export class AgentTradeAuditComponent implements OnInit {
     const a = document.createElement('a');
     a.href = url;
     a.download = `agent_audit_history_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  }
+
+  downloadFilteredStrategyTxt(): void {
+    const strategyId = this.downloadStrategyId();
+    if (!strategyId) return;
+
+    // Filtrar trades por estrategia seleccionada
+    const filteredTrades = this.allRows().filter(t => t.strategyProfileId === strategyId);
+    
+    if (filteredTrades.length === 0) {
+      alert('No hay trades para esta estrategia');
+      return;
+    }
+
+    const strategyName = this.strategies().find(s => s.id === strategyId)?.name || 'Unknown';
+    
+    let out = '';
+    
+    for (const tr of filteredTrades) {
+      const pnlStr = (tr.realizedPnl != null && tr.status !== TradeStatus.Open) 
+        ? tr.realizedPnl.toLocaleString('es-AR', { maximumFractionDigits: 2 }) 
+        : '—';
+      
+      const openedStr = tr.openedAt ? new Date(tr.openedAt).toLocaleString('es-AR') : '—';
+      const closedStr = tr.closedAt ? new Date(tr.closedAt).toLocaleString('es-AR') : '—';
+      const hasAudit = this.hasAuditSnapshot(tr) ? 'Sí' : 'No';
+      
+      out += `${tr.symbol}\n`;
+      out += `Estrategia: ${strategyName}\n`;
+      out += `${this.signalSource(tr)}\n`;
+      out += `Ejecución simulada\n`;
+      out += `Entrada (servidor)\n${tr.entryPrice}\n`;
+      out += `TP\n${tr.tpPrice}\n`;
+      out += `SL\n${tr.slPrice}\n`;
+      out += `Margen / Lev\n${tr.margin} USDT × ${tr.leverage}\n`;
+      
+      const snap = this.parseSnapshot(tr);
+      if (snap) {
+        const ps = this.asRecord(snap.position_sizing);
+        if (ps) {
+          out += `Tamaño (motor de riesgo)\n`;
+          for (const row of this.positionSizingRows(ps)) {
+            out += `${row.label}\n${row.value}\n`;
+          }
+        }
+        
+        if (snap.agent_meta) {
+          out += `Razonamiento del agente\n${snap.agent_meta.entry_reason || ''}\n\n`;
+          out += `Grupo Nexus\n${snap.agent_meta.nexus_group || ''}\n`;
+          out += `Tier\n${snap.agent_meta.tier || ''}\n`;
+          out += `Capturado\n${snap.captured_at_utc ? new Date(snap.captured_at_utc).toLocaleString('es-AR') : ''}\n`;
+        }
+        
+        const c = snap.candidate;
+        if (c) {
+          out += `Nexus-15 · lectura al ejecutar\n`;
+          out += `Confianza IA\n${c['nexus_confidence'] ?? ''}\n`;
+          out += `Dirección\n${c['nexus_direction'] ?? ''}\n`;
+          out += `Régimen\n${c['regime'] ?? ''}\n`;
+          out += `Rango est. %\n${c['estimated_range_pct'] ?? ''}\n`;
+          out += `Confluencia\n${c['confluence_score'] ?? ''}\n`;
+          
+          const audit = this.asRecord(c['agent_audit_context']);
+          if (audit) {
+            const nx = this.asRecord(audit['nexus15']);
+            if (nx) {
+              out += `Respuesta Nexus (API)\n`;
+              for (const item of this.nexusSummaryItems(nx)) {
+                out += `${item.label}\n${item.value}\n`;
+              }
+            }
+          }
+          
+          out += `SCAR\nscore_grial en candidato: ${c['scar_score'] ?? ''}\n\n`;
+          
+          if (c['source'] === 'LSE') {
+            out += `Liquidity Engine (LSE)\n`;
+            out += `Score LSE\n${c['lse_score'] ?? ''}\n`;
+            out += `Detección\n${c['lse_detection_mode'] ?? ''}\n`;
+            out += `Entry modelo\n${c['lse_entry_price'] ?? ''}\n`;
+            out += `SL modelo\n${c['lse_stop_loss'] ?? ''}\n`;
+            out += `TP1 modelo\n${c['lse_take_profit_1'] ?? ''}\n`;
+            
+            if (audit) {
+              const lseSig = this.asRecord(audit['lse_signal']);
+              if (lseSig) {
+                out += `Señal LSE\n`;
+                for (const row of this.auditRecordRows(lseSig)) {
+                  out += `${row.label}\n${row.value}\n`;
+                }
+              }
+            }
+          }
+          
+          if (this.reasonLines(c).length > 0) {
+             out += `Reasoning\n`;
+             out += JSON.stringify(this.reasonLines(c)) + '\n';
+          }
+        }
+      }
+      
+      out += `\n--------------------------------------------------\n\n`;
+    }
+    
+    const blob = new Blob([out], { type: 'text/plain;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `audit_${strategyName.replace(/\s+/g, '_')}_${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
     a.click();
     window.URL.revokeObjectURL(url);
   }

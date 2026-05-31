@@ -180,6 +180,30 @@ class VergeAgent:
             "flash_crash": is_flash_crash,
         }
         
+        # ── AI-GRADE AUDIT: Temporal Context ──
+        now_utc = datetime.utcnow()
+        hour_utc = now_utc.hour
+        day_of_week = now_utc.strftime("%A")
+        
+        # Determine trading session
+        if 0 <= hour_utc < 8:
+            session = "ASIA"
+        elif 8 <= hour_utc < 13:
+            session = "LONDON"
+        elif 13 <= hour_utc < 21:
+            session = "NY_OPEN"
+        elif 21 <= hour_utc < 24:
+            session = "NY_CLOSE"
+        else:
+            session = "WEEKEND"
+        
+        temporal_context = {
+            "hour_utc": hour_utc,
+            "day_of_week": day_of_week,
+            "session": session,
+            "is_weekend": day_of_week in ["Saturday", "Sunday"],
+        }
+        
         snap = {
             "schema_version": 1,
             "agent_version": "risk_v5",
@@ -193,6 +217,7 @@ class VergeAgent:
                 "setup_metrics": self._json_safe_for_audit(copy.deepcopy(setup_metrics or {})),
             },
             "btc_context": btc_context,
+            "temporal_context": temporal_context,
             "candidate": self._json_safe_for_audit(copy.deepcopy(candidate)),
             "position_sizing": self._json_safe_for_audit(copy.deepcopy(pos_details)),
         }
@@ -204,6 +229,133 @@ class VergeAgent:
                 {"schema_version": 1, "error": str(ex), "symbol": candidate.get("symbol")},
                 ensure_ascii=False,
             )
+
+    def _capture_market_context(self, symbol: str, candidate: dict) -> dict:
+        """
+        AI-GRADE AUDIT: Capture market context snapshot at trade entry.
+        Logs order book, OI, funding, volume, volatility, and liquidations.
+        This data is NOT used for trading decisions - only for post-trade AI analysis.
+        """
+        try:
+            context = {
+                "captured_at_utc": datetime.utcnow().isoformat() + "Z",
+                "symbol": symbol,
+            }
+            
+            # Order Book metrics (si está disponible)
+            try:
+                if hasattr(self, 'fetcher') and hasattr(self.fetcher, 'get_orderbook_snapshot'):
+                    ob = self.fetcher.get_orderbook_snapshot(symbol)
+                    if ob:
+                        context["orderbook"] = {
+                            "bid_ask_spread_pct": ob.get("spread_pct"),
+                            "depth_5_pct_usdt": ob.get("depth_5_usdt"),
+                            "imbalance": ob.get("imbalance"),  # (bids - asks) / (bids + asks)
+                        }
+            except Exception as e:
+                logger.debug(f"[AUDIT] Order book capture failed for {symbol}: {e}")
+            
+            # Open Interest (si está disponible)
+            try:
+                if hasattr(self, 'fetcher') and hasattr(self.fetcher, 'get_open_interest'):
+                    oi_data = self.fetcher.get_open_interest(symbol)
+                    if oi_data:
+                        context["open_interest"] = {
+                            "oi_usdt": oi_data.get("oi_usdt"),
+                            "oi_change_1h_pct": oi_data.get("change_1h_pct"),
+                            "oi_change_4h_pct": oi_data.get("change_4h_pct"),
+                        }
+            except Exception as e:
+                logger.debug(f"[AUDIT] OI capture failed for {symbol}: {e}")
+            
+            # Funding Rate
+            try:
+                if hasattr(self, 'fetcher') and hasattr(self.fetcher, 'get_funding_rate'):
+                    funding = self.fetcher.get_funding_rate(symbol)
+                    if funding is not None:
+                        context["funding"] = {
+                            "current_rate": funding,
+                            "trend": "unknown",  # Requiere histórico
+                        }
+            except Exception as e:
+                logger.debug(f"[AUDIT] Funding rate capture failed for {symbol}: {e}")
+            
+            # Volume
+            try:
+                if hasattr(self, 'fetcher') and hasattr(self.fetcher, 'get_volume_24h'):
+                    vol = self.fetcher.get_volume_24h(symbol)
+                    if vol:
+                        context["volume"] = {
+                            "volume_24h_usdt": vol.get("volume_usdt"),
+                            "volume_ratio": vol.get("ratio_vs_avg"),
+                        }
+            except Exception as e:
+                logger.debug(f"[AUDIT] Volume capture failed for {symbol}: {e}")
+            
+            # Volatility (ATR)
+            try:
+                if "atr_14" in candidate:
+                    context["volatility"] = {
+                        "atr_14": candidate.get("atr_14"),
+                    }
+            except Exception as e:
+                logger.debug(f"[AUDIT] Volatility capture failed for {symbol}: {e}")
+            
+            return context
+            
+        except Exception as e:
+            logger.warning(f"[AUDIT] Market context capture failed for {symbol}: {e}")
+            return {"error": str(e)}
+
+    def _determine_exit_reason(self, close_reason: str, side: int, current_price: float, tp: float, sl: float, entry_price: float) -> str:
+        """
+        AI-GRADE AUDIT: Classify why a trade was closed.
+        Returns standardized exit reason for post-trade analysis.
+        """
+        # Normalize close_reason
+        reason_lower = close_reason.lower()
+        
+        # TP hit
+        if "take profit" in reason_lower or "tp" in reason_lower:
+            return "tp_hit"
+        
+        # SL hit
+        if "stop loss" in reason_lower or "sl" in reason_lower:
+            return "sl_hit"
+        
+        # BTC dump exit
+        if "btc" in reason_lower and ("dump" in reason_lower or "exit" in reason_lower):
+            return "btc_dump"
+        
+        # Cosecha Inteligente (trailing stop)
+        if "cosecha" in reason_lower or "trailing" in reason_lower:
+            return "trailing_stop"
+        
+        # Timeout
+        if "timeout" in reason_lower or "duration" in reason_lower or "zombie" in reason_lower:
+            return "timeout"
+        
+        # LSE follow-through exit
+        if "lse" in reason_lower or "follow" in reason_lower:
+            return "lse_exit"
+        
+        # Regime change
+        if "regime" in reason_lower:
+            return "regime_change"
+        
+        # Default: classify based on price action
+        if entry_price > 0:
+            if side == 0:  # LONG
+                pnl_pct = (current_price - entry_price) / entry_price
+            else:  # SHORT
+                pnl_pct = (entry_price - current_price) / entry_price
+            
+            if pnl_pct > 0:
+                return "manual_profit"  # Closed in profit manually
+            else:
+                return "manual_loss"  # Closed in loss manually
+        
+        return "unknown"
 
     def run(self):
         logger.info(f"Agent started. Loop interval: {config.LOOP_INTERVAL_SECONDS}s.")
@@ -1516,6 +1668,28 @@ class VergeAgent:
         if not pos_details:
             return False
         
+        # ── AI-GRADE AUDIT: Capture MA7 distance for Sniper filter validation ──
+        try:
+            ma7_value = candidate.get("ma7", 0)
+            entry_price = float(pos_details.get("entry_price", market_px))
+            if ma7_value > 0 and entry_price > 0:
+                ma7_distance_pct = abs(entry_price - ma7_value) / ma7_value * 100.0
+                pos_details["ma7_distance_pct"] = round(ma7_distance_pct, 4)
+                logger.debug(f"[AUDIT] {symbol} MA7 distance: {ma7_distance_pct:.2f}% (MA7={ma7_value}, Entry={entry_price})")
+            else:
+                pos_details["ma7_distance_pct"] = None
+        except Exception as e:
+            logger.warning(f"[AUDIT] Failed to calculate MA7 distance for {symbol}: {e}")
+            pos_details["ma7_distance_pct"] = None
+        
+        # ── AI-GRADE AUDIT: Capture Market Context Snapshot ──
+        try:
+            market_context = self._capture_market_context(symbol, candidate)
+            pos_details["market_context"] = market_context
+        except Exception as e:
+            logger.warning(f"[AUDIT] Failed to capture market context for {symbol}: {e}")
+            pos_details["market_context"] = {}
+        
         # Tag with strategy ID
         if profile and profile.get("id"):
             pos_details["strategy_profile_id"] = profile["id"]
@@ -1995,6 +2169,16 @@ class VergeAgent:
             if should_close:
                 logger.info(f"{close_tag} Closing {symbol}: {close_reason} @ {current_price}")
 
+                # ── AI-GRADE AUDIT: Determine exit_reason ──
+                exit_reason = self._determine_exit_reason(close_reason, side, current_price, tp, sl, entry_price)
+                
+                # ── AI-GRADE AUDIT: Get BTC price at close ──
+                btc_price_at_close = None
+                try:
+                    btc_price_at_close = self.fetcher.get_current_price("BTCUSDT")
+                except Exception as e:
+                    logger.debug(f"[AUDIT] Failed to get BTC price at close: {e}")
+                
                 # ── Sync max adverse price to backend before closing ──
                 max_adv = pos.get("max_adverse_price")
                 logger.info(f" [MAE] Before closing trade {trade_id}, max_adverse_price = {max_adv}")
@@ -2004,6 +2188,21 @@ class VergeAgent:
                     logger.info(f" [MAE] update_max_adverse_price result: {result}")
                 else:
                     logger.warning(f" [MAE] max_adverse_price is None for trade {trade_id}, skipping update")
+                
+                # ── AI-GRADE AUDIT: Sync max favorable price ──
+                max_fav = pos.get("max_profit_price")
+                if max_fav is not None:
+                    try:
+                        self.positions.update_max_favorable_price(trade_id, float(max_fav))
+                        logger.info(f" [MFE] Updated max_favorable_price for {trade_id}: {max_fav}")
+                    except Exception as e:
+                        logger.warning(f" [MFE] Failed to update max_favorable_price: {e}")
+                
+                # ── AI-GRADE AUDIT: Sync exit_reason and BTC price ──
+                try:
+                    self.positions.update_trade_exit_info(trade_id, exit_reason, btc_price_at_close)
+                except Exception as e:
+                    logger.warning(f" [AUDIT] Failed to update exit info: {e}")
 
                 success = self.positions.close_trade(trade_id)
 

@@ -136,6 +136,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private ma7Series: ISeriesApi<'Line'> | null = null;
   private ma25Series: ISeriesApi<'Line'> | null = null;
   private ma99Series: ISeriesApi<'Line'> | null = null;
+  private priceMirrorSeries: ISeriesApi<'Line'> | null = null;
   private volumeSeries: any = null;
   private chartContainerElement: HTMLElement | null = null;
 
@@ -777,7 +778,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.chart = createChart(container, {
       width: container.clientWidth,
-      height: 500,
+      height: container.clientHeight || 480,
       layout: {
         background: { type: ColorType.Solid, color: 'rgba(5, 9, 16, 0.4)' },
         textColor: '#00f3ff',
@@ -790,6 +791,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       },
       rightPriceScale: {
         borderColor: 'rgba(0, 243, 255, 0.15)',
+      },
+      leftPriceScale: {
+        visible: false,
       },
       timeScale: {
         borderColor: 'rgba(0, 243, 255, 0.15)',
@@ -838,26 +842,30 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.hmaSeries = this.chart.addSeries(LineSeries, {
       color: '#00e5ff',
       lineWidth: 2,
-      title: 'HMA 50',
+      title: '',
+      lastValueVisible: false,
     });
 
     this.ma7Series = this.chart.addSeries(LineSeries, {
       color: '#ffcc00', // Yellow
       lineWidth: 1,
-      title: 'MA(7)',
+      title: '',
       lineStyle: LineStyle.Dashed,
+      lastValueVisible: false,
     });
 
     this.ma25Series = this.chart.addSeries(LineSeries, {
       color: '#ba55d3', // Purple
       lineWidth: 1,
-      title: 'MA(25)',
+      title: '',
+      lastValueVisible: false,
     });
 
     this.ma99Series = this.chart.addSeries(LineSeries, {
       color: '#722ed1', // Deep purple
       lineWidth: 1,
-      title: 'MA(99)',
+      title: '',
+      lastValueVisible: false,
     });
 
     window.addEventListener('resize', this.onResize);
@@ -950,6 +958,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
           
           this.candlestickSeries.setData(this.chartData);
           this.volumeSeries?.setData(this.chartVolumes);
+          this.priceMirrorSeries?.setData(this.chartData.map(d => ({ time: d.time, value: Number(d.close) })));
           
           this.updateHMA(this.chartData);
           this.updateMA(this.chartData, 7, this.ma7Series);
@@ -1051,6 +1060,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
       this.candlestickSeries?.setData(this.chartData);
       this.volumeSeries?.setData(this.chartVolumes);
+      this.priceMirrorSeries?.setData(this.chartData.map(d => ({ time: d.time, value: Number(d.close) })));
 
       this.updateHMA(this.chartData);
       this.updateMA(this.chartData, 7, this.ma7Series);
@@ -1199,6 +1209,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.chartVolumes = volumes;
     this.candlestickSeries?.setData(candles);
     this.volumeSeries?.setData(volumes);
+    this.priceMirrorSeries?.setData(candles.map(d => ({ time: d.time, value: Number(d.close) })));
     
     this.updateHMA(candles);
     this.updateMA(candles, 7, this.ma7Series);

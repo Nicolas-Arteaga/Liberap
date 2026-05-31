@@ -59,6 +59,31 @@ public class SimulatedTrade : FullAuditedAggregateRoot<Guid>
     public decimal? MaxAdversePrice { get; set; }
 
     /// <summary>
+    /// The farthest favorable price reached during the trade.
+    /// For LONG: the highest price seen. For SHORT: the lowest price seen.
+    /// Null if tracking wasn't available (legacy trades).
+    /// </summary>
+    public decimal? MaxFavorablePrice { get; set; }
+
+    /// <summary>
+    /// Why the trade was closed: "tp_hit", "sl_hit", "btc_dump", "timeout", "manual", "trailing_stop", "regime_change"
+    /// </summary>
+    public string? ExitReason { get; set; }
+
+    /// <summary>
+    /// Distance from entry price to MA7 at entry time (percentage).
+    /// Example: 0.8 means price was 0.8% away from MA7 when entering.
+    /// Used for Sniper filter validation.
+    /// </summary>
+    public decimal? Ma7DistancePctAtEntry { get; set; }
+
+    /// <summary>
+    /// BTC price at the moment this trade was closed.
+    /// Used for BTC correlation analysis.
+    /// </summary>
+    public decimal? BtcPriceAtClose { get; set; }
+
+    /// <summary>
     /// Links this trade to the StrategyProfile that generated it.
     /// Null for trades opened before multi-strategy was implemented.
     /// </summary>

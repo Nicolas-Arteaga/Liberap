@@ -237,6 +237,10 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         if (input.StrategyProfileId.HasValue)
             trade.StrategyProfileId = input.StrategyProfileId;
 
+        // Set MA7 distance at entry for Sniper filter validation
+        if (input.Ma7DistancePctAtEntry.HasValue)
+            trade.Ma7DistancePctAtEntry = input.Ma7DistancePctAtEntry;
+
         await _tradeRepo.InsertAsync(trade, autoSave: true);
 
         var dto = MapToDto(trade);
@@ -248,6 +252,29 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
             input.Side, symbol, input.Leverage, entryPrice, margin);
 
         return dto;
+    }
+
+    /// <summary>
+    /// AI-GRADE AUDIT: Update max favorable price (MFE) for a trade.
+    /// </summary>
+    public async Task UpdateMaxFavorablePriceAsync(Guid tradeId, decimal maxFavorablePrice)
+    {
+        var trade = await _tradeRepo.GetAsync(tradeId);
+        trade.MaxFavorablePrice = maxFavorablePrice;
+        await _tradeRepo.UpdateAsync(trade, autoSave: true);
+        Logger.LogDebug("[AUDIT] MFE updated for trade {TradeId}: {Price}", tradeId, maxFavorablePrice);
+    }
+
+    /// <summary>
+    /// AI-GRADE AUDIT: Update exit reason and BTC price at close.
+    /// </summary>
+    public async Task UpdateExitInfoAsync(Guid tradeId, string exitReason, decimal? btcPriceAtClose = null)
+    {
+        var trade = await _tradeRepo.GetAsync(tradeId);
+        trade.ExitReason = exitReason;
+        trade.BtcPriceAtClose = btcPriceAtClose;
+        await _tradeRepo.UpdateAsync(trade, autoSave: true);
+        Logger.LogDebug("[AUDIT] Exit info updated for trade {TradeId}: {Reason} | BTC={BTC}", tradeId, exitReason, btcPriceAtClose);
     }
 
     public async Task<SimulatedTradeDto> CloseTradeAsync(Guid tradeId)
@@ -545,7 +572,11 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         Exchange = t.Exchange,
         AgentDecisionJson = t.AgentDecisionJson,
         StrategyProfileId = t.StrategyProfileId,
-        MaxAdversePrice = t.MaxAdversePrice
+        MaxAdversePrice = t.MaxAdversePrice,
+        MaxFavorablePrice = t.MaxFavorablePrice,
+        ExitReason = t.ExitReason,
+        Ma7DistancePctAtEntry = t.Ma7DistancePctAtEntry,
+        BtcPriceAtClose = t.BtcPriceAtClose
     };
 
     /// <summary>

@@ -36,6 +36,7 @@ class PositionManager:
             "tradingSignalId": position_data.get("tradingSignalId"),
             "agentDecisionJson": position_data.get("agent_decision_json"),
             "strategyProfileId": position_data.get("strategy_profile_id"),
+            "ma7DistancePctAtEntry": position_data.get("ma7_distance_pct"),  # Sniper filter validation
         }
         
         try:
@@ -79,9 +80,60 @@ class PositionManager:
             else:
                 logger.error(f" Failed to close trade {trade_id}. Status {response.status_code}: {response.text}")
                 return False
-                
         except Exception as e:
             logger.error(f" Connection error while closing trade {trade_id}: {e}")
+            return False
+
+    def update_max_favorable_price(self, trade_id: str, max_favorable_price: float) -> bool:
+        """
+        AI-GRADE AUDIT: Update max favorable price (MFE) for a trade.
+        LONG: highest price seen. SHORT: lowest price seen.
+        """
+        headers = self.auth_manager.get_auth_headers()
+        if not headers:
+            logger.error("Cannot update MFE: No valid auth token.")
+            return False
+
+        url = f"{self.base_url}/api/app/simulated-trade/update-max-favorable-price/{trade_id}"
+        payload = {"maxFavorablePrice": max_favorable_price}
+        
+        try:
+            response = requests.post(url, json=payload, headers=headers, verify=False, timeout=10)
+            if response.status_code == 200:
+                logger.debug(f" MFE updated for trade {trade_id}: {max_favorable_price}")
+                return True
+            else:
+                logger.warning(f" Failed to update MFE for {trade_id}. Status {response.status_code}")
+                return False
+        except Exception as e:
+            logger.error(f" Connection error updating MFE: {e}")
+            return False
+
+    def update_trade_exit_info(self, trade_id: str, exit_reason: str, btc_price_at_close: float = None) -> bool:
+        """
+        AI-GRADE AUDIT: Update exit reason and BTC price at close.
+        """
+        headers = self.auth_manager.get_auth_headers()
+        if not headers:
+            logger.error("Cannot update exit info: No valid auth token.")
+            return False
+
+        url = f"{self.base_url}/api/app/simulated-trade/update-exit-info/{trade_id}"
+        payload = {
+            "exitReason": exit_reason,
+            "btcPriceAtClose": btc_price_at_close,
+        }
+        
+        try:
+            response = requests.post(url, json=payload, headers=headers, verify=False, timeout=10)
+            if response.status_code == 200:
+                logger.debug(f" Exit info updated for trade {trade_id}: {exit_reason}")
+                return True
+            else:
+                logger.warning(f" Failed to update exit info for {trade_id}. Status {response.status_code}")
+                return False
+        except Exception as e:
+            logger.error(f" Connection error updating exit info: {e}")
             return False
 
     def update_tp_sl(self, trade_id: str, tp_sl_data: dict) -> bool:
