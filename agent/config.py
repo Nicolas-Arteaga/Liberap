@@ -1,6 +1,15 @@
 import os
 import json
 import time
+from dotenv import load_dotenv
+
+# Load .env from root directory
+dotenv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+if os.path.exists(dotenv_path):
+    load_dotenv(dotenv_path)
+else:
+    load_dotenv()
+
 
 # ==========================================
 # VERGE AUTONOMOUS TRADING AGENT CONFIGURATION
@@ -88,6 +97,7 @@ AGENT_MAX_CANDIDATES_PER_CYCLE = int(os.getenv("AGENT_MAX_CANDIDATES_PER_CYCLE",
 AGENT_MAX_RANK_FOR_NEXUS_FALLBACK = int(os.getenv("AGENT_MAX_RANK_FOR_NEXUS_FALLBACK", "0"))
 
 MAX_OPEN_POSITIONS = 3              # 3 posiciones simultáneas para scalping
+BINANCE_REAL_TRADING = os.getenv("BINANCE_REAL_TRADING", "false").lower() in ("1", "true", "yes")
 MIN_ENTRY_NEXUS  = float(os.getenv("MIN_ENTRY_NEXUS",  "76.0"))  # Nexus mínimo para abrir slot libre (Antes 70.0)
 MIN_UPGRADE_NEXUS = float(os.getenv("MIN_UPGRADE_NEXUS", "80.0"))  # Nexus mínimo para reemplazar la peor posición
 MAX_TRADES_PER_DAY = 100

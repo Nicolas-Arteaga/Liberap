@@ -395,6 +395,7 @@ class VergeAgent:
         except Exception as e:
             logger.error(f"Failed to refresh watchlist: {e}")
         logger.info("--- Starting new analysis cycle ---")
+        logger.info("[VERSION] PositionManager v3.1 - TP/SL via closePosition=true with fallbacks")
 
         # 0. Check exchange health
         breakers     = get_breakers()
@@ -1863,6 +1864,29 @@ class VergeAgent:
         pos_details.pop("agent_decision_json", None)
 
         if trade_result:
+            # ── Mirror entry to Binance if real trading is enabled ──
+            if getattr(config, "BINANCE_REAL_TRADING", False):
+                p_id = profile.get("id") if profile else None
+                p_name = profile.get("name") if profile else ""
+                is_ma_cross = (p_id == "3a214744-f0b9-68bb-f235-438a39d39d33") or (p_name == "MA Cross Momentum")
+                if is_ma_cross:
+                    try:
+                        entry_px = float(pos_details.get("entry_price", market_px))
+                        margin = float(pos_details.get("margin", 150.0))
+                        lev = int(pos_details.get("leverage", 1))
+                        qty = (margin * lev) / entry_px
+                        qty = round(qty, 3)
+                        logger.info(f"[BINANCE REAL] Mirroring entry to Binance for {symbol}: Qty={qty}, Side={candidate.get('side')}, TP={pos_details.get('tp_price')}, SL={pos_details.get('sl_price')}")
+                        self.positions.open_binance_trade(
+                            symbol=symbol,
+                            side=candidate.get("side", 0),
+                            quantity=qty,
+                            tp_price=pos_details.get("tp_price"),
+                            sl_price=pos_details.get("sl_price")
+                        )
+                    except Exception as ex:
+                        logger.error(f"[BINANCE REAL] Exception placing entry order for {symbol}: {ex}")
+
             trade_id = trade_result.get("id")
             local_pos = {
                 "trade_id": trade_id,
@@ -2207,6 +2231,19 @@ class VergeAgent:
                 success = self.positions.close_trade(trade_id)
 
                 if success:
+                    # ── Mirror close to Binance if real trading is enabled ──
+                    if getattr(config, "BINANCE_REAL_TRADING", False):
+                        p_id = pos.get("strategy_profile_id") or pos.get("strategyProfileId")
+                        profile = next((p for p in self.active_profiles if p.get("id") == p_id), None)
+                        p_name = profile.get("name", "") if profile else ""
+                        is_ma_cross = (p_id == "3a214744-f0b9-68bb-f235-438a39d39d33") or (p_name == "MA Cross Momentum")
+                        if is_ma_cross:
+                            try:
+                                logger.info(f"[BINANCE REAL] Mirroring close of {symbol} to Binance")
+                                self.positions.close_binance_trade(symbol)
+                            except Exception as ex:
+                                logger.error(f"[BINANCE REAL] Exception closing position for {symbol}: {ex}")
+
                     realized_pnl = pos["margin"] * (current_price - pos["entry_price"]) / pos["entry_price"] * (1 if side == 0 else -1) * pos["leverage"]
                     fake_data = {
                         "closePrice": current_price,
