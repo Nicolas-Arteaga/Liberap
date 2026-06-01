@@ -118,9 +118,34 @@ public class AgentAppService : VergeAppService, IAgentAppService
         await _agentHubContext.Clients.All.SendAsync("ServerStateChanged", "STOPPED");
     }
 
+    // ============================================================
+    // ⚠️ TESTNET: Agente espejo en Binance Futures TESTNET (DEMO)
+    // Usa paper money — seguro para pruebas.
+    // NO se puede ejecutar junto con el agente MAINNET.
+    // ============================================================
     public async Task StartAgentAsync()
     {
-        await _processManager.StartProcessAsync("Agent", "verge_agent.py");
+        await _processManager.StartProcessAsync("Agent", "verge_agent.py", new System.Collections.Generic.Dictionary<string, string>
+        {
+            ["BINANCE_USE_TESTNET"] = "true"
+        });
+        await _agentHubContext.Clients.All.SendAsync("ServerStateChanged", "AGENT_RUNNING");
+    }
+
+    // ============================================================
+    // 🚨 MAINNET: Agente espejo en Binance Futures REAL (DINERO REAL)
+    // ⚠️ ADVERTENCIA CRÍTICA: Este proceso opera con dinero REAL.
+    // ⚠️ Una mala configuración puede causar pérdidas financieras reales.
+    // ⚠️ Solo activar cuando se haya validado completamente en TESTNET.
+    // ⚠️ NUNCA ejecutar al mismo tiempo que el agente TESTNET.
+    // El sistema garantiza exclusión mutua via el key "Agent" en el ProcessManager.
+    // ============================================================
+    public async Task StartAgentMainnetAsync()
+    {
+        await _processManager.StartProcessAsync("Agent", "verge_agent.py", new System.Collections.Generic.Dictionary<string, string>
+        {
+            ["BINANCE_USE_TESTNET"] = "false"
+        });
         await _agentHubContext.Clients.All.SendAsync("ServerStateChanged", "AGENT_RUNNING");
     }
 

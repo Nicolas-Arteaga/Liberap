@@ -7,6 +7,7 @@ import { AgentSignalrService, AgentLog } from './agent-signalr.service';
 import { Subscription } from 'rxjs';
 
 export type SystemState = 'STOPPED' | 'STARTING_SERVER' | 'SERVER_READY' | 'AGENT_RUNNING';
+export type AgentMode = 'TESTNET' | 'MAINNET' | null;
 
 @Component({
   selector: 'app-agent',
@@ -63,6 +64,14 @@ export class AgentComponent implements OnInit, OnDestroy, AfterViewChecked {
   operations: any[] = [];
   openPositions: any[] = [];
   ghostAgents: any[] = [];
+
+  // ======================================================
+  // 🚨 MODO DEL AGENTE: controla si corremos TESTNET o MAINNET
+  // Solo 1 puede estar activo a la vez — el backend lo garantiza
+  // via el key "Agent" en AgentProcessManager.
+  // ======================================================
+  activeAgentMode: AgentMode = null;
+  showMainnetWarning = false; // controla el modal de confirmación mainnet
 
   private refreshInterval: any;
   private isRefreshing = false;
@@ -500,18 +509,56 @@ export class AgentComponent implements OnInit, OnDestroy, AfterViewChecked {
   startAgent() {
     if (this.systemState !== 'SERVER_READY') return;
     this.systemState = 'STARTING_SERVER'; // Bloquea doble click inmediatamente
-    this.addLog('Iniciando Agente en el servidor...', '#64748b');
+    this.addLog('🟡 [TESTNET] Iniciando Agente en modo DEMO (Binance Testnet)...', '#f59e0b');
+    this.activeAgentMode = 'TESTNET';
     this.agentService.startAgent().subscribe({
       next: () => {},
       error: (err) => {
-        this.addLog('❌ ERROR al iniciar agente: ' + (err.message || 'Error desconocido'), '#ef4444');
+        this.addLog('❌ ERROR al iniciar agente TESTNET: ' + (err.message || 'Error desconocido'), '#ef4444');
         this.systemState = 'SERVER_READY'; // Re-habilita botón si falló
+        this.activeAgentMode = null;
+      }
+    });
+  }
+
+  // ============================================================
+  // 🚨 MAINNET FLOW — dos pasos para evitar activación accidental
+  // Paso 1: el usuario pulsa el botón → se muestra modal de advertencia
+  // Paso 2: el usuario confirma explícitamente → se llama a la API
+  // ============================================================
+  requestStartMainnet() {
+    if (this.systemState !== 'SERVER_READY') return;
+    // Mostrar modal de confirmación con advertencia de dinero real
+    this.showMainnetWarning = true;
+  }
+
+  cancelMainnetConfirm() {
+    this.showMainnetWarning = false;
+  }
+
+  confirmStartMainnet() {
+    if (this.systemState !== 'SERVER_READY') {
+      this.showMainnetWarning = false;
+      return;
+    }
+    this.showMainnetWarning = false;
+    this.systemState = 'STARTING_SERVER'; // Bloquea doble click
+    this.addLog('🚨 [MAINNET] Iniciando Agente en modo REAL (Binance Futures MAINNET)...', '#ef4444');
+    this.addLog('⚠️ ADVERTENCIA: Este agente opera con DINERO REAL. Supervisar activamente.', '#f59e0b');
+    this.activeAgentMode = 'MAINNET';
+    this.agentService.startAgentMainnet().subscribe({
+      next: () => {},
+      error: (err) => {
+        this.addLog('❌ ERROR al iniciar agente MAINNET: ' + (err.message || 'Error desconocido'), '#ef4444');
+        this.systemState = 'SERVER_READY';
+        this.activeAgentMode = null;
       }
     });
   }
 
   stopAgent() {
     if (this.systemState !== 'AGENT_RUNNING') return;
+    this.activeAgentMode = null;
     this.agentService.stopAgent().subscribe();
   }
 

@@ -395,7 +395,11 @@ class VergeAgent:
         except Exception as e:
             logger.error(f"Failed to refresh watchlist: {e}")
         logger.info("--- Starting new analysis cycle ---")
-        logger.info("[VERSION] PositionManager v3.1 - TP/SL via closePosition=true with fallbacks")
+        use_testnet_str = os.getenv("BINANCE_USE_TESTNET", "false")
+        use_testnet = use_testnet_str.lower() in ("1", "true", "yes")
+        version = "3.4" if use_testnet else "3.3"
+        env_str = "TESTNET" if use_testnet else "MAINNET"
+        logger.info(f"[VERSION] PositionManager v{version} - TP/SL via closePosition=true with fallbacks ({env_str})")
 
         # 0. Check exchange health
         breakers     = get_breakers()

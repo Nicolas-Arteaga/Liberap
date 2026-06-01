@@ -22,10 +22,20 @@ namespace Verge.Trading
         public BinanceFuturesManager(IConfiguration configuration, ILogger<BinanceFuturesManager> logger)
         {
             _logger = logger;
-            var apiKey = configuration["BINANCE_API_KEY"];
-            var apiSecret = configuration["BINANCE_API_SECRET"];
             var useTestnetStr = configuration["Binance:UseTestnet"] ?? configuration["BINANCE_USE_TESTNET"];
             _useTestnet = !string.IsNullOrEmpty(useTestnetStr) && bool.Parse(useTestnetStr);
+
+            string apiKey, apiSecret;
+            if (_useTestnet)
+            {
+                apiKey = configuration["BINANCE_TESTNET_API_KEY"] ?? configuration["BINANCE_API_KEY"];
+                apiSecret = configuration["BINANCE_TESTNET_API_SECRET"] ?? configuration["BINANCE_API_SECRET"];
+            }
+            else
+            {
+                apiKey = configuration["BINANCE_MAINNET_API_KEY"] ?? configuration["BINANCE_API_KEY"];
+                apiSecret = configuration["BINANCE_MAINNET_API_SECRET"] ?? configuration["BINANCE_API_SECRET"];
+            }
 
             if (string.IsNullOrEmpty(apiKey) || string.IsNullOrEmpty(apiSecret))
             {

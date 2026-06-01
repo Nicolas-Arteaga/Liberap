@@ -99,6 +99,15 @@ export class AgentService {
       url: '/api/app/agent/start-agent',
     },
     { apiName: this.apiName,...config });
+
+  // ⚠️ MAINNET — opera con dinero REAL en Binance Futures.
+  // Solo usar cuando el bot haya sido validado completamente en TESTNET.
+  startAgentMainnet = (config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'POST',
+      url: '/api/app/agent/start-agent-mainnet',
+    },
+    { apiName: this.apiName,...config });
   
 
   startServer = (config?: Partial<Rest.Config>) =>

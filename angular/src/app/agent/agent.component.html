@@ -41,15 +41,42 @@
       </div>
 
       <div class="action-buttons">
-        <!-- READY TO START AGENT -->
-        <button *ngIf="systemState !== 'AGENT_RUNNING'" class="btn-start" style="width: 100%; justify-content: center;" [disabled]="systemState !== 'SERVER_READY'" (click)="startAgent()">
-          <ion-icon name="play"></ion-icon> INICIAR AGENTE
+        <!-- TESTNET: Solo disponible cuando el servidor está listo y no hay agente corriendo -->
+        <button *ngIf="systemState !== 'AGENT_RUNNING'"
+                class="btn-start btn-testnet"
+                style="width: 100%; justify-content: center;"
+                [disabled]="systemState !== 'SERVER_READY'"
+                (click)="startAgent()"
+                title="Inicia el agente mirror en Binance Testnet (DEMO con paper money)">
+          <ion-icon name="flask-outline"></ion-icon> Iniciar Agente Testnet
         </button>
 
-        <!-- AGENT RUNNING -->
-        <button *ngIf="systemState === 'AGENT_RUNNING'" class="btn-stop" style="flex: 1; justify-content: center;" (click)="stopAgent()">
-          <ion-icon name="square"></ion-icon> DETENER AGENTE
+        <!-- MAINNET: Botón de ADVERTENCIA — dinero real. Sólo disponible si el servidor está listo -->
+        <!--
+          ⚠️ PELIGRO: Este botón inicia el agente con DINERO REAL en Binance Futures Mainnet.
+          Al pulsar, se muestra un modal de confirmación antes de hacer nada.
+          NO puede coexistir con el agente Testnet — el backend usa el mismo key "Agent"
+          en AgentProcessManager lo que garantiza exclusión mutua absoluta.
+        -->
+        <button *ngIf="systemState !== 'AGENT_RUNNING'"
+                class="btn-mainnet"
+                style="width: 100%; justify-content: center; margin-top: 0.5rem;"
+                [disabled]="systemState !== 'SERVER_READY'"
+                (click)="requestStartMainnet()"
+                title="⚠️ Inicia el agente con DINERO REAL en Binance Futures. Requiere confirmación.">
+          <ion-icon name="warning-outline"></ion-icon> Iniciar Agente Mainnet
         </button>
+
+        <!-- AGENTE CORRIENDO — mostrar modo activo y botón detener -->
+        <div *ngIf="systemState === 'AGENT_RUNNING'" style="width: 100%;">
+          <div class="agent-mode-badge" [class.mode-testnet]="activeAgentMode === 'TESTNET'" [class.mode-mainnet]="activeAgentMode === 'MAINNET'">
+            <ion-icon [name]="activeAgentMode === 'MAINNET' ? 'warning' : 'flask-outline'"></ion-icon>
+            {{ activeAgentMode === 'MAINNET' ? '🚨 MAINNET — DINERO REAL' : '🟡 TESTNET — DEMO' }}
+          </div>
+          <button class="btn-stop" style="width: 100%; justify-content: center; margin-top: 0.5rem;" (click)="stopAgent()">
+            <ion-icon name="square"></ion-icon> DETENER AGENTE
+          </button>
+        </div>
       </div>
 
       <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.5rem;">SERVICIOS</div>
@@ -368,6 +395,38 @@
           <h3><ion-icon name="information-circle-outline"></ion-icon> Detalle de Operación</h3>
         </div>
         <div style="text-align: center; color: #64748b; padding: 2rem 0;">No hay operaciones registradas aún.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- 🚨 MODAL DE CONFIRMACIÓN — MAINNET (DINERO REAL)             -->
+  <!-- Solo aparece cuando el usuario pulsa "Iniciar Agente Mainnet" -->
+  <!-- El usuario DEBE confirmar explícitamente para continuar.      -->
+  <!-- ============================================================ -->
+  <div class="mainnet-modal-overlay" *ngIf="showMainnetWarning" (click)="cancelMainnetConfirm()">
+    <div class="mainnet-modal" (click)="$event.stopPropagation()">
+      <div class="mainnet-modal-icon">
+        <ion-icon name="warning"></ion-icon>
+      </div>
+      <h2 class="mainnet-modal-title">⚠️ ATENCIÓN — DINERO REAL</h2>
+      <div class="mainnet-modal-body">
+        <p>Estás a punto de iniciar el agente en <strong>Binance Futures MAINNET</strong>.</p>
+        <ul>
+          <li>🚨 Esto usará <strong>dinero real</strong> de tu cuenta de Binance.</li>
+          <li>⚠️ Las operaciones generadas son <strong>irreversibles</strong>.</li>
+          <li>⚠️ Una mala configuración puede causar <strong>pérdidas financieras</strong>.</li>
+          <li>✅ Solo activa esto si validaste el bot en TESTNET.</li>
+        </ul>
+        <p style="margin-top: 1rem; color: #f59e0b; font-weight: 600;">¿Estás seguro de que querés continuar?</p>
+      </div>
+      <div class="mainnet-modal-actions">
+        <button class="btn-modal-cancel" (click)="cancelMainnetConfirm()">
+          <ion-icon name="close-circle-outline"></ion-icon> Cancelar
+        </button>
+        <button class="btn-modal-confirm" (click)="confirmStartMainnet()">
+          <ion-icon name="warning"></ion-icon> SÍ, INICIAR MAINNET
+        </button>
       </div>
     </div>
   </div>

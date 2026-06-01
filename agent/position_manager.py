@@ -9,9 +9,6 @@ from typing import Dict, Any, Optional
 
 logger = logging.getLogger("PositionManager")
 
-# VERSION: 3.2 - TP/SL via closePosition=true with robust fallback retries
-logger.info("[BinanceDirect] PositionManager v3.2 loaded - closePosition=true with fallbacks")
-
 # ──────────────────────────────────────────────────────────────
 # Binance Futures Direct Client (bypasses C# backend)
 # ──────────────────────────────────────────────────────────────
@@ -19,15 +16,20 @@ class BinanceDirectClient:
     """Signs and sends requests directly to Binance Futures REST API."""
 
     def __init__(self):
-        self.api_key = os.getenv("BINANCE_API_KEY", "")
-        self.api_secret = os.getenv("BINANCE_API_SECRET", "")
         use_testnet_str = os.getenv("BINANCE_USE_TESTNET", "false")
         self.use_testnet = use_testnet_str.lower() in ("1", "true", "yes")
         if self.use_testnet:
+            self.api_key = os.getenv("BINANCE_TESTNET_API_KEY") or os.getenv("BINANCE_API_KEY", "")
+            self.api_secret = os.getenv("BINANCE_TESTNET_API_SECRET") or os.getenv("BINANCE_API_SECRET", "")
             self.base_url = "https://testnet.binancefuture.com"
+            version = "3.4"
         else:
+            self.api_key = os.getenv("BINANCE_MAINNET_API_KEY") or os.getenv("BINANCE_API_KEY", "")
+            self.api_secret = os.getenv("BINANCE_MAINNET_API_SECRET") or os.getenv("BINANCE_API_SECRET", "")
             self.base_url = "https://fapi.binance.com"
+            version = "3.3"
         self._precision_cache: dict = {}
+        logger.info(f"[BinanceDirect] PositionManager v{version} loaded - closePosition=true with fallbacks ({'TESTNET' if self.use_testnet else 'MAINNET'})")
 
     def _sign(self, params: dict) -> dict:
         params["timestamp"] = int(time.time() * 1000)
@@ -139,13 +141,13 @@ class BinanceDirectClient:
         opposite = "SELL" if side == "BUY" else "BUY"
         logger.info(f"[BinanceDirect] Precision: qty_p={qty_p}, price_p={price_p}, rounded_qty={qty}, opposite={opposite}")
 
-        # 0. Set Leverage to match our config (Testnet leverage adjustment)
+        # 0. Set Leverage to 1x (Spot-like mode for both Mainnet and Testnet)
         try:
             leverage_url = f"{self.base_url}/fapi/v1/leverage"
-            lev_params = self._sign({"symbol": symbol, "leverage": 20})
+            lev_params = self._sign({"symbol": symbol, "leverage": 1})
             lev_resp = requests.post(leverage_url, params=lev_params, headers=self._headers(), timeout=10)
             if lev_resp.status_code == 200:
-                logger.info(f"[BinanceDirect] Auto-adjusted leverage to 20x. Response: {lev_resp.text}")
+                logger.info(f"[BinanceDirect] Auto-adjusted leverage to 1x. Response: {lev_resp.text}")
             else:
                 logger.warning(f"[BinanceDirect] Leverage adjustment returned code {lev_resp.status_code}: {lev_resp.text}")
         except Exception as e:
@@ -155,10 +157,10 @@ class BinanceDirectClient:
         logger.info(f"[BinanceDirect] Step 1/3: Entry {side} {qty} {symbol} @ MARKET (env={env_str})")
         r = self.place_order(symbol, side, "MARKET", quantity=qty)
         if not r["success"]:
-            # If 20x was too high / low, try 10x as fallback
+            # If entry fails, retry with 1x leverage (already set, but ensure it)
             try:
-                logger.info("[BinanceDirect] Entry failed. Retrying with fallback 10x leverage...")
-                lev_params = self._sign({"symbol": symbol, "leverage": 10})
+                logger.info("[BinanceDirect] Entry failed. Retrying with 1x leverage...")
+                lev_params = self._sign({"symbol": symbol, "leverage": 1})
                 requests.post(f"{self.base_url}/fapi/v1/leverage", params=lev_params, headers=self._headers(), timeout=10)
                 r = self.place_order(symbol, side, "MARKET", quantity=qty)
             except Exception as e:

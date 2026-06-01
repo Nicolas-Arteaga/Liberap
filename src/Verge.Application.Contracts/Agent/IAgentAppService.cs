@@ -9,6 +9,7 @@ public interface IAgentAppService : IApplicationService
     Task StartServerAsync();
     Task StopServerAsync();
     Task StartAgentAsync();
+    Task StartAgentMainnetAsync();
     Task StopAgentAsync();
     Task<object> GetSystemStateAsync();
 
