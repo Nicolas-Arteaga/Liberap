@@ -39,7 +39,7 @@ public class AgentAppService : VergeAppService, IAgentAppService
     [AllowAnonymous]
     public async Task<object> GetSystemStateAsync()
     {
-        try 
+        try
         {
             // If cache is empty (first call after startup), probe immediately before reading
             await _healthService.EnsureProbeAsync();
@@ -62,13 +62,25 @@ public class AgentAppService : VergeAppService, IAgentAppService
             var marketWsLocalProcess = _processManager.IsProcessRunning("MarketWS");
             var marketWsExternal = isServerRunning && !marketWsLocalProcess && !isAgentRunning;
 
+            // Detect agent mode (MAINNET vs TESTNET) from environment variables
+            string agentMode = null;
+            if (isAgentRunning)
+            {
+                var envVars = _processManager.GetProcessEnvironmentVariables("Agent");
+                if (envVars != null && envVars.TryGetValue("BINANCE_USE_TESTNET", out var testnetValue))
+                {
+                    agentMode = (testnetValue?.ToLower() == "true") ? "TESTNET" : "MAINNET";
+                }
+            }
+
             return new {
                 state,
                 startTime = startTimeStr,
                 isServerHealthy = isServerRunning,
                 health,
                 marketWsExternal,
-                logs = (marketWsExternal && state == "SERVER_READY") ? await TryGetMarketWsLogsAsync() : null
+                logs = (marketWsExternal && state == "SERVER_READY") ? await TryGetMarketWsLogsAsync() : null,
+                agentMode // Include agent mode for UI sync on F5
             };
         }
         catch (Exception ex)

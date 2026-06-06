@@ -13,8 +13,14 @@ import config
 
 logger = logging.getLogger("SetupValidator")
 
+# ── Flag de primera ejecución para confirmar código nuevo en logs ──
+_VALIDATE_FIRST_CALL = True
+_VALIDATE_CALL_COUNT = 0  # Contador global de validaciones
+_VALIDATE_VETO_COUNT = 0  # Contador de vetos aplicados
+_VALIDATE_PASS_COUNT = 0  # Contador de validaciones que pasaron
+
 # --- 24h Ticker Cache (Thread-Safe Symmetrical Veto Provider) ---
-_TICKER_CACHE: Dict[str, float] = {}
+_TICKER_CACHE: Dict[str, Dict[str, float]] = {}
 _LAST_TICKER_FETCH = 0.0
 _TICKER_CACHE_TTL = 300.0  # 5 minutos cache TTL
 
@@ -35,15 +41,50 @@ def _fetch_24h_price_change_percent(symbol: str) -> float:
                 for x in data:
                     sym = x.get("symbol")
                     pct = x.get("priceChangePercent")
+                    low = x.get("lowPrice")
                     if sym and pct is not None:
-                        new_cache[sym] = float(pct)
+                        new_cache[sym] = {
+                            "priceChangePercent": float(pct),
+                            "lowPrice": float(low) if low else 0.0
+                        }
                 _TICKER_CACHE = new_cache
                 _LAST_TICKER_FETCH = now
                 logger.info(f"[TICKER-CACHE] Refreshed 24h ticker cache. {len(_TICKER_CACHE)} symbols cached.")
         except Exception as e:
             logger.warning(f"[TICKER-CACHE] Error refreshing 24h ticker: {e}")
             
-    return _TICKER_CACHE.get(symbol, 0.0)
+    return _TICKER_CACHE.get(symbol, {}).get("priceChangePercent", 0.0)
+
+def _fetch_24h_low_price(symbol: str) -> float:
+    """
+    Fetches the 24h low price for a symbol, with a global cache.
+    Returns the low price (e.g. 0.05234).
+    """
+    global _TICKER_CACHE, _LAST_TICKER_FETCH
+    now = time.time()
+    if not _TICKER_CACHE or (now - _LAST_TICKER_FETCH) > _TICKER_CACHE_TTL:
+        try:
+            url = "https://fapi.binance.com/fapi/v1/ticker/24hr"
+            resp = requests.get(url, timeout=5)
+            if resp.status_code == 200:
+                data = resp.json()
+                new_cache = {}
+                for x in data:
+                    sym = x.get("symbol")
+                    pct = x.get("priceChangePercent")
+                    low = x.get("lowPrice")
+                    if sym and pct is not None:
+                        new_cache[sym] = {
+                            "priceChangePercent": float(pct),
+                            "lowPrice": float(low) if low else 0.0
+                        }
+                _TICKER_CACHE = new_cache
+                _LAST_TICKER_FETCH = now
+                logger.info(f"[TICKER-CACHE] Refreshed 24h ticker cache. {len(_TICKER_CACHE)} symbols cached.")
+        except Exception as e:
+            logger.warning(f"[TICKER-CACHE] Error refreshing 24h ticker: {e}")
+            
+    return _TICKER_CACHE.get(symbol, {}).get("lowPrice", 0.0)
 
 
 def _effective_tick(ref_price: float) -> float:
@@ -302,6 +343,20 @@ def validate_nexus_confluence_setup(
     if candle_body_ratio < 0.05:
         return False, "no_body_no_trade", metrics
 
+    # ── VETO #12: Volume Floor (Liquidez Mínima) ─────────────────────────────
+    # Si el volumen es < 80% del promedio, la moneda está "muerta".
+    # Entrar ahí es regalar plata al spread. Cualquier movimiento pequeño liquida.
+    # USUSDT ejemplo: VolumeRatio 0.0045 = 0.4% del promedio → trade liquidado al instante.
+    if volume_ratio_20 < 0.80:
+        _VALIDATE_VETO_COUNT += 1
+        logger.warning(
+            f"❌ [VETO-12-VOLUME-FLOOR] Bloqueando trade en {symbol}. "
+            f"VolumeRatio20={volume_ratio_20:.4f} < 0.80 (80% del promedio). "
+            f"Moneda sin liquidez - spread te liquida. "
+            f"(veto #{_VALIDATE_VETO_COUNT} total)"
+        )
+        return False, "volume_floor_insufficient", {"volume_ratio_20": volume_ratio_20, "min_required": 0.80}
+
     # Volume check only blocks when volume is very weak AND no surge at all
     if volume_ratio_20 < 0.8 and not volume_surge_bullish:
         if getattr(config, "MIN_CONFLUENCE_SCORE", 50.0) > 30.0:
@@ -312,6 +367,36 @@ def validate_nexus_confluence_setup(
             return False, "no_volume_confirmation", metrics
         else:
             logger.info("[TESTING] Bypassed no_volume_confirmation veto for %s", candidate.get("symbol"))
+
+    # ── VETO #13: Technical Floor (Confluencia Orgánica) ──────────────────────
+    # No importa si Nexus tiene 99% de confianza. Si los grupos técnicos (SMC, PA, Vol)
+    # son un desastre (< 40 puntos promedio), el trade es una timba.
+    # USUSDT ejemplo: PA=18.6, SMC=20, Vol=19.9 → promedio ~19 → trade liquidado.
+    group_scores = candidate.get("group_scores", {})
+    if group_scores:
+        pa_score = float(group_scores.get("g1_price_action", 0) or 0)
+        smc_score = float(group_scores.get("g2_smc_ict", 0) or 0)
+        vol_score = float(group_scores.get("g5_volume", 0) or 0)
+        
+        # Solo aplicar si los 3 scores están disponibles (no son 0)
+        if pa_score > 0 and smc_score > 0 and vol_score > 0:
+            tech_avg = (pa_score + smc_score + vol_score) / 3.0
+            if tech_avg < 40.0:
+                _VALIDATE_VETO_COUNT += 1
+                logger.warning(
+                    f"❌ [VETO-13-TECH-FLOOR] Bloqueando trade en {symbol}. "
+                    f"Promedio técnico (PA+SMC+Vol)/3 = {tech_avg:.1f} < 40.0. "
+                    f"PA={pa_score:.1f}, SMC={smc_score:.1f}, Vol={vol_score:.1f}. "
+                    f"Estructura técnica de mierda - IA fanática ignorando realidad. "
+                    f"(veto #{_VALIDATE_VETO_COUNT} total)"
+                )
+                return False, "technical_floor_insufficient", {
+                    "pa_score": pa_score,
+                    "smc_score": smc_score,
+                    "vol_score": vol_score,
+                    "tech_avg": tech_avg,
+                    "min_required": 40.0
+                }
     # ── VETO #3: Post-Pump/Dump Distance from MA7 ────────────────────────
     # Si el precio ya se alejó >3.5% de la MA7, el movimiento ya ocurrió.
     # Entrar LONG cuando el precio está >3.5% sobre MA7 = comprar el techo.
@@ -452,8 +537,43 @@ def validate_pre_trade(
     Si se pasa 'profile', usa sus umbrales. Si no, usa config.py (Legacy).
     Si se pasan btc_filter y btc_corr, aplica penalización de correlación BTC.
     """
+    global _VALIDATE_FIRST_CALL, _VALIDATE_CALL_COUNT, _VALIDATE_VETO_COUNT, _VALIDATE_PASS_COUNT
+    
+    _VALIDATE_CALL_COUNT += 1
     symbol = candidate.get("symbol", "?")
     side = int(candidate.get("side", 0))
+    
+    # ── Log de primera ejecución: confirma que los VETOS NUEVOS están activos ──
+    if _VALIDATE_FIRST_CALL:
+        _VALIDATE_FIRST_CALL = False
+        btc_shield = "ACTIVO" if btc_filter else "SIN btc_filter"
+        corr_block = "ACTIVO" if (btc_filter and btc_corr) else "SIN btc_corr"
+        bleed_threshold = getattr(config, "BTC_BLEED_1H_THRESHOLD", "?")
+        hard_block_corr = getattr(config, "BTC_CORR_HARD_BLOCK_THRESHOLD", "?")
+        ceiling_threshold = getattr(config, "BTC_RED_ALT_CEILING_PCT", 12.0)
+        logger.info(
+            f"[SetupValidator] >>> PRIMERA EJECUCION v5.2 <<< "
+            f"| VETO #10 BTC Blood Shield: {btc_shield} (umbral {bleed_threshold}%/1h) "
+            f"| VETO #11 Dynamic Ceiling: {btc_shield} (BTC ROJO=12%, BTC VERDE=22% + Room to Breathe) "
+            f"| VETO #11.1 Insufficient Upside: {btc_shield} (espacio restante < TP necesario) "
+            f"| VETO #12 Volume Floor: ACTIVO (VolumeRatio20 < 0.80 = moneda muerta) "
+            f"| VETO #13 Technical Floor: ACTIVO (PA+SMC+Vol promedio < 40 = estructura de mierda) "
+            f"| BTC DUMPING hard block: {corr_block} (corr>={hard_block_corr}) "
+            f"| Symbol={symbol} side={'LONG' if side==0 else 'SHORT'}"
+        )
+    
+    # ── Health Summary cada 10 validaciones ──────────────────────────
+    if _VALIDATE_CALL_COUNT % 10 == 0 and _VALIDATE_CALL_COUNT > 0:
+        btc_health = btc_filter.get_health_status() if btc_filter else {}
+        corr_fallbacks = getattr(btc_corr, '_fallback_count', '?') if btc_corr else '?'
+        corr_success = getattr(btc_corr, '_call_count', '?') if btc_corr else '?'
+        logger.info(
+            f"[SetupValidator] === HEALTH CHECK #{_VALIDATE_CALL_COUNT} === "
+            f"| Validaciones: {_VALIDATE_CALL_COUNT} | Vetos: {_VALIDATE_VETO_COUNT} | Pasaron: {_VALIDATE_PASS_COUNT} "
+            f"| BTC regime_calls={btc_health.get('regime_calls', '?')} bleeding_calls={btc_health.get('bleeding_calls', '?')} "
+            f"errors={btc_health.get('errors', '?')} regime={btc_health.get('current_regime', '?')} "
+            f"| Corr: ok={corr_success} fallbacks={corr_fallbacks}"
+        )
 
     # ── VETO GLOBAL: Agotamiento Diario (MAX_DAILY_PUMP/DUMP) ──
     # Si ya subió más del 25% en el día, vetamos LONG. Si cayó más del 30%, vetamos SHORT.
@@ -529,13 +649,128 @@ def validate_pre_trade(
 
         confluence_score = float(candidate.get("confluence_score", 0) or 0)
 
-        # ── BTC CORRELATION PENALTY (Capa 3) ──
-        # Penalizar score de confluencia cuando BTC está en DUMPING y la alt tiene alta correlación
+        # ── VETO #10: BTC BLOOD SHIELD (HARD VETO) ──────────────────────────
+        # Si BTC está sangrando >1% en 1h, BLOQUEO TOTAL de LONGs.
+        # No importa cuán bueno sea el setup de la altcoin.
+        # Este veto previene la repetición de la pérdida de 20 USDT del 1/6/2026
+        # donde BTC cayó de 73k a 71k gradualmente y el bot abrió 14 LONGs.
+        if btc_filter and side == 0:
+            is_bleeding, btc_pct_1h = btc_filter.is_btc_bleeding()
+            if is_bleeding:
+                _VALIDATE_VETO_COUNT += 1
+                logger.warning(
+                    f"❌ [VETO-BTC-BLOOD] Bloqueando LONG en {symbol}. "
+                    f"BTC sangrando {btc_pct_1h:.2f}% en 1h. "
+                    f"NO importa la confluencia del setup. "
+                    f"(veto #{_VALIDATE_VETO_COUNT} total)"
+                )
+                return False, "btc_bleeding_1h", {"btc_dump_1h": btc_pct_1h}
+
+        # ── VETO #11: DYNAMIC CEILING (BTC STATE + ALT EXHAUSTION) ─────────────
+        # Techo dinámico según el estado de BTC:
+        # - Si BTC daily es ROJO: techo = 12% (mercado bajista, alts agotadas rápido)
+        # - Si BTC daily es VERDE: techo = 22% (mercado alcista, alts pueden correr más)
+        # Esto permite capturar "Home Runs" (+30-40%) cuando BTC acompaña,
+        # pero sigue protegiendo de techos cuando BTC está en rojo.
+        #
+        # VETO #11.1: ROOM TO BREATHE (Espacio para respirar)
+        # Validamos que haya espacio suficiente para el TP.
+        # Si el espacio restante hasta el techo es menor al TP que necesita la estrategia,
+        # el trade se anula por "insufficient_upside_for_ceiling".
+        if btc_filter and side == 0:
+            btc_daily_red, btc_daily_open, btc_current = btc_filter.is_btc_daily_red()
+            alt_24h_low = _fetch_24h_low_price(symbol)
+            if alt_24h_low > 0:
+                alt_move_from_low = ((current_price - alt_24h_low) / alt_24h_low) * 100
+
+                # Techo dinámico según estado de BTC
+                if btc_daily_red:
+                    ceiling_threshold = float(getattr(config, "BTC_RED_ALT_CEILING_PCT", 12.0))
+                    btc_state = "ROJA"
+                else:
+                    ceiling_threshold = float(getattr(config, "BTC_GREEN_ALT_CEILING_PCT", 22.0))
+                    btc_state = "VERDE"
+
+                # Calcular el TP que la estrategia necesita (en porcentaje)
+                target_tp_pct = 0.0
+                if candidate.get("source") == "LSE":
+                    # Para LSE: TP2 es el take profit objetivo
+                    lse_entry = float(candidate.get("lse_entry_price", 0) or 0)
+                    lse_tp2 = float(candidate.get("lse_take_profit_2", 0) or 0)
+                    if lse_entry > 0 and lse_tp2 > 0:
+                        target_tp_pct = ((lse_tp2 - lse_entry) / lse_entry) * 100
+                else:
+                    # Para Nexus/SCAR: TP se calcula del rango estimado
+                    estimated_range_pct = float(candidate.get("estimated_range_pct", 2.0) or 2.0)
+                    tp_multiplier = float(profile.get("tpMultiplier", config.TP_MULTIPLIER)) if profile else config.TP_MULTIPLIER
+                    target_tp_pct = estimated_range_pct * tp_multiplier
+
+                # Espacio restante hasta el techo de cristal
+                remaining_upside = ceiling_threshold - alt_move_from_low
+
+                # VETO #11: Si ya pasó el techo absoluto
+                if alt_move_from_low > ceiling_threshold:
+                    _VALIDATE_VETO_COUNT += 1
+                    logger.warning(
+                        f"❌ [VETO-DYNAMIC-CEILING] Bloqueando LONG en {symbol}. "
+                        f"BTC vela diaria {btc_state} (open={btc_daily_open:.2f}, close={btc_current:.2f}). "
+                        f"Alt subió {alt_move_from_low:.2f}% desde low 24h (límite={ceiling_threshold}%). "
+                        f"Agotamiento extremo - techo dinámico según estado BTC. "
+                        f"(veto #{_VALIDATE_VETO_COUNT} total)"
+                    )
+                    return False, "dynamic_ceiling_exhaustion", {
+                        "btc_daily_open": btc_daily_open,
+                        "btc_current": btc_current,
+                        "btc_state": btc_state,
+                        "alt_move_from_low": alt_move_from_low,
+                        "ceiling_threshold": ceiling_threshold
+                    }
+
+                # VETO #11.1: Si no hay espacio suficiente para el TP (Room to Breathe)
+                if remaining_upside < target_tp_pct:
+                    _VALIDATE_VETO_COUNT += 1
+                    logger.warning(
+                        f"❌ [VETO-CEILING-SPACE] Bloqueando LONG en {symbol}. "
+                        f"BTC vela diaria {btc_state}. Espacio restante ({remaining_upside:.2f}%) menor al TP necesario ({target_tp_pct:.2f}%). "
+                        f"Alt ya subió {alt_move_from_low:.2f}% desde low 24h (techo={ceiling_threshold}%). "
+                        f"No hay room to breathe - trade nace asfixiado. "
+                        f"(veto #{_VALIDATE_VETO_COUNT} total)"
+                    )
+                    return False, "insufficient_upside_for_ceiling", {
+                        "btc_daily_open": btc_daily_open,
+                        "btc_current": btc_current,
+                        "btc_state": btc_state,
+                        "alt_move_from_low": alt_move_from_low,
+                        "ceiling_threshold": ceiling_threshold,
+                        "remaining_upside": remaining_upside,
+                        "target_tp_pct": target_tp_pct
+                    }
+
+        # ── BTC CORRELATION PENALTY (Capa 3) — AHORA CON BLOQUEO DURO ──
+        # Si BTC está en DUMPING y la alt tiene alta correlación:
+        #   - correlación > 0.8 → BLOQUEO TOTAL (veto duro, no solo penalización)
+        #   - correlación > 0.6 → penalización del score
         raw_confluence_score = confluence_score
         if btc_filter and btc_corr and candidate.get("source") != "LSE":
             btc_regime = btc_filter.get_regime()
             if btc_regime == "DUMPING":
+                correlation = btc_corr.get_correlation(symbol)
                 penalty = btc_corr.get_score_penalty(symbol, btc_regime)
+                
+                # HARD BLOCK: Correlación alta + BTC DUMPING = veto absoluto
+                btc_hard_block_threshold = float(getattr(config, "BTC_CORR_HARD_BLOCK_THRESHOLD", 0.75))
+                if side == 0 and correlation >= btc_hard_block_threshold:
+                    logger.warning(
+                        f"❌ [VETO-BTC-DUMPING-HIGH-CORR] Bloqueando LONG en {symbol}. "
+                        f"BTC en DUMPING + correlación {correlation:.3f} >= {btc_hard_block_threshold}. "
+                        f"Las alts correlacionadas CAEN con BTC."
+                    )
+                    return False, "btc_dumping_high_correlation", {
+                        "btc_regime": btc_regime, 
+                        "correlation": correlation,
+                        "threshold": btc_hard_block_threshold
+                    }
+                
                 if penalty < 1.0:
                     confluence_score = raw_confluence_score * penalty
                     logger.info(f"[BTC-CORR] {symbol} nexus penalizado {raw_confluence_score:.1f}→{confluence_score:.1f} (penalty={penalty:.2f} régimen={btc_regime})")

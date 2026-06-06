@@ -136,10 +136,22 @@ HIGH_VOLATILITY_MIN_CONFLUENCE = 90.0   # Requiere confluencia extrema de 90+ pa
 # --- Capa 1: BTC Macro Filter (Régimen + Flash Crash) ---
 BTC_DUMP_THRESHOLD_5M = float(os.getenv("BTC_DUMP_THRESHOLD_5M", "-0.8"))   # % caída 5m para DUMPING
 BTC_DUMP_THRESHOLD_15M = float(os.getenv("BTC_DUMP_THRESHOLD_15M", "-1.5")) # % caída 15m para DUMPING
+BTC_DUMP_THRESHOLD_1H = float(os.getenv("BTC_DUMP_THRESHOLD_1H", "-1.5"))   # % caída 1h para DUMPING (sangrado gradual)
 BTC_PUMP_THRESHOLD_5M = float(os.getenv("BTC_PUMP_THRESHOLD_5M", "0.8"))    # % subida 5m para BULLISH
 BTC_REGIME_CACHE_SEC = int(os.getenv("BTC_REGIME_CACHE_SEC", "60"))        # Caché de régimen (segundos)
 BTC_FLASH_CRASH_PCT_1H = float(os.getenv("BTC_FLASH_CRASH_PCT_1H", "-3.0")) # % caída 1h para flash crash
 BTC_FLASH_CRASH_PAUSE_M = int(os.getenv("BTC_FLASH_CRASH_PAUSE_M", "120"))  # Pausa tras flash crash (minutos)
+
+# --- VETO DURO: BTC Blood Shield (nuevo tras pérdida 20 USDT del 1/6/2026) ---
+BTC_BLEED_1H_THRESHOLD = float(os.getenv("BTC_BLEED_1H_THRESHOLD", "-1.0")) # % caída 1h para veto DURO de LONGs
+BTC_CORR_HARD_BLOCK_THRESHOLD = float(os.getenv("BTC_CORR_HARD_BLOCK_THRESHOLD", "0.75")) # correlación mínima para bloqueo duro cuando BTC=DUMPING
+
+# --- VETO #11: Dynamic Ceiling (BTC State + Alt Exhaustion) ---
+# Techo dinámico según el estado de BTC:
+# - Si BTC daily es ROJO: techo = 12% (mercado bajista, alts agotadas rápido)
+# - Si BTC daily es VERDE: techo = 22% (mercado alcista, alts pueden correr más)
+BTC_RED_ALT_CEILING_PCT = float(os.getenv("BTC_RED_ALT_CEILING_PCT", "12.0")) # % máximo de subida desde low 24h cuando BTC está rojo
+BTC_GREEN_ALT_CEILING_PCT = float(os.getenv("BTC_GREEN_ALT_CEILING_PCT", "22.0")) # % máximo de subida desde low 24h cuando BTC está verde
 
 # --- Capa 2: Bloqueo Inteligente + Decouple + Macro Exit ---
 BTC_EXIT_DUMP_5M = float(os.getenv("BTC_EXIT_DUMP_5M", "-0.7"))              # % dump 5m para trigger salida

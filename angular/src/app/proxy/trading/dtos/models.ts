@@ -30,6 +30,15 @@ export interface AlertHistoryDto extends FullAuditedEntityDto<string> {
   tierDisplayName?: string;
 }
 
+export interface BinanceTradeResultDto {
+  success: boolean;
+  message?: string;
+}
+
+export interface CloseBinanceTradeInputDto {
+  symbol?: string;
+}
+
 export interface CreateUpdateStrategyProfileDto {
   name?: string;
   description?: string;
@@ -75,6 +84,14 @@ export interface EquityPointDto {
   balance: number;
 }
 
+export interface OpenBinanceTradeInputDto {
+  symbol?: string;
+  side?: string;
+  quantity: number;
+  tpPrice?: number;
+  slPrice?: number;
+}
+
 export interface OpenTradeInputDto {
   symbol?: string;
   side?: SignalDirection;
@@ -86,6 +103,7 @@ export interface OpenTradeInputDto {
   exchange?: string;
   agentDecisionJson?: string;
   strategyProfileId?: string;
+  ma7DistancePctAtEntry?: number;
 }
 
 export interface SentimentAnalysisDto {
@@ -147,6 +165,8 @@ export interface SimulatedTradeDto extends EntityDto<string> {
   maxAdversePrice?: number;
   maxFavorablePrice?: number;
   exitReason?: string;
+  ma7DistancePctAtEntry?: number;
+  btcPriceAtClose?: number;
 }
 
 export interface SimulationPerformanceDto {

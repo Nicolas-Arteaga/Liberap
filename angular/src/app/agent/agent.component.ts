@@ -169,6 +169,7 @@ export class AgentComponent implements OnInit, OnDestroy, AfterViewChecked {
     if (state === 'STOPPED') {
       this.dockerTerminalSeeded = false;
       this.seenDockerLogs.clear();
+      this.activeAgentMode = null; // Reset agent mode when stopped
       return;
     }
 
@@ -184,6 +185,11 @@ export class AgentComponent implements OnInit, OnDestroy, AfterViewChecked {
 
     if (data?.marketWsExternal && (data?.health || data?.logs)) {
       this.maybeSeedDockerMarketWsLogs(data);
+    }
+
+    // Sync agent mode from backend (fix for F5 refresh)
+    if (data?.agentMode && (data.agentMode === 'MAINNET' || data.agentMode === 'TESTNET')) {
+      this.activeAgentMode = data.agentMode;
     }
 
     this.startUptime();

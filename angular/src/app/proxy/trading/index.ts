@@ -4,6 +4,7 @@ import * as Scar from './scar';
 export * from './alert-history.service';
 export * from './alert-type.enum';
 export * from './analysis-log-type.enum';
+export * from './binance-trade.service';
 export * from './bot.service';
 export * from './crypto-analysis.service';
 export * from './execution.service';

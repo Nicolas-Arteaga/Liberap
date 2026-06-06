@@ -37,6 +37,21 @@ from btc_correlation import BTCCorrelation
 
 # LSE: LiquiditySweepEngine — runs BEFORE Nexus-15 to catch sweeps early
 # The LSE Python service endpoint is part of the same python-service container.
+
+# ── AGENT VERSION — Cambiar en cada release para identificar en logs ─────
+AGENT_VERSION = "v5.0-ROOM-TO-BREATHE"
+AGENT_BUILD_DATE = "2026-06-01"
+AGENT_CHANGES = [
+    "FIX: get_regime() ahora usa 3 ventanas (5m/15m/1h) - detecta sangrado gradual",
+    "FIX: get_dump_pct() ahora mide ventana EXACTA - no compara contra hace 5hs",
+    "NEW: VETO #10 BTC Blood Shield - bloqueo DURO si BTC cae >1% en 1h",
+    "NEW: BTC DUMPING + correlacion >0.75 = bloqueo DURO (no penalizacion suave)",
+    "NEW: is_btc_bleeding() metodo para veto duro en tiempo real",
+    "NEW: VETO #11 12% Ceiling - BTC rojo + alt >12% desde low = veto",
+    "NEW: VETO #11.1 Room to Breathe - espacio restante < TP necesario = veto",
+    "NEW: is_btc_daily_red() metodo para detectar vela diaria roja",
+]
+
 LSE_ENABLED = getattr(config, "LSE_ENABLED", True)
 LSE_MIN_SCORE = getattr(config, "LSE_MIN_SCORE", 65.0)
 LSE_SYMBOLS = getattr(config, "LSE_SYMBOLS", None)  # None = all watchlist; or list of symbols
@@ -85,7 +100,21 @@ class VergeAgent:
       - Dynamic Tiers (Pre-filtering to save Nexus-15 compute)
     """
     def __init__(self):
-        logger.info("Initializing VERGE Agent v4.0 [Professional Architecture]...")
+        logger.info("=" * 70)
+        logger.info(f"  VERGE AGENT {AGENT_VERSION}  |  Build: {AGENT_BUILD_DATE}")
+        logger.info("=" * 70)
+        for change in AGENT_CHANGES:
+            logger.info(f"  >> {change}")
+        logger.info("=" * 70)
+        logger.info(f"  BTC Defense Config:")
+        logger.info(f"    BTC_DUMP_THRESHOLD_5M  = {getattr(config, 'BTC_DUMP_THRESHOLD_5M', '?')}%")
+        logger.info(f"    BTC_DUMP_THRESHOLD_15M = {getattr(config, 'BTC_DUMP_THRESHOLD_15M', '?')}%")
+        logger.info(f"    BTC_DUMP_THRESHOLD_1H  = {getattr(config, 'BTC_DUMP_THRESHOLD_1H', '?')}% (NUEVO)")
+        logger.info(f"    BTC_BLEED_1H_THRESHOLD = {getattr(config, 'BTC_BLEED_1H_THRESHOLD', '?')}% (VETO DURO)")
+        logger.info(f"    BTC_CORR_HARD_BLOCK    = {getattr(config, 'BTC_CORR_HARD_BLOCK_THRESHOLD', '?')} (VETO DURO)")
+        logger.info(f"    BTC_FLASH_CRASH_PCT_1H = {getattr(config, 'BTC_FLASH_CRASH_PCT_1H', '?')}%")
+        logger.info("=" * 70)
+        logger.info("Initializing VERGE Agent...")
         self.auth      = AuthManager()
         self.fetcher   = BinanceFetcher()
         self.state     = StateManager()
@@ -359,7 +388,7 @@ class VergeAgent:
 
     def run(self):
         logger.info(f"Agent started. Loop interval: {config.LOOP_INTERVAL_SECONDS}s.")
-        logger.info("[CONFIG] Agent Version: risk_v4.0 (segregated metrics ON)")
+        logger.info("[CONFIG] Agent Version: risk_v5.0 (segregated metrics ON)")
 
         if not self.auth.get_token():
             logger.error("FATAL: Could not authenticate with ABP Backend. Stopping.")

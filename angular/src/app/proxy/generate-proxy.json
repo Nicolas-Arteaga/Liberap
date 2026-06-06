@@ -910,6 +910,14 @@
                   }
                 },
                 {
+                  "name": "StartAgentMainnetAsync",
+                  "parametersOnMethod": [],
+                  "returnValue": {
+                    "type": "System.Void",
+                    "typeSimple": "System.Void"
+                  }
+                },
+                {
                   "name": "StopAgentAsync",
                   "parametersOnMethod": [],
                   "returnValue": {
@@ -1087,6 +1095,21 @@
               "name": "StartAgentAsync",
               "httpMethod": "POST",
               "url": "api/app/agent/start-agent",
+              "supportedVersions": [],
+              "parametersOnMethod": [],
+              "parameters": [],
+              "returnValue": {
+                "type": "System.Void",
+                "typeSimple": "System.Void"
+              },
+              "allowAnonymous": false,
+              "implementFrom": "Verge.Agent.IAgentAppService"
+            },
+            "StartAgentMainnetAsync": {
+              "uniqueName": "StartAgentMainnetAsync",
+              "name": "StartAgentMainnetAsync",
+              "httpMethod": "POST",
+              "url": "api/app/agent/start-agent-mainnet",
               "supportedVersions": [],
               "parametersOnMethod": [],
               "parameters": [],
@@ -1578,6 +1601,132 @@
               },
               "allowAnonymous": null,
               "implementFrom": "Verge.Trading.IAlertHistoryAppService"
+            }
+          }
+        },
+        "Verge.Trading.BinanceTradeAppService": {
+          "controllerName": "BinanceTrade",
+          "controllerGroupName": "BinanceTrade",
+          "isRemoteService": true,
+          "isIntegrationService": false,
+          "apiVersion": null,
+          "type": "Verge.Trading.BinanceTradeAppService",
+          "interfaces": [
+            {
+              "type": "Verge.Trading.IBinanceTradeAppService",
+              "name": "IBinanceTradeAppService",
+              "methods": [
+                {
+                  "name": "OpenBinanceTradeAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "input",
+                      "typeAsString": "Verge.Trading.DTOs.OpenBinanceTradeInputDto, Verge.Application.Contracts",
+                      "type": "Verge.Trading.DTOs.OpenBinanceTradeInputDto",
+                      "typeSimple": "Verge.Trading.DTOs.OpenBinanceTradeInputDto",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "Verge.Trading.DTOs.BinanceTradeResultDto",
+                    "typeSimple": "Verge.Trading.DTOs.BinanceTradeResultDto"
+                  }
+                },
+                {
+                  "name": "CloseBinanceTradeAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "input",
+                      "typeAsString": "Verge.Trading.DTOs.CloseBinanceTradeInputDto, Verge.Application.Contracts",
+                      "type": "Verge.Trading.DTOs.CloseBinanceTradeInputDto",
+                      "typeSimple": "Verge.Trading.DTOs.CloseBinanceTradeInputDto",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "Verge.Trading.DTOs.BinanceTradeResultDto",
+                    "typeSimple": "Verge.Trading.DTOs.BinanceTradeResultDto"
+                  }
+                }
+              ]
+            }
+          ],
+          "actions": {
+            "OpenBinanceTradeAsyncByInput": {
+              "uniqueName": "OpenBinanceTradeAsyncByInput",
+              "name": "OpenBinanceTradeAsync",
+              "httpMethod": "POST",
+              "url": "api/app/binance-trade/open-binance-trade",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "input",
+                  "typeAsString": "Verge.Trading.DTOs.OpenBinanceTradeInputDto, Verge.Application.Contracts",
+                  "type": "Verge.Trading.DTOs.OpenBinanceTradeInputDto",
+                  "typeSimple": "Verge.Trading.DTOs.OpenBinanceTradeInputDto",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "input",
+                  "name": "input",
+                  "jsonName": null,
+                  "type": "Verge.Trading.DTOs.OpenBinanceTradeInputDto",
+                  "typeSimple": "Verge.Trading.DTOs.OpenBinanceTradeInputDto",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "Body",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "Verge.Trading.DTOs.BinanceTradeResultDto",
+                "typeSimple": "Verge.Trading.DTOs.BinanceTradeResultDto"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.IBinanceTradeAppService"
+            },
+            "CloseBinanceTradeAsyncByInput": {
+              "uniqueName": "CloseBinanceTradeAsyncByInput",
+              "name": "CloseBinanceTradeAsync",
+              "httpMethod": "POST",
+              "url": "api/app/binance-trade/close-binance-trade",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "input",
+                  "typeAsString": "Verge.Trading.DTOs.CloseBinanceTradeInputDto, Verge.Application.Contracts",
+                  "type": "Verge.Trading.DTOs.CloseBinanceTradeInputDto",
+                  "typeSimple": "Verge.Trading.DTOs.CloseBinanceTradeInputDto",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "input",
+                  "name": "input",
+                  "jsonName": null,
+                  "type": "Verge.Trading.DTOs.CloseBinanceTradeInputDto",
+                  "typeSimple": "Verge.Trading.DTOs.CloseBinanceTradeInputDto",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "Body",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "Verge.Trading.DTOs.BinanceTradeResultDto",
+                "typeSimple": "Verge.Trading.DTOs.BinanceTradeResultDto"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.IBinanceTradeAppService"
             }
           }
         },
@@ -3354,6 +3503,140 @@
               },
               "allowAnonymous": null,
               "implementFrom": "Verge.Trading.ISimulatedTradeAppService"
+            },
+            "UpdateMaxFavorablePriceAsyncByTradeIdAndMaxFavorablePrice": {
+              "uniqueName": "UpdateMaxFavorablePriceAsyncByTradeIdAndMaxFavorablePrice",
+              "name": "UpdateMaxFavorablePriceAsync",
+              "httpMethod": "PUT",
+              "url": "api/app/simulated-trade/max-favorable-price/{tradeId}",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "tradeId",
+                  "typeAsString": "System.Guid, System.Private.CoreLib",
+                  "type": "System.Guid",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null
+                },
+                {
+                  "name": "maxFavorablePrice",
+                  "typeAsString": "System.Decimal, System.Private.CoreLib",
+                  "type": "System.Decimal",
+                  "typeSimple": "number",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "tradeId",
+                  "name": "tradeId",
+                  "jsonName": null,
+                  "type": "System.Guid",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": [],
+                  "bindingSourceId": "Path",
+                  "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "maxFavorablePrice",
+                  "name": "maxFavorablePrice",
+                  "jsonName": null,
+                  "type": "System.Decimal",
+                  "typeSimple": "number",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "System.Void",
+                "typeSimple": "System.Void"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.SimulatedTradeAppService"
+            },
+            "UpdateExitInfoAsyncByTradeIdAndExitReasonAndBtcPriceAtClose": {
+              "uniqueName": "UpdateExitInfoAsyncByTradeIdAndExitReasonAndBtcPriceAtClose",
+              "name": "UpdateExitInfoAsync",
+              "httpMethod": "PUT",
+              "url": "api/app/simulated-trade/exit-info/{tradeId}",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "tradeId",
+                  "typeAsString": "System.Guid, System.Private.CoreLib",
+                  "type": "System.Guid",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null
+                },
+                {
+                  "name": "exitReason",
+                  "typeAsString": "System.String, System.Private.CoreLib",
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null
+                },
+                {
+                  "name": "btcPriceAtClose",
+                  "typeAsString": "System.Nullable`1[[System.Decimal, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                  "type": "System.Decimal?",
+                  "typeSimple": "number?",
+                  "isOptional": true,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "tradeId",
+                  "name": "tradeId",
+                  "jsonName": null,
+                  "type": "System.Guid",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": [],
+                  "bindingSourceId": "Path",
+                  "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "exitReason",
+                  "name": "exitReason",
+                  "jsonName": null,
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "btcPriceAtClose",
+                  "name": "btcPriceAtClose",
+                  "jsonName": null,
+                  "type": "System.Decimal?",
+                  "typeSimple": "number?",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "System.Void",
+                "typeSimple": "System.Void"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.SimulatedTradeAppService"
             },
             "CloseTradeAsyncByTradeId": {
               "uniqueName": "CloseTradeAsyncByTradeId",
@@ -10016,6 +10299,60 @@
         }
       ]
     },
+    "Verge.Trading.DTOs.BinanceTradeResultDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Success",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Message",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.DTOs.CloseBinanceTradeInputDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Symbol",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
     "Verge.Trading.DTOs.CreateUpdateStrategyProfileDto": {
       "baseType": null,
       "isEnum": false,
@@ -10475,6 +10812,75 @@
         }
       ]
     },
+    "Verge.Trading.DTOs.OpenBinanceTradeInputDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Symbol",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Side",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Quantity",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "TpPrice",
+          "jsonName": null,
+          "type": "System.Decimal?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "SlPrice",
+          "jsonName": null,
+          "type": "System.Decimal?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
     "Verge.Trading.DTOs.OpenTradeInputDto": {
       "baseType": null,
       "isEnum": false,
@@ -10595,6 +11001,18 @@
           "jsonName": null,
           "type": "System.Guid?",
           "typeSimple": "string?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Ma7DistancePctAtEntry",
+          "jsonName": null,
+          "type": "System.Decimal?",
+          "typeSimple": "number?",
           "isRequired": false,
           "minLength": null,
           "maxLength": null,
@@ -11192,6 +11610,54 @@
         },
         {
           "name": "MaxAdversePrice",
+          "jsonName": null,
+          "type": "System.Decimal?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "MaxFavorablePrice",
+          "jsonName": null,
+          "type": "System.Decimal?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "ExitReason",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Ma7DistancePctAtEntry",
+          "jsonName": null,
+          "type": "System.Decimal?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "BtcPriceAtClose",
           "jsonName": null,
           "type": "System.Decimal?",
           "typeSimple": "number?",

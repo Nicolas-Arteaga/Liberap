@@ -9,7 +9,7 @@ public class TradingStrategy : FullAuditedAggregateRoot<Guid>
 {
     public Guid TraderProfileId { get; set; }
     public string Name { get; set; } = string.Empty;
-    public SignalDirection DirectionPreference { get; set; } // Long, Short, Auto
+    public SignalDirection DirectionPreference { get; set; } // Long, Short, Auto 
     public string SelectedCryptosJson { get; set; } = string.Empty; // Serialized list of symbols
     public int Leverage { get; set; }
     public decimal Capital { get; set; }

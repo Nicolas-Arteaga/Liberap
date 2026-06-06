@@ -203,6 +203,28 @@ public class AgentProcessManager : ISingletonDependency
         return null;
     }
 
+    public System.Collections.Generic.Dictionary<string, string>? GetProcessEnvironmentVariables(string name)
+    {
+        if (_processes.TryGetValue(name, out var process))
+        {
+            try {
+                if (!process.HasExited)
+                {
+                    var envVars = new System.Collections.Generic.Dictionary<string, string>();
+                    foreach (System.Collections.DictionaryEntry entry in process.StartInfo.EnvironmentVariables)
+                    {
+                        if (entry.Key != null && entry.Value != null)
+                        {
+                            envVars[entry.Key.ToString()] = entry.Value.ToString();
+                        }
+                    }
+                    return envVars;
+                }
+            } catch {}
+        }
+        return null;
+    }
+
     public async Task StopAllAsync()
     {
         foreach (var key in _processes.Keys)

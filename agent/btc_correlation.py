@@ -17,6 +17,8 @@ class BTCCorrelation:
         self.btc_filter = btc_filter
         self._correlation_cache = {}
         self._cache_ttl = config.BTC_CORR_CACHE_MINUTES * 60
+        self._call_count = 0
+        self._fallback_count = 0  # Cuántas veces devolvimos 0.5 (datos insuficientes)
         
     def get_correlation(self, symbol: str) -> float:
         """
@@ -39,7 +41,12 @@ class BTCCorrelation:
             btc_candles = self.fetcher.get_klines_for_nexus("BTCUSDT", "5m", limit=limit)
             
             if not symbol_candles or not btc_candles or len(symbol_candles) < 2 or len(btc_candles) < 2:
-                logger.warning(f"[BTC-CORR] Datos insuficientes para {symbol} - retornando 0.5 (conservador)")
+                self._fallback_count += 1
+                logger.warning(
+                    f"[BTC-CORR] !!! Datos INSUFICIENTES para {symbol} "
+                    f"(sym={len(symbol_candles) if symbol_candles else 0}, btc={len(btc_candles) if btc_candles else 0}) "
+                    f"- retornando 0.5 (fallback #{self._fallback_count}, correlacion desconocida)"
+                )
                 self._correlation_cache[symbol] = (0.5, now)
                 return 0.5
             
@@ -58,7 +65,8 @@ class BTCCorrelation:
             
             # Calcular correlación de Pearson
             if len(symbol_returns) < 2:
-                logger.warning(f"[BTC-CORR] Datos insuficientes para {symbol} tras diff - retornando 0.5")
+                self._fallback_count += 1
+                logger.warning(f"[BTC-CORR] !!! Datos insuficientes para {symbol} tras diff (returns={len(symbol_returns)}) - retornando 0.5 (fallback #{self._fallback_count})")
                 self._correlation_cache[symbol] = (0.5, now)
                 return 0.5
             
@@ -66,16 +74,24 @@ class BTCCorrelation:
             
             # Handle NaN
             if np.isnan(correlation):
-                logger.warning(f"[BTC-CORR] Correlación NaN para {symbol} - retornando 0.5")
+                self._fallback_count += 1
+                logger.warning(f"[BTC-CORR] !!! Correlacion NaN para {symbol} - retornando 0.5 (fallback #{self._fallback_count})")
                 self._correlation_cache[symbol] = (0.5, now)
                 return 0.5
             
-            logger.debug(f"[BTC-CORR] {symbol} correlación con BTC: {correlation:.3f}")
+            self._call_count += 1
+            # Log visible para las primeras correlaciones y cada 10 llamadas
+            if self._call_count <= 3 or self._call_count % 10 == 0:
+                logger.info(f"[BTC-CORR] {symbol} correlacion #{self._call_count} con BTC: {correlation:.3f}")
             self._correlation_cache[symbol] = (correlation, now)
             return correlation
             
         except Exception as e:
-            logger.error(f"[BTC-CORR] Error al calcular correlación para {symbol}: {e} - retornando 0.5")
+            self._fallback_count += 1
+            logger.error(
+                f"[BTC-CORR] !!! ERROR calculando correlacion para {symbol}: {e} "
+                f"- retornando 0.5 (fallback #{self._fallback_count}, CORRELACION ROTA)"
+            )
             self._correlation_cache[symbol] = (0.5, now)
             return 0.5
     
@@ -105,6 +121,6 @@ class BTCCorrelation:
             logger.info(f"[BTC-CORR] {symbol} penalización LEVE - corr={correlation:.3f} > {config.BTC_CORR_LOW_THRESHOLD} → penalty={penalty:.2f}")
         else:
             penalty = 1.0  # Sin penalización - alt independiente
-            logger.debug(f"[BTC-CORR] {symbol} sin penalización - corr={correlation:.3f} ≤ {config.BTC_CORR_LOW_THRESHOLD} (alt independiente)")
+            logger.info(f"[BTC-CORR] {symbol} SIN penalizacion — corr={correlation:.3f} <= {config.BTC_CORR_LOW_THRESHOLD} (alt independiente de BTC)")
         
         return penalty

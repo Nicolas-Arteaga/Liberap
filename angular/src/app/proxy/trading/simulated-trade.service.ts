@@ -77,11 +77,29 @@ export class SimulatedTradeService {
     { apiName: this.apiName,...config });
   
 
+  updateExitInfo = (tradeId: string, exitReason: string, btcPriceAtClose?: number, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'PUT',
+      url: `/api/app/simulated-trade/exit-info/${tradeId}`,
+      params: { exitReason, btcPriceAtClose },
+    },
+    { apiName: this.apiName,...config });
+  
+
   updateMaxAdversePrice = (tradeId: string, input: UpdateMaxAdversePriceInputDto, config?: Partial<Rest.Config>) =>
     this.restService.request<any, void>({
       method: 'PUT',
       url: `/api/app/simulated-trade/max-adverse-price/${tradeId}`,
       body: input,
+    },
+    { apiName: this.apiName,...config });
+  
+
+  updateMaxFavorablePrice = (tradeId: string, maxFavorablePrice: number, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, void>({
+      method: 'PUT',
+      url: `/api/app/simulated-trade/max-favorable-price/${tradeId}`,
+      params: { maxFavorablePrice },
     },
     { apiName: this.apiName,...config });
   
