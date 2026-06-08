@@ -331,7 +331,7 @@ EXCHANGES: Dict[str, ExchangeConfig] = {
         from_exchange=_identity,
         rest_watchlist_url="https://fapi.binance.com/fapi/v1/ticker/24hr",
         rest_watchlist_parser=_wl_parse_binance,
-        interval_map={"15m": "15m", "1h": "1h", "4h": "4h", "1d": "1d"},
+        interval_map={"5m": "5m", "15m": "15m", "1h": "1h", "4h": "4h", "1d": "1d"},
     ),
 
     "bybit": ExchangeConfig(
@@ -345,7 +345,7 @@ EXCHANGES: Dict[str, ExchangeConfig] = {
         rest_kline_url="https://api.bybit.com/v5/market/kline",
         rest_kline_params=lambda sym, ivl, lim: {
             "category": "linear", "symbol": sym,
-            "interval": {"15m": "15", "1h": "60", "4h": "240", "1d": "D"}.get(ivl, "15"),
+            "interval": {"5m": "5", "15m": "15", "1h": "60", "4h": "240", "1d": "D"}.get(ivl, "15"),
             "limit": lim
         },
         rest_kline_parser=_rest_parse_bybit,
@@ -353,7 +353,7 @@ EXCHANGES: Dict[str, ExchangeConfig] = {
         from_exchange=_identity,
         rest_watchlist_url="https://api.bybit.com/v5/market/tickers?category=linear",
         rest_watchlist_parser=_wl_parse_bybit,
-        interval_map={"15m": "15", "1h": "60", "4h": "240", "1d": "D"},
+        interval_map={"5m": "5", "15m": "15", "1h": "60", "4h": "240", "1d": "D"},
     ),
 
     "okx": ExchangeConfig(
@@ -368,7 +368,7 @@ EXCHANGES: Dict[str, ExchangeConfig] = {
         rest_kline_url="https://www.okx.com/api/v5/market/candles",
         rest_kline_params=lambda sym, ivl, lim: {
             "instId": _to_okx(sym),
-            "bar": {"15m": "15m", "1h": "1H", "4h": "4H", "1d": "1Dutc"}.get(ivl, "15m"),
+            "bar": {"5m": "5m", "15m": "15m", "1h": "1H", "4h": "4H", "1d": "1Dutc"}.get(ivl, "15m"),
             "limit": lim
         },
         rest_kline_parser=_rest_parse_okx,
@@ -376,7 +376,7 @@ EXCHANGES: Dict[str, ExchangeConfig] = {
         from_exchange=_from_okx,
         rest_watchlist_url="https://www.okx.com/api/v5/market/tickers?instType=SWAP",
         rest_watchlist_parser=_wl_parse_okx,
-        interval_map={"15m": "15m", "1h": "1H", "4h": "4H", "1d": "1Dutc"},
+        interval_map={"5m": "5m", "15m": "15m", "1h": "1H", "4h": "4H", "1d": "1Dutc"},
     ),
 
     "bitget": ExchangeConfig(
@@ -391,7 +391,7 @@ EXCHANGES: Dict[str, ExchangeConfig] = {
         rest_kline_url="https://api.bitget.com/api/v2/mix/market/candles",
         rest_kline_params=lambda sym, ivl, lim: {
             "symbol": sym, "productType": "USDT-FUTURES",
-            "granularity": {"15m": "15m", "1h": "1H", "4h": "4H", "1d": "1Dutc"}.get(ivl, "15m"),
+            "granularity": {"5m": "5m", "15m": "15m", "1h": "1H", "4h": "4H", "1d": "1Dutc"}.get(ivl, "15m"),
             "limit": lim
         },
         rest_kline_parser=_rest_parse_bitget,
@@ -399,7 +399,7 @@ EXCHANGES: Dict[str, ExchangeConfig] = {
         from_exchange=_identity,
         rest_watchlist_url="https://api.bitget.com/api/v2/mix/market/tickers?productType=USDT-FUTURES",
         rest_watchlist_parser=None,  # Bitget watchlist format varies — skip for now
-        interval_map={"15m": "15m", "1h": "1H", "4h": "4H", "1d": "1Dutc"},
+        interval_map={"5m": "5m", "15m": "15m", "1h": "1H", "4h": "4H", "1d": "1Dutc"},
     ),
 
     "pyth": ExchangeConfig(

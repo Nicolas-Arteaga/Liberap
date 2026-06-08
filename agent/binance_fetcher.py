@@ -90,14 +90,15 @@ class BinanceFetcher:
 
     def get_klines_for_nexus(self, symbol: str, interval: str = "15m", limit: int = 300) -> list:
         """
-        Returns OHLCV klines for Nexus-15 analysis.
+        Returns OHLCV klines for Nexus-15 (15m) and Nexus-5 (5m) analysis.
 
         Priority:
           1. KlineCache (SQLite) — always preferred (written by WS from any exchange)
           2. Multi-source REST fetch if cache stale or has < 100 candles
 
-        NOTE: Nexus-15 model was trained on 1000 candles. Sending fewer degrades accuracy.
-              300 candles (~3 days of 15m data) is the practical minimum for consistent scoring.
+        NOTE for 5m: Uses Binance Futures directly to guarantee correct interval data.
+             Other exchanges (Bybit/OKX/Bitget) may return different intervals if "5m"
+             is not in their primary rotation. Binance supports up to 1500 candles at 5m.
 
         Returns [] if insufficient data and all REST sources fail.
         """
@@ -105,27 +106,37 @@ class BinanceFetcher:
         # 1. Check cache first
         klines = self._cache.get_klines(symbol, interval, limit)
         is_fresh = False
-        if len(klines) >= 100:  # Need at least 100 candles for a meaningful Nexus score
+        if len(klines) >= 100:  # Need at least 100 candles for a meaningful score
             last_open = klines[-1]["open_time"]
             age_mins = (time.time() - (last_open / 1000.0)) / 60.0
-            if age_mins <= 35:  # Tolerance for 15m candles
+            # Tolerance: 10 min for 5m candles, 35 min for 15m candles
+            max_age = 10 if interval == "5m" else 35
+            if age_mins <= max_age:
                 is_fresh = True
 
         if is_fresh:
             return klines
 
-        # 2. On-demand multi-source REST fetch
+        # 2. On-demand REST fetch
         if len(klines) > 0:
             logger.debug(
-                f"[Fetcher] {symbol} has {len(klines)} klines in cache "
-                f"(need 25+). Fetching via multi-source REST."
+                f"[Fetcher] {symbol} {interval}: {len(klines)} klines in cache "
+                f"(need 100+). Fetching via REST."
             )
         else:
-            logger.info(f"[Fetcher] {symbol} has no cache history. Fetching via multi-source REST.")
+            logger.info(f"[Fetcher] {symbol} {interval}: no cache history. Fetching via REST.")
 
-        # Check if Binance-specific limiter blocks us
-        # (MultiSourceFetcher handles per-exchange circuit breakers internally)
-        fetched = self._multi_fetcher.fetch_klines(symbol, interval, limit)
+        # For 5m candles, always use Binance Futures directly to guarantee correct interval.
+        # Other exchanges default to 15m when "5m" is not explicitly supported.
+        if interval == "5m":
+            from exchange_registry import EXCHANGES
+            binance_exc = EXCHANGES.get("binance")
+            if binance_exc:
+                fetched = self._do_fetch_binance_direct(binance_exc, symbol, interval, limit)
+            else:
+                fetched = self._multi_fetcher.fetch_klines(symbol, interval, limit)
+        else:
+            fetched = self._multi_fetcher.fetch_klines(symbol, interval, limit)
 
         if fetched:
             # Persist to cache so subsequent calls are instant
@@ -210,6 +221,41 @@ class BinanceFetcher:
                 f"[Fetcher/LSE] {symbol} {interval}: REST falló; devolviendo {len(klines)} parciales."
             )
         return klines
+
+    def _do_fetch_binance_direct(self, binance_exc, symbol: str, interval: str, limit: int) -> list:
+        """
+        Calls Binance Futures REST API directly for klines.
+        Used for 5m candles to bypass the load-balancer that may route to
+        exchanges with no native 5m support.
+
+        Returns normalized kline list, or [] on any failure.
+        """
+        import requests
+        try:
+            params = binance_exc.rest_kline_params(symbol, interval, limit)
+            resp = requests.get(
+                binance_exc.rest_kline_url,
+                params=params,
+                timeout=10
+            )
+            if resp.status_code == 200:
+                klines = binance_exc.rest_kline_parser(resp.json())
+                if klines:
+                    logger.info(
+                        f"[Fetcher] {symbol} {interval}: fetched {len(klines)} klines "
+                        f"via Binance direct REST and saved to cache."
+                    )
+                    return klines
+                logger.debug(f"[Fetcher/Direct] Binance returned empty klines for {symbol} {interval}")
+            elif resp.status_code == 429:
+                logger.warning(f"[Fetcher/Direct] Binance rate-limited (429) for {symbol}")
+            elif resp.status_code == 418:
+                logger.critical(f"[Fetcher/Direct] Binance IP ban (418) for {symbol}")
+            else:
+                logger.warning(f"[Fetcher/Direct] Binance HTTP {resp.status_code} for {symbol}")
+        except Exception as e:
+            logger.error(f"[Fetcher/Direct] Exception fetching {symbol} {interval} from Binance: {e}")
+        return []
 
     def get_rate_limiter_status(self) -> dict:
         """Exposes rate limiter + circuit breaker status for /health endpoints."""

@@ -139,6 +139,7 @@ export class MobileLayoutComponent implements OnInit, OnDestroy {
     const url = this.router.url.split('?')[0];
     if (url === '/' || url === '/home')           this.currentRouteName = 'DASHBOARD CORE';
     else if (url === '/nexus-15')                 this.currentRouteName = 'NEXUS-15 PREDICTIVE CORE';
+    else if (url === '/nexus-5')                  this.currentRouteName = 'NEXUS-5 IGNITION CORE';
     else if (url === '/agent')                    this.currentRouteName = 'AI TRADING AGENT';
     else if (url === '/agent-audit')              this.currentRouteName = 'AUDITORÍA DE OPERACIONES';
     else if (url.startsWith('/strategies'))       this.currentRouteName = 'ESTRATEGIAS DE INVERSIÓN';

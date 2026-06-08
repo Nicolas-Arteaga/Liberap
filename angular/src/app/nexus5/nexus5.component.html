@@ -1,13 +1,13 @@
-<div class="nx15-shell nx15-page">
+<div class="nx5-shell nx5-page">
 
   <!-- ══════════════════════════════════════════════════════════ HEADER -->
-  <header class="nx15-header">
+  <header class="nx5-header">
 
     <!-- Terminal: izquierda -->
-    <div class="nx15-terminal-mini">
+    <div class="nx5-terminal-mini">
       <div class="tm-bar">
         <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
-        <span class="tm-title">NEXUS-15 CORE v1.0</span>
+        <span class="tm-title">NEXUS-5 IGNITION v1.0</span>
       </div>
       <div class="tm-body">
         <div class="tm-line" *ngFor="let line of terminalLines().slice(-6)">
@@ -17,14 +17,14 @@
     </div>
 
     <!-- Logo: centro -->
-    <div class="nx15-logo-area">
-      <div class="nx15-logo-title">NEXUS-15</div>
-      <div class="nx15-logo-sub">⬡ PREDICTIVE CORE ⬡</div>
-      <div class="nx15-scan-badge">SCANS: {{ scanCount() }}</div>
+    <div class="nx5-logo-area">
+      <div class="nx5-logo-title">NEXUS-5</div>
+      <div class="nx5-logo-sub">⚡ IGNITION CORE ⚡</div>
+      <div class="nx5-scan-badge">SCANS: {{ scanCount() }}</div>
     </div>
 
-    <!-- Confidence: derecha -->
-    <div class="nx15-confidence-panel">
+    <!-- Confidence + Phase: derecha -->
+    <div class="nx5-confidence-panel">
       <div class="cp-label">AI CONFIDENCE</div>
       <div class="cp-value" [style.color]="confidenceColor()">
         {{ data()?.aiConfidence | number:'1.1-1' }}<span class="cp-pct">%</span>
@@ -35,10 +35,17 @@
           [style.background]="confidenceColor()">
         </div>
       </div>
+
+      <!-- Phase Badge -->
+      <div class="phase-badge" [ngClass]="phaseClass()" *ngIf="data()">
+        <span class="phase-label">{{ phaseLabel() }}</span>
+        <span class="phase-score">{{ data()?.phaseScore | number:'1.0-0' }}</span>
+      </div>
+
       <div class="cp-probs">
+        <span>3v: <b>{{ ((data()?.next3CandlesProb ?? 0) * 100) | number:'1.0-0' }}%</b></span>
         <span>5v: <b>{{ ((data()?.next5CandlesProb ?? 0) * 100) | number:'1.0-0' }}%</b></span>
-        <span>15v: <b>{{ ((data()?.next15CandlesProb ?? 0) * 100) | number:'1.0-0' }}%</b></span>
-        <span>20v: <b>{{ ((data()?.next20CandlesProb ?? 0) * 100) | number:'1.0-0' }}%</b></span>
+        <span>10v: <b>{{ ((data()?.next10CandlesProb ?? 0) * 100) | number:'1.0-0' }}%</b></span>
       </div>
       <div class="cp-direction" [ngClass]="directionClass()">
         <span class="dir-arrow">{{directionArrow()}}</span>
@@ -49,11 +56,10 @@
   </header>
 
   <!-- ══════════════════════════════════════════════════════════ TOOLBAR -->
-  <div class="nx15-toolbar">
+  <div class="nx5-toolbar">
     <div class="tb-pair-row">
       <span class="tb-sym">{{ selectedSymbol() }}</span>
 
-      <!-- Dynamic pair selector with search -->
       <div class="pair-selector-wrap">
         <input
           class="pair-search"
@@ -65,7 +71,7 @@
           spellcheck="false"
         />
         <select
-          class="nx15-select"
+          class="nx5-select"
           [ngModel]="selectedSymbol()"
           (ngModelChange)="onSymbolChange($event)"
           size="1"
@@ -75,7 +81,7 @@
         </select>
       </div>
 
-      <!-- ── Live Price Display ── -->
+      <!-- Live Price -->
       <div class="tb-live-price" *ngIf="livePrice() !== null">
         <span class="lp-label">PRECIO</span>
         <span class="lp-value">{{ livePrice() | number:'1.2-6' }}</span>
@@ -90,23 +96,37 @@
         <span class="lp-value lp-wait">— — —</span>
       </div>
 
-      <div class="tb-regime" *ngIf="data()">
-        <span class="regime-label">{{ data()?.regime }}</span>
+      <!-- Entry Timeframe + Phase info -->
+      <div class="tb-entry-tf" *ngIf="data()">
+        <span class="entry-label">ENTRY</span>
+        <span class="entry-tf" [ngClass]="phaseClass()">{{ data()?.entryTimeframe }}</span>
         <span class="regime-sep">|</span>
         <span class="regime-range">±{{ data()?.estimatedRangePercent | number:'1.2-2' }}%</span>
       </div>
       <span class="tb-time" *ngIf="data()">{{ data()?.analyzedAt | date:'HH:mm:ss' }}</span>
     </div>
+
+    <!-- Ignition/Bypass indicators row -->
+    <div class="tb-indicators" *ngIf="data()">
+      <span class="indicator" [class.active]="data()?.compressionState">
+        🔒 COMP
+      </span>
+      <span class="indicator" [class.active]="data()?.ignitionDetected">
+        ⚡ IGNIT
+      </span>
+      <span class="indicator bypass" [class.active]="data()?.bypassActive">
+        🛡️ BYPASS
+      </span>
+    </div>
+
     <div class="tb-error" *ngIf="errorMsg()">⚠ {{ errorMsg() }}</div>
   </div>
 
   <!-- ══════════════════════════════════════════════════════════ MAIN GRID -->
-  <!-- Layout: LEFT 25% (G1-G4) | CENTER (chart) | RIGHT 25% (G5-G6 + button) -->
-  <div class="nx15-grid">
+  <div class="nx5-grid">
 
     <!-- ─────────────────────────── LEFT COL: G1, G2, G3, G4 -->
-    <aside class="nx15-col nx15-col-left">
-
+    <aside class="nx5-col nx5-col-left">
       <ng-container *ngFor="let g of leftGroups()">
         <div class="gcard" [style.--gc]="g.color">
           <div class="gcard-header">
@@ -133,30 +153,31 @@
           </ul>
         </div>
       </ng-container>
-
     </aside>
 
     <!-- ─────────────────────────── CENTER COL (CHART) -->
-    <main class="nx15-col nx15-col-center">
+    <main class="nx5-col nx5-col-center">
 
-      <!-- Direction banner -->
-      <div class="nx15-dir-banner" [ngClass]="directionClass()" *ngIf="topResults().length === 0">
-        <span class="dir-arrow">{{ directionArrow() }}</span>
-        <span class="dir-text">{{ data()?.direction ?? 'WAITING...' }}</span>
-        <span class="dir-sub">+{{ ((data()?.next15CandlesProb ?? 0) * 100) | number:'1.0-0' }}% / 15 velas</span>
-        <span class="dir-rec" [ngClass]="data()?.recommendation?.toLowerCase()">
-          {{ data()?.recommendation ?? '--' }}
-        </span>
+      <!-- Phase Banner -->
+      <div class="nx5-phase-banner" [ngClass]="phaseClass()" *ngIf="data() && topResults().length === 0">
+        <span class="phase-icon">{{ data()?.phase === 'IGNITION' ? '⚡' : data()?.phase === 'COMPRESSION' ? '🔒' : data()?.phase === 'EXPANSION' ? '🚀' : '⏸' }}</span>
+        <span class="phase-text">{{ data()?.phase ?? 'IDLE' }}</span>
+        <span class="phase-score-text">{{ data()?.phaseScore | number:'1.0-0' }} pts</span>
+        <span class="dir-arrow-small" [ngClass]="directionClass()">{{ directionArrow() }}</span>
+        <span class="dir-text-small">{{ data()?.direction ?? '---' }}</span>
+        <span class="entry-tf-badge" [ngClass]="phaseClass()">Entry: {{ data()?.entryTimeframe }}</span>
       </div>
-      
 
-
-      <!-- Top 5 List (Horizontal Banner) -->
-      <div class="nx15-top-banner" *ngIf="topResults().length > 0">
-        <div class="tb-title">🏆 TOP 5</div>
+      <!-- Top 5 List -->
+      <div class="nx5-top-banner" *ngIf="topResults().length > 0">
+        <div class="tb-title">⚡ TOP 5 IGNITION</div>
         <div class="tb-items">
-          <div class="tb-item" *ngFor="let tr of topResults()" (click)="onSymbolChange(tr.symbol!, tr)">
+          <div class="tb-item" *ngFor="let tr of topResults(); let i = index" (click)="onSymbolChange(tr.symbol!, tr)">
+            <span class="tb-rank">{{ i + 1 }}.</span>
             <span class="tb-sym">{{ tr.symbol?.replace('USDT','') }}</span>
+            <span class="tb-phase" [ngClass]="tr.phase === 'IGNITION' ? 'phase-ignition' : tr.phase === 'COMPRESSION' ? 'phase-compression' : 'phase-expansion'">
+              {{ tr.phase }}
+            </span>
             <span class="tb-conf" [style.color]="(tr.aiConfidence ?? 0) >= 75 ? '#00ff88' : (tr.aiConfidence ?? 0) >= 45 ? '#ffdd00' : '#ff8888'">
                {{ tr.aiConfidence | number:'1.1-1' }}%
             </span>
@@ -172,62 +193,61 @@
       </div>
 
       <!-- Chart -->
-      <div class="nx15-chart-box">
-        <!-- Syncing Overlay -->
-        <div class="nx15-sync-overlay" *ngIf="realCandles.length === 0 && !errorMsg()">
+      <div class="nx5-chart-box">
+        <div class="nx5-sync-overlay" *ngIf="realCandles.length === 0 && !errorMsg()">
           <div class="sync-spinner"></div>
           <span>SYNCHRONIZING {{ selectedSymbol() }}...</span>
         </div>
 
-        <div class="nx15-chart-container" #chartContainer></div>
-
-        <!-- HUD Indicators Overlay -->
-        <div class="chart-hud-indicators" style="position: absolute; top: 10px; right: 60px; z-index: 5; pointer-events: none; background: rgba(5, 9, 16, 0.85); border: 1px solid rgba(0, 243, 255, 0.15); font-family: 'Share Tech Mono', monospace; font-size: 11px; padding: 6px 10px; display: flex; align-items: center; gap: 12px; border-radius: 4px;">
-          <span style="color: #ff00aa; display: flex; align-items: center; gap: 4px;">
+        <!-- Indicators Overlay (Top-Left) -->
+        <div class="chart-hud-indicators position-absolute p-2 d-flex align-items-center gap-3" 
+             style="top: 55px; left: 12px; z-index: 5; pointer-events: none; background: rgba(5, 9, 16, 0.85); border: 1px solid rgba(0, 243, 255, 0.15); font-family: 'Share Tech Mono', monospace; font-size: 11px;">
+          <span class="d-flex align-items-center gap-1" style="color: #00e5ff;">
             <span class="hud-label">HMA(50):</span>
             <span class="hud-value fw-bold">{{ currentHmaValue() ? (currentHmaValue() | number:'1.2-5') : '0.00000' }}</span>
           </span>
-          <span style="color: #ffcc00; display: flex; align-items: center; gap: 4px;">
+          <span class="d-flex align-items-center gap-1" style="color: #ffcc00;">
             <span class="hud-label">MA(7):</span>
             <span class="hud-value fw-bold">{{ currentMa7Value() ? (currentMa7Value() | number:'1.2-5') : '0.00000' }}</span>
           </span>
-          <span style="color: #ba55d3; display: flex; align-items: center; gap: 4px;">
+          <span class="d-flex align-items-center gap-1" style="color: #ba55d3;">
             <span class="hud-label">MA(25):</span>
             <span class="hud-value fw-bold">{{ currentMa25Value() ? (currentMa25Value() | number:'1.2-5') : '0.00000' }}</span>
           </span>
-          <span style="color: #722ed1; display: flex; align-items: center; gap: 4px;">
+          <span class="d-flex align-items-center gap-1" style="color: #722ed1;">
             <span class="hud-label">MA(99):</span>
             <span class="hud-value fw-bold">{{ currentMa99Value() ? (currentMa99Value() | number:'1.2-5') : '0.00000' }}</span>
           </span>
         </div>
 
+        <div class="nx5-chart-container" #chartContainer></div>
+
         <div class="chart-header-row">
           <div class="chart-label">{{ selectedSymbol() }}</div>
           <div class="chart-timeframes">
-            <button class="tf-btn" *ngFor="let tf of availableTimeframes" 
-                    [class.active]="tf === selectedTimeframe()" 
+            <button class="tf-btn" *ngFor="let tf of availableTimeframes"
+                    [class.active]="tf === selectedTimeframe()"
                     (click)="onTimeframeChange(tf)">
               {{ tf }}
             </button>
           </div>
         </div>
 
-        <div class="chart-funnel-badge" [ngClass]="directionClass()" *ngIf="data()?.direction && data()?.direction !== 'NEUTRAL'">
-          <span class="funnel-icon">{{ data()?.direction === 'BULLISH' ? '▲' : '▼' }}</span>
-          {{ data()?.direction }}
-          ±{{ data()?.estimatedRangePercent | number:'1.1-1' }}%
+        <div class="chart-phase-badge" [ngClass]="phaseClass()" *ngIf="data()?.phase && data()?.phase !== 'IDLE'">
+          {{ phaseLabel() }}
+          <span class="phase-score-inline">{{ data()?.phaseScore | number:'1.0-0' }}</span>
         </div>
+
         <div class="chart-loading" *ngIf="isLoading()">
-          <span class="spin">⟳</span> ANALYZING...
+          <span class="spin">⟳</span> IGNITION SCAN...
         </div>
       </div>
 
     </main>
 
-    <!-- ─────────────────────────── RIGHT COL: G5, G6 + BUTTON -->
-    <aside class="nx15-col nx15-col-right">
+    <!-- ─────────────────────────── RIGHT COL: G5, G6 + BUTTONS -->
+    <aside class="nx5-col nx5-col-right">
 
-      <!-- G5 Volume & G6 ML stacked -->
       <ng-container *ngFor="let g of rightGroups()">
         <div class="gcard" [style.--gc]="g.color">
           <div class="gcard-header">
@@ -256,45 +276,61 @@
       </ng-container>
 
       <!-- Direction mini-card -->
-      <div class="nx15-right-dir" [ngClass]="directionClass()" *ngIf="data()">
+      <div class="nx5-right-dir" [ngClass]="directionClass()" *ngIf="data()">
         <div class="rd-arrow">{{ directionArrow() }}</div>
         <div class="rd-dir">{{ data()?.direction }}</div>
         <div class="rd-probs">
+          <div>3v &nbsp;<b>{{ ((data()?.next3CandlesProb ?? 0) * 100) | number:'1.0-0' }}%</b></div>
           <div>5v &nbsp;<b>{{ ((data()?.next5CandlesProb ?? 0) * 100) | number:'1.0-0' }}%</b></div>
-          <div>15v <b>{{ ((data()?.next15CandlesProb ?? 0) * 100) | number:'1.0-0' }}%</b></div>
-          <div>20v <b>{{ ((data()?.next20CandlesProb ?? 0) * 100) | number:'1.0-0' }}%</b></div>
+          <div>10v <b>{{ ((data()?.next10CandlesProb ?? 0) * 100) | number:'1.0-0' }}%</b></div>
         </div>
       </div>
 
-      <!-- FreqTrade info (Always Visible) -->
-      <div class="nx15-freqtrade">
-        <div class="ft-title">
-          <span class="ft-logo">FreqTrade</span>
-          <span class="ft-live" [style.color]="data() ? '#00ff88' : '#555'">● {{ data() ? 'LIVE' : 'IDLE' }}</span>
+      <!-- Ignition Info Panel -->
+      <div class="nx5-ignition-panel" *ngIf="data()">
+        <div class="ip-title">
+          <span class="ip-logo">IGNITION STATUS</span>
+          <span class="ip-live" [style.color]="data()?.phase === 'IGNITION' ? '#ff4400' : '#555'">● {{ data()?.phase }}</span>
         </div>
-        <div class="ft-rows" *ngIf="data()">
-          <div class="ft-row"><span>Symbol</span><b>{{ data()?.symbol }}</b></div>
-          <div class="ft-row"><span>Direction</span>
+        <div class="ip-rows">
+          <div class="ip-row"><span>Phase</span>
+            <b [ngClass]="phaseClass()">{{ data()?.phase }} ({{ data()?.phaseScore | number:'1.0-0' }})</b>
+          </div>
+          <div class="ip-row"><span>Entry TF</span>
+            <b>{{ data()?.entryTimeframe }}</b>
+          </div>
+          <div class="ip-row"><span>Compression</span>
+            <b [style.color]="data()?.compressionState ? '#00ff88' : '#888'">{{ data()?.compressionState ? 'YES' : 'NO' }}</b>
+          </div>
+          <div class="ip-row"><span>Ignition</span>
+            <b [style.color]="data()?.ignitionDetected ? '#ff4400' : '#888'">{{ data()?.ignitionDetected ? 'YES' : 'NO' }}</b>
+          </div>
+          <div class="ip-row"><span>RSI Bypass</span>
+            <b [style.color]="data()?.bypassActive ? '#ffdd00' : '#888'">{{ data()?.bypassActive ? 'ACTIVE' : 'OFF' }}</b>
+          </div>
+          <div class="ip-row"><span>Vol Multiplier</span>
+            <b>{{ data()?.features?.relativeVolMultiplier | number:'1.2-2' }}x</b>
+          </div>
+          <div class="ip-row"><span>Direction</span>
             <b [class]="directionClass()">{{ data()?.direction }}</b>
           </div>
-          <div class="ft-row"><span>Confidence</span>
+          <div class="ip-row"><span>Confidence</span>
             <b [style.color]="confidenceColor()">{{ data()?.aiConfidence | number:'1.1-1' }}%</b>
           </div>
-          <div class="ft-row"><span>Scans</span><b>{{ scanCount() }}</b></div>
         </div>
       </div>
 
-      <!-- ⚡ ACTIVATE BUTTONS — below G6 -->
-      <div class="nx15-actions-panel">
-        <button class="nx15-activate" (click)="runOnDemand()" [disabled]="isLoading() || isTopLoading()">
+      <!-- ACTION BUTTONS -->
+      <div class="nx5-actions-panel">
+        <button class="nx5-activate" (click)="runOnDemand()" [disabled]="isLoading() || isTopLoading()">
           <span class="act-icon">⚡</span>
-          <span class="act-text">ACTIVAR NEXUS-15</span>
+          <span class="act-text">ACTIVAR NEXUS-5</span>
           <span class="act-spin" *ngIf="isLoading()"> ⟳</span>
         </button>
 
-        <button class="nx15-activate btn-top5" (click)="runTopScan()" [disabled]="isLoading() || isTopLoading()">
+        <button class="nx5-activate btn-top5" (click)="runTopScan()" [disabled]="isLoading() || isTopLoading()">
           <span class="act-icon">🏆</span>
-          <span class="act-text">TOP DE NEXUS-15</span>
+          <span class="act-text">TOP IGNITION</span>
           <span class="act-spin" *ngIf="isTopLoading()"> ⟳</span>
         </button>
       </div>

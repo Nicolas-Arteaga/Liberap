@@ -67,7 +67,98 @@ class SignalEngine:
         return None
 
 
-    def calculate_confluence(self, symbol: str, scar_data: dict, nexus_data: dict) -> dict:
+    def get_nexus5_prediction(self, symbol: str, limit: int = 500) -> Optional[Dict[str, Any]]:
+        """
+        Fetches the NEXUS-5 prediction for a symbol (5m candles, Phase 1/2 detection).
+        Returns None silently on ANY error — never crashes the agent cycle.
+        """
+        klines = self.fetcher.get_klines_for_nexus(symbol, interval="5m", limit=limit)
+        if not klines or len(klines) < 30:
+            return None
+
+        url = f"{self.base_url}/nexus5/analyze"
+        payload = {
+            "symbol": symbol,
+            "timeframe": "5m",
+            "candles": klines
+        }
+
+        try:
+            response = requests.post(url, json=payload, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                logger.debug(
+                    f"[Nexus-5] {symbol}: phase={data.get('phase')} "
+                    f"conf={data.get('ai_confidence')}% dir={data.get('direction')}"
+                )
+                return data
+            else:
+                logger.debug(f"[Nexus-5] {symbol} HTTP {response.status_code}")
+        except requests.exceptions.Timeout:
+            logger.warning(f"[Nexus-5] Timeout for {symbol} (>10s). Skipping.")
+        except requests.exceptions.ConnectionError:
+            logger.warning(f"[Nexus-5] AI service unreachable at {self.base_url}. Is Docker running?")
+        except Exception as e:
+            logger.error(f"[Nexus-5] Unexpected error for {symbol}: {e}")
+
+        return None
+
+
+    @staticmethod
+    def evaluate_nexus5_timing(n5_data: dict, n15_direction: str) -> dict:
+        """
+        Evaluates NEXUS-5 timing for entry decisions.
+
+        Sweet spot (25-65%): The spring is loaded but hasn't fired. Boost confluence.
+        Confirmed (65-80%): Window closing, small boost.
+        Too late (>80%): Move already happened. Consider reversal (exhaustion top/bottom).
+
+        Returns: {nexus5_ok, nexus5_boost, nexus5_timing_note, nexus5_reversal}
+        """
+        if not n5_data:
+            return {
+                "nexus5_ok": True, "nexus5_boost": 0,
+                "nexus5_timing_note": "no_data", "nexus5_reversal": False,
+                "nexus5_phase": None, "nexus5_confidence": 0,
+            }
+
+        phase = n5_data.get("phase", "IDLE")
+        conf = n5_data.get("ai_confidence", 0)
+        n5_dir = n5_data.get("direction", "NEUTRAL")
+        phase_score = n5_data.get("phase_score", 0)
+
+        base = {
+            "nexus5_ok": True, "nexus5_boost": 0,
+            "nexus5_reversal": False,
+            "nexus5_phase": phase, "nexus5_confidence": conf,
+        }
+
+        # Phase IDLE: no timing signal, neutral
+        if phase == "IDLE":
+            return {**base, "nexus5_timing_note": "idle"}
+
+        # Minimum phase score threshold
+        if phase_score < config.NEXUS5_MIN_PHASE_SCORE:
+            return {**base, "nexus5_timing_note": f"low_phase_score({phase_score:.0f})"}
+
+        # SWEET SPOT: compression or early ignition (25-65%)
+        if config.NEXUS5_SWEET_SPOT_MIN <= conf <= config.NEXUS5_SWEET_SPOT_MAX:
+            boost = config.NEXUS5_CONFLUENCE_BOOST * (1.0 - conf / config.NEXUS5_SWEET_SPOT_MAX)
+            return {**base, "nexus5_boost": boost, "nexus5_timing_note": f"sweet_spot({phase},{conf:.0f}%)"}
+
+        # CONFIRMED: ignition confirmed, window closing (65-80%)
+        if config.NEXUS5_SWEET_SPOT_MAX < conf <= config.NEXUS5_LATE_ENTRY_MAX:
+            return {**base, "nexus5_boost": 3.0, "nexus5_timing_note": f"confirmed({phase},{conf:.0f}%)"}
+
+        # TOO LATE: > 80%, consider reversal
+        if conf > config.NEXUS5_REVERSAL_MIN:
+            return {**base, "nexus5_timing_note": f"too_late({phase},{conf:.0f}%)", "nexus5_reversal": True}
+
+        # Below minimum
+        return {**base, "nexus5_timing_note": f"below_min({conf:.0f}%)"}
+
+
+    def calculate_confluence(self, symbol: str, scar_data: dict, nexus_data: dict, nexus5_data: dict = None) -> dict:
         """
         Full confluence score using ALL available signals:
           - Nexus-15 AI confidence          (max 40 pts)
@@ -179,12 +270,37 @@ class SignalEngine:
             score = config.MIN_CONFLUENCE_SCORE
             reasons.append(f"StandaloneNexus≥{config.MIN_NEXUS_CONFIDENCE}%→floor={config.MIN_CONFLUENCE_SCORE}")
 
+        # 9. NEXUS-5 Timing Filter — determines WHEN to enter
+        #    Sweet spot (25-65%): boost score. Too late (>80%): consider reversal.
+        n5_timing = self.evaluate_nexus5_timing(nexus5_data, nexus_direction)
+        n5_boost = n5_timing.get("nexus5_boost", 0)
+        n5_reversal = n5_timing.get("nexus5_reversal", False)
+        n5_note = n5_timing.get("nexus5_timing_note", "no_data")
+
+        if n5_boost > 0:
+            score += n5_boost
+            reasons.append(f"Nexus5({n5_note})→+{n5_boost:.1f}")
+
         score = round(min(100.0, max(0.0, score)), 2)
 
         # Determine trade direction
         trade_direction = nexus_direction
         if trade_direction == "NEUTRAL" and scar_score >= config.MIN_SCAR_SCORE:
             trade_direction = "BULLISH"  # SCAR default bias (whales pump)
+
+        # NEXUS-5 Reversal: if confidence > 80%, the move already happened.
+        # Consider entering in the OPPOSITE direction (exhaustion top/bottom).
+        if n5_reversal and trade_direction != "NEUTRAL":
+            n5_conf = n5_timing.get("nexus5_confidence", 0)
+            n5_dir = (nexus5_data or {}).get("direction", "NEUTRAL")
+            reversed_dir = "BEARISH" if n5_dir == "BULLISH" else "BULLISH" if n5_dir == "BEARISH" else trade_direction
+            if reversed_dir != trade_direction:
+                trade_direction = reversed_dir
+                reasons.append(f"Nexus5REVERSAL({n5_dir}@{n5_conf:.0f}%)→{reversed_dir}")
+                logger.info(
+                    f"[Nexus5-REVERSAL] {symbol}: {n5_dir} @ {n5_conf:.0f}% = too late, "
+                    f"flipping to {reversed_dir} (exhaustion entry)"
+                )
 
         side = 0 if trade_direction == "BULLISH" else 1
 
@@ -212,5 +328,11 @@ class SignalEngine:
             "scored_at":         scored_at_ts,
             "scored_at_age_s":   0.0,  # se actualiza en verge_agent al ejecutar
             "price_at_signal":   last_close_kline,
+            # NEXUS-5 Timing data
+            "nexus5_phase":       n5_timing.get("nexus5_phase"),
+            "nexus5_confidence":  n5_timing.get("nexus5_confidence", 0),
+            "nexus5_timing_note": n5_note,
+            "nexus5_boost":       n5_boost,
+            "nexus5_reversal":    n5_reversal,
         }
 

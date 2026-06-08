@@ -29,6 +29,7 @@ export class TradingSignalrService {
     private tradeUpdateSource = new Subject<any>();
     private superScoreSource = new BehaviorSubject<any>(null); // 👈 Nuevo para Scores de IA
     private nexus15Source = new BehaviorSubject<any>(null);    // 👈 NEXUS-15 signals
+    private nexus5Source = new BehaviorSubject<any>(null);    // ⚡ NEXUS-5 Ignition signals
 
     sessionStarted$ = this.sessionStartedSource.asObservable();
     sessionEnded$ = this.sessionEndedSource.asObservable();
@@ -39,6 +40,7 @@ export class TradingSignalrService {
     tradeUpdate$ = this.tradeUpdateSource.asObservable();
     superScore$ = this.superScoreSource.asObservable();
     nexus15$ = this.nexus15Source.asObservable(); // 👈 NEXUS-15 observable
+    nexus5$ = this.nexus5Source.asObservable();  // ⚡ NEXUS-5 observable
 
     private connection: signalR.HubConnection | null = null;
     private lastNotifiedState: Record<string, string> = {};
@@ -235,6 +237,17 @@ export class TradingSignalrService {
                 this.nexus15Source.next(data);
             } catch (e) {
                 console.error('[SignalR] ❌ Error parsing Nexus15Update:', e);
+            }
+        });
+
+        // --- NEXUS-5 Ignition Handler ---
+        this.connection.on('Nexus5Update', (payload: any) => {
+            try {
+                const data = typeof payload === 'string' ? JSON.parse(payload) : payload;
+                console.log('[SignalR] ⚡ Nexus5Update:', data?.symbol, '| Phase:', data?.phase, '| Conf:', data?.aiConfidence);
+                this.nexus5Source.next(data);
+            } catch (e) {
+                console.error('[SignalR] ❌ Error parsing Nexus5Update:', e);
             }
         });
 

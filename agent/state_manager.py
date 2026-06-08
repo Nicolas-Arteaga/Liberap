@@ -16,12 +16,16 @@ class StateManager:
     def __init__(self):
         self.positions_file = config.POSITIONS_FILE
         self.daily_stats_file = config.DAILY_STATS_FILE
+        self.snipers_file = os.path.join(config.DATA_DIR, "pending_snipers.json")
         
         self._ensure_files()
 
     def _ensure_files(self):
         if not os.path.exists(self.positions_file):
             self._save_json(self.positions_file, [])
+            
+        if not os.path.exists(self.snipers_file):
+            self._save_json(self.snipers_file, [])
             
         if not os.path.exists(self.daily_stats_file):
             self._reset_daily_stats()
@@ -208,3 +212,21 @@ class StateManager:
         else:
             d["consecutive_losses"] = 0
         self._save_loss_streak(d)
+
+    # --- Pending Sniper Traps Management ---
+
+    def get_pending_snipers(self) -> list:
+        return self._load_json(self.snipers_file)
+
+    def add_pending_sniper(self, sniper: dict):
+        snipers = self.get_pending_snipers()
+        # Prevent duplicate symbol traps
+        snipers = [s for s in snipers if s.get("symbol") != sniper.get("symbol")]
+        snipers.append(sniper)
+        self._save_json(self.snipers_file, snipers)
+
+    def remove_pending_sniper(self, symbol: str):
+        snipers = self.get_pending_snipers()
+        filtered = [s for s in snipers if s.get("symbol") != symbol]
+        if len(filtered) != len(snipers):
+            self._save_json(self.snipers_file, filtered)

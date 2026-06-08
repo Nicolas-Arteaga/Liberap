@@ -33,7 +33,7 @@ export class StrategyEditorComponent implements OnInit {
     maxRsiLong: 80,
     minRsiShort: 20,
     maxMa7DistancePct: 3.5,
-    allowedSources: 'Nexus,LSE,Bridge',
+    allowedSources: 'Nexus,Nexus5,LSE,Bridge',
     allowLong: true,
     allowShort: true,
     marginPerTrade: 150,

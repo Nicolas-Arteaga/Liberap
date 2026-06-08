@@ -701,6 +701,11 @@
     color: #7dd3fc;
     border-color: rgba(56, 189, 248, 0.35);
   }
+  &--success {
+    background: rgba(0, 196, 125, 0.15);
+    color: #00C47D;
+    border-color: rgba(0, 196, 125, 0.35);
+  }
 }
 
 .scores-grid {

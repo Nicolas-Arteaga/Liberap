@@ -84,6 +84,10 @@ export const APP_ROUTES: Routes = [
         loadComponent: () => import('./nexus15/nexus15.component').then(c => c.Nexus15Component),
       },
       {
+        path: 'nexus-5',
+        loadComponent: () => import('./nexus5/nexus5.component').then(c => c.Nexus5Component),
+      },
+      {
         path: 'scar/analytics',
         loadComponent: () => import('./scar-analytics/scar-analytics.component').then(c => c.ScarAnalyticsComponent),
       },

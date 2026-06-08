@@ -213,7 +213,7 @@ class VergeAgent:
         now_utc = datetime.utcnow()
         hour_utc = now_utc.hour
         day_of_week = now_utc.strftime("%A")
-        
+
         # Determine trading session
         if 0 <= hour_utc < 8:
             session = "ASIA"
@@ -225,12 +225,21 @@ class VergeAgent:
             session = "NY_CLOSE"
         else:
             session = "WEEKEND"
-        
+
         temporal_context = {
             "hour_utc": hour_utc,
             "day_of_week": day_of_week,
             "session": session,
             "is_weekend": day_of_week in ["Saturday", "Sunday"],
+        }
+
+        # ── NEXUS-5 Timing Context ──
+        nexus5_context = {
+            "phase": candidate.get("nexus5_phase"),
+            "confidence": candidate.get("nexus5_confidence"),
+            "timing_note": candidate.get("nexus5_timing_note"),
+            "boost_applied": candidate.get("nexus5_boost"),
+            "is_reversal": candidate.get("nexus5_reversal"),
         }
         
         snap = {
@@ -247,6 +256,7 @@ class VergeAgent:
             },
             "btc_context": btc_context,
             "temporal_context": temporal_context,
+            "nexus5_context": nexus5_context,
             "candidate": self._json_safe_for_audit(copy.deepcopy(candidate)),
             "position_sizing": self._json_safe_for_audit(copy.deepcopy(pos_details)),
         }
@@ -419,6 +429,12 @@ class VergeAgent:
             time.sleep(config.BTC_FLASH_CRASH_PAUSE_M * 60)
             return
         
+        # ── PENDING SNIPERS TRAPS MANAGEMENT (Sniper Mode) ──
+        try:
+            self._manage_pending_snipers()
+        except Exception as e:
+            logger.error(f"[SNIPER] Error managing pending snipers: {e}", exc_info=True)
+            
         try:
             config.refresh_watchlist()
         except Exception as e:
@@ -522,6 +538,30 @@ class VergeAgent:
         scar_alerts = self.signals.get_scar_alerts()
         logger.info(f"[Step 3/6] Received {len(scar_alerts)} alerts.")
 
+        # 3.5 NEXUS-5 Timing Scan — 5m Phase 1/2 detection for entry timing
+        #     Only scans symbols that already have 5m data in SQLite cache (no REST calls)
+        #     This runs BEFORE Nexus-15 so we can pass timing data to confluence scoring.
+        nexus5_cache = {}
+        NEXUS5_ENABLED = getattr(config, "NEXUS5_ENABLED", True)
+        if NEXUS5_ENABLED:
+            all_targets_n5 = config.WATCHLIST
+            logger.info(f"[Step 3.5/6] Scanning {len(all_targets_n5)} symbols with NEXUS-5 (5m timing)...")
+            n5_ok = 0
+            n5_fail = 0
+            for symbol in all_targets_n5:
+                try:
+                    n5 = self.signals.get_nexus5_prediction(symbol, limit=500)
+                    if n5:
+                        nexus5_cache[symbol] = n5
+                        n5_ok += 1
+                    else:
+                        n5_fail += 1
+                except Exception:
+                    n5_fail += 1
+            logger.info(
+                f"[Step 3.5/6] NEXUS-5: {n5_ok} symbols analyzed, {n5_fail} skipped (no 5m data or error)"
+            )
+
         # 4. Scan ALL watchlist symbols with Nexus-15
         #    - Symbols with cache history: instant (SQLite read)
         #    - Symbols without cache history: on-demand REST fetch (Bybit/OKX)
@@ -568,7 +608,8 @@ class VergeAgent:
 
                 analyzed += 1
                 scar_data  = scar_alerts.get(symbol, {})
-                confluence = self.signals.calculate_confluence(symbol, scar_data, nexus_data)
+                n5_data    = nexus5_cache.get(symbol)
+                confluence = self.signals.calculate_confluence(symbol, scar_data, nexus_data, nexus5_data=n5_data)
 
                 # 🟢 BROADCAST: Batch scores to UI scanner (avoid request spam)
                 broadcast_batch.append(confluence)
@@ -578,6 +619,7 @@ class VergeAgent:
                     enriched["agent_audit_context"] = {
                         "nexus15": self._json_safe_for_audit(nexus_data),
                         "scar": self._json_safe_for_audit(scar_data) if scar_data else {},
+                        "nexus5": self._json_safe_for_audit(n5_data) if n5_data else {},
                     }
 
                     # ── BONUS SMC: Aplicar bonus de calidad antes del ranking ──
@@ -669,6 +711,7 @@ class VergeAgent:
             sym          = sig["symbol"]
             bridge_score = sig["score"]
             sig_age_s    = time.time() - sig.get("received_at", 0)
+            bridge_dir   = sig.get("direction", "").upper()  # Inicializar dirección del bridge
 
             if self._should_skip(sym):
                 continue
@@ -698,9 +741,26 @@ class VergeAgent:
                         )
                         continue
 
+            # ── NEXUS-5 Reversal Check: Si confidence > 80%, el movimiento ya pasó. Considerar reversión. ──
+            # Solo para señales de NEXUS-5 (source=nexus5_bridge o estado=NEXUS5_HOT)
+            is_nexus5_signal = sig.get("source") == "nexus5_bridge" or sig.get("estado") == "NEXUS5_HOT"
+            n5_confidence = float(sig.get("nexus5", 0))
+            n5_phase = sig.get("phase", "")
+            n5_direction = sig.get("direction", "").upper()
+
+            if is_nexus5_signal and n5_confidence > config.NEXUS5_REVERSAL_MIN:
+                # Confidence > 80% = movimiento ya pasó, considerar entrada en dirección opuesta (exhaustion)
+                reversed_dir = "BEARISH" if n5_direction == "BULLISH" else "BULLISH" if n5_direction == "BEARISH" else n5_direction
+                if reversed_dir != n5_direction:
+                    logger.info(
+                        "[BRIDGE] NEXUS-5 REVERSAL %s: %s @ %.0f%% = too late, flipping to %s (exhaustion entry)",
+                        sym, n5_direction, n5_confidence, reversed_dir
+                    )
+                    bridge_dir = reversed_dir
+
             # ── Validación 2: Nexus-15 fresco — confirma dirección en tiempo real ──
             # Llama al python-service Nexus-15 sobre el símbolo AHORA, no con el caché.
-            # EXCEPCIÓN: Si la señal viene de la UI (nexus15_ui), ya tiene 1000 velas procesadas, 
+            # EXCEPCIÓN: Si la señal viene de la UI (nexus15_ui), ya tiene 1000 velas procesadas,
             # usar sus features directamente en lugar de degradar la señal con un re-cálculo local.
             if sig.get("source") == "nexus15_ui":
                 nexus_fresh = {
@@ -727,7 +787,6 @@ class VergeAgent:
             nexus_dir   = str(nexus_fresh.get("prediction", "")).upper()   # BULLISH/BEARISH/NEUTRAL
             nexus_conf  = float(nexus_fresh.get("ai_confidence", 0))
             nexus_reco  = str(nexus_fresh.get("features", {}).get("nexus_recommendation", "")).lower()
-            bridge_dir  = sig.get("direction", "").upper()
 
             # Si Nexus-15 recomienda esperar → señal caducada
             if nexus_reco in ("wait", "hold"):
@@ -1675,8 +1734,100 @@ class VergeAgent:
                 return True
         return False
 
-    def _execute_trade(self, candidate: dict, profile: dict = None) -> bool:
+    def _get_ma99_15m(self, symbol: str) -> Optional[float]:
+        try:
+            klines = self.fetcher.get_klines_for_nexus(symbol, interval="15m", limit=120)
+            if not klines or len(klines) < 99:
+                return None
+            closes = [float(k["close"]) for k in klines]
+            return sum(closes[-99:]) / 99.0
+        except Exception as e:
+            logger.error(f"[SNIPER] Error calculating MA99 for {symbol}: {e}")
+            return None
+
+    def _get_vol_ratio_5m(self, symbol: str) -> float:
+        try:
+            klines = self.fetcher.get_klines_for_nexus(symbol, interval="5m", limit=15)
+            if not klines or len(klines) < 10:
+                return 1.0
+            volumes = [float(k["volume"]) for k in klines]
+            current_vol = volumes[-1]
+            avg_vol = sum(volumes[-10:]) / 10.0
+            if avg_vol <= 0:
+                return 1.0
+            return current_vol / avg_vol
+        except Exception as e:
+            logger.error(f"[SNIPER] Error calculating vol ratio for {symbol}: {e}")
+            return 1.0
+
+    def _manage_pending_snipers(self):
+        snipers = self.state.get_pending_snipers()
+        if not snipers:
+            return
+
+        logger.info(f"[Step 1.5/6] Checking {len(snipers)} pending sniper traps...")
+        now = time.time()
+        to_remove = []
+
+        for s in snipers:
+            symbol = s["symbol"]
+            created_at = s.get("created_at", now)
+            trigger_price = s["trigger_price"]
+            candidate = s["candidate"]
+            profile = s["profile"]
+
+            # 4 hours vanish timer check
+            if now - created_at > 4 * 3600:
+                logger.info(f"[SNIPER] Vanish Timer expired for {symbol}. Removing trap.")
+                to_remove.append(symbol)
+                continue
+
+            current_px = self.fetcher.get_current_price(symbol)
+            if current_px <= 0:
+                continue
+
+            # Check price cross
+            if current_px >= trigger_price:
+                # Check volume ratio
+                vol_ratio = self._get_vol_ratio_5m(symbol)
+                logger.info(f"[SNIPER] {symbol} crossed trigger price {trigger_price:.6f} (current: {current_px:.6f}). Checking volume: {vol_ratio:.2f}x (needed: 2.5x)")
+                if vol_ratio >= 2.5:
+                    logger.info(f"[SNIPER] 🔥 TRIGGERED! {symbol} volume is explosive ({vol_ratio:.2f}x >= 2.5x). Executing trade...")
+                    success = self._execute_trade(candidate, profile=profile, is_triggered_sniper=True)
+                    if success:
+                        to_remove.append(symbol)
+                    else:
+                        logger.warning(f"[SNIPER] Failed to execute triggered trade for {symbol}.")
+            else:
+                # Still stalking
+                logger.info(f"[SNIPER] Stalking {symbol}: price={current_px:.6f} trigger={trigger_price:.6f} (diff={((trigger_price - current_px)/current_px)*100:.2f}%)")
+
+        for sym in to_remove:
+            self.state.remove_pending_sniper(sym)
+
+    def _execute_trade(self, candidate: dict, profile: dict = None, is_triggered_sniper: bool = False) -> bool:
         symbol = candidate["symbol"]
+        confluence = candidate.get("confluence_score", 0)
+
+        # Sniper mode check for scores > 90%
+        if confluence > 90.0 and not is_triggered_sniper:
+            ma99 = self._get_ma99_15m(symbol)
+            if ma99:
+                trigger_price = ma99 * 1.005
+                sniper_data = {
+                    "symbol": symbol,
+                    "trigger_price": trigger_price,
+                    "ma99": ma99,
+                    "created_at": datetime.now(timezone.utc).timestamp(),
+                    "candidate": candidate,
+                    "profile": profile
+                }
+                self.state.add_pending_sniper(sniper_data)
+                logger.info(f"[SNIPER] 🎯 Trap set for {symbol} at {trigger_price:.6f} (0.5% above MA99={ma99:.6f}). Score={confluence:.1f}%")
+                return False
+            else:
+                logger.warning(f"[SNIPER] Could not set trap for {symbol}: failed to calculate MA99.")
+
         balance = self.positions.get_virtual_balance()
         setup_metrics: dict = {}
 
@@ -1687,8 +1838,7 @@ class VergeAgent:
 
         # Update staleness metric for VETO #4
         if candidate.get("scored_at"):
-            import time
-            candidate["scored_at_age_s"] = time.time() - candidate["scored_at"]
+            candidate["scored_at_age_s"] = datetime.now(timezone.utc).timestamp() - candidate["scored_at"]
 
         ok, code, setup_metrics = validate_pre_trade(candidate, market_px, profile=profile, btc_filter=self.btc_filter, btc_corr=self.btc_corr)
         if not ok:

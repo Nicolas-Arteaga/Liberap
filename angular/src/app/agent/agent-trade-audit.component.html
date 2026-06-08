@@ -104,6 +104,7 @@
           <tr>
             <th (click)="sortBy('openedAt')">Fecha/Hora <span class="sort-indicator"></span></th>
             <th (click)="sortBy('strategy')">Estrategia <span class="sort-indicator"></span></th>
+            <th>Herramienta</th>
             <th (click)="sortBy('symbol')">Símbolo <span class="sort-indicator"></span></th>
             <th>Dirección</th>
             <th>Entrada</th>
@@ -120,6 +121,7 @@
             <tr>
               <td>{{ tr.openedAt | date:'short' }}</td>
               <td><strong class="strategy-name">{{ getStrategyName(tr) }}</strong></td>
+              <td><span class="badge" [class.badge--info]="signalSource(tr) === 'LSE' || signalSource(tr) === 'Nexus-5'" [class.badge--success]="signalSource(tr) === 'Nexus-15 Top'" [class.badge--muted]="signalSource(tr) === '—'">{{ signalSource(tr) }}</span></td>
               <td><strong>{{ tr.symbol }}</strong></td>
               <td>
                 <span [class]="tr.side === 0 ? 'badge-long' : 'badge-short'">
@@ -179,6 +181,7 @@
               <h3>Ejecución simulada</h3>
               <dl class="kv">
                 <dt>Estrategia</dt><dd><strong class="strategy-name">{{ getStrategyName(tr) }}</strong></dd>
+                <dt>Herramienta</dt><dd><span class="badge" [class.badge--info]="signalSource(tr) === 'LSE' || signalSource(tr) === 'Nexus-5'" [class.badge--success]="signalSource(tr) === 'Nexus-15 Top'" [class.badge--muted]="signalSource(tr) === '—'">{{ signalSource(tr) }}</span></dd>
                 <dt>Entrada (servidor)</dt><dd class="price-value">{{ tr.entryPrice | number:'1.4-6' }}</dd>
                 <dt>Cierre (servidor)</dt><dd>{{ tr.closedAt ? (tr.closedAt | date:'medium') : '—' }}</dd>
                 <dt>Precio de cierre</dt><dd class="price-value">{{ tr.closePrice ? (tr.closePrice | number:'1.4-6') : '—' }}</dd>

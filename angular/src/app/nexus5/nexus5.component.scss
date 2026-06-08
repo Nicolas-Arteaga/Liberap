@@ -1,0 +1,403 @@
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;600;700;800&display=swap');
+
+$fire:    #ff4400;
+$orange:  #ff8800;
+$cyan:    #00f0ff;
+$magenta: #ff00aa;
+$green:   #00ff88;
+$yellow:  #ffdd00;
+$bg:      #0a0500;
+$bg2:     #0d0800;
+$border:  rgba(255, 68, 0, 0.15);
+
+// Keyframes
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px currentColor; }
+  50% { opacity: 0.6; box-shadow: 0 0 20px currentColor, 0 0 40px rgba(255,68,0,0.3); }
+}
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes spinAnim { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes bar-fill { from { width: 0; } }
+@keyframes fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes flicker { 0%,100% { opacity: 1; } 92% { opacity: 1; } 93% { opacity: 0.4; } 94% { opacity: 1; } 96% { opacity: 0.6; } }
+@keyframes rotate { to { transform: rotate(360deg); } }
+@keyframes ignition-pulse {
+  0%, 100% { box-shadow: 0 0 8px $fire, 0 0 20px rgba($fire,0.3); }
+  50% { box-shadow: 0 0 16px $fire, 0 0 40px rgba($fire,0.5), 0 0 60px rgba($orange,0.2); }
+}
+
+// ── Shell ──
+.nx5-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 140px);
+  background: $bg;
+  background-image:
+    radial-gradient(ellipse at 15% 0%, rgba(255,68,0,0.07) 0%, transparent 60%),
+    radial-gradient(ellipse at 85% 100%, rgba(255,136,0,0.05) 0%, transparent 60%);
+  color: #f0d8c8;
+  font-family: 'Share Tech Mono', monospace;
+  overflow: hidden;
+  position: relative;
+  &::before {
+    content: ''; position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px);
+    pointer-events: none; z-index: 1000;
+  }
+}
+
+// ── HEADER ──
+.nx5-header {
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+  gap: 16px; padding: 12px 20px; border-bottom: 1px solid $border;
+  background: rgba(10, 5, 0, 0.9); backdrop-filter: blur(12px);
+  position: sticky; top: 0; z-index: 100; flex-shrink: 0;
+}
+
+.nx5-terminal-mini {
+  background: #000; border: 1px solid rgba($fire, 0.3); border-radius: 6px;
+  overflow: hidden; font-size: 9.5px; min-height: 90px; max-width: 320px; width: 100%;
+  .tm-bar {
+    background: rgba($fire, 0.1); padding: 4px 8px; display: flex; align-items: center;
+    gap: 5px; border-bottom: 1px solid rgba($fire, 0.2);
+    .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .r { background: #ff5f56; } .y { background: #ffbd2e; } .g { background: #27c93f; }
+    .tm-title { color: $fire; opacity: 0.7; margin-left: 6px; }
+  }
+  .tm-body { padding: 6px 8px; min-height: 60px; }
+  .tm-line {
+    color: $orange; opacity: 0.8; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; animation: fade-in 0.3s ease; margin-bottom: 1px; font-size: 9px;
+    .tm-prompt { color: $fire; }
+  }
+}
+
+.nx5-logo-area {
+  text-align: center;
+  .nx5-logo-title {
+    font-family: 'Orbitron', sans-serif; font-size: clamp(22px, 3vw, 36px); font-weight: 900;
+    color: $fire; text-shadow: 0 0 20px $fire, 0 0 40px rgba($fire, 0.5), 0 0 80px rgba($fire, 0.2);
+    letter-spacing: 6px; animation: flicker 8s infinite;
+  }
+  .nx5-logo-sub {
+    font-family: 'Orbitron', sans-serif; font-size: 11px; color: $orange;
+    letter-spacing: 5px; text-shadow: 0 0 10px $orange; margin-top: 2px;
+  }
+  .nx5-scan-badge {
+    display: inline-block; margin-top: 4px; background: rgba($fire, 0.1);
+    border: 1px solid rgba($fire, 0.4); color: $fire; font-size: 9px;
+    padding: 2px 10px; border-radius: 20px;
+  }
+}
+
+.nx5-confidence-panel {
+  text-align: right;
+  .cp-label { font-size: 9px; letter-spacing: 3px; color: rgba($fire, 0.6); text-transform: uppercase; }
+  .cp-value {
+    font-family: 'Rajdhani', sans-serif; font-size: clamp(34px, 4vw, 48px); font-weight: 800;
+    line-height: 1; text-shadow: 0 0 20px currentColor;
+    .cp-pct { font-size: 0.5em; opacity: 0.7; font-weight: 700; }
+  }
+  .cp-bar-wrap {
+    height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; margin: 6px 0; overflow: hidden;
+    .cp-bar-fill { height: 100%; border-radius: 2px; transition: width 1s ease; box-shadow: 0 0 8px currentColor; animation: bar-fill 1s ease; }
+  }
+  .cp-probs {
+    display: flex; gap: 12px; justify-content: flex-end;
+    font-family: 'Rajdhani', sans-serif; font-size: 11px; font-weight: 600; color: rgba($orange, 0.7);
+    b { color: $orange; font-weight: 700; }
+  }
+  .cp-direction {
+    display: inline-flex; align-items: center; gap: 6px; margin-top: 6px;
+    font-family: 'Orbitron', sans-serif; font-size: 11px; font-weight: 700;
+    padding: 3px 12px; border-radius: 4px;
+    &.bullish { color: $green; border: 1px solid rgba($green, 0.4); background: rgba($green, 0.08); }
+    &.bearish { color: #ff4466; border: 1px solid rgba(#ff4466, 0.4); background: rgba(#ff4466, 0.08); }
+    &.neutral { color: #888; border: 1px solid rgba(#888, 0.3); }
+  }
+}
+
+// ── Phase Badge (Header) ──
+.phase-badge {
+  display: inline-flex; align-items: center; gap: 6px; margin: 4px 0;
+  font-family: 'Orbitron', sans-serif; font-size: 12px; font-weight: 900;
+  padding: 3px 12px; border-radius: 20px; letter-spacing: 1px;
+  &.phase-ignition { color: $fire; border: 1px solid rgba($fire,0.6); background: rgba($fire,0.15); text-shadow: 0 0 10px $fire; animation: ignition-pulse 2s ease infinite; }
+  &.phase-compression { color: $cyan; border: 1px solid rgba($cyan,0.5); background: rgba($cyan,0.08); }
+  &.phase-expansion { color: $green; border: 1px solid rgba($green,0.5); background: rgba($green,0.08); }
+  &.phase-idle { color: #666; border: 1px solid rgba(#666,0.3); background: rgba(#666,0.05); }
+  .phase-score { font-size: 11px; opacity: 0.8; }
+}
+
+// ── TOOLBAR ──
+.nx5-toolbar {
+  padding: 6px 12px; background: rgba(0,0,0,0.5); border-bottom: 1px solid $border;
+  display: flex; flex-direction: column; gap: 4px; flex-shrink: 0;
+}
+.tb-pair-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tb-sym { font-family: 'Orbitron', sans-serif; font-size: 16px; font-weight: 700; color: $fire; text-shadow: 0 0 10px $fire; }
+.nx5-select {
+  background: rgba($fire,0.05); border: 1px solid rgba($fire,0.3); color: $orange;
+  font-family: 'Share Tech Mono', monospace; font-size: 13px; padding: 3px 6px;
+  border-radius: 4px; cursor: pointer; outline: none; option { background: $bg; }
+}
+.pair-selector-wrap { display: flex; flex-direction: column; gap: 4px; min-width: 140px; }
+.pair-search {
+  background: rgba($fire, 0.06); border: 1px solid rgba($fire, 0.25); color: $orange;
+  font-family: 'Share Tech Mono', monospace; font-size: 13px; padding: 3px 7px;
+  border-radius: 4px; outline: none; width: 100%;
+  &::placeholder { color: rgba($fire, 0.35); }
+  &:focus { border-color: rgba($fire, 0.6); box-shadow: 0 0 6px rgba($fire, 0.2); }
+}
+
+// Entry TF badge
+.tb-entry-tf {
+  display: flex; align-items: center; gap: 6px;
+  font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 600;
+  .entry-label { color: rgba($fire, 0.5); letter-spacing: 2px; font-size: 9px; }
+  .entry-tf {
+    font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: 14px;
+    &.phase-ignition { color: $fire; text-shadow: 0 0 8px $fire; }
+    &.phase-compression { color: $cyan; }
+    &.phase-expansion { color: $green; }
+    &.phase-idle { color: #666; }
+  }
+  .regime-sep { opacity: 0.3; color: #fff; }
+  .regime-range { color: $orange; font-weight: 700; }
+}
+
+// Ignition indicators
+.tb-indicators {
+  display: flex; gap: 8px; padding: 2px 0;
+  .indicator {
+    font-family: 'Orbitron', sans-serif; font-size: 9px; font-weight: 700;
+    padding: 2px 8px; border-radius: 12px;
+    color: #555; border: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.3);
+    transition: all 0.3s;
+    &.active { color: $fire; border-color: rgba($fire,0.5); background: rgba($fire,0.1); text-shadow: 0 0 6px $fire; }
+    &.bypass.active { color: $yellow; border-color: rgba($yellow,0.5); background: rgba($yellow,0.1); text-shadow: 0 0 6px $yellow; }
+  }
+}
+
+.tb-time { font-size: 12px; color: rgba($fire,0.35); margin-left: auto; }
+.tb-error { font-size: 13px; color: #ff4466; }
+
+// ── Live Price ──
+.tb-live-price {
+  display: flex; align-items: center; gap: 7px; padding: 4px 12px;
+  border: 1px solid rgba($fire, 0.35); border-radius: 6px;
+  background: rgba($fire, 0.05); animation: fade-in 0.3s ease;
+  .lp-label { font-size: 11px; letter-spacing: 2px; color: rgba($fire, 0.5); }
+  .lp-value { font-family: 'Rajdhani', sans-serif; font-size: 22px; font-weight: 700; color: $orange; text-shadow: 0 0 14px rgba($orange, 0.8); }
+  .lp-change {
+    font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 700; padding: 2px 6px; border-radius: 4px;
+    &.lp-pos { color: $green; background: rgba($green, 0.1); border: 1px solid rgba($green, 0.3); }
+    &.lp-neg { color: #ff4466; background: rgba(#ff4466, 0.1); border: 1px solid rgba(#ff4466, 0.3); }
+  }
+  &.lp-loading { border-color: rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); .lp-value { color: rgba(255,255,255,0.2); } }
+}
+
+// ── 3-COL GRID ──
+.nx5-grid { display: grid; grid-template-columns: 240px 1fr 240px; flex: 1; overflow: hidden; min-height: 0; }
+.nx5-col {
+  display: flex; flex-direction: column; overflow-y: auto; gap: 8px; padding: 12px;
+  &::-webkit-scrollbar { width: 3px; }
+  &::-webkit-scrollbar-thumb { background: rgba($fire,0.15); }
+}
+.nx5-col-left  { border-right: 1px solid $border; background: rgba(0,0,0,0.2); }
+.nx5-col-right { border-left: 1px solid $border; background: rgba(0,0,0,0.2); }
+.nx5-col-center { background: $bg2; padding: 12px 14px; gap: 12px; }
+
+// ── Group Card ──
+.gcard {
+  border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 10px 12px;
+  background: rgba(0,0,0,0.35); animation: fade-in 0.4s ease; flex-shrink: 0;
+  &:hover { border-color: rgba(255,255,255,0.15); }
+}
+.gcard-header { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
+.gcard-num {
+  width: 18px; height: 18px; border-radius: 4px; display: flex; align-items: center; justify-content: center;
+  font-family: 'Orbitron', sans-serif; font-size: 12px; font-weight: 900; color: #000; flex-shrink: 0;
+}
+.gcard-label { flex: 1; font-family: 'Orbitron', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 0.3px; text-shadow: 0 0 8px currentColor; }
+.gcard-pct { font-family: 'Rajdhani', sans-serif; font-size: 20px; font-weight: 800; text-shadow: 0 0 12px currentColor; }
+.gcard-bar-track { height: 3px; background: rgba(255,255,255,0.05); border-radius: 2px; overflow: hidden; margin-bottom: 7px; }
+.gcard-bar-fill { height: 100%; border-radius: 2px; transition: width 1s ease; animation: bar-fill 1s ease; box-shadow: 0 0 6px currentColor; }
+
+.gcard-checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.ck-row { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: rgba(255,255,255,0.45); padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.ck-idx { color: rgba(255,255,255,0.2); min-width: 12px; }
+.ck-label { flex: 1; }
+.ck-val { font-family: 'Rajdhani', sans-serif; color: rgba(255,255,255,0.6); min-width: 36px; text-align: right; font-size: 13px; font-weight: 600; }
+.ck-icon { .ico-ok { color: #00ff88; font-size: 14px; } .ico-warn { color: $orange; font-size: 13px; } .ico-neutral { color: #aaa; font-size: 13px; } }
+
+// ── Phase Banner ──
+.nx5-phase-banner {
+  display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.4);
+  animation: fade-in 0.3s ease; flex-shrink: 0;
+  .phase-icon { font-size: 22px; }
+  .phase-text { font-family: 'Orbitron', sans-serif; font-size: 16px; font-weight: 900; letter-spacing: 3px; }
+  .phase-score-text { font-size: 11px; opacity: 0.5; }
+  .dir-arrow-small { font-size: 14px; &.bullish { color: $green; } &.bearish { color: #ff4466; } &.neutral { color: #888; } }
+  .dir-text-small { font-family: 'Orbitron', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 2px; }
+  .entry-tf-badge {
+    margin-left: auto; font-family: 'Orbitron', sans-serif; font-size: 10px; font-weight: 900;
+    padding: 3px 8px; border-radius: 4px; letter-spacing: 1px;
+    &.phase-ignition { background: rgba($fire,0.2); color: $fire; border: 1px solid rgba($fire,0.5); }
+    &.phase-compression { background: rgba($cyan,0.1); color: $cyan; border: 1px solid rgba($cyan,0.4); }
+    &.phase-expansion { background: rgba($green,0.1); color: $green; border: 1px solid rgba($green,0.4); }
+    &.phase-idle { background: rgba(#666,0.1); color: #666; }
+  }
+  &.phase-ignition { border-color: rgba($fire,0.4); .phase-icon,.phase-text { color: $fire; text-shadow: 0 0 10px $fire; } }
+  &.phase-compression { border-color: rgba($cyan,0.3); .phase-icon,.phase-text { color: $cyan; } }
+  &.phase-expansion { border-color: rgba($green,0.3); .phase-icon,.phase-text { color: $green; } }
+}
+
+// ── Top Banner ──
+.nx5-top-banner {
+  display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px;
+  border: 1px solid rgba($fire, 0.3); background: rgba(0,5,0,0.4); animation: fade-in 0.3s ease; flex-shrink: 0;
+  .tb-title { font-family: 'Orbitron', sans-serif; font-size: 13px; font-weight: 700; color: $fire; text-shadow: 0 0 10px $fire; white-space: nowrap; }
+  .tb-items { display: grid; grid-template-columns: repeat(5, 1fr); flex: 1; gap: 8px; }
+  .tb-item {
+    display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 4px;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); cursor: pointer;
+    transition: all 0.2s; white-space: nowrap; min-width: 0; overflow: hidden;
+    &:hover { background: rgba($fire,0.15); border-color: rgba($fire,0.4); }
+    .tb-rank { font-family: 'Rajdhani', sans-serif; font-size: 11px; font-weight: 800; color: rgba($fire,0.6); min-width: 12px; }
+    .tb-sym { font-family: 'Orbitron', sans-serif; font-size: 11px; font-weight: 700; color: #fff; overflow: hidden; text-overflow: ellipsis; max-width: 60px; }
+    .tb-phase { font-size: 8px; font-weight: 700; padding: 1px 5px; border-radius: 8px;
+      &.phase-ignition { color: $fire; background: rgba($fire,0.15); }
+      &.phase-compression { color: $cyan; background: rgba($cyan,0.1); }
+      &.phase-expansion { color: $green; background: rgba($green,0.1); }
+    }
+    .tb-conf { font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 700; }
+    .tb-dir { font-size: 12px; font-weight: 900;
+      &.bullish { color: $green; } &.bearish { color: #ff4466; } &.neutral { color: #888; }
+    }
+  }
+  .tb-clear { font-size: 18px; color: rgba(255,255,255,0.4); cursor: pointer; &:hover { color: #ff4466; } }
+}
+
+// ── Chart ──
+.nx5-chart-box {
+  flex: 1 0 auto; min-height: 400px; position: relative; background: rgba(0,0,0,0.6);
+  border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; overflow: hidden;
+  box-shadow: inset 0 0 40px rgba(0,0,0,0.5);
+}
+.nx5-sync-overlay {
+  position: absolute; inset: 0; z-index: 100; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 15px;
+  color: $fire; font-family: 'Orbitron', sans-serif; letter-spacing: 2px;
+  .sync-spinner { width: 40px; height: 40px; border: 3px solid rgba($fire,0.1); border-top-color: $fire; border-radius: 50%; animation: rotate 1s linear infinite; }
+}
+.nx5-chart-container { position: absolute; inset: 0; z-index: 2; }
+
+.chart-header-row {
+  position: absolute; top: 8px; left: 10px; right: 54px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 8px; z-index: 10; pointer-events: none;
+}
+.chart-label { font-size: 14px; font-weight: bold; color: rgba($fire,0.9); font-family: 'Share Tech Mono', monospace; pointer-events: auto; text-shadow: 0 0 5px rgba(0,0,0,0.8); }
+.chart-timeframes {
+  display: flex; flex-wrap: wrap; gap: 4px; pointer-events: auto;
+  background: rgba(0,0,0,0.4); padding: 3px; border-radius: 6px; border: 1px solid rgba($fire,0.2);
+  .tf-btn {
+    background: transparent; border: none; color: rgba($fire,0.5); font-size: 11px;
+    font-family: 'Orbitron', sans-serif; padding: 2px 6px; border-radius: 4px; cursor: pointer;
+    &:hover { color: $fire; background: rgba($fire,0.1); }
+    &.active { color: #000; background: $fire; font-weight: bold; box-shadow: 0 0 8px rgba($fire,0.5); }
+  }
+}
+.chart-phase-badge {
+  position: absolute; bottom: 34px; left: 10px; z-index: 10;
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: 'Orbitron', sans-serif; font-size: 12px; font-weight: 700;
+  padding: 3px 12px; border-radius: 20px; backdrop-filter: blur(8px); letter-spacing: 1px; pointer-events: none;
+  .phase-score-inline { font-size: 10px; opacity: 0.7; }
+  &.phase-ignition { color: $fire; border: 1px solid rgba($fire,0.5); background: rgba($fire,0.1); text-shadow: 0 0 10px $fire; animation: ignition-pulse 2s ease infinite; }
+  &.phase-compression { color: $cyan; border: 1px solid rgba($cyan,0.4); background: rgba($cyan,0.08); }
+  &.phase-expansion { color: $green; border: 1px solid rgba($green,0.4); background: rgba($green,0.08); }
+}
+.chart-loading {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: rgba($bg,0.7); color: $fire; font-size: 14px; z-index: 20;
+  .spin { animation: spin 0.8s linear infinite; display: inline-block; }
+}
+
+// ── Right: Direction mini-card ──
+.nx5-right-dir {
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px;
+  text-align: center; animation: fade-in 0.4s ease; background: rgba(0,0,0,0.4); flex-shrink: 0;
+  .rd-arrow { font-size: 28px; line-height: 1.1; text-shadow: 0 0 16px currentColor; }
+  .rd-dir { font-family: 'Orbitron', sans-serif; font-size: 14px; font-weight: 900; letter-spacing: 3px; margin: 2px 0; }
+  .rd-probs {
+    display: flex; justify-content: center; gap: 10px; font-family: 'Rajdhani', sans-serif;
+    font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.4); margin-top: 6px;
+    b { color: $orange; font-weight: 700; }
+  }
+  &.bullish { border-color: rgba($green,0.35); .rd-arrow,.rd-dir { color: $green; } }
+  &.bearish { border-color: rgba(#ff4466,0.35); .rd-arrow,.rd-dir { color: #ff4466; } }
+  &.neutral { .rd-arrow,.rd-dir { color: #888; } }
+}
+
+// ── Ignition Panel ──
+.nx5-ignition-panel {
+  border: 1px solid rgba($fire,0.2); border-radius: 8px; padding: 10px;
+  background: rgba(0,0,0,0.45); display: flex; flex-direction: column; gap: 8px; margin-top: auto;
+  .ip-title {
+    display: flex; align-items: center; justify-content: space-between;
+    .ip-logo { font-family: 'Orbitron', sans-serif; font-size: 10px; color: $fire; letter-spacing: 1px; }
+    .ip-live { font-size: 9px; }
+  }
+  .ip-rows { display: flex; flex-direction: column; gap: 3px; }
+  .ip-row {
+    display: flex; justify-content: space-between; font-size: 9px;
+    color: rgba(255,255,255,0.35); border-bottom: 1px solid rgba(255,255,255,0.04); padding: 2px 0;
+    b { font-weight: normal; &.bullish { color: $green; } &.bearish { color: #ff4466; } }
+    b.phase-ignition { color: $fire; font-weight: bold; }
+    b.phase-compression { color: $cyan; }
+    b.phase-expansion { color: $green; }
+  }
+}
+
+// ── Action Buttons ──
+.nx5-actions-panel { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.nx5-activate {
+  width: 100%; position: relative; overflow: hidden;
+  background: linear-gradient(135deg, rgba($fire,0.25), rgba($orange,0.15));
+  border: 2px solid rgba($fire,0.7); border-radius: 8px; padding: 12px 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  animation: pulse-glow 2.5s ease infinite; transition: all 0.25s;
+  &:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgba($fire,0.4), rgba($orange,0.25));
+    border-color: $fire; box-shadow: 0 0 24px rgba($fire,0.5), 0 0 48px rgba($fire,0.2);
+  }
+  &:disabled { opacity: 0.4; cursor: not-allowed; animation: none; }
+  .act-icon { font-size: 19px; filter: drop-shadow(0 0 6px $fire); }
+  .act-text { font-family: 'Orbitron', sans-serif; font-size: 13px; font-weight: 900; letter-spacing: 2px; color: #fff; }
+  .act-spin { margin-left: 6px; font-size: 15px; display: inline-block; animation: spinAnim 1s linear infinite; }
+}
+.btn-top5 {
+  border-color: rgba($fire,0.7); background: linear-gradient(135deg, rgba($fire,0.20), rgba($fire,0.05));
+  .act-icon { filter: drop-shadow(0 0 6px $fire); }
+  &:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgba($fire,0.35), rgba($fire,0.15));
+    border-color: $fire; box-shadow: 0 0 24px rgba($fire,0.4);
+  }
+}
+
+// ── Responsive ──
+@media (max-width: 900px) {
+  .nx5-header { grid-template-columns: 1fr; text-align: center;
+    .nx5-terminal-mini { display: none; }
+    .nx5-confidence-panel { text-align: center; .cp-probs { justify-content: center; } }
+  }
+  .nx5-grid { grid-template-columns: 1fr; overflow-y: auto; }
+  .nx5-col-left, .nx5-col-right { border: none; border-bottom: 1px solid $border; flex-direction: row; flex-wrap: wrap; .gcard { min-width: 200px; flex: 1; } }
+}
+@media (max-width: 600px) {
+  .nx5-logo-title { font-size: 24px !important; }
+  .cp-value { font-size: 28px !important; }
+}

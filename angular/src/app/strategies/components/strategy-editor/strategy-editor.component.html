@@ -203,6 +203,9 @@
             <button class="source-pill" [class.active]="isSourceAllowed('Nexus')" (click)="toggleSource('Nexus')">
               <ion-icon name="analytics-outline"></ion-icon> Nexus-15
             </button>
+            <button class="source-pill" [class.active]="isSourceAllowed('Nexus5')" (click)="toggleSource('Nexus5')">
+              <ion-icon name="flash-outline"></ion-icon> NEXUS-5
+            </button>
             <button class="source-pill" [class.active]="isSourceAllowed('LSE')" (click)="toggleSource('LSE')">
               <ion-icon name="pulse-outline"></ion-icon> LSE Spring
             </button>
@@ -456,6 +459,7 @@
           <div class="lc-footer">
             <div class="lc-sources">
               <span class="src-chip" *ngIf="isSourceAllowed('Nexus')">Nexus</span>
+              <span class="src-chip" *ngIf="isSourceAllowed('Nexus5')">NEXUS-5</span>
               <span class="src-chip" *ngIf="isSourceAllowed('LSE')">LSE</span>
               <span class="src-chip" *ngIf="isSourceAllowed('Bridge')">Bridge</span>
             </div>

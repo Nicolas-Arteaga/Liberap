@@ -42,6 +42,10 @@
             <ion-icon name="pulse-outline"></ion-icon>
             <span>NEXUS-15</span>
           </a>
+          <a class="nav-item" [routerLink]="['/nexus-5']" routerLinkActive="active">
+            <ion-icon name="flash-outline"></ion-icon>
+            <span>NEXUS-5</span>
+          </a>
           <a class="nav-item" [routerLink]="['/dashboard']" routerLinkActive="active">
             <ion-icon name="stats-chart-outline"></ion-icon>
             <span>DASHBOARD</span>
@@ -105,6 +109,10 @@
             <!-- Nexus Button -->
             <button class="action-btn nexus-btn" [routerLink]="['/nexus-15']" title="Nexus-15">
               <ion-icon name="hardware-chip-outline"></ion-icon>
+            </button>
+            <!-- Nexus-5 Ignition Button -->
+            <button class="action-btn nexus5-btn" [routerLink]="['/nexus-5']" title="Nexus-5 Ignition">
+              <ion-icon name="flash-outline"></ion-icon>
             </button>
             
             <!-- Notifications Dropdown -->

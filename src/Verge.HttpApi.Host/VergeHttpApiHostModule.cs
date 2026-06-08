@@ -149,6 +149,8 @@ public class VergeHttpApiHostModule : AbpModule
         context.Services.AddHostedService<SimulationMarkPriceWorker>();
         context.Services.AddHostedService<Verge.Trading.Nexus15.Nexus15ScannerJob>();
         context.Services.AddScoped<Verge.Trading.Nexus15.IPythonNexus15Service, Verge.Trading.Nexus15.PythonNexus15Service>();
+        context.Services.AddHostedService<Verge.Trading.Nexus5.Nexus5ScannerJob>();
+        context.Services.AddScoped<Verge.Trading.Nexus5.IPythonNexus5Service, Verge.Trading.Nexus5.PythonNexus5Service>();
         context.Services.AddScoped<Verge.Trading.Scar.IPythonScarService, Verge.Trading.Scar.PythonScarService>();
 
 
@@ -174,6 +176,14 @@ public class VergeHttpApiHostModule : AbpModule
 
         // Python Nexus 15 HTTP Client
         context.Services.AddHttpClient("PythonNexus15", client =>
+        {
+            var url = configuration["PythonService:Url"] ?? "http://localhost:8000";
+            client.BaseAddress = new Uri(url);
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
+
+        // Python Nexus 5 HTTP Client (Ignition Core — 5m analysis)
+        context.Services.AddHttpClient("PythonNexus5", client =>
         {
             var url = configuration["PythonService:Url"] ?? "http://localhost:8000";
             client.BaseAddress = new Uri(url);

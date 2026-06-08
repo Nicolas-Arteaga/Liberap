@@ -128,6 +128,9 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
   private candleSeries!: ISeriesApi<'Candlestick'>;
   private volumeSeries!: ISeriesApi<'Histogram'>;
   private hmaSeries!: ISeriesApi<'Line'>;       // HMA 50 Overlay
+  private ma7Series!: ISeriesApi<'Line'>;
+  private ma25Series!: ISeriesApi<'Line'>;
+  private ma99Series!: ISeriesApi<'Line'>;
   // Projection lines - ALL native Lightweight Charts series (no canvas!)
   private midLineSeries!: ISeriesApi<'Line'>;   // center trajectory
   private upperBandSeries!: ISeriesApi<'Line'>; // upper probability band
@@ -138,6 +141,17 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
 
   // All real candles stored so we can read the last one's price at projection time
   realCandles: CandlestickData[] = []; // public for template *ngIf
+
+  // ── HUD Indicator Values ──────────────────────────────────────────────────
+  currentHmaValue = signal<number | null>(null);
+  currentMa7Value = signal<number | null>(null);
+  currentMa25Value = signal<number | null>(null);
+  currentMa99Value = signal<number | null>(null);
+
+  lastHmaValue: number | null = null;
+  lastMa7Value: number | null = null;
+  lastMa25Value: number | null = null;
+  lastMa99Value: number | null = null;
 
   // ── Computed ───────────────────────────────────────────────────────────────
   confidenceColor = computed(() => {
@@ -229,9 +243,22 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
     this.candleSeries?.setData([]);
     this.volumeSeries?.setData([]);
     this.hmaSeries?.setData([]);
+    this.ma7Series?.setData([]);
+    this.ma25Series?.setData([]);
+    this.ma99Series?.setData([]);
     this.midLineSeries?.setData([]);
     this.upperBandSeries?.setData([]);
     this.lowerBandSeries?.setData([]);
+
+    // Reset HUD signals
+    this.currentHmaValue.set(null);
+    this.currentMa7Value.set(null);
+    this.currentMa25Value.set(null);
+    this.currentMa99Value.set(null);
+    this.lastHmaValue = null;
+    this.lastMa7Value = null;
+    this.lastMa25Value = null;
+    this.lastMa99Value = null;
 
     // Remove horizontal price lines
     if (this.entryLine && this.candleSeries) {
@@ -421,6 +448,37 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
       autoscaleInfoProvider: () => null, // Exclude from autoscale calculation
     });
 
+    // ── MA 7 (Yellow) ────────────────────────────────────────────────────────
+    this.ma7Series = this.chart.addSeries(LineSeries, {
+      color: '#ffcc00',
+      lineWidth: 1,
+      lineStyle: LineStyle.Dashed,
+      crosshairMarkerVisible: false,
+      lastValueVisible: false,
+      priceLineVisible: false,
+      autoscaleInfoProvider: () => null,
+    });
+
+    // ── MA 25 (Purple) ───────────────────────────────────────────────────────
+    this.ma25Series = this.chart.addSeries(LineSeries, {
+      color: '#ba55d3',
+      lineWidth: 1,
+      crosshairMarkerVisible: false,
+      lastValueVisible: false,
+      priceLineVisible: false,
+      autoscaleInfoProvider: () => null,
+    });
+
+    // ── MA 99 (Deep Purple) ──────────────────────────────────────────────────
+    this.ma99Series = this.chart.addSeries(LineSeries, {
+      color: '#722ed1',
+      lineWidth: 1,
+      crosshairMarkerVisible: false,
+      lastValueVisible: false,
+      priceLineVisible: false,
+      autoscaleInfoProvider: () => null,
+    });
+
     // ── Projection lines (ALL native - zero canvas) ───────────────────────────
     // Upper probability band
     this.upperBandSeries = this.chart.addSeries(LineSeries, {
@@ -453,6 +511,23 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
       lastValueVisible: true,
       priceLineVisible: false,
       autoscaleInfoProvider: () => null,
+    });
+
+    // Crosshair move overlay tracker
+    this.chart.subscribeCrosshairMove((param) => {
+      if (param && param.time) {
+        const hmaData = param.seriesData.get(this.hmaSeries!) as any;
+        const ma7Data = param.seriesData.get(this.ma7Series!) as any;
+        const ma25Data = param.seriesData.get(this.ma25Series!) as any;
+        const ma99Data = param.seriesData.get(this.ma99Series!) as any;
+
+        this.currentHmaValue.set(hmaData ? hmaData.value : null);
+        this.currentMa7Value.set(ma7Data ? ma7Data.value : null);
+        this.currentMa25Value.set(ma25Data ? ma25Data.value : null);
+        this.currentMa99Value.set(ma99Data ? ma99Data.value : null);
+      } else {
+        this.restoreLastIndicatorValues();
+      }
     });
 
     this.loadBinanceCandles(this.selectedSymbol());
@@ -513,6 +588,9 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
       const format = { type: 'price' as const, precision: prec, minMove };
       this.candleSeries?.applyOptions({ priceFormat: format });
       this.hmaSeries?.applyOptions({ priceFormat: format });
+      this.ma7Series?.applyOptions({ priceFormat: format });
+      this.ma25Series?.applyOptions({ priceFormat: format });
+      this.ma99Series?.applyOptions({ priceFormat: format });
       this.midLineSeries?.applyOptions({ priceFormat: format });
       this.upperBandSeries?.applyOptions({ priceFormat: format });
       this.lowerBandSeries?.applyOptions({ priceFormat: format });
@@ -524,8 +602,48 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
       if (candles.length >= 50) {
         const hmaData = this.calculateHMA(candles, 50);
         this.hmaSeries?.setData(hmaData);
+        this.lastHmaValue = hmaData.length > 0 ? hmaData[hmaData.length - 1].value : null;
+        this.currentHmaValue.set(this.lastHmaValue);
       } else {
         this.hmaSeries?.setData([]);
+        this.lastHmaValue = null;
+        this.currentHmaValue.set(null);
+      }
+
+      // SMA 7
+      if (candles.length >= 7) {
+        const ma7Data = this.calculateSMAForLightweight(candles, 7);
+        this.ma7Series?.setData(ma7Data);
+        this.lastMa7Value = ma7Data.length > 0 ? ma7Data[ma7Data.length - 1].value : null;
+        this.currentMa7Value.set(this.lastMa7Value);
+      } else {
+        this.ma7Series?.setData([]);
+        this.lastMa7Value = null;
+        this.currentMa7Value.set(null);
+      }
+
+      // SMA 25
+      if (candles.length >= 25) {
+        const ma25Data = this.calculateSMAForLightweight(candles, 25);
+        this.ma25Series?.setData(ma25Data);
+        this.lastMa25Value = ma25Data.length > 0 ? ma25Data[ma25Data.length - 1].value : null;
+        this.currentMa25Value.set(this.lastMa25Value);
+      } else {
+        this.ma25Series?.setData([]);
+        this.lastMa25Value = null;
+        this.currentMa25Value.set(null);
+      }
+
+      // SMA 99
+      if (candles.length >= 99) {
+        const ma99Data = this.calculateSMAForLightweight(candles, 99);
+        this.ma99Series?.setData(ma99Data);
+        this.lastMa99Value = ma99Data.length > 0 ? ma99Data[ma99Data.length - 1].value : null;
+        this.currentMa99Value.set(this.lastMa99Value);
+      } else {
+        this.ma99Series?.setData([]);
+        this.lastMa99Value = null;
+        this.currentMa99Value.set(null);
       }
 
       this.chart?.timeScale().fitContent();
@@ -905,5 +1023,28 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
       ];
       default: return [];
     }
+  }
+
+  private restoreLastIndicatorValues() {
+    this.currentHmaValue.set(this.lastHmaValue);
+    this.currentMa7Value.set(this.lastMa7Value);
+    this.currentMa25Value.set(this.lastMa25Value);
+    this.currentMa99Value.set(this.lastMa99Value);
+  }
+
+  private calculateSMAForLightweight(candles: CandlestickData[], period: number): LineData[] {
+    const closes = candles.map(c => c.close);
+    const sma = [];
+    if (closes.length < period) return [];
+
+    let sum = 0;
+    for (let i = 0; i < period; i++) sum += closes[i];
+    sma.push({ time: candles[period - 1].time, value: sum / period });
+
+    for (let i = period; i < closes.length; i++) {
+      sum = sum - closes[i - period] + closes[i];
+      sma.push({ time: candles[i].time, value: sum / period });
+    }
+    return sma as LineData[];
   }
 }

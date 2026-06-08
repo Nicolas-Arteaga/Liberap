@@ -31,6 +31,7 @@ logger = logging.getLogger("RedisSignalBridge")
 # Constantes configurables
 # ─────────────────────────────────────────────
 REDIS_CHANNEL         = "verge:superscore"
+REDIS_CHANNEL_NEXUS5  = "verge:nexus5:superscore"  # NEXUS-5 Ignition Core signals
 SIGNAL_TTL_SECONDS    = int(900)   # 15 minutos — señales más viejas se descartan
 MAX_BUFFER_SIZE       = int(500)   # máx señales en memoria (evita leak)
 RECONNECT_BASE_DELAY  = float(2.0) # segundos espera inicial en backoff
@@ -132,8 +133,11 @@ class RedisSignalBridge:
             retry_on_timeout=True,
         )
         pubsub = client.pubsub()
-        pubsub.subscribe(REDIS_CHANNEL)
-        logger.info("[RSB] Subscripto a '%s'. Escuchando señales del backend C#…", REDIS_CHANNEL)
+        pubsub.subscribe(REDIS_CHANNEL, REDIS_CHANNEL_NEXUS5)
+        logger.info(
+            "[RSB] Subscripto a '%s' + '%s'. Escuchando señales Nexus-15 y NEXUS-5…",
+            REDIS_CHANNEL, REDIS_CHANNEL_NEXUS5,
+        )
 
         for message in pubsub.listen():
             if not self._running:
@@ -155,19 +159,31 @@ class RedisSignalBridge:
             if not symbol:
                 return
 
+            # Detect source: NEXUS-5 vs Nexus-15
+            estado = payload.get("estado", "WAIT")
+            is_nexus5 = estado == "NEXUS5_HOT" or payload.get("source") == "nexus5_ui"
+            source = "nexus5_bridge" if is_nexus5 else payload.get("source", "redis_bridge")
+
             now_utc = datetime.now(timezone.utc).timestamp()
             enriched = {
                 "symbol":    symbol,
                 "score":     score,
                 "direction": payload.get("direction", "Auto"),
                 "regime":    payload.get("regime", "Unknown"),
-                "estado":    payload.get("estado", "WAIT"),
+                "estado":    estado,
                 "received_at": now_utc,
-                "source":    payload.get("source", "redis_bridge"),
-                "nexus15":   payload.get("nexus15", score),
+                "source":    source,
+                "nexus15":   payload.get("nexus15", score) if not is_nexus5 else 0,
+                "nexus5":    payload.get("nexus5", score) if is_nexus5 else 0,
                 "estimatedRangePercent": payload.get("estimatedRangePercent", 0.0),
                 "features":  payload.get("features", {}),
-                "groupScores": payload.get("groupScores", {})
+                "groupScores": payload.get("groupScores", {}),
+                # NEXUS-5 specific fields
+                "phase":       payload.get("phase", ""),
+                "phase_score": payload.get("phase_score", 0),
+                "compression_state":  payload.get("compression_state", False),
+                "ignition_detected":  payload.get("ignition_detected", False),
+                "bypass_active":      payload.get("bypass_active", False),
             }
 
             with self._lock:

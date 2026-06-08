@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from sentiment_service import SentimentService
 from dotenv import load_dotenv
 from nexus15 import router as nexus15_router
+from nexus5 import router as nexus5_router
 from scar import router as scar_router
 from scar import data_store as scar_db
 from scar import scheduler as scar_scheduler
@@ -56,6 +57,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(nexus15_router)
+app.include_router(nexus5_router)
 app.include_router(scar_router)
 app.include_router(lse_router)
 
@@ -279,14 +281,56 @@ async def get_tickers():
         # Try Binance first
         r = requests.get("https://fapi.binance.com/fapi/v1/ticker/24hr", timeout=5)
         if r.status_code == 200:
-            return r.json()
+            raw_data = r.json()
+            normalized = []
+            for t in raw_data:
+                symbol = t.get("symbol")
+                if not symbol or not symbol.endswith("USDT"):
+                    continue
+                try:
+                    normalized.append({
+                        "symbol": symbol,
+                        "lastPrice": float(t.get("lastPrice", 0)),
+                        "priceChange": float(t.get("priceChange", 0)),
+                        "priceChangePercent": float(t.get("priceChangePercent", 0)),
+                        "volume": float(t.get("quoteVolume", 0)),
+                        "highPrice": float(t.get("highPrice", 0)),
+                        "lowPrice": float(t.get("lowPrice", 0))
+                    })
+                except Exception:
+                    continue
+            return normalized
             
         # Fallback to Bybit
         r = requests.get("https://api.bybit.com/v5/market/tickers?category=linear", timeout=5)
         if r.status_code == 200:
             data = r.json()
-            # Normalize Bybit format to what the backend expects (approximate)
-            return data.get("result", {}).get("list", [])
+            raw_list = data.get("result", {}).get("list", [])
+            normalized = []
+            for t in raw_list:
+                symbol = t.get("symbol")
+                if not symbol or not symbol.endswith("USDT"):
+                    continue
+                try:
+                    last_price = float(t.get("lastPrice", 0))
+                    price_change_pcnt = float(t.get("price24hPcnt", 0)) * 100
+                    volume = float(t.get("turnover24h", 0))
+                    high_price = float(t.get("highPrice24h", 0))
+                    low_price = float(t.get("lowPrice24h", 0))
+                    open_price = float(t.get("prevPrice24h", last_price))
+                    price_change = last_price - open_price
+                    normalized.append({
+                        "symbol": symbol,
+                        "lastPrice": last_price,
+                        "priceChange": price_change,
+                        "priceChangePercent": price_change_pcnt,
+                        "volume": volume,
+                        "highPrice": high_price,
+                        "lowPrice": low_price
+                    })
+                except Exception:
+                    continue
+            return normalized
             
         return []
     except Exception as e:

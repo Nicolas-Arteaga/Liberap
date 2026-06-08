@@ -24,4 +24,9 @@ public class TradingHub : AbpHub
     {
         await Clients.All.SendAsync("Nexus15Update", payload);
     }
+
+    public async Task SendNexus5Update(string payload)
+    {
+        await Clients.All.SendAsync("Nexus5Update", payload);
+    }
 }

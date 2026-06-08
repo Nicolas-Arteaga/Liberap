@@ -112,6 +112,17 @@ MIN_CONFLUENCE_SCORE = 60.0          # (Antes 55.0) — Evita picoteo sangrante 
 LSE_WARNING_OVERRIDE_SCORE = float(os.getenv("LSE_WARNING_OVERRIDE_SCORE", "85.0"))
 MIN_ESTIMATED_RANGE_PCT = float(os.getenv("MIN_ESTIMATED_RANGE_PCT", "0.8"))  # calibración LSE inicial — subir progresivamente según resultados
 
+# ==========================================
+# NEXUS-5 IGNITION CORE — Entry Timing Filter
+# ==========================================
+NEXUS5_ENABLED = os.getenv("NEXUS5_ENABLED", "true").lower() in ("1", "true", "yes")
+NEXUS5_SWEET_SPOT_MIN = float(os.getenv("NEXUS5_SWEET_SPOT_MIN", "25.0"))   # Min confidence for entry timing signal
+NEXUS5_SWEET_SPOT_MAX = float(os.getenv("NEXUS5_SWEET_SPOT_MAX", "65.0"))   # Max confidence for sweet spot boost
+NEXUS5_LATE_ENTRY_MAX = float(os.getenv("NEXUS5_LATE_ENTRY_MAX", "80.0"))    # Max confidence for original direction entry
+NEXUS5_REVERSAL_MIN   = float(os.getenv("NEXUS5_REVERSAL_MIN", "80.0"))      # Min confidence for reversal (exhaustion top/bottom)
+NEXUS5_CONFLUENCE_BOOST = float(os.getenv("NEXUS5_CONFLUENCE_BOOST", "12.0"))  # Max points added to confluence in sweet spot
+NEXUS5_MIN_PHASE_SCORE  = float(os.getenv("NEXUS5_MIN_PHASE_SCORE", "50.0"))   # Minimum phase_score to consider timing valid
+
 # --- CALIBRACIÓN DE VOLATILIDAD Y SEGURIDAD MÁXIMA ---
 MAX_ESTIMATED_RANGE_PCT = 15.0         # Deja respirar a bombas reales (FIDA/PLAY) hasta 15% en 15m
 MAX_STOP_LOSS_PCT = 9.0               # Máximo stop porcentual absoluto de 9% para evitar pérdidas catastróficas

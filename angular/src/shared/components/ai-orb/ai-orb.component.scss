@@ -1,16 +1,19 @@
 .ai-orb-container {
   width: 120px;
   height: 120px;
-  position: absolute;
-  top: 0;
-  left: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
   overflow: hidden;
-  background: #050816;
-  
+
   canvas {
     display: block;
     width: 120px;
     height: 120px;
-    background: #050816;
+    background: transparent;
+    border-radius: 12px;
   }
 }

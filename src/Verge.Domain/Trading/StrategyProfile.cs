@@ -22,7 +22,7 @@ public class StrategyProfile : FullAuditedAggregateRoot<Guid>
     public float MinRsiShort { get; set; } = 20f;   // Block SHORTs below this RSI
     public float MaxMa7DistancePct { get; set; } = 3.5f; // % max distance from MA7
     public bool? RequireMacdPositive { get; set; } = null; // null=any, true=positive only
-    public string AllowedSources { get; set; } = "LSE,Nexus,Bridge"; // comma-separated
+    public string AllowedSources { get; set; } = "LSE,Nexus,Nexus5,Bridge"; // comma-separated
     public bool AllowLong { get; set; } = true;
     public bool AllowShort { get; set; } = true;
 

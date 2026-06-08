@@ -304,7 +304,21 @@ export class AgentTradeAuditComponent implements OnInit {
     if (!this.hasAuditSnapshot(trade)) return '—';
     const snap = this.parseSnapshot(trade);
     const src = snap?.candidate?.['source'];
-    return typeof src === 'string' ? src : 'Nexus+SCAR';
+    return typeof src === 'string' ? this.mapSourceToLabel(src) : 'Nexus-15';
+  }
+
+  /** Maps internal agent source keys to human-readable tool names */
+  mapSourceToLabel(src: string): string {
+    const map: Record<string, string> = {
+      'nexus_top':     'Nexus-15 Top',
+      'nexus15_ui':    'Nexus-15',
+      'nexus':         'Nexus-15',
+      'nexus5_bridge': 'Nexus-5',
+      'redis_bridge':  'Nexus-15',  // bridge signals are confirmed by Nexus-15
+      'LSE':           'LSE',
+      'lse':           'LSE',
+    };
+    return map[src] ?? src;
   }
 
   getStrategyName(trade: SimulatedTradeDto): string {

@@ -241,6 +241,86 @@ def validate_lse_setup(
     metrics["atr_signal"] = float(atr) if atr is not None else None
     metrics["risk_pct_used"] = float(getattr(config, "EQUITY_RISK_PCT_FOR_STOP", 0.01))
 
+    # ── VETO #14: MA CONVERGENCE & SPRING VETO (15m timeframe) ───────────────
+    # Este veto aplica específicamente a temporalidades de 15 minutos.
+    # LSE puede ser 15m, 1h, 4h, etc. (lse_timeframe)
+    # Regla 1: MA Convergence (Magnet Effect) - Para SHORTs, si distancia MA99-precio < 1.5%
+    # Regla 2: Wyckoff Contradiction (Spring) - Si se detecta SPRING, bloquear todos los SHORTs
+    # Regla 3: RSI Exhaustion (En el piso) - Para SHORTs, si RSI-14 < 35
+    
+    # Determinar si es temporalidad de 15m
+    lse_timeframe = str(candidate.get("lse_timeframe", "1h")).lower()
+    is_15m_timeframe = (lse_timeframe == "15m")
+    
+    if is_15m_timeframe and side == 1:  # Solo para SHORTs en 15m
+        # Regla 1: MA Convergence (Magnet Effect)
+        ma99 = candidate.get("lse_ma99")
+        if ma99 is not None and ma99 > 0:
+            try:
+                ma99_f = float(ma99)
+                dist_pct = abs(cp - ma99_f) / ma99_f * 100
+                if dist_pct < 1.5:
+                    _VALIDATE_VETO_COUNT += 1
+                    logger.warning(
+                        f"❌ [VETO-14-MA-CONVERGENCE] Bloqueando SHORT en {symbol}. "
+                        f"Distancia MA99-Precio = {dist_pct:.2f}% < 1.5%. "
+                        f"Efecto magnético - precio muy cerca de MA99. "
+                        f"(veto #{_VALIDATE_VETO_COUNT} total)"
+                    )
+                    return False, "ma_convergence_magnet_effect", {
+                        "ma99": ma99_f,
+                        "current_price": cp,
+                        "distance_pct": dist_pct,
+                        "threshold": 1.5
+                    }
+            except (TypeError, ValueError):
+                pass
+        
+        # Regla 2: Wyckoff Contradiction (Spring)
+        # Para LSE, verificar el regime o detection_mode
+        lse_regime = str(candidate.get("lse_regime", "")).lower()
+        detection_mode = str(candidate.get("lse_detection_mode", "")).lower()
+        
+        # Spring puede estar indicado por regime="LSE_SPRING" o detection_mode
+        is_spring_detected = (
+            "spring" in lse_regime or
+            "spring" in detection_mode
+        )
+        
+        if is_spring_detected:
+            _VALIDATE_VETO_COUNT += 1
+            logger.warning(
+                f"❌ [VETO-14-WYCKOFF-SPRING] Bloqueando SHORT en {symbol}. "
+                f"SPRING detectado (Regime: {lse_regime}, Detection: {detection_mode}). "
+                f"Contradicción de Wyckoff - no SHORT contra un Spring. "
+                f"(veto #{_VALIDATE_VETO_COUNT} total)"
+            )
+            return False, "wyckoff_spring_contradiction", {
+                "lse_regime": lse_regime,
+                "detection_mode": detection_mode
+            }
+        
+        # Regla 3: RSI Exhaustion (En el piso)
+        # Para LSE, RSI puede estar en lse_rsi o necesitamos obtenerlo de otro lugar
+        lse_rsi = candidate.get("lse_rsi")
+        if lse_rsi is not None:
+            try:
+                rsi_val = float(lse_rsi)
+                if rsi_val < 35:
+                    _VALIDATE_VETO_COUNT += 1
+                    logger.warning(
+                        f"❌ [VETO-14-RSI-EXHAUSTION] Bloqueando SHORT en {symbol}. "
+                        f"RSI = {rsi_val:.1f} < 35. "
+                        f"RSI exhaustión en el piso - mercado oversold. "
+                        f"(veto #{_VALIDATE_VETO_COUNT} total)"
+                    )
+                    return False, "rsi_exhaustion_oversold", {
+                        "rsi_14": rsi_val,
+                        "threshold": 35
+                    }
+            except (TypeError, ValueError):
+                pass
+
     return True, "ok", metrics
 
 
@@ -347,15 +427,17 @@ def validate_nexus_confluence_setup(
     # Si el volumen es < 80% del promedio, la moneda está "muerta".
     # Entrar ahí es regalar plata al spread. Cualquier movimiento pequeño liquida.
     # USUSDT ejemplo: VolumeRatio 0.0045 = 0.4% del promedio → trade liquidado al instante.
-    if volume_ratio_20 < 0.80:
-        _VALIDATE_VETO_COUNT += 1
-        logger.warning(
-            f"❌ [VETO-12-VOLUME-FLOOR] Bloqueando trade en {symbol}. "
-            f"VolumeRatio20={volume_ratio_20:.4f} < 0.80 (80% del promedio). "
-            f"Moneda sin liquidez - spread te liquida. "
-            f"(veto #{_VALIDATE_VETO_COUNT} total)"
-        )
-        return False, "volume_floor_insufficient", {"volume_ratio_20": volume_ratio_20, "min_required": 0.80}
+    # EXCLUSIÓN: No aplica a Standard Scalping y Scalping Clone
+    if profile and profile.get("id") not in ("00000000-0000-0000-0000-000000000000", "00000000-0000-0000-0000-000000000001"):
+        if volume_ratio_20 < 0.80:
+            _VALIDATE_VETO_COUNT += 1
+            logger.warning(
+                f"❌ [VETO-12-VOLUME-FLOOR] Bloqueando trade en {symbol}. "
+                f"VolumeRatio20={volume_ratio_20:.4f} < 0.80 (80% del promedio). "
+                f"Moneda sin liquidez - spread te liquida. "
+                f"(veto #{_VALIDATE_VETO_COUNT} total)"
+            )
+            return False, "volume_floor_insufficient", {"volume_ratio_20": volume_ratio_20, "min_required": 0.80}
 
     # Volume check only blocks when volume is very weak AND no surge at all
     if volume_ratio_20 < 0.8 and not volume_surge_bullish:
@@ -372,31 +454,33 @@ def validate_nexus_confluence_setup(
     # No importa si Nexus tiene 99% de confianza. Si los grupos técnicos (SMC, PA, Vol)
     # son un desastre (< 40 puntos promedio), el trade es una timba.
     # USUSDT ejemplo: PA=18.6, SMC=20, Vol=19.9 → promedio ~19 → trade liquidado.
+    # EXCLUSIÓN: No aplica a Standard Scalping y Scalping Clone
     group_scores = candidate.get("group_scores", {})
-    if group_scores:
-        pa_score = float(group_scores.get("g1_price_action", 0) or 0)
-        smc_score = float(group_scores.get("g2_smc_ict", 0) or 0)
-        vol_score = float(group_scores.get("g5_volume", 0) or 0)
-        
-        # Solo aplicar si los 3 scores están disponibles (no son 0)
-        if pa_score > 0 and smc_score > 0 and vol_score > 0:
-            tech_avg = (pa_score + smc_score + vol_score) / 3.0
-            if tech_avg < 40.0:
-                _VALIDATE_VETO_COUNT += 1
-                logger.warning(
-                    f"❌ [VETO-13-TECH-FLOOR] Bloqueando trade en {symbol}. "
-                    f"Promedio técnico (PA+SMC+Vol)/3 = {tech_avg:.1f} < 40.0. "
-                    f"PA={pa_score:.1f}, SMC={smc_score:.1f}, Vol={vol_score:.1f}. "
-                    f"Estructura técnica de mierda - IA fanática ignorando realidad. "
-                    f"(veto #{_VALIDATE_VETO_COUNT} total)"
-                )
-                return False, "technical_floor_insufficient", {
-                    "pa_score": pa_score,
-                    "smc_score": smc_score,
-                    "vol_score": vol_score,
-                    "tech_avg": tech_avg,
-                    "min_required": 40.0
-                }
+    if profile and profile.get("id") not in ("00000000-0000-0000-0000-000000000000", "00000000-0000-0000-0000-000000000001"):
+        if group_scores:
+            pa_score = float(group_scores.get("g1_price_action", 0) or 0)
+            smc_score = float(group_scores.get("g2_smc_ict", 0) or 0)
+            vol_score = float(group_scores.get("g5_volume", 0) or 0)
+            
+            # Solo aplicar si los 3 scores están disponibles (no son 0)
+            if pa_score > 0 and smc_score > 0 and vol_score > 0:
+                tech_avg = (pa_score + smc_score + vol_score) / 3.0
+                if tech_avg < 40.0:
+                    _VALIDATE_VETO_COUNT += 1
+                    logger.warning(
+                        f"❌ [VETO-13-TECH-FLOOR] Bloqueando trade en {symbol}. "
+                        f"Promedio técnico (PA+SMC+Vol)/3 = {tech_avg:.1f} < 40.0. "
+                        f"PA={pa_score:.1f}, SMC={smc_score:.1f}, Vol={vol_score:.1f}. "
+                        f"Estructura técnica de mierda - IA fanática ignorando realidad. "
+                        f"(veto #{_VALIDATE_VETO_COUNT} total)"
+                    )
+                    return False, "technical_floor_insufficient", {
+                        "pa_score": pa_score,
+                        "smc_score": smc_score,
+                        "vol_score": vol_score,
+                        "tech_avg": tech_avg,
+                        "min_required": 40.0
+                    }
     # ── VETO #3: Post-Pump/Dump Distance from MA7 ────────────────────────
     # Si el precio ya se alejó >3.5% de la MA7, el movimiento ya ocurrió.
     # Entrar LONG cuando el precio está >3.5% sobre MA7 = comprar el techo.
@@ -447,6 +531,87 @@ def validate_nexus_confluence_setup(
             candidate.get("symbol"), estimated_range_pct, MIN_RANGE_PCT
         )
         return False, "range_too_small", metrics
+
+    # ── VETO #14: MA CONVERGENCE & SPRING VETO (15m timeframe) ───────────────
+    # Este veto aplica específicamente a temporalidades de 15 minutos.
+    # Nexus-15 es inherentemente 15m, LSE puede ser 15m, 1h, 4h, etc.
+    # Regla 1: MA Convergence (Magnet Effect) - Para SHORTs, si distancia MA99-precio < 1.5%
+    # Regla 2: Wyckoff Contradiction (Spring) - Si se detecta SPRING, bloquear todos los SHORTs
+    # Regla 3: RSI Exhaustion (En el piso) - Para SHORTs, si RSI-14 < 35
+    
+    # Determinar si es temporalidad de 15m
+    is_15m_timeframe = True  # Nexus-15 es inherentemente 15m por defecto
+    source = candidate.get("source", "").lower()
+    
+    if source == "lse":
+        # Para LSE, verificar el timeframe explícito
+        lse_timeframe = str(candidate.get("lse_timeframe", "1h")).lower()
+        is_15m_timeframe = (lse_timeframe == "15m")
+    
+    if is_15m_timeframe and side == 1:  # Solo para SHORTs en 15m
+        # Regla 1: MA Convergence (Magnet Effect)
+        # Para LSE, usar lse_ma99. Para Nexus-15, MA99 no está disponible en nexus_features
+        if source == "lse":
+            ma99 = candidate.get("lse_ma99")
+            if ma99 is not None and ma99 > 0:
+                try:
+                    ma99_f = float(ma99)
+                    dist_pct = abs(cp - ma99_f) / ma99_f * 100
+                    if dist_pct < 1.5:
+                        _VALIDATE_VETO_COUNT += 1
+                        logger.warning(
+                            f"❌ [VETO-14-MA-CONVERGENCE] Bloqueando SHORT en {symbol}. "
+                            f"Distancia MA99-Precio = {dist_pct:.2f}% < 1.5%. "
+                            f"Efecto magnético - precio muy cerca de MA99. "
+                            f"(veto #{_VALIDATE_VETO_COUNT} total)"
+                        )
+                        return False, "ma_convergence_magnet_effect", {
+                            "ma99": ma99_f,
+                            "current_price": cp,
+                            "distance_pct": dist_pct,
+                            "threshold": 1.5
+                        }
+                except (TypeError, ValueError):
+                    pass
+        
+        # Regla 2: Wyckoff Contradiction (Spring)
+        # Verificar si hay detección de Spring en nexus_features o regime
+        wyckoff_phase = str(nexus_features.get("wyckoff_phase", "")).lower()
+        nexus_regime = str(nexus15_ctx.get("regime", "")).lower() if isinstance(nexus15_ctx, dict) else ""
+        
+        # Spring puede estar indicado por wyckoff_phase="spring" o regime="LSE_SPRING"
+        is_spring_detected = (
+            "spring" in wyckoff_phase or 
+            "spring" in nexus_regime or
+            "reaccumulation" in wyckoff_phase
+        )
+        
+        if is_spring_detected:
+            _VALIDATE_VETO_COUNT += 1
+            logger.warning(
+                f"❌ [VETO-14-WYCKOFF-SPRING] Bloqueando SHORT en {symbol}. "
+                f"SPRING detectado (Wyckoff: {wyckoff_phase}, Regime: {nexus_regime}). "
+                f"Contradicción de Wyckoff - no SHORT contra un Spring. "
+                f"(veto #{_VALIDATE_VETO_COUNT} total)"
+            )
+            return False, "wyckoff_spring_contradiction", {
+                "wyckoff_phase": wyckoff_phase,
+                "regime": nexus_regime
+            }
+        
+        # Regla 3: RSI Exhaustion (En el piso)
+        if rsi_14 < 35:
+            _VALIDATE_VETO_COUNT += 1
+            logger.warning(
+                f"❌ [VETO-14-RSI-EXHAUSTION] Bloqueando SHORT en {symbol}. "
+                f"RSI-14 = {rsi_14:.1f} < 35. "
+                f"RSI exhaustión en el piso - mercado oversold. "
+                f"(veto #{_VALIDATE_VETO_COUNT} total)"
+            )
+            return False, "rsi_exhaustion_oversold", {
+                "rsi_14": rsi_14,
+                "threshold": 35
+            }
 
     # ── BONUS SMC Triple: OB + FVG + BOS simultáneos ──────────────
     # En producción: BILLUSDT con este patrón hizo +17.82% ROI en 5h.
@@ -552,12 +717,13 @@ def validate_pre_trade(
         hard_block_corr = getattr(config, "BTC_CORR_HARD_BLOCK_THRESHOLD", "?")
         ceiling_threshold = getattr(config, "BTC_RED_ALT_CEILING_PCT", 12.0)
         logger.info(
-            f"[SetupValidator] >>> PRIMERA EJECUCION v5.2 <<< "
+            f"[SetupValidator] >>> PRIMERA EJECUCION v5.3 <<< "
             f"| VETO #10 BTC Blood Shield: {btc_shield} (umbral {bleed_threshold}%/1h) "
             f"| VETO #11 Dynamic Ceiling: {btc_shield} (BTC ROJO=12%, BTC VERDE=22% + Room to Breathe) "
             f"| VETO #11.1 Insufficient Upside: {btc_shield} (espacio restante < TP necesario) "
             f"| VETO #12 Volume Floor: ACTIVO (VolumeRatio20 < 0.80 = moneda muerta) "
             f"| VETO #13 Technical Floor: ACTIVO (PA+SMC+Vol promedio < 40 = estructura de mierda) "
+            f"| VETO #14 MA Convergence & Spring: ACTIVO (15m timeframe SHORTs: MA99<1.5%, Spring, RSI<35) "
             f"| BTC DUMPING hard block: {corr_block} (corr>={hard_block_corr}) "
             f"| Symbol={symbol} side={'LONG' if side==0 else 'SHORT'}"
         )
@@ -654,17 +820,19 @@ def validate_pre_trade(
         # No importa cuán bueno sea el setup de la altcoin.
         # Este veto previene la repetición de la pérdida de 20 USDT del 1/6/2026
         # donde BTC cayó de 73k a 71k gradualmente y el bot abrió 14 LONGs.
+        # EXCLUSIÓN: No aplica a Standard Scalping y Scalping Clone
         if btc_filter and side == 0:
-            is_bleeding, btc_pct_1h = btc_filter.is_btc_bleeding()
-            if is_bleeding:
-                _VALIDATE_VETO_COUNT += 1
-                logger.warning(
-                    f"❌ [VETO-BTC-BLOOD] Bloqueando LONG en {symbol}. "
-                    f"BTC sangrando {btc_pct_1h:.2f}% en 1h. "
-                    f"NO importa la confluencia del setup. "
-                    f"(veto #{_VALIDATE_VETO_COUNT} total)"
-                )
-                return False, "btc_bleeding_1h", {"btc_dump_1h": btc_pct_1h}
+            if profile and profile.get("id") not in ("00000000-0000-0000-0000-000000000000", "00000000-0000-0000-0000-000000000001"):
+                is_bleeding, btc_pct_1h = btc_filter.is_btc_bleeding()
+                if is_bleeding:
+                    _VALIDATE_VETO_COUNT += 1
+                    logger.warning(
+                        f"❌ [VETO-BTC-BLOOD] Bloqueando LONG en {symbol}. "
+                        f"BTC sangrando {btc_pct_1h:.2f}% en 1h. "
+                        f"NO importa la confluencia del setup. "
+                        f"(veto #{_VALIDATE_VETO_COUNT} total)"
+                    )
+                    return False, "btc_bleeding_1h", {"btc_dump_1h": btc_pct_1h}
 
         # ── VETO #11: DYNAMIC CEILING (BTC STATE + ALT EXHAUSTION) ─────────────
         # Techo dinámico según el estado de BTC:
@@ -677,74 +845,76 @@ def validate_pre_trade(
         # Validamos que haya espacio suficiente para el TP.
         # Si el espacio restante hasta el techo es menor al TP que necesita la estrategia,
         # el trade se anula por "insufficient_upside_for_ceiling".
+        # EXCLUSIÓN: No aplica a Standard Scalping y Scalping Clone
         if btc_filter and side == 0:
-            btc_daily_red, btc_daily_open, btc_current = btc_filter.is_btc_daily_red()
-            alt_24h_low = _fetch_24h_low_price(symbol)
-            if alt_24h_low > 0:
-                alt_move_from_low = ((current_price - alt_24h_low) / alt_24h_low) * 100
+            if profile and profile.get("id") not in ("00000000-0000-0000-0000-000000000000", "00000000-0000-0000-0000-000000000001"):
+                btc_daily_red, btc_daily_open, btc_current = btc_filter.is_btc_daily_red()
+                alt_24h_low = _fetch_24h_low_price(symbol)
+                if alt_24h_low > 0:
+                    alt_move_from_low = ((current_price - alt_24h_low) / alt_24h_low) * 100
 
-                # Techo dinámico según estado de BTC
-                if btc_daily_red:
-                    ceiling_threshold = float(getattr(config, "BTC_RED_ALT_CEILING_PCT", 12.0))
-                    btc_state = "ROJA"
-                else:
-                    ceiling_threshold = float(getattr(config, "BTC_GREEN_ALT_CEILING_PCT", 22.0))
-                    btc_state = "VERDE"
+                    # Techo dinámico según estado de BTC
+                    if btc_daily_red:
+                        ceiling_threshold = float(getattr(config, "BTC_RED_ALT_CEILING_PCT", 12.0))
+                        btc_state = "ROJA"
+                    else:
+                        ceiling_threshold = float(getattr(config, "BTC_GREEN_ALT_CEILING_PCT", 22.0))
+                        btc_state = "VERDE"
 
-                # Calcular el TP que la estrategia necesita (en porcentaje)
-                target_tp_pct = 0.0
-                if candidate.get("source") == "LSE":
-                    # Para LSE: TP2 es el take profit objetivo
-                    lse_entry = float(candidate.get("lse_entry_price", 0) or 0)
-                    lse_tp2 = float(candidate.get("lse_take_profit_2", 0) or 0)
-                    if lse_entry > 0 and lse_tp2 > 0:
-                        target_tp_pct = ((lse_tp2 - lse_entry) / lse_entry) * 100
-                else:
-                    # Para Nexus/SCAR: TP se calcula del rango estimado
-                    estimated_range_pct = float(candidate.get("estimated_range_pct", 2.0) or 2.0)
-                    tp_multiplier = float(profile.get("tpMultiplier", config.TP_MULTIPLIER)) if profile else config.TP_MULTIPLIER
-                    target_tp_pct = estimated_range_pct * tp_multiplier
+                    # Calcular el TP que la estrategia necesita (en porcentaje)
+                    target_tp_pct = 0.0
+                    if candidate.get("source") == "LSE":
+                        # Para LSE: TP2 es el take profit objetivo
+                        lse_entry = float(candidate.get("lse_entry_price", 0) or 0)
+                        lse_tp2 = float(candidate.get("lse_take_profit_2", 0) or 0)
+                        if lse_entry > 0 and lse_tp2 > 0:
+                            target_tp_pct = ((lse_tp2 - lse_entry) / lse_entry) * 100
+                    else:
+                        # Para Nexus/SCAR: TP se calcula del rango estimado
+                        estimated_range_pct = float(candidate.get("estimated_range_pct", 2.0) or 2.0)
+                        tp_multiplier = float(profile.get("tpMultiplier", config.TP_MULTIPLIER)) if profile else config.TP_MULTIPLIER
+                        target_tp_pct = estimated_range_pct * tp_multiplier
 
-                # Espacio restante hasta el techo de cristal
-                remaining_upside = ceiling_threshold - alt_move_from_low
+                    # Espacio restante hasta el techo de cristal
+                    remaining_upside = ceiling_threshold - alt_move_from_low
 
-                # VETO #11: Si ya pasó el techo absoluto
-                if alt_move_from_low > ceiling_threshold:
-                    _VALIDATE_VETO_COUNT += 1
-                    logger.warning(
-                        f"❌ [VETO-DYNAMIC-CEILING] Bloqueando LONG en {symbol}. "
-                        f"BTC vela diaria {btc_state} (open={btc_daily_open:.2f}, close={btc_current:.2f}). "
-                        f"Alt subió {alt_move_from_low:.2f}% desde low 24h (límite={ceiling_threshold}%). "
-                        f"Agotamiento extremo - techo dinámico según estado BTC. "
-                        f"(veto #{_VALIDATE_VETO_COUNT} total)"
-                    )
-                    return False, "dynamic_ceiling_exhaustion", {
-                        "btc_daily_open": btc_daily_open,
-                        "btc_current": btc_current,
-                        "btc_state": btc_state,
-                        "alt_move_from_low": alt_move_from_low,
-                        "ceiling_threshold": ceiling_threshold
-                    }
+                    # VETO #11: Si ya pasó el techo absoluto
+                    if alt_move_from_low > ceiling_threshold:
+                        _VALIDATE_VETO_COUNT += 1
+                        logger.warning(
+                            f"❌ [VETO-DYNAMIC-CEILING] Bloqueando LONG en {symbol}. "
+                            f"BTC vela diaria {btc_state} (open={btc_daily_open:.2f}, close={btc_current:.2f}). "
+                            f"Alt subió {alt_move_from_low:.2f}% desde low 24h (límite={ceiling_threshold}%). "
+                            f"Agotamiento extremo - techo dinámico según estado BTC. "
+                            f"(veto #{_VALIDATE_VETO_COUNT} total)"
+                        )
+                        return False, "dynamic_ceiling_exhaustion", {
+                            "btc_daily_open": btc_daily_open,
+                            "btc_current": btc_current,
+                            "btc_state": btc_state,
+                            "alt_move_from_low": alt_move_from_low,
+                            "ceiling_threshold": ceiling_threshold
+                        }
 
-                # VETO #11.1: Si no hay espacio suficiente para el TP (Room to Breathe)
-                if remaining_upside < target_tp_pct:
-                    _VALIDATE_VETO_COUNT += 1
-                    logger.warning(
-                        f"❌ [VETO-CEILING-SPACE] Bloqueando LONG en {symbol}. "
-                        f"BTC vela diaria {btc_state}. Espacio restante ({remaining_upside:.2f}%) menor al TP necesario ({target_tp_pct:.2f}%). "
-                        f"Alt ya subió {alt_move_from_low:.2f}% desde low 24h (techo={ceiling_threshold}%). "
-                        f"No hay room to breathe - trade nace asfixiado. "
-                        f"(veto #{_VALIDATE_VETO_COUNT} total)"
-                    )
-                    return False, "insufficient_upside_for_ceiling", {
-                        "btc_daily_open": btc_daily_open,
-                        "btc_current": btc_current,
-                        "btc_state": btc_state,
-                        "alt_move_from_low": alt_move_from_low,
-                        "ceiling_threshold": ceiling_threshold,
-                        "remaining_upside": remaining_upside,
-                        "target_tp_pct": target_tp_pct
-                    }
+                    # VETO #11.1: Si no hay espacio suficiente para el TP (Room to Breathe)
+                    if remaining_upside < target_tp_pct:
+                        _VALIDATE_VETO_COUNT += 1
+                        logger.warning(
+                            f"❌ [VETO-CEILING-SPACE] Bloqueando LONG en {symbol}. "
+                            f"BTC vela diaria {btc_state}. Espacio restante ({remaining_upside:.2f}%) menor al TP necesario ({target_tp_pct:.2f}%). "
+                            f"Alt ya subió {alt_move_from_low:.2f}% desde low 24h (techo={ceiling_threshold}%). "
+                            f"No hay room to breathe - trade nace asfixiado. "
+                            f"(veto #{_VALIDATE_VETO_COUNT} total)"
+                        )
+                        return False, "insufficient_upside_for_ceiling", {
+                            "btc_daily_open": btc_daily_open,
+                            "btc_current": btc_current,
+                            "btc_state": btc_state,
+                            "alt_move_from_low": alt_move_from_low,
+                            "ceiling_threshold": ceiling_threshold,
+                            "remaining_upside": remaining_upside,
+                            "target_tp_pct": target_tp_pct
+                        }
 
         # ── BTC CORRELATION PENALTY (Capa 3) — AHORA CON BLOQUEO DURO ──
         # Si BTC está en DUMPING y la alt tiene alta correlación:
