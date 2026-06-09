@@ -5,6 +5,7 @@ Devuelve métricas para auditoría / trade_analytics.
 from __future__ import annotations
 
 import logging
+import math
 import time
 import requests
 from typing import Any, Dict, Tuple
@@ -87,6 +88,158 @@ def _fetch_24h_low_price(symbol: str) -> float:
     return _TICKER_CACHE.get(symbol, {}).get("lowPrice", 0.0)
 
 
+# ── HYBRID SNIPER SYNERGY v7.0: Structural Bypass Module ─────────────────────
+# Este módulo permite entradas basadas en geometría y estructura del mercado,
+# ignorando requisitos de confianza IA cuando la estructura es perfecta.
+
+def _calculate_ma99_slope_angle(ma99_values: list) -> float:
+    """
+    Calcula el ángulo de inclinación de la MA99 en grados.
+    Retorna el ángulo en grados (positivo = subiendo, negativo = bajando).
+    """
+    if not ma99_values or len(ma99_values) < 2:
+        return 0.0
+    
+    # Tomar los últimos 4 valores para calcular la pendiente reciente
+    recent_values = ma99_values[-4:]
+    if len(recent_values) < 2:
+        return 0.0
+    
+    # Calcular pendiente usando regresión lineal simple
+    n = len(recent_values)
+    x = list(range(n))
+    y = recent_values
+    
+    sum_x = sum(x)
+    sum_y = sum(y)
+    sum_xy = sum(xi * yi for xi, yi in zip(x, y))
+    sum_x2 = sum(xi ** 2 for xi in x)
+    
+    if n * sum_x2 - sum_x ** 2 == 0:
+        return 0.0
+    
+    slope = (n * sum_xy - sum_x * sum_y) / (n * sum_x2 - sum_x ** 2)
+    
+    # Convertir pendiente a ángulo en grados
+    # Asumiendo que x es tiempo (velas) y y es precio
+    angle = math.degrees(math.atan(slope / recent_values[-1])) if recent_values[-1] > 0 else 0.0
+    
+    return angle
+
+
+def _is_flat_market(ma99_angle: float, threshold_deg: float = 5.0) -> bool:
+    """
+    Determina si el mercado está en lateralización (MA99 horizontal).
+    Retorna True si el ángulo está entre -threshold_deg y +threshold_deg.
+    """
+    return abs(ma99_angle) <= threshold_deg
+
+
+def check_structural_synergy(
+    candidate: dict, 
+    current_price: float
+) -> Tuple[bool, str, Dict[str, Any]]:
+    """
+    Verifica si se cumple la sinergia estructural para bypass de confluencia.
+    
+    Condiciones requeridas:
+    1. NEXUS-5: Compression_Score > 85% (resorte al máximo)
+    2. NEXUS-15: Wyckoff_Phase == "Accumulation" O Spring_Detected == True
+    3. GEOMETRÍA: IS_FLAT_MARKET == True (MA99 horizontal entre -5° y +5°)
+    
+    Si se cumplen las 3 condiciones, el trade es VÁLIDO con Score Interno 99.
+    """
+    metrics: Dict[str, Any] = {"structural_synergy": False}
+    symbol = candidate.get("symbol", "?")
+    
+    # ── 1. Verificar NEXUS-5 Compression Score ────────────────────────
+    # Extraer contexto de Nexus-5 si está disponible
+    audit_ctx = candidate.get("agent_audit_context", {})
+    nexus5_ctx = audit_ctx.get("nexus5", {}) if isinstance(audit_ctx, dict) else {}
+    
+    # Compression Score puede venir de nexus5 o de candidate directamente
+    compression_score = 0.0
+    if isinstance(nexus5_ctx, dict):
+        compression_score = float(nexus5_ctx.get("compression_score", 0) or 0)
+    else:
+        compression_score = float(candidate.get("compression_score", 0) or 0)
+    
+    if compression_score <= 85.0:
+        logger.debug(f"[STRUCTURAL-SYNERGY] {symbol}: Compression Score {compression_score:.1f}% <= 85% - FAIL")
+        return False, "compression_insufficient", metrics
+    
+    logger.info(f"[STRUCTURAL-SYNERGY] {symbol}: Compression Score {compression_score:.1f}% > 85% - PASS ✓")
+    
+    # ── 2. Verificar NEXUS-15 Wyckoff Phase ───────────────────────────
+    nexus15_ctx = audit_ctx.get("nexus15", {}) if isinstance(audit_ctx, dict) else {}
+    nexus_features = nexus15_ctx.get("features", {}) if isinstance(nexus15_ctx, dict) else {}
+    
+    wyckoff_phase = str(nexus_features.get("wyckoff_phase", "")).lower()
+    spring_detected = bool(nexus_features.get("spring_detected", False))
+    
+    is_accumulation = "accumulation" in wyckoff_phase
+    is_spring = spring_detected or "spring" in wyckoff_phase
+    
+    if not (is_accumulation or is_spring):
+        logger.debug(f"[STRUCTURAL-SYNERGY] {symbol}: Wyckoff Phase={wyckoff_phase}, Spring={spring_detected} - FAIL")
+        return False, "wyckoff_not_accumulation", metrics
+    
+    logger.info(f"[STRUCTURAL-SYNERGY] {symbol}: Wyckoff Phase={wyckoff_phase}, Spring={spring_detected} - PASS ✓")
+    
+    # ── 3. Verificar GEOMETRÍA: MA99 Flat Market ───────────────────────
+    # Extraer valores de MA99 para calcular ángulo
+    ma99_values = []
+    if isinstance(nexus_features, dict):
+        # Intentar obtener valores históricos de MA99 si están disponibles
+        ma99_values = nexus_features.get("ma99_history", [])
+    
+    # Si no hay historia, usar valores del candidate
+    if not ma99_values:
+        ma99_current = float(nexus_features.get("ma99", 0) or 0)
+        ma99_prev = float(nexus_features.get("ma99_prev", 0) or 0)
+        if ma99_current > 0 and ma99_prev > 0:
+            ma99_values = [ma99_prev, ma99_current]
+    
+    if not ma99_values:
+        logger.debug(f"[STRUCTURAL-SYNERGY] {symbol}: No MA99 values available - FAIL")
+        return False, "no_ma99_data", metrics
+    
+    ma99_angle = _calculate_ma99_slope_angle(ma99_values)
+    is_flat = _is_flat_market(ma99_angle, threshold_deg=5.0)
+    
+    if not is_flat:
+        logger.debug(f"[STRUCTURAL-SYNERGY] {symbol}: MA99 Angle={ma99_angle:.2f}° (not flat) - FAIL")
+        return False, "ma99_not_flat", metrics
+    
+    logger.info(f"[STRUCTURAL-SYNERGY] {symbol}: MA99 Angle={ma99_angle:.2f}° (FLAT) - PASS ✓")
+    
+    # ── 4. Verificar Volumen (1m) > 1.0x (v7.4: bajado de 1.2x para test) ─────────────
+    volume_ratio_1m = float(nexus_features.get("volume_ratio_1m", 0) or 0)
+    if volume_ratio_1m < 1.0:
+        logger.debug(f"[STRUCTURAL-SYNERGY] {symbol}: Volume Ratio 1m={volume_ratio_1m:.2f}x < 1.0x - FAIL")
+        return False, "volume_insufficient", metrics
+    
+    logger.info(f"[STRUCTURAL-SYNERGY] {symbol}: Volume Ratio 1m={volume_ratio_1m:.2f}x > 1.0x - PASS ✓")
+    
+    # ── TODAS LAS CONDICIONES CUMPLIDAS ───────────────────────────────────
+    metrics["structural_synergy"] = True
+    metrics["internal_score"] = 99.0
+    metrics["compression_score"] = compression_score
+    metrics["wyckoff_phase"] = wyckoff_phase
+    metrics["spring_detected"] = spring_detected
+    metrics["ma99_angle"] = ma99_angle
+    metrics["volume_ratio_1m"] = volume_ratio_1m
+    
+    logger.warning(
+        f"🎯 [STRUCTURAL-SNIPER-MODE] {symbol} - BYPASS ACTIVADO! "
+        f"Compression={compression_score:.1f}% | Wyckoff={wyckoff_phase} | "
+        f"MA99 Angle={ma99_angle:.2f}° (FLAT) | Volume 1m={volume_ratio_1m:.2f}x | "
+        f"Internal Score=99"
+    )
+    
+    return True, "structural_synergy_bypass", metrics
+
+
 def _effective_tick(ref_price: float) -> float:
     rel = getattr(config, "TICK_SIZE_MIN_RELATIVE_OF_PRICE", 1e-7)
     abs_min = getattr(config, "TICK_SIZE_MIN_ABSOLUTE", 1e-10)
@@ -118,7 +271,9 @@ def validate_lse_setup(
     candidate: dict, current_price: float, profile: dict = None
 ) -> Tuple[bool, str, Dict[str, Any]]:
     """Reglas duras LSE (spring LONG side 0 en producción actual)."""
+    global _VALIDATE_VETO_COUNT
     metrics: Dict[str, Any] = {}
+    symbol = candidate.get("symbol", "UNKNOWN")  # FIX v7.6: definir symbol antes de usarlo en f-strings
 
     entry = candidate.get("lse_entry_price")
     sl = candidate.get("lse_stop_loss")
@@ -331,7 +486,9 @@ def validate_nexus_confluence_setup(
     Mismas ideas operativas que LSE: RR mínimo, TP/stop no microscópicos vs precio.
     Niveles TP/SL = mismos multiplicadores que RiskManager (estimated_range_pct).
     """
+    global _VALIDATE_VETO_COUNT, _VALIDATE_PASS_COUNT
     metrics: Dict[str, Any] = {"pipeline": "nexus_scar"}
+    symbol = candidate.get("symbol", "UNKNOWN")  # FIX v7.6: definir symbol antes de usarlo en f-strings
     side = int(candidate.get("side", 0))
 
     try:
@@ -423,21 +580,89 @@ def validate_nexus_confluence_setup(
     if candle_body_ratio < 0.05:
         return False, "no_body_no_trade", metrics
 
-    # ── VETO #12: Volume Floor (Liquidez Mínima) ─────────────────────────────
-    # Si el volumen es < 80% del promedio, la moneda está "muerta".
-    # Entrar ahí es regalar plata al spread. Cualquier movimiento pequeño liquida.
-    # USUSDT ejemplo: VolumeRatio 0.0045 = 0.4% del promedio → trade liquidado al instante.
+    # ── HYBRID SNIPER SYNERGY v7.0: Structural Bypass ───────────────────────────
+    # Si la geometría del mercado es perfecta, bypass de minConfluenceScore y AI_Confidence.
+    # Esto permite entradas durante lateralización/accumulación para máxima asimetría.
     # EXCLUSIÓN: No aplica a Standard Scalping y Scalping Clone
     if profile and profile.get("id") not in ("00000000-0000-0000-0000-000000000000", "00000000-0000-0000-0000-000000000001"):
-        if volume_ratio_20 < 0.80:
+        structural_synergy, synergy_reason, synergy_metrics = check_structural_synergy(candidate, cp)
+        
+        if structural_synergy:
+            # BYPASS ACTIVADO: Ignorar minConfluenceScore y AI_Confidence
+            # Setear confluence_score a 99 para pasar todos los filtros de confluencia
+            candidate["confluence_score"] = 99.0
+            confluence_score = 99.0  # Actualizar variable local
+            
+            # Agregar metadata al candidate para que el RiskManager use la calibración especial
+            candidate["structural_sniper_mode"] = True
+            candidate["structural_sniper_sl_source"] = "spring_low_or_0.5x_atr"
+            
+            # Calibración de Riesgo: SL = Low del Spring de Wyckoff o 0.5x ATR
+            # Extraer Spring Low si está disponible
+            audit_ctx = candidate.get("agent_audit_context", {})
+            nexus15_ctx = audit_ctx.get("nexus15", {}) if isinstance(audit_ctx, dict) else {}
+            nexus_features = nexus15_ctx.get("features", {}) if isinstance(nexus15_ctx, dict) else {}
+            
+            spring_low = float(nexus_features.get("spring_low", 0) or 0)
+            atr_14 = float(nexus_features.get("atr_14", 0) or 0)
+            
+            if spring_low > 0 and spring_low < cp:
+                # Usar Spring Low como Stop Loss
+                candidate["custom_sl_price"] = spring_low
+                logger.info(
+                    f"[STRUCTURAL-SNIPER-RISK] {symbol}: SL calibrado a Spring Low={spring_low:.6f} "
+                    f"(distancia={(cp - spring_low) / cp * 100:.2f}%)"
+                )
+            elif atr_14 > 0:
+                # Usar 0.5x ATR como Stop Loss
+                custom_sl = cp - (atr_14 * 0.5)
+                candidate["custom_sl_price"] = custom_sl
+                logger.info(
+                    f"[STRUCTURAL-SNIPER-RISK] {symbol}: SL calibrado a 0.5x ATR={custom_sl:.6f} "
+                    f"(ATR={atr_14:.6f}, distancia={(cp - custom_sl) / cp * 100:.2f}%)"
+                )
+            
+            # Agregar métricas de sinergia al metrics principal
+            metrics.update(synergy_metrics)
+            
+            # Continuar con validaciones (ahora con confluence_score=99 pasará todo)
+            logger.info(
+                f"[STRUCTURAL-SNIPER-MODE] {symbol}: Bypass activado - continuando validaciones con Score=99"
+            )
+
+    # ── VETO #15: ATR MINIMUM FILTER (Movimiento Mínimo) ─────────────────────
+    # Si el activo no se mueve al menos un 0.5% en promedio por vela, se ignora.
+    # Esto mata a USUSDT y otras stablecoins que tienen ATR de 0.001%.
+    # AJUSTE v6.0: Nuevo filtro para evitar trades en activos muertos (Era Dorada)
+    atr_14 = float(nexus_features.get("atr_14", 0) or 0)
+    if atr_14 > 0:
+        atr_pct = (atr_14 / cp) * 100
+        if atr_pct < 0.5:
+            _VALIDATE_VETO_COUNT += 1
+            logger.warning(
+                f"❌ [VETO-15-ATR-FLOOR] Bloqueando trade en {symbol}. "
+                f"ATR 14 = {atr_pct:.3f}% < 0.5% (mínimo). "
+                f"Activo sin movimiento - probable stablecoin o muerto. "
+                f"(veto #{_VALIDATE_VETO_COUNT} total)"
+            )
+            return False, "atr_too_low", {"atr_pct": atr_pct, "min_required": 0.5}
+
+    # ── VETO #12: Volume Floor (Liquidez Mínima) ─────────────────────────────
+    # Si el volumen es < 40% del promedio, la moneda está "muerta".
+    # Entrar ahí es regalar plata al spread. Cualquier movimiento pequeño liquida.
+    # USUSDT ejemplo: VolumeRatio 0.0045 = 0.4% del promedio → trade liquidado al instante.
+    # AJUSTE v6.0: Bajado de 0.80 a 0.40 para permitir volumen emergente (Era Dorada)
+    # EXCLUSIÓN: No aplica a Standard Scalping y Scalping Clone
+    if profile and profile.get("id") not in ("00000000-0000-0000-0000-000000000000", "00000000-0000-0000-0000-000000000001"):
+        if volume_ratio_20 < 0.40:
             _VALIDATE_VETO_COUNT += 1
             logger.warning(
                 f"❌ [VETO-12-VOLUME-FLOOR] Bloqueando trade en {symbol}. "
-                f"VolumeRatio20={volume_ratio_20:.4f} < 0.80 (80% del promedio). "
+                f"VolumeRatio20={volume_ratio_20:.4f} < 0.40 (40% del promedio). "
                 f"Moneda sin liquidez - spread te liquida. "
                 f"(veto #{_VALIDATE_VETO_COUNT} total)"
             )
-            return False, "volume_floor_insufficient", {"volume_ratio_20": volume_ratio_20, "min_required": 0.80}
+            return False, "volume_floor_insufficient", {"volume_ratio_20": volume_ratio_20, "min_required": 0.40}
 
     # Volume check only blocks when volume is very weak AND no surge at all
     if volume_ratio_20 < 0.8 and not volume_surge_bullish:
@@ -452,8 +677,9 @@ def validate_nexus_confluence_setup(
 
     # ── VETO #13: Technical Floor (Confluencia Orgánica) ──────────────────────
     # No importa si Nexus tiene 99% de confianza. Si los grupos técnicos (SMC, PA, Vol)
-    # son un desastre (< 40 puntos promedio), el trade es una timba.
+    # son un desastre (< 15 puntos promedio), el trade es una timba.
     # USUSDT ejemplo: PA=18.6, SMC=20, Vol=19.9 → promedio ~19 → trade liquidado.
+    # AJUSTE v6.0: Bajado de 40.0 a 15.0 para permitir entrada en despegue (Era Dorada)
     # EXCLUSIÓN: No aplica a Standard Scalping y Scalping Clone
     group_scores = candidate.get("group_scores", {})
     if profile and profile.get("id") not in ("00000000-0000-0000-0000-000000000000", "00000000-0000-0000-0000-000000000001"):
@@ -465,11 +691,11 @@ def validate_nexus_confluence_setup(
             # Solo aplicar si los 3 scores están disponibles (no son 0)
             if pa_score > 0 and smc_score > 0 and vol_score > 0:
                 tech_avg = (pa_score + smc_score + vol_score) / 3.0
-                if tech_avg < 40.0:
+                if tech_avg < 15.0:
                     _VALIDATE_VETO_COUNT += 1
                     logger.warning(
                         f"❌ [VETO-13-TECH-FLOOR] Bloqueando trade en {symbol}. "
-                        f"Promedio técnico (PA+SMC+Vol)/3 = {tech_avg:.1f} < 40.0. "
+                        f"Promedio técnico (PA+SMC+Vol)/3 = {tech_avg:.1f} < 15.0. "
                         f"PA={pa_score:.1f}, SMC={smc_score:.1f}, Vol={vol_score:.1f}. "
                         f"Estructura técnica de mierda - IA fanática ignorando realidad. "
                         f"(veto #{_VALIDATE_VETO_COUNT} total)"
@@ -479,7 +705,7 @@ def validate_nexus_confluence_setup(
                         "smc_score": smc_score,
                         "vol_score": vol_score,
                         "tech_avg": tech_avg,
-                        "min_required": 40.0
+                        "min_required": 15.0
                     }
     # ── VETO #3: Post-Pump/Dump Distance from MA7 ────────────────────────
     # Si el precio ya se alejó >3.5% de la MA7, el movimiento ya ocurrió.
@@ -708,6 +934,20 @@ def validate_pre_trade(
     symbol = candidate.get("symbol", "?")
     side = int(candidate.get("side", 0))
     
+    # ── VETO #16: STABLECOIN BLACKLIST (FIXED v6.1) ─────────────────────────
+    # Evita operar activos de paridad o monedas muertas.
+    # FIX v6.1: Comparación EXACTA en lugar de substring para no bloquear todos los pares USDT
+    # USO: Solo bloquea stablecoins reales (USDTUSDT, USDCUSDT, etc.)
+    STABLES = {"USDTUSDT", "USDCUSDT", "FDUSDUSDT", "TUSDUSDT", "PAXGUSDT", "USUSDT", "BUSDUSDT", "DAIUSDT"}
+
+    if symbol.upper() in STABLES:
+        _VALIDATE_VETO_COUNT += 1
+        logger.warning(
+            f"❌ [VETO-16-STABLE] {symbol} es una Stablecoin. Abortando. "
+            f"(veto #{_VALIDATE_VETO_COUNT} total)"
+        )
+        return False, "stablecoin_blacklist", {"symbol": symbol}
+    
     # ── Log de primera ejecución: confirma que los VETOS NUEVOS están activos ──
     if _VALIDATE_FIRST_CALL:
         _VALIDATE_FIRST_CALL = False
@@ -715,15 +955,22 @@ def validate_pre_trade(
         corr_block = "ACTIVO" if (btc_filter and btc_corr) else "SIN btc_corr"
         bleed_threshold = getattr(config, "BTC_BLEED_1H_THRESHOLD", "?")
         hard_block_corr = getattr(config, "BTC_CORR_HARD_BLOCK_THRESHOLD", "?")
-        ceiling_threshold = getattr(config, "BTC_RED_ALT_CEILING_PCT", 12.0)
+        ceiling_threshold = getattr(config, "BTC_RED_ALT_CEILING_PCT", 18.0)
         logger.info(
-            f"[SetupValidator] >>> PRIMERA EJECUCION v5.3 <<< "
+            f"[SetupValidator] >>> PRIMERA EJECUCION v7.6 (SYMBOL FIX DEFINITIVO) <<< "
+            f"| HYBRID SNIPER SYNERGY v7.0: ACTIVO (Bypass estructural: Compression>85%, Wyckoff Accumulation/Spring, MA99 Flat -5°/+5°, Volume 1m>1.0x) "
+            f"| PERFORMANCE v7.5: Pre-filtrado volumen >= $500k, TIER 1 FORCE-INJECTION (siempre analizado), MSF fallback, ThreadPoolExecutor (10 workers) "
+            f"| VOLUME FIX v7.5: Corrección definitiva 'quoteVolume' (Binance standard) + MSF directo si ticker es None "
+            f"| GLOBAL VAR FIX v7.5: global _VALIDATE_VETO_COUNT, _VALIDATE_PASS_COUNT en validate_nexus_confluence_setup y validate_pre_trade "
             f"| VETO #10 BTC Blood Shield: {btc_shield} (umbral {bleed_threshold}%/1h) "
-            f"| VETO #11 Dynamic Ceiling: {btc_shield} (BTC ROJO=12%, BTC VERDE=22% + Room to Breathe) "
+            f"| VETO #11 Dynamic Ceiling: {btc_shield} (BTC ROJO=18%, BTC VERDE=22% + Room to Breathe) "
             f"| VETO #11.1 Insufficient Upside: {btc_shield} (espacio restante < TP necesario) "
-            f"| VETO #12 Volume Floor: ACTIVO (VolumeRatio20 < 0.80 = moneda muerta) "
-            f"| VETO #13 Technical Floor: ACTIVO (PA+SMC+Vol promedio < 40 = estructura de mierda) "
+            f"| VETO #12 Volume Floor: ACTIVO (VolumeRatio20 < 0.40 = moneda muerta) "
+            f"| VETO #13 Technical Floor: ACTIVO (PA+SMC+Vol promedio < 15 = estructura de mierda) "
+            f"| VETO #15 ATR Floor: ACTIVO (ATR < 0.5% = activo muerto) "
+            f"| VETO #16 Stable Blacklist: ACTIVO (FIXED - comparación exacta: USDTUSDT, USDCUSDT, etc.) "
             f"| VETO #14 MA Convergence & Spring: ACTIVO (15m timeframe SHORTs: MA99<1.5%, Spring, RSI<35) "
+            f"| CONCURRENCY FIX v7.1: Retry 3x con delay 100ms para error 409 en PositionManager "
             f"| BTC DUMPING hard block: {corr_block} (corr>={hard_block_corr}) "
             f"| Symbol={symbol} side={'LONG' if side==0 else 'SHORT'}"
         )
@@ -854,8 +1101,9 @@ def validate_pre_trade(
                     alt_move_from_low = ((current_price - alt_24h_low) / alt_24h_low) * 100
 
                     # Techo dinámico según estado de BTC
+                    # AJUSTE v6.0: Subido de 12.0 a 18.0 para permitir segundo tramo de rally (Era Dorada)
                     if btc_daily_red:
-                        ceiling_threshold = float(getattr(config, "BTC_RED_ALT_CEILING_PCT", 12.0))
+                        ceiling_threshold = float(getattr(config, "BTC_RED_ALT_CEILING_PCT", 18.0))
                         btc_state = "ROJA"
                     else:
                         ceiling_threshold = float(getattr(config, "BTC_GREEN_ALT_CEILING_PCT", 22.0))

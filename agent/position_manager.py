@@ -397,19 +397,38 @@ class PositionManager:
 
         url = f"{self.base_url}/api/app/simulated-trade/close-trade/{trade_id}"
         
-        try:
-            logger.info(f" Sending Close Trade command for ID {trade_id}")
-            response = requests.post(url, headers=headers, verify=False, timeout=30)
-            
-            if response.status_code == 200:
-                logger.info(f" Trade {trade_id} successfully closed!")
-                return True
-            else:
-                logger.error(f" Failed to close trade {trade_id}. Status {response.status_code}: {response.text}")
+        # ── FIX v7.1: Retry con delay para error 409 (Conflict) ─────────────────────
+        max_retries = 3
+        retry_delay = 0.1  # 100ms
+        
+        for attempt in range(max_retries):
+            try:
+                logger.info(f" Sending Close Trade command for ID {trade_id} (attempt {attempt + 1}/{max_retries})")
+                response = requests.post(url, headers=headers, verify=False, timeout=30)
+                
+                if response.status_code == 200:
+                    logger.info(f" Trade {trade_id} successfully closed!")
+                    return True
+                elif response.status_code == 409:
+                    # Conflict error - data changed by another user
+                    logger.warning(f" Conflict (409) on attempt {attempt + 1} for trade {trade_id}. Retrying in {retry_delay}s...")
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_delay)
+                        continue
+                    else:
+                        logger.error(f" Failed to close trade {trade_id} after {max_retries} retries due to conflicts.")
+                        return False
+                else:
+                    logger.error(f" Failed to close trade {trade_id}. Status {response.status_code}: {response.text}")
+                    return False
+            except Exception as e:
+                logger.error(f" Connection error while closing trade {trade_id}: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay)
+                    continue
                 return False
-        except Exception as e:
-            logger.error(f" Connection error while closing trade {trade_id}: {e}")
-            return False
+        
+        return False
 
     def update_max_favorable_price(self, trade_id: str, max_favorable_price: float) -> bool:
         """

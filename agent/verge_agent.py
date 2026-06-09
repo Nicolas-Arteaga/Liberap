@@ -398,7 +398,7 @@ class VergeAgent:
 
     def run(self):
         logger.info(f"Agent started. Loop interval: {config.LOOP_INTERVAL_SECONDS}s.")
-        logger.info("[CONFIG] Agent Version: risk_v5.0 (segregated metrics ON)")
+        logger.info("[CONFIG] Agent Version: risk_v7.1 (Performance Optimization + Hybrid Sniper Synergy)")
 
         if not self.auth.get_token():
             logger.error("FATAL: Could not authenticate with ABP Backend. Stopping.")
@@ -407,13 +407,25 @@ class VergeAgent:
         self._repair_existing_positions()
 
         while True:
+            cycle_start_time = time.time()
             try:
                 self.loop_cycle()
             except Exception as e:
                 logger.error(f"Unhandled exception in main loop: {e}", exc_info=True)
 
-            logger.info(f"Sleeping {config.LOOP_INTERVAL_SECONDS}s...")
-            time.sleep(config.LOOP_INTERVAL_SECONDS)
+            # ── SYNC v7.1: Calcular sleep dinámico basado en tiempo de análisis ─────────
+            cycle_duration = time.time() - cycle_start_time
+            loop_interval = config.LOOP_INTERVAL_SECONDS
+            
+            if cycle_duration < loop_interval:
+                sleep_time = loop_interval - cycle_duration
+                logger.info(f"Sleeping {sleep_time:.1f}s... (cycle took {cycle_duration:.1f}s)")
+                time.sleep(sleep_time)
+            else:
+                logger.warning(
+                    f"⚠️ Cycle took {cycle_duration:.1f}s (> {loop_interval}s). "
+                    f"Starting next cycle immediately (performance bottleneck detected)."
+                )
 
     # ─────────────────────────────────────────────────────────
     # Main cycle
@@ -539,37 +551,135 @@ class VergeAgent:
         logger.info(f"[Step 3/6] Received {len(scar_alerts)} alerts.")
 
         # 3.5 NEXUS-5 Timing Scan — 5m Phase 1/2 detection for entry timing
-        #     Only scans symbols that already have 5m data in SQLite cache (no REST calls)
-        #     This runs BEFORE Nexus-15 so we can pass timing data to confluence scoring.
+        #     OPTIMIZACIÓN v7.2: Pre-filtrado con ticker24h para reducir scope
+        #     Solo analiza símbolos con volumen >= $500k en 24h para evitar HTTP 429
+        #     Usa ThreadPoolExecutor para paralelizar descargas
         nexus5_cache = {}
         NEXUS5_ENABLED = getattr(config, "NEXUS5_ENABLED", True)
         if NEXUS5_ENABLED:
             all_targets_n5 = config.WATCHLIST
-            logger.info(f"[Step 3.5/6] Scanning {len(all_targets_n5)} symbols with NEXUS-5 (5m timing)...")
+            
+            # ── PRE-FILTRADO v7.5: Solo símbolos con volumen >= $500k en 24h ────────────
+            MIN_VOLUME_24H_USD = 500_000  # $500k mínimo (ajustado de $2M por ser demasiado estricto)
+            filtered_targets_n5 = []
+            
+            logger.info(f"[Step 3.5/6] Pre-filtrando {len(all_targets_n5)} símbolos (volumen >= ${MIN_VOLUME_24H_USD/1_000_000}M)...")
+            
+            # ── BYPASS v7.5: TIER 1 siempre se analiza (bypass de emergencia) ─────────────
+            tier1_symbols = config.WATCHLIST_TIER1 if hasattr(config, "WATCHLIST_TIER1") else []
+            logger.info(f"[Step 3.5/6] BYPASS: {len(tier1_symbols)} TIER 1 symbols will be analyzed regardless of volume filter")
+            
+            # ── DEBUG v7.5: Auditoría de volumen para detectar error de unidades ─────────
+            debug_count = 0
+            for symbol in all_targets_n5:
+                try:
+                    ticker = self.fetcher.get_ticker(symbol)
+                    if ticker:
+                        # FIX v7.5: Binance usa "quoteVolume" (con V mayúscula) para volumen en USDT
+                        # Intentar quoteVolume primero, luego quote_volume, luego volume
+                        quote_volume = float(ticker.get("quoteVolume", ticker.get("quote_volume", ticker.get("volume", 0))) or 0)
+                        
+                        # Log de auditoría para los primeros 10 símbolos (aumentado de 5)
+                        if debug_count < 10:
+                            logger.info(
+                                f"[Step 3.5/6] DEBUG VOLUME: {symbol} | volume_raw={quote_volume} | "
+                                f"volume_formatted=${quote_volume:,.2f} | threshold=${MIN_VOLUME_24H_USD:,.2f} | "
+                                f"ticker_keys={list(ticker.keys())}"
+                            )
+                            debug_count += 1
+                        
+                        # BYPASS v7.5: TIER 1 siempre pasa el filtro
+                        if symbol in tier1_symbols:
+                            filtered_targets_n5.append(symbol)
+                            logger.debug(f"[Step 3.5/6] BYPASS: {symbol} (TIER 1) added regardless of volume")
+                        elif quote_volume >= MIN_VOLUME_24H_USD:
+                            filtered_targets_n5.append(symbol)
+                    else:
+                        # FIX v7.5: Si ticker es None, intentar obtenerlo directamente del MSF
+                        logger.debug(f"[Step 3.5/6] DEBUG: {symbol} ticker is None, trying MSF directly...")
+                        try:
+                            # Intentar obtener ticker 24h directamente del MSF
+                            ticker_24h = self.fetcher._msf.get_ticker_24h(symbol) if hasattr(self.fetcher, '_msf') else None
+                            if ticker_24h:
+                                # FIX v7.5: Binance usa "quoteVolume" (con V mayúscula)
+                                quote_volume = float(ticker_24h.get("quoteVolume", ticker_24h.get("quote_volume", ticker_24h.get("volume", 0))) or 0)
+                                logger.info(
+                                    f"[Step 3.5/6] DEBUG MSF: {symbol} | volume_raw={quote_volume} | "
+                                    f"volume_formatted=${quote_volume:,.2f} | threshold=${MIN_VOLUME_24H_USD:,.2f}"
+                                )
+                                if symbol in tier1_symbols:
+                                    filtered_targets_n5.append(symbol)
+                                    logger.debug(f"[Step 3.5/6] BYPASS MSF: {symbol} (TIER 1) added regardless of volume")
+                                elif quote_volume >= MIN_VOLUME_24H_USD:
+                                    filtered_targets_n5.append(symbol)
+                        except Exception as msf_e:
+                            logger.debug(f"[Step 3.5/6] MSF failed for {symbol}: {msf_e}")
+                except Exception as e:
+                    logger.debug(f"[Step 3.5/6] Error getting ticker for {symbol}: {e}")
+                    pass  # Silently skip ticker errors
+            
+            # ── FIX v7.4: Agregar TIER 1 explícitamente si no fueron agregados ────────────
+            for symbol in tier1_symbols:
+                if symbol not in filtered_targets_n5:
+                    filtered_targets_n5.append(symbol)
+                    logger.info(f"[Step 3.5/6] BYPASS v7.4: {symbol} (TIER 1) FORCE-ADDED (no ticker or volume filter failed)")
+            
+            logger.info(
+                f"[Step 3.5/6] Pre-filtrado completado: {len(filtered_targets_n5)}/{len(all_targets_n5)} "
+                f"símbolos pasaron el filtro de volumen >= ${MIN_VOLUME_24H_USD/1_000_000}M"
+            )
+            
+            # ── WARNING v7.2: Si 0 símbolos pasan el filtro, advertir ─────────────────────
+            if len(filtered_targets_n5) == 0:
+                logger.warning(
+                    f"[Step 3.5/6] ⚠️ WARNING: High volume filter active (${MIN_VOLUME_24H_USD/1_000_000}M). "
+                    f"NEXUS-5 analysis skipped. Hybrid Sniper Synergy will not activate."
+                )
+            
+            # ── PARALELIZACIÓN v7.1: ThreadPoolExecutor para descargas ─────────────────
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            import threading
+            
+            logger.info(f"[Step 3.5/6] Escaneando {len(filtered_targets_n5)} símbolos con NEXUS-5 (5m timing) [PARALELIZADO v7.1]...")
             n5_ok = 0
             n5_fail = 0
-            for symbol in all_targets_n5:
+            lock = threading.Lock()
+            
+            def fetch_n5_symbol(symbol):
+                nonlocal n5_ok, n5_fail
                 try:
                     n5 = self.signals.get_nexus5_prediction(symbol, limit=500)
                     if n5:
-                        nexus5_cache[symbol] = n5
-                        n5_ok += 1
+                        with lock:
+                            nexus5_cache[symbol] = n5
+                            n5_ok += 1
                     else:
-                        n5_fail += 1
+                        with lock:
+                            n5_fail += 1
                 except Exception:
-                    n5_fail += 1
+                    with lock:
+                        n5_fail += 1
+            
+            # Usar max_workers=10 para paralelizar sin saturar APIs
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                futures = [executor.submit(fetch_n5_symbol, symbol) for symbol in filtered_targets_n5]
+                for future in as_completed(futures):
+                    pass  # Los contadores se actualizan dentro de fetch_n5_symbol
+            
             logger.info(
-                f"[Step 3.5/6] NEXUS-5: {n5_ok} symbols analyzed, {n5_fail} skipped (no 5m data or error)"
+                f"[Step 3.5/6] NEXUS-5: {n5_ok} symbols analyzed, {n5_fail} skipped (no 5m data or error) [PARALELIZADO v7.1]"
             )
 
-        # 4. Scan ALL watchlist symbols with Nexus-15
+        # 4. Scan T1+T2 watchlist symbols with Nexus-15 (OPTIMIZACIÓN v6.1)
+        #    - Tier 1 (30) + Tier 2 (70) = 100 symbols only (down from 421)
+        #    - Tier 3 only analyzed via Redis Bridge or Nexus TOP (on-demand)
+        #    - Reduces analysis time from 20min to ~3min
         #    - Symbols with cache history: instant (SQLite read)
         #    - Symbols without cache history: on-demand REST fetch (Bybit/OKX)
-        #    - Mirrors exactly what the Nexus-15 dashboard analyzes
-        all_targets = config.WATCHLIST  # All 200 symbols, no exceptions
+        all_targets = config.WATCHLIST_TIER1 + config.WATCHLIST_TIER2  # T1+T2 only (100 symbols)
 
         logger.info(
-            f"[Step 4/6] Scanning {len(all_targets)} symbols with Nexus-15..."
+            f"[Step 4/6] Scanning {len(all_targets)} symbols (T1+T2 only) with Nexus-15... [OPTIMIZED v6.1]"
         )
 
         # 4. Fetch Nexus-15 Top candidates from the backend (same data as UI "TOP" button)

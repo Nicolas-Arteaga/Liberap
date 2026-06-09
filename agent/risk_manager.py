@@ -132,51 +132,87 @@ class RiskManager:
 
         cp = float(current_price)
 
+        # ── HYBRID SNIPER SYNERGY v7.0: Custom SL Calibration ─────────────────────
+        # Si structural_sniper_mode está activo, usar custom_sl_price (Spring Low o 0.5x ATR)
+        structural_sniper_mode = signal_data.get("structural_sniper_mode", False)
+        custom_sl_price = signal_data.get("custom_sl_price")
+        
+        if structural_sniper_mode and custom_sl_price:
+            try:
+                custom_sl_f = float(custom_sl_price)
+                # Validar que el custom SL sea válido
+                if custom_sl_f > 0 and custom_sl_f < cp:  # Solo para LONGs
+                    sl_price = custom_sl_f
+                    sl_distance_price = cp - sl_price
+                    sl_distance_pct = sl_distance_price / cp
+                    logger.info(
+                        f"[STRUCTURAL-SNIPER-RISK] {symbol}: Usando custom SL={custom_sl_f:.6f} "
+                        f"(distancia={sl_distance_pct:.4f}%)"
+                    )
+                else:
+                    logger.warning(
+                        f"[STRUCTURAL-SNIPER-RISK] {symbol}: Custom SL inválido ({custom_sl_f}), "
+                        f"usando cálculo estándar"
+                    )
+                    custom_sl_price = None  # Fallback a cálculo estándar
+            except (TypeError, ValueError):
+                logger.warning(
+                    f"[STRUCTURAL-SNIPER-RISK] {symbol}: Error al parsear custom SL, "
+                    f"usando cálculo estándar"
+                )
+                custom_sl_price = None
+
         # 1. Distancia SL basada en volatilidad (atr o estimated_range)
-        atr_signal = signal_data.get("atr_signal")
-        est_range = signal_data.get("estimated_range_pct")
+        # Solo calcular si no hay custom SL de Sniper Mode
+        if not (structural_sniper_mode and custom_sl_price):
+            atr_signal = signal_data.get("atr_signal")
+            est_range = signal_data.get("estimated_range_pct")
 
-        if profile:
-            sl_mult = float(profile.get("slMultiplier", 0.8))
-        else:
-            sl_mult = float(getattr(config, "SL_MULTIPLIER", 0.8))
+            if profile:
+                sl_mult = float(profile.get("slMultiplier", 0.8))
+            else:
+                sl_mult = float(getattr(config, "SL_MULTIPLIER", 0.8))
 
-        atr_f = float(atr_signal) if atr_signal else 0.0
-        est_range_f = float(est_range) if est_range else 0.0
+            atr_f = float(atr_signal) if atr_signal else 0.0
+            est_range_f = float(est_range) if est_range else 0.0
 
-        if atr_f > 0 and (atr_f / cp) <= 0.20:
-            sl_distance_price = atr_f * sl_mult
-            sl_distance_pct = sl_distance_price / cp
-        elif est_range_f > 0:
-            sl_distance_pct = (est_range_f / 100.0) * sl_mult
-        else:
-            sl_distance_pct = 0.015 * sl_mult
+            if atr_f > 0 and (atr_f / cp) <= 0.20:
+                sl_distance_price = atr_f * sl_mult
+                sl_distance_pct = sl_distance_price / cp
+            elif est_range_f > 0:
+                sl_distance_pct = (est_range_f / 100.0) * sl_mult
+            else:
+                sl_distance_pct = 0.015 * sl_mult
 
-        min_sl_pct = float(getattr(config, "MIN_STOP_PCT_OF_PRICE", 0.002))
-        if sl_distance_pct < min_sl_pct:
-            sl_distance_pct = min_sl_pct
+            min_sl_pct = float(getattr(config, "MIN_STOP_PCT_OF_PRICE", 0.002))
+            if sl_distance_pct < min_sl_pct:
+                sl_distance_pct = min_sl_pct
 
-        sl_distance_price = cp * sl_distance_pct
+            sl_distance_price = cp * sl_distance_pct
 
         # Calcular base SL sin el multiplicador de Clone para el Take Profit
-        if profile and profile.get("name") == "Scalping Clone":
-            base_sl_mult = float(getattr(config, "SL_MULTIPLIER", 0.6))
-        elif profile:
-            base_sl_mult = float(profile.get("slMultiplier", 0.6))
+        # Para Sniper Mode con custom SL, usar el mismo sl_distance_price calculado
+        if structural_sniper_mode and custom_sl_price:
+            base_sl_distance_price = sl_distance_price
         else:
-            base_sl_mult = float(getattr(config, "SL_MULTIPLIER", 0.6))
+            if profile and profile.get("name") == "Scalping Clone":
+                base_sl_mult = float(getattr(config, "SL_MULTIPLIER", 0.6))
+            elif profile:
+                base_sl_mult = float(profile.get("slMultiplier", 0.6))
+            else:
+                base_sl_mult = float(getattr(config, "SL_MULTIPLIER", 0.6))
 
-        if atr_f > 0 and (atr_f / cp) <= 0.20:
-            base_sl_distance_pct = (atr_f * base_sl_mult) / cp
-        elif est_range_f > 0:
-            base_sl_distance_pct = (est_range_f / 100.0) * base_sl_mult
-        else:
-            base_sl_distance_pct = 0.015 * base_sl_mult
+            if atr_f > 0 and (atr_f / cp) <= 0.20:
+                base_sl_distance_pct = (atr_f * base_sl_mult) / cp
+            elif est_range_f > 0:
+                base_sl_distance_pct = (est_range_f / 100.0) * base_sl_mult
+            else:
+                base_sl_distance_pct = 0.015 * base_sl_mult
 
-        if base_sl_distance_pct < min_sl_pct:
-            base_sl_distance_pct = min_sl_pct
+            if base_sl_distance_pct < min_sl_pct:
+                base_sl_distance_pct = min_sl_pct
 
-        base_sl_distance_price = cp * base_sl_distance_pct
+            base_sl_distance_price = cp * base_sl_distance_pct
 
         # Limitar RR según setup_type (caps hard por tipo de señal)
         if profile:

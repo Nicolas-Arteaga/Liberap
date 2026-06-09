@@ -161,7 +161,7 @@ BTC_CORR_HARD_BLOCK_THRESHOLD = float(os.getenv("BTC_CORR_HARD_BLOCK_THRESHOLD",
 # Techo dinámico según el estado de BTC:
 # - Si BTC daily es ROJO: techo = 12% (mercado bajista, alts agotadas rápido)
 # - Si BTC daily es VERDE: techo = 22% (mercado alcista, alts pueden correr más)
-BTC_RED_ALT_CEILING_PCT = float(os.getenv("BTC_RED_ALT_CEILING_PCT", "12.0")) # % máximo de subida desde low 24h cuando BTC está rojo
+BTC_RED_ALT_CEILING_PCT = float(os.getenv("BTC_RED_ALT_CEILING_PCT", "18.0")) # % máximo de subida desde low 24h cuando BTC está rojo
 BTC_GREEN_ALT_CEILING_PCT = float(os.getenv("BTC_GREEN_ALT_CEILING_PCT", "22.0")) # % máximo de subida desde low 24h cuando BTC está verde
 
 # --- Capa 2: Bloqueo Inteligente + Decouple + Macro Exit ---
