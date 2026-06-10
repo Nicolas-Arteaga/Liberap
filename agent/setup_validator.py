@@ -88,20 +88,22 @@ def _fetch_24h_low_price(symbol: str) -> float:
     return _TICKER_CACHE.get(symbol, {}).get("lowPrice", 0.0)
 
 
-# ── HYBRID SNIPER SYNERGY v7.0: Structural Bypass Module ─────────────────────
-# Este módulo permite entradas basadas en geometría y estructura del mercado,
-# ignorando requisitos de confianza IA cuando la estructura es perfecta.
+# ── GOLDEN U-TURN DETECTOR v9.0: MA99 Lateralization After Drop ─────────────
+# Detecta lateralización de MA99 tras caída confirmada.
+# Bypass (Score 99) solo si MA99 horizontal (-1.5°/+1.5°) y venimos de caída >2%.
+# Fast path: usa datos pre-calculados por el agente en Step 3.5 (Gravity Check).
 
-def _calculate_ma99_slope_angle(ma99_values: list) -> float:
+def _calculate_ma99_slope_angle(ma99_values: list, window: int = None) -> float:
     """
     Calcula el ángulo de inclinación de la MA99 en grados.
     Retorna el ángulo en grados (positivo = subiendo, negativo = bajando).
     """
     if not ma99_values or len(ma99_values) < 2:
         return 0.0
-    
-    # Tomar los últimos 4 valores para calcular la pendiente reciente
-    recent_values = ma99_values[-4:]
+
+    if window is None:
+        window = int(getattr(config, "GOLDEN_UTURN_ANGLE_WINDOW", 12))
+    recent_values = ma99_values[-window:] if len(ma99_values) >= window else ma99_values
     if len(recent_values) < 2:
         return 0.0
     
@@ -135,109 +137,168 @@ def _is_flat_market(ma99_angle: float, threshold_deg: float = 5.0) -> bool:
     return abs(ma99_angle) <= threshold_deg
 
 
-def check_structural_synergy(
-    candidate: dict, 
+def _validate_golden_cement_floor(
+    current_price: float,
+    golden_ctx: dict,
+    symbol: str = "?",
+) -> Tuple[bool, str]:
+    """v9.4 — Re-valida proximidad MA99 y confirmación MA7 en tiempo de ejecución."""
+    if not golden_ctx:
+        return False, "no_golden_context"
+
+    max_ma99_dist = float(getattr(config, "GOLDEN_UTURN_MAX_MA99_DISTANCE_PCT", 15.0))
+    max_ma7_dist = float(getattr(config, "GOLDEN_UTURN_MAX_MA7_DISTANCE_PCT", 2.0))
+
+    dist_pct = golden_ctx.get("price_to_ma99_distance_pct")
+    if dist_pct is None:
+        ma99_now = float(golden_ctx.get("ma99_now", 0) or 0)
+        if ma99_now > 0 and current_price > 0:
+            dist_pct = ((current_price - ma99_now) / ma99_now) * 100
+        else:
+            dist_pct = 0.0
+    else:
+        dist_pct = float(dist_pct)
+
+    if abs(dist_pct) > max_ma99_dist:
+        logger.warning(
+            f"[GOLDEN-v9.5] {symbol}: VETO distancia MA99={dist_pct:.2f}% > ±{max_ma99_dist}%"
+        )
+        return False, "golden_ma99_distance_veto"
+
+    ma7_now = float(golden_ctx.get("ma7_now", 0) or 0)
+    ma7_prox = golden_ctx.get("ma7_proximity_pct")
+    if ma7_prox is None and ma7_now > 0:
+        ma7_prox = abs((current_price - ma7_now) / ma7_now) * 100
+    else:
+        ma7_prox = float(ma7_prox or 999.0)
+
+    if ma7_now <= 0 or ma7_prox > max_ma7_dist:
+        logger.warning(
+            f"[GOLDEN-v9.5] {symbol}: VETO proximidad MA7={ma7_prox:.2f}% > ±{max_ma7_dist}%"
+        )
+        return False, "golden_ma7_proximity_veto"
+
+    return True, "ok"
+
+
+def check_uturn_detector(
+    candidate: dict,
     current_price: float
 ) -> Tuple[bool, str, Dict[str, Any]]:
     """
-    Verifica si se cumple la sinergia estructural para bypass de confluencia.
+    GOLDEN U-TURN DETECTOR v9.0: Detecta lateralización de MA99 tras una caída.
     
-    Condiciones requeridas:
-    1. NEXUS-5: Compression_Score > 85% (resorte al máximo)
-    2. NEXUS-15: Wyckoff_Phase == "Accumulation" O Spring_Detected == True
-    3. GEOMETRÍA: IS_FLAT_MARKET == True (MA99 horizontal entre -5° y +5°)
+    Fast path: Si el agente pre-calculó golden_uturn en Step 3.5, usa esos valores directos.
+    Fallback: Calcula desde nexus15 features (v8.1 legacy).
     
-    Si se cumplen las 3 condiciones, el trade es VÁLIDO con Score Interno 99.
+    Bypass (Score 99) SOLO SI:
+    1. MA99 horizontal: ángulo entre -1.5° y +1.5°
+    2. MA99 hace 100 velas (15m) >= 3% SUPERIOR al actual (caída confirmada)
+    
+    Bloqueo: Si MA99 lateraliza pero venimos de SUBIDA → BLOQUEA LONG
     """
-    metrics: Dict[str, Any] = {"structural_synergy": False}
+    metrics: Dict[str, Any] = {"uturn_detected": False}
     symbol = candidate.get("symbol", "?")
     
-    # ── 1. Verificar NEXUS-5 Compression Score ────────────────────────
-    # Extraer contexto de Nexus-5 si está disponible
     audit_ctx = candidate.get("agent_audit_context", {})
-    nexus5_ctx = audit_ctx.get("nexus5", {}) if isinstance(audit_ctx, dict) else {}
     
-    # Compression Score puede venir de nexus5 o de candidate directamente
-    compression_score = 0.0
-    if isinstance(nexus5_ctx, dict):
-        compression_score = float(nexus5_ctx.get("compression_score", 0) or 0)
-    else:
-        compression_score = float(candidate.get("compression_score", 0) or 0)
+    # ── FAST PATH v9.0: Usar datos pre-calculados por el agente (Step 3.5) ──
+    golden_ctx = audit_ctx.get("golden_uturn", {}) if isinstance(audit_ctx, dict) else {}
+    if golden_ctx and golden_ctx.get("detected"):
+        cement_ok, cement_code = _validate_golden_cement_floor(current_price, golden_ctx, symbol)
+        if not cement_ok:
+            metrics["cement_floor_veto"] = cement_code
+            return False, cement_code, metrics
+
+        angle = float(golden_ctx.get("angle", 0))
+        drop_pct = float(golden_ctx.get("drop_pct", 0))
+        sl_5low = float(golden_ctx.get("sl_5low", 0))
+        
+        metrics["ma99_angle"] = angle
+        metrics["ma99_change_pct"] = round(drop_pct, 2)
+        metrics["uturn_detected"] = True
+        metrics["internal_score"] = 99.0
+        metrics["uturn_type"] = "golden_uturn_floor"
+        metrics["golden_uturn_sl_5low"] = sl_5low
+        
+        candidate["golden_uturn_mode"] = True
+        if sl_5low > 0 and sl_5low < current_price:
+            candidate["custom_sl_price"] = sl_5low
+        
+        logger.warning(
+            f"[GOLDEN-U-TURN v9.4] {symbol} - PISO DE CEMENTO! "
+            f"MA99 Angle={angle:.2f}° | Drop={drop_pct:.2f}% | "
+            f"DistMA99={golden_ctx.get('price_to_ma99_distance_pct')}% | SL={sl_5low:.6f}"
+        )
+        return True, "golden_uturn_bypass", metrics
     
-    if compression_score <= 85.0:
-        logger.debug(f"[STRUCTURAL-SYNERGY] {symbol}: Compression Score {compression_score:.1f}% <= 85% - FAIL")
-        return False, "compression_insufficient", metrics
-    
-    logger.info(f"[STRUCTURAL-SYNERGY] {symbol}: Compression Score {compression_score:.1f}% > 85% - PASS ✓")
-    
-    # ── 2. Verificar NEXUS-15 Wyckoff Phase ───────────────────────────
+    # ── FALLBACK PATH v8.1: Calcular desde nexus15 features ──
     nexus15_ctx = audit_ctx.get("nexus15", {}) if isinstance(audit_ctx, dict) else {}
     nexus_features = nexus15_ctx.get("features", {}) if isinstance(nexus15_ctx, dict) else {}
     
-    wyckoff_phase = str(nexus_features.get("wyckoff_phase", "")).lower()
-    spring_detected = bool(nexus_features.get("spring_detected", False))
-    
-    is_accumulation = "accumulation" in wyckoff_phase
-    is_spring = spring_detected or "spring" in wyckoff_phase
-    
-    if not (is_accumulation or is_spring):
-        logger.debug(f"[STRUCTURAL-SYNERGY] {symbol}: Wyckoff Phase={wyckoff_phase}, Spring={spring_detected} - FAIL")
-        return False, "wyckoff_not_accumulation", metrics
-    
-    logger.info(f"[STRUCTURAL-SYNERGY] {symbol}: Wyckoff Phase={wyckoff_phase}, Spring={spring_detected} - PASS ✓")
-    
-    # ── 3. Verificar GEOMETRÍA: MA99 Flat Market ───────────────────────
-    # Extraer valores de MA99 para calcular ángulo
-    ma99_values = []
+    ma99_history = []
     if isinstance(nexus_features, dict):
-        # Intentar obtener valores históricos de MA99 si están disponibles
-        ma99_values = nexus_features.get("ma99_history", [])
+        ma99_history = nexus_features.get("ma99_history", [])
     
-    # Si no hay historia, usar valores del candidate
-    if not ma99_values:
+    if not ma99_history or len(ma99_history) < 2:
         ma99_current = float(nexus_features.get("ma99", 0) or 0)
         ma99_prev = float(nexus_features.get("ma99_prev", 0) or 0)
         if ma99_current > 0 and ma99_prev > 0:
-            ma99_values = [ma99_prev, ma99_current]
+            ma99_history = [ma99_prev, ma99_current]
     
-    if not ma99_values:
-        logger.debug(f"[STRUCTURAL-SYNERGY] {symbol}: No MA99 values available - FAIL")
+    if not ma99_history or len(ma99_history) < 2:
+        logger.debug(f"[U-TURN v9.0] {symbol}: No MA99 data - SKIP")
         return False, "no_ma99_data", metrics
     
-    ma99_angle = _calculate_ma99_slope_angle(ma99_values)
-    is_flat = _is_flat_market(ma99_angle, threshold_deg=5.0)
+    ma99_angle = _calculate_ma99_slope_angle(ma99_history)
+    metrics["ma99_angle"] = ma99_angle
     
+    # v9.0: ±1.5° (más estricto que v8.1 ±2°)
+    angle_threshold = float(getattr(config, "GOLDEN_UTURN_ANGLE_THRESHOLD", 1.5))
+    is_flat = abs(ma99_angle) <= angle_threshold
     if not is_flat:
-        logger.debug(f"[STRUCTURAL-SYNERGY] {symbol}: MA99 Angle={ma99_angle:.2f}° (not flat) - FAIL")
+        logger.debug(f"[U-TURN v9.0] {symbol}: MA99 Angle={ma99_angle:.2f}° not flat - FAIL")
         return False, "ma99_not_flat", metrics
     
-    logger.info(f"[STRUCTURAL-SYNERGY] {symbol}: MA99 Angle={ma99_angle:.2f}° (FLAT) - PASS ✓")
+    logger.info(f"[U-TURN v9.0] {symbol}: MA99 Angle={ma99_angle:.2f}° FLAT - PASS")
     
-    # ── 4. Verificar Volumen (1m) > 1.0x (v7.4: bajado de 1.2x para test) ─────────────
-    volume_ratio_1m = float(nexus_features.get("volume_ratio_1m", 0) or 0)
-    if volume_ratio_1m < 1.0:
-        logger.debug(f"[STRUCTURAL-SYNERGY] {symbol}: Volume Ratio 1m={volume_ratio_1m:.2f}x < 1.0x - FAIL")
-        return False, "volume_insufficient", metrics
+    lookback_candles = int(getattr(config, "GOLDEN_UTURN_LOOKBACK_CANDLES", 60))
+    lookback_idx = min(lookback_candles, len(ma99_history) - 1)
+    ma99_ago = float(ma99_history[-lookback_idx - 1]) if lookback_idx > 0 else 0.0
+    ma99_now = float(ma99_history[-1])
     
-    logger.info(f"[STRUCTURAL-SYNERGY] {symbol}: Volume Ratio 1m={volume_ratio_1m:.2f}x > 1.0x - PASS ✓")
+    if ma99_ago <= 0 or ma99_now <= 0:
+        return False, "ma99_insufficient_history", metrics
     
-    # ── TODAS LAS CONDICIONES CUMPLIDAS ───────────────────────────────────
-    metrics["structural_synergy"] = True
-    metrics["internal_score"] = 99.0
-    metrics["compression_score"] = compression_score
-    metrics["wyckoff_phase"] = wyckoff_phase
-    metrics["spring_detected"] = spring_detected
-    metrics["ma99_angle"] = ma99_angle
-    metrics["volume_ratio_1m"] = volume_ratio_1m
+    ma99_change_pct = ((ma99_now - ma99_ago) / ma99_ago) * 100
+    metrics["ma99_lookback_ago"] = ma99_ago
+    metrics["ma99_now"] = ma99_now
+    metrics["ma99_change_pct"] = round(ma99_change_pct, 2)
     
-    logger.warning(
-        f"🎯 [STRUCTURAL-SNIPER-MODE] {symbol} - BYPASS ACTIVADO! "
-        f"Compression={compression_score:.1f}% | Wyckoff={wyckoff_phase} | "
-        f"MA99 Angle={ma99_angle:.2f}° (FLAT) | Volume 1m={volume_ratio_1m:.2f}x | "
-        f"Internal Score=99"
-    )
+    # v9.0: drop >= 2% (más estricto que v8.1 1.5%)
+    min_drop = float(getattr(config, "GOLDEN_UTURN_MIN_DROP_PCT", 2.0))
     
-    return True, "structural_synergy_bypass", metrics
+    if ma99_change_pct <= -min_drop:
+        metrics["uturn_detected"] = True
+        metrics["internal_score"] = 99.0
+        metrics["uturn_type"] = "floor_after_drop"
+        
+        candidate["golden_uturn_mode"] = True
+        
+        logger.warning(
+            f"[GOLDEN-U-TURN v9.0] {symbol} - SUELO! MA99 cayó {ma99_change_pct:.2f}% y lateraliza. Score=99."
+        )
+        return True, "golden_uturn_bypass", metrics
+    
+    if ma99_change_pct >= min_drop:
+        metrics["uturn_block"] = True
+        logger.warning(
+            f"[U-TURN v9.0] {symbol} - TECHO! MA99 subió {ma99_change_pct:.2f}% y lateraliza. BLOCK LONG."
+        )
+        return False, "uturn_top_block_long", metrics
+    
+    logger.debug(f"[U-TURN v9.0] {symbol}: MA99 flat, change={ma99_change_pct:.2f}% - NEUTRAL")
+    return False, "uturn_neutral", metrics
 
 
 def _effective_tick(ref_price: float) -> float:
@@ -396,86 +457,6 @@ def validate_lse_setup(
     metrics["atr_signal"] = float(atr) if atr is not None else None
     metrics["risk_pct_used"] = float(getattr(config, "EQUITY_RISK_PCT_FOR_STOP", 0.01))
 
-    # ── VETO #14: MA CONVERGENCE & SPRING VETO (15m timeframe) ───────────────
-    # Este veto aplica específicamente a temporalidades de 15 minutos.
-    # LSE puede ser 15m, 1h, 4h, etc. (lse_timeframe)
-    # Regla 1: MA Convergence (Magnet Effect) - Para SHORTs, si distancia MA99-precio < 1.5%
-    # Regla 2: Wyckoff Contradiction (Spring) - Si se detecta SPRING, bloquear todos los SHORTs
-    # Regla 3: RSI Exhaustion (En el piso) - Para SHORTs, si RSI-14 < 35
-    
-    # Determinar si es temporalidad de 15m
-    lse_timeframe = str(candidate.get("lse_timeframe", "1h")).lower()
-    is_15m_timeframe = (lse_timeframe == "15m")
-    
-    if is_15m_timeframe and side == 1:  # Solo para SHORTs en 15m
-        # Regla 1: MA Convergence (Magnet Effect)
-        ma99 = candidate.get("lse_ma99")
-        if ma99 is not None and ma99 > 0:
-            try:
-                ma99_f = float(ma99)
-                dist_pct = abs(cp - ma99_f) / ma99_f * 100
-                if dist_pct < 1.5:
-                    _VALIDATE_VETO_COUNT += 1
-                    logger.warning(
-                        f"❌ [VETO-14-MA-CONVERGENCE] Bloqueando SHORT en {symbol}. "
-                        f"Distancia MA99-Precio = {dist_pct:.2f}% < 1.5%. "
-                        f"Efecto magnético - precio muy cerca de MA99. "
-                        f"(veto #{_VALIDATE_VETO_COUNT} total)"
-                    )
-                    return False, "ma_convergence_magnet_effect", {
-                        "ma99": ma99_f,
-                        "current_price": cp,
-                        "distance_pct": dist_pct,
-                        "threshold": 1.5
-                    }
-            except (TypeError, ValueError):
-                pass
-        
-        # Regla 2: Wyckoff Contradiction (Spring)
-        # Para LSE, verificar el regime o detection_mode
-        lse_regime = str(candidate.get("lse_regime", "")).lower()
-        detection_mode = str(candidate.get("lse_detection_mode", "")).lower()
-        
-        # Spring puede estar indicado por regime="LSE_SPRING" o detection_mode
-        is_spring_detected = (
-            "spring" in lse_regime or
-            "spring" in detection_mode
-        )
-        
-        if is_spring_detected:
-            _VALIDATE_VETO_COUNT += 1
-            logger.warning(
-                f"❌ [VETO-14-WYCKOFF-SPRING] Bloqueando SHORT en {symbol}. "
-                f"SPRING detectado (Regime: {lse_regime}, Detection: {detection_mode}). "
-                f"Contradicción de Wyckoff - no SHORT contra un Spring. "
-                f"(veto #{_VALIDATE_VETO_COUNT} total)"
-            )
-            return False, "wyckoff_spring_contradiction", {
-                "lse_regime": lse_regime,
-                "detection_mode": detection_mode
-            }
-        
-        # Regla 3: RSI Exhaustion (En el piso)
-        # Para LSE, RSI puede estar en lse_rsi o necesitamos obtenerlo de otro lugar
-        lse_rsi = candidate.get("lse_rsi")
-        if lse_rsi is not None:
-            try:
-                rsi_val = float(lse_rsi)
-                if rsi_val < 35:
-                    _VALIDATE_VETO_COUNT += 1
-                    logger.warning(
-                        f"❌ [VETO-14-RSI-EXHAUSTION] Bloqueando SHORT en {symbol}. "
-                        f"RSI = {rsi_val:.1f} < 35. "
-                        f"RSI exhaustión en el piso - mercado oversold. "
-                        f"(veto #{_VALIDATE_VETO_COUNT} total)"
-                    )
-                    return False, "rsi_exhaustion_oversold", {
-                        "rsi_14": rsi_val,
-                        "threshold": 35
-                    }
-            except (TypeError, ValueError):
-                pass
-
     return True, "ok", metrics
 
 
@@ -507,6 +488,28 @@ def validate_nexus_confluence_setup(
         nexus15_ctx.get("features", {}) if isinstance(nexus15_ctx, dict) else {}
     )
 
+    # ── GOLDEN U-TURN v9.1: Detector estructural (TODOS los perfiles, incl. Standard Scalping) ──
+    uturn_detected, uturn_reason, uturn_metrics = check_uturn_detector(candidate, cp)
+    if uturn_reason == "uturn_top_block_long" and side == 0:
+        logger.warning(
+            f"[GOLDEN-U-TURN v9.1] {symbol}: TECHO — MA99 subió {uturn_metrics.get('ma99_change_pct', 0):.2f}% y lateraliza. BLOCK LONG."
+        )
+        return False, "uturn_top_block_long", metrics
+    if uturn_detected:
+        golden_ctx = (candidate.get("agent_audit_context", {}) or {}).get("golden_uturn", {})
+        cement_ok, cement_code = _validate_golden_cement_floor(cp, golden_ctx, symbol)
+        if not cement_ok:
+            logger.warning(f"[GOLDEN-v9.4] {symbol}: bloqueado en ejecución — {cement_code}")
+            return False, cement_code, metrics
+        candidate["golden_uturn_mode"] = True
+        candidate["confluence_score"] = float(getattr(config, "GOLDEN_UTURN_SCORE", 99.0))
+        metrics.update(uturn_metrics)
+        logger.info(
+            f"[GOLDEN-U-TURN v9.4] {symbol}: Piso de Cemento confirmado — Score=99 bypass activo."
+        )
+
+    is_golden = bool(candidate.get("golden_uturn_mode"))
+
     rsi_14 = float(nexus_features.get("rsi_14", 50) or 50)
     upthrust_detected = bool(nexus_features.get("upthrust_detected", False))
     candle_body_ratio = float(nexus_features.get("candle_body_ratio", 1.0) or 1.0)
@@ -519,33 +522,37 @@ def validate_nexus_confluence_setup(
     volume_ratio_20 = float(nexus_features.get("volume_ratio_20", 1.0) or 1.0)
     volume_surge_bullish = bool(nexus_features.get("volume_surge_bullish", False))
 
-    # ── VETO #1: Pump exhaustion
-    if side == 0 and explosion_bearish and not explosion_bullish and rsi_14 > 68:
+    # ── VETO #1: Pump exhaustion (bypass Golden U-Turn — suelo tras caída)
+    if not is_golden and side == 0 and explosion_bearish and not explosion_bullish and rsi_14 > 68:
         return False, "pump_exhaust_long", metrics
 
     # ── VETO #6: RSI Extreme Exhaustion (Parametrizado por Profile) ──────
-    if profile:
-        max_rsi_long = float(profile.get("maxRsiLong", getattr(config, "MAX_RSI_LONG_LIMIT", 75.0)))
-        min_rsi_short = float(profile.get("minRsiShort", 15.0))
-    else:
-        max_rsi_long = float(getattr(config, "MAX_RSI_LONG_LIMIT", 75.0))
-        min_rsi_short = 15.0
+    # BYPASS: Golden U-Turn v9.0 — un suelo real siempre tiene RSI bajo, no bloquear.
+    if not candidate.get("golden_uturn_mode"):
+        if profile:
+            max_rsi_long = float(profile.get("maxRsiLong", getattr(config, "MAX_RSI_LONG_LIMIT", 75.0)))
+            min_rsi_short = float(profile.get("minRsiShort", 15.0))
+        else:
+            max_rsi_long = float(getattr(config, "MAX_RSI_LONG_LIMIT", 75.0))
+            min_rsi_short = 15.0
 
-    if side == 0 and rsi_14 > max_rsi_long:
-        logger.info("[VETO] rsi_extreme — %s | RSI=%.1f > limit=%.1f", candidate.get("symbol"), rsi_14, max_rsi_long)
-        return False, "rsi_extreme_exhaustion", metrics
+        if side == 0 and rsi_14 > max_rsi_long:
+            logger.info("[VETO] rsi_extreme — %s | RSI=%.1f > limit=%.1f", candidate.get("symbol"), rsi_14, max_rsi_long)
+            return False, "rsi_extreme_exhaustion", metrics
 
-    if side == 1 and rsi_14 < min_rsi_short:
-        logger.info("[VETO] rsi_extreme — %s | RSI=%.1f < limit=%.1f", candidate.get("symbol"), rsi_14, min_rsi_short)
-        return False, "rsi_extreme_exhaustion", metrics
+        if side == 1 and rsi_14 < min_rsi_short:
+            logger.info("[VETO] rsi_extreme — %s | RSI=%.1f < limit=%.1f", candidate.get("symbol"), rsi_14, min_rsi_short)
+            return False, "rsi_extreme_exhaustion", metrics
 
     # ── VETO #7: MA7 Distance (Parametrizado por Profile) ────────────────
-    if profile and ma7 > 0:
-        max_dist_pct = float(profile.get("maxMa7DistancePct", 3.5))
-        dist_pct = abs(cp - ma7) / ma7 * 100
-        if dist_pct > max_dist_pct:
-            logger.info("[VETO] ma7_distance — %s | dist=%.2f%% > limit=%.2f%%", candidate.get("symbol"), dist_pct, max_dist_pct)
-            return False, "ma7_distance_overextended", metrics
+    # BYPASS: Golden U-Turn v9.0 — no importa distancia a MA7, compramos el pivot.
+    if not candidate.get("golden_uturn_mode"):
+        if profile and ma7 > 0:
+            max_dist_pct = float(profile.get("maxMa7DistancePct", 3.5))
+            dist_pct = abs(cp - ma7) / ma7 * 100
+            if dist_pct > max_dist_pct:
+                logger.info("[VETO] ma7_distance — %s | dist=%.2f%% > limit=%.2f%%", candidate.get("symbol"), dist_pct, max_dist_pct)
+                return False, "ma7_distance_overextended", metrics
 
     # ── VETO #8: Ranging sin volumen = trampa ──────────────────────────────
     # Prod 24h: Ranging + sin vol_expl = 0% WR, -7 USDT neto — dinero regalado.
@@ -554,7 +561,7 @@ def validate_nexus_confluence_setup(
     nexus_regime = str(nexus15_ctx.get("regime", "")).lower() if isinstance(nexus15_ctx, dict) else ""
     regime = bridge_regime or nexus_regime
 
-    if "ranging" in regime and not volume_surge_bullish and volume_ratio_20 < 2.0:
+    if not is_golden and "ranging" in regime and not volume_surge_bullish and volume_ratio_20 < 2.0:
         if getattr(config, "MIN_CONFLUENCE_SCORE", 50.0) > 30.0:
             logger.info(
                 "[VETO] ranging_no_momentum — %s | regime=%s vol_ratio=%.2f surge=False",
@@ -564,8 +571,8 @@ def validate_nexus_confluence_setup(
         else:
             logger.info("[TESTING] Bypassed ranging_no_momentum veto for %s", candidate.get("symbol"))
 
-    # ── VETO #5: Bearish Rejection at Top ──────────────────────────────
-    if side == 0:
+    # ── VETO #5: Bearish Rejection at Top (bypass Golden U-Turn) ───────
+    if not is_golden and side == 0:
         # Si la mecha superior es > 35% del tamaño total de la vela y el RSI es > 70
         # es una trampa de liquidez. No importa el score de la IA.
         if upper_wick_ratio > 0.35 and rsi_14 > 70:
@@ -577,95 +584,31 @@ def validate_nexus_confluence_setup(
             logger.info("[VETO] UPTHRUST_REJECTION — %s | Upthrust detected and RSI=%.1f", candidate.get("symbol"), rsi_14)
             return False, "upthrust_rejection", metrics
 
-    if candle_body_ratio < 0.05:
+    if not is_golden and candle_body_ratio < 0.05:
         return False, "no_body_no_trade", metrics
 
-    # ── HYBRID SNIPER SYNERGY v7.0: Structural Bypass ───────────────────────────
-    # Si la geometría del mercado es perfecta, bypass de minConfluenceScore y AI_Confidence.
-    # Esto permite entradas durante lateralización/accumulación para máxima asimetría.
-    # EXCLUSIÓN: No aplica a Standard Scalping y Scalping Clone
-    if profile and profile.get("id") not in ("00000000-0000-0000-0000-000000000000", "00000000-0000-0000-0000-000000000001"):
-        structural_synergy, synergy_reason, synergy_metrics = check_structural_synergy(candidate, cp)
-        
-        if structural_synergy:
-            # BYPASS ACTIVADO: Ignorar minConfluenceScore y AI_Confidence
-            # Setear confluence_score a 99 para pasar todos los filtros de confluencia
-            candidate["confluence_score"] = 99.0
-            confluence_score = 99.0  # Actualizar variable local
-            
-            # Agregar metadata al candidate para que el RiskManager use la calibración especial
-            candidate["structural_sniper_mode"] = True
-            candidate["structural_sniper_sl_source"] = "spring_low_or_0.5x_atr"
-            
-            # Calibración de Riesgo: SL = Low del Spring de Wyckoff o 0.5x ATR
-            # Extraer Spring Low si está disponible
-            audit_ctx = candidate.get("agent_audit_context", {})
-            nexus15_ctx = audit_ctx.get("nexus15", {}) if isinstance(audit_ctx, dict) else {}
-            nexus_features = nexus15_ctx.get("features", {}) if isinstance(nexus15_ctx, dict) else {}
-            
-            spring_low = float(nexus_features.get("spring_low", 0) or 0)
-            atr_14 = float(nexus_features.get("atr_14", 0) or 0)
-            
-            if spring_low > 0 and spring_low < cp:
-                # Usar Spring Low como Stop Loss
-                candidate["custom_sl_price"] = spring_low
+    # Golden U-Turn v9.6 Big Fish: SL = min(low-20velas, 3% bajo entrada)
+    if is_golden:
+        gu_sl = (
+            candidate.get("custom_sl_price")
+            or uturn_metrics.get("golden_uturn_sl_5low")
+            or (candidate.get("agent_audit_context", {}).get("golden_uturn", {}) or {}).get("sl_5low")
+        )
+        if gu_sl and float(gu_sl) > 0:
+            min_sl_pct = float(getattr(config, "GOLDEN_UTURN_SL_MIN_DISTANCE_PCT", 3.0)) / 100.0
+            pct_sl = cp * (1.0 - min_sl_pct)
+            final_sl = min(float(gu_sl), pct_sl)
+            if final_sl > 0 and final_sl < cp:
+                candidate["custom_sl_price"] = final_sl
+                sl_dist = (cp - final_sl) / cp * 100
+                min_tp = float(getattr(config, "GOLDEN_UTURN_TP_MIN_DISTANCE_PCT", 10.0))
                 logger.info(
-                    f"[STRUCTURAL-SNIPER-RISK] {symbol}: SL calibrado a Spring Low={spring_low:.6f} "
-                    f"(distancia={(cp - spring_low) / cp * 100:.2f}%)"
+                    f"[BIG-FISH-RISK] {symbol}: SL={sl_dist:.2f}% bajo entrada, TP objetivo ≥{min_tp:.1f}%"
                 )
-            elif atr_14 > 0:
-                # Usar 0.5x ATR como Stop Loss
-                custom_sl = cp - (atr_14 * 0.5)
-                candidate["custom_sl_price"] = custom_sl
-                logger.info(
-                    f"[STRUCTURAL-SNIPER-RISK] {symbol}: SL calibrado a 0.5x ATR={custom_sl:.6f} "
-                    f"(ATR={atr_14:.6f}, distancia={(cp - custom_sl) / cp * 100:.2f}%)"
-                )
-            
-            # Agregar métricas de sinergia al metrics principal
-            metrics.update(synergy_metrics)
-            
-            # Continuar con validaciones (ahora con confluence_score=99 pasará todo)
-            logger.info(
-                f"[STRUCTURAL-SNIPER-MODE] {symbol}: Bypass activado - continuando validaciones con Score=99"
-            )
-
-    # ── VETO #15: ATR MINIMUM FILTER (Movimiento Mínimo) ─────────────────────
-    # Si el activo no se mueve al menos un 0.5% en promedio por vela, se ignora.
-    # Esto mata a USUSDT y otras stablecoins que tienen ATR de 0.001%.
-    # AJUSTE v6.0: Nuevo filtro para evitar trades en activos muertos (Era Dorada)
-    atr_14 = float(nexus_features.get("atr_14", 0) or 0)
-    if atr_14 > 0:
-        atr_pct = (atr_14 / cp) * 100
-        if atr_pct < 0.5:
-            _VALIDATE_VETO_COUNT += 1
-            logger.warning(
-                f"❌ [VETO-15-ATR-FLOOR] Bloqueando trade en {symbol}. "
-                f"ATR 14 = {atr_pct:.3f}% < 0.5% (mínimo). "
-                f"Activo sin movimiento - probable stablecoin o muerto. "
-                f"(veto #{_VALIDATE_VETO_COUNT} total)"
-            )
-            return False, "atr_too_low", {"atr_pct": atr_pct, "min_required": 0.5}
-
-    # ── VETO #12: Volume Floor (Liquidez Mínima) ─────────────────────────────
-    # Si el volumen es < 40% del promedio, la moneda está "muerta".
-    # Entrar ahí es regalar plata al spread. Cualquier movimiento pequeño liquida.
-    # USUSDT ejemplo: VolumeRatio 0.0045 = 0.4% del promedio → trade liquidado al instante.
-    # AJUSTE v6.0: Bajado de 0.80 a 0.40 para permitir volumen emergente (Era Dorada)
-    # EXCLUSIÓN: No aplica a Standard Scalping y Scalping Clone
-    if profile and profile.get("id") not in ("00000000-0000-0000-0000-000000000000", "00000000-0000-0000-0000-000000000001"):
-        if volume_ratio_20 < 0.40:
-            _VALIDATE_VETO_COUNT += 1
-            logger.warning(
-                f"❌ [VETO-12-VOLUME-FLOOR] Bloqueando trade en {symbol}. "
-                f"VolumeRatio20={volume_ratio_20:.4f} < 0.40 (40% del promedio). "
-                f"Moneda sin liquidez - spread te liquida. "
-                f"(veto #{_VALIDATE_VETO_COUNT} total)"
-            )
-            return False, "volume_floor_insufficient", {"volume_ratio_20": volume_ratio_20, "min_required": 0.40}
 
     # Volume check only blocks when volume is very weak AND no surge at all
-    if volume_ratio_20 < 0.8 and not volume_surge_bullish:
+    # BYPASS: Golden U-Turn v9.0 — el volumen suele ser bajo en el suelo exacto.
+    if not candidate.get("golden_uturn_mode") and volume_ratio_20 < 0.8 and not volume_surge_bullish:
         if getattr(config, "MIN_CONFLUENCE_SCORE", 50.0) > 30.0:
             logger.info(
                 "[SKIP] no_volume_confirmation — %s | volume_ratio_20=%.2f surge=False",
@@ -675,44 +618,12 @@ def validate_nexus_confluence_setup(
         else:
             logger.info("[TESTING] Bypassed no_volume_confirmation veto for %s", candidate.get("symbol"))
 
-    # ── VETO #13: Technical Floor (Confluencia Orgánica) ──────────────────────
-    # No importa si Nexus tiene 99% de confianza. Si los grupos técnicos (SMC, PA, Vol)
-    # son un desastre (< 15 puntos promedio), el trade es una timba.
-    # USUSDT ejemplo: PA=18.6, SMC=20, Vol=19.9 → promedio ~19 → trade liquidado.
-    # AJUSTE v6.0: Bajado de 40.0 a 15.0 para permitir entrada en despegue (Era Dorada)
-    # EXCLUSIÓN: No aplica a Standard Scalping y Scalping Clone
-    group_scores = candidate.get("group_scores", {})
-    if profile and profile.get("id") not in ("00000000-0000-0000-0000-000000000000", "00000000-0000-0000-0000-000000000001"):
-        if group_scores:
-            pa_score = float(group_scores.get("g1_price_action", 0) or 0)
-            smc_score = float(group_scores.get("g2_smc_ict", 0) or 0)
-            vol_score = float(group_scores.get("g5_volume", 0) or 0)
-            
-            # Solo aplicar si los 3 scores están disponibles (no son 0)
-            if pa_score > 0 and smc_score > 0 and vol_score > 0:
-                tech_avg = (pa_score + smc_score + vol_score) / 3.0
-                if tech_avg < 15.0:
-                    _VALIDATE_VETO_COUNT += 1
-                    logger.warning(
-                        f"❌ [VETO-13-TECH-FLOOR] Bloqueando trade en {symbol}. "
-                        f"Promedio técnico (PA+SMC+Vol)/3 = {tech_avg:.1f} < 15.0. "
-                        f"PA={pa_score:.1f}, SMC={smc_score:.1f}, Vol={vol_score:.1f}. "
-                        f"Estructura técnica de mierda - IA fanática ignorando realidad. "
-                        f"(veto #{_VALIDATE_VETO_COUNT} total)"
-                    )
-                    return False, "technical_floor_insufficient", {
-                        "pa_score": pa_score,
-                        "smc_score": smc_score,
-                        "vol_score": vol_score,
-                        "tech_avg": tech_avg,
-                        "min_required": 15.0
-                    }
     # ── VETO #3: Post-Pump/Dump Distance from MA7 ────────────────────────
     # Si el precio ya se alejó >3.5% de la MA7, el movimiento ya ocurrió.
     # Entrar LONG cuando el precio está >3.5% sobre MA7 = comprar el techo.
     # Entrar SHORT cuando el precio está >3.5% bajo MA7 = vender el piso.
     post_pump_threshold = float(profile.get("maxMa7DistancePct", getattr(config, "POST_PUMP_MA7_DISTANCE_PCT", 0.035)) / 100.0) if profile else float(getattr(config, "POST_PUMP_MA7_DISTANCE_PCT", 0.035))
-    if ma7 > 0:
+    if not is_golden and ma7 > 0:
         ma7_distance = (cp - ma7) / ma7  # positivo = precio sobre MA7
         if side == 0 and ma7_distance > post_pump_threshold:
             logger.info(
@@ -736,7 +647,7 @@ def validate_nexus_confluence_setup(
     max_nexus_age = float(profile.get("maxNexusSignalAgeSeconds", getattr(config, "MAX_NEXUS_SIGNAL_AGE_SECONDS", 120.0))) if profile else float(getattr(config, "MAX_NEXUS_SIGNAL_AGE_SECONDS", 120.0))
     max_drift_pct = float(profile.get("nexusMaxPriceDriftPct", getattr(config, "NEXUS_MAX_PRICE_DRIFT_PCT", 0.025))) if profile else float(getattr(config, "NEXUS_MAX_PRICE_DRIFT_PCT", 0.025))
 
-    if signal_age_s > max_nexus_age and price_at_signal > 0:
+    if not is_golden and signal_age_s > max_nexus_age and price_at_signal > 0:
         price_drift = abs(cp - price_at_signal) / price_at_signal
         if price_drift > max_drift_pct:
             logger.info(
@@ -751,93 +662,12 @@ def validate_nexus_confluence_setup(
     # Un rango <3% en 15m no tiene recorrido suficiente para cubrir el riesgo.
     estimated_range_pct = float(candidate.get("estimated_range_pct", 0) or 0)
     MIN_RANGE_PCT = float(profile.get("minEstimatedRangePct", getattr(config, "MIN_ESTIMATED_RANGE_PCT", 3.0))) if profile else float(getattr(config, "MIN_ESTIMATED_RANGE_PCT", 3.0))
-    if estimated_range_pct < MIN_RANGE_PCT:
+    if not is_golden and estimated_range_pct < MIN_RANGE_PCT:
         logger.info(
             "[VETO] range_too_small — %s | range=%.2f%% < min=%.1f%%",
             candidate.get("symbol"), estimated_range_pct, MIN_RANGE_PCT
         )
         return False, "range_too_small", metrics
-
-    # ── VETO #14: MA CONVERGENCE & SPRING VETO (15m timeframe) ───────────────
-    # Este veto aplica específicamente a temporalidades de 15 minutos.
-    # Nexus-15 es inherentemente 15m, LSE puede ser 15m, 1h, 4h, etc.
-    # Regla 1: MA Convergence (Magnet Effect) - Para SHORTs, si distancia MA99-precio < 1.5%
-    # Regla 2: Wyckoff Contradiction (Spring) - Si se detecta SPRING, bloquear todos los SHORTs
-    # Regla 3: RSI Exhaustion (En el piso) - Para SHORTs, si RSI-14 < 35
-    
-    # Determinar si es temporalidad de 15m
-    is_15m_timeframe = True  # Nexus-15 es inherentemente 15m por defecto
-    source = candidate.get("source", "").lower()
-    
-    if source == "lse":
-        # Para LSE, verificar el timeframe explícito
-        lse_timeframe = str(candidate.get("lse_timeframe", "1h")).lower()
-        is_15m_timeframe = (lse_timeframe == "15m")
-    
-    if is_15m_timeframe and side == 1:  # Solo para SHORTs en 15m
-        # Regla 1: MA Convergence (Magnet Effect)
-        # Para LSE, usar lse_ma99. Para Nexus-15, MA99 no está disponible en nexus_features
-        if source == "lse":
-            ma99 = candidate.get("lse_ma99")
-            if ma99 is not None and ma99 > 0:
-                try:
-                    ma99_f = float(ma99)
-                    dist_pct = abs(cp - ma99_f) / ma99_f * 100
-                    if dist_pct < 1.5:
-                        _VALIDATE_VETO_COUNT += 1
-                        logger.warning(
-                            f"❌ [VETO-14-MA-CONVERGENCE] Bloqueando SHORT en {symbol}. "
-                            f"Distancia MA99-Precio = {dist_pct:.2f}% < 1.5%. "
-                            f"Efecto magnético - precio muy cerca de MA99. "
-                            f"(veto #{_VALIDATE_VETO_COUNT} total)"
-                        )
-                        return False, "ma_convergence_magnet_effect", {
-                            "ma99": ma99_f,
-                            "current_price": cp,
-                            "distance_pct": dist_pct,
-                            "threshold": 1.5
-                        }
-                except (TypeError, ValueError):
-                    pass
-        
-        # Regla 2: Wyckoff Contradiction (Spring)
-        # Verificar si hay detección de Spring en nexus_features o regime
-        wyckoff_phase = str(nexus_features.get("wyckoff_phase", "")).lower()
-        nexus_regime = str(nexus15_ctx.get("regime", "")).lower() if isinstance(nexus15_ctx, dict) else ""
-        
-        # Spring puede estar indicado por wyckoff_phase="spring" o regime="LSE_SPRING"
-        is_spring_detected = (
-            "spring" in wyckoff_phase or 
-            "spring" in nexus_regime or
-            "reaccumulation" in wyckoff_phase
-        )
-        
-        if is_spring_detected:
-            _VALIDATE_VETO_COUNT += 1
-            logger.warning(
-                f"❌ [VETO-14-WYCKOFF-SPRING] Bloqueando SHORT en {symbol}. "
-                f"SPRING detectado (Wyckoff: {wyckoff_phase}, Regime: {nexus_regime}). "
-                f"Contradicción de Wyckoff - no SHORT contra un Spring. "
-                f"(veto #{_VALIDATE_VETO_COUNT} total)"
-            )
-            return False, "wyckoff_spring_contradiction", {
-                "wyckoff_phase": wyckoff_phase,
-                "regime": nexus_regime
-            }
-        
-        # Regla 3: RSI Exhaustion (En el piso)
-        if rsi_14 < 35:
-            _VALIDATE_VETO_COUNT += 1
-            logger.warning(
-                f"❌ [VETO-14-RSI-EXHAUSTION] Bloqueando SHORT en {symbol}. "
-                f"RSI-14 = {rsi_14:.1f} < 35. "
-                f"RSI exhaustión en el piso - mercado oversold. "
-                f"(veto #{_VALIDATE_VETO_COUNT} total)"
-            )
-            return False, "rsi_exhaustion_oversold", {
-                "rsi_14": rsi_14,
-                "threshold": 35
-            }
 
     # ── BONUS SMC Triple: OB + FVG + BOS simultáneos ──────────────
     # En producción: BILLUSDT con este patrón hizo +17.82% ROI en 5h.
@@ -934,45 +764,17 @@ def validate_pre_trade(
     symbol = candidate.get("symbol", "?")
     side = int(candidate.get("side", 0))
     
-    # ── VETO #16: STABLECOIN BLACKLIST (FIXED v6.1) ─────────────────────────
-    # Evita operar activos de paridad o monedas muertas.
-    # FIX v6.1: Comparación EXACTA en lugar de substring para no bloquear todos los pares USDT
-    # USO: Solo bloquea stablecoins reales (USDTUSDT, USDCUSDT, etc.)
-    STABLES = {"USDTUSDT", "USDCUSDT", "FDUSDUSDT", "TUSDUSDT", "PAXGUSDT", "USUSDT", "BUSDUSDT", "DAIUSDT"}
-
-    if symbol.upper() in STABLES:
-        _VALIDATE_VETO_COUNT += 1
-        logger.warning(
-            f"❌ [VETO-16-STABLE] {symbol} es una Stablecoin. Abortando. "
-            f"(veto #{_VALIDATE_VETO_COUNT} total)"
-        )
-        return False, "stablecoin_blacklist", {"symbol": symbol}
-    
-    # ── Log de primera ejecución: confirma que los VETOS NUEVOS están activos ──
+    # ── Log de primera ejecución ──
     if _VALIDATE_FIRST_CALL:
         _VALIDATE_FIRST_CALL = False
         btc_shield = "ACTIVO" if btc_filter else "SIN btc_filter"
-        corr_block = "ACTIVO" if (btc_filter and btc_corr) else "SIN btc_corr"
-        bleed_threshold = getattr(config, "BTC_BLEED_1H_THRESHOLD", "?")
-        hard_block_corr = getattr(config, "BTC_CORR_HARD_BLOCK_THRESHOLD", "?")
-        ceiling_threshold = getattr(config, "BTC_RED_ALT_CEILING_PCT", 18.0)
         logger.info(
-            f"[SetupValidator] >>> PRIMERA EJECUCION v7.6 (SYMBOL FIX DEFINITIVO) <<< "
-            f"| HYBRID SNIPER SYNERGY v7.0: ACTIVO (Bypass estructural: Compression>85%, Wyckoff Accumulation/Spring, MA99 Flat -5°/+5°, Volume 1m>1.0x) "
-            f"| PERFORMANCE v7.5: Pre-filtrado volumen >= $500k, TIER 1 FORCE-INJECTION (siempre analizado), MSF fallback, ThreadPoolExecutor (10 workers) "
-            f"| VOLUME FIX v7.5: Corrección definitiva 'quoteVolume' (Binance standard) + MSF directo si ticker es None "
-            f"| GLOBAL VAR FIX v7.5: global _VALIDATE_VETO_COUNT, _VALIDATE_PASS_COUNT en validate_nexus_confluence_setup y validate_pre_trade "
-            f"| VETO #10 BTC Blood Shield: {btc_shield} (umbral {bleed_threshold}%/1h) "
-            f"| VETO #11 Dynamic Ceiling: {btc_shield} (BTC ROJO=18%, BTC VERDE=22% + Room to Breathe) "
-            f"| VETO #11.1 Insufficient Upside: {btc_shield} (espacio restante < TP necesario) "
-            f"| VETO #12 Volume Floor: ACTIVO (VolumeRatio20 < 0.40 = moneda muerta) "
-            f"| VETO #13 Technical Floor: ACTIVO (PA+SMC+Vol promedio < 15 = estructura de mierda) "
-            f"| VETO #15 ATR Floor: ACTIVO (ATR < 0.5% = activo muerto) "
-            f"| VETO #16 Stable Blacklist: ACTIVO (FIXED - comparación exacta: USDTUSDT, USDCUSDT, etc.) "
-            f"| VETO #14 MA Convergence & Spring: ACTIVO (15m timeframe SHORTs: MA99<1.5%, Spring, RSI<35) "
-            f"| CONCURRENCY FIX v7.1: Retry 3x con delay 100ms para error 409 en PositionManager "
-            f"| BTC DUMPING hard block: {corr_block} (corr>={hard_block_corr}) "
-            f"| Symbol={symbol} side={'LONG' if side==0 else 'SHORT'}"
+            f"[SetupValidator] >>> PRIMERA EJECUCION v9.5 (DUAL SNIPER) <<< "
+            f"| GOLDEN: MA99 ±0.5°/12v, distMA99≤15%, proxMA7≤2% | Nexus min=65% "
+            f"| PERFORMANCE: ThreadPoolExecutor (10 workers), MSF fallback, quoteVolume mapping "
+            f"| Vetos activos: #1 Pump Exhaustion, #3 Post-Pump MA7, #4 Stale Signal, #5 Climax Rejection, "
+            f"#6 RSI Extreme, #7 MA7 Distance, #8 Ranging No Momentum, #9 Range Too Small "
+            f"| BTC Shield: {btc_shield} | Symbol={symbol} side={'LONG' if side==0 else 'SHORT'}"
         )
     
     # ── Health Summary cada 10 validaciones ──────────────────────────
@@ -1006,10 +808,20 @@ def validate_pre_trade(
         )
         return False, "daily_dump_exhaustion_short", {"daily_change_pct": daily_change_pct, "limit": max_daily_dump}
 
+    # ── GOLDEN U-TURN v9.1: Activar modo estructural antes de vetos globales ──
+    is_golden = bool(
+        candidate.get("golden_uturn_mode")
+        or candidate.get("source") == "golden_uturn"
+        or (candidate.get("agent_audit_context", {}).get("golden_uturn", {}) or {}).get("detected")
+    )
+    if is_golden:
+        candidate["golden_uturn_mode"] = True
+        candidate["confluence_score"] = float(getattr(config, "GOLDEN_UTURN_SCORE", 99.0))
+
     # ── VETO GLOBAL: Rango Estimado Máximo (MAX_ESTIMATED_RANGE_PCT) ──
     estimated_range_pct = float(candidate.get("estimated_range_pct", 0) or 0)
     max_range_pct = float(profile.get("maxEstimatedRangePct", getattr(config, "MAX_ESTIMATED_RANGE_PCT", 7.0))) if profile else float(getattr(config, "MAX_ESTIMATED_RANGE_PCT", 7.0))
-    if max_range_pct > 0 and estimated_range_pct > max_range_pct:
+    if not is_golden and max_range_pct > 0 and estimated_range_pct > max_range_pct:
         logger.info(
             "[VETO] range_too_large — %s | range=%.2f%% > limit=%.1f%% (Evita hiper-volatilidad)",
             symbol, estimated_range_pct, max_range_pct
@@ -1040,6 +852,10 @@ def validate_pre_trade(
         return False, "stop_loss_too_expensive", {"sl_pct": sl_pct, "max_limit": max_sl_pct}
 
     # ── VALIDACIONES Y FILTRADO POR TIERS PARA NEXUS / BRIDGE ──
+    # Golden U-Turn: bypass total de confluencia/Nexus — la geometría MA99 es la señal
+    if is_golden and candidate.get("source") != "LSE":
+        return validate_nexus_confluence_setup(candidate, current_price, profile)
+
     if candidate.get("source") != "LSE":
         # Detectar Tier
         tier = "N/A"
@@ -1062,133 +878,13 @@ def validate_pre_trade(
 
         confluence_score = float(candidate.get("confluence_score", 0) or 0)
 
-        # ── VETO #10: BTC BLOOD SHIELD (HARD VETO) ──────────────────────────
-        # Si BTC está sangrando >1% en 1h, BLOQUEO TOTAL de LONGs.
-        # No importa cuán bueno sea el setup de la altcoin.
-        # Este veto previene la repetición de la pérdida de 20 USDT del 1/6/2026
-        # donde BTC cayó de 73k a 71k gradualmente y el bot abrió 14 LONGs.
-        # EXCLUSIÓN: No aplica a Standard Scalping y Scalping Clone
-        if btc_filter and side == 0:
-            if profile and profile.get("id") not in ("00000000-0000-0000-0000-000000000000", "00000000-0000-0000-0000-000000000001"):
-                is_bleeding, btc_pct_1h = btc_filter.is_btc_bleeding()
-                if is_bleeding:
-                    _VALIDATE_VETO_COUNT += 1
-                    logger.warning(
-                        f"❌ [VETO-BTC-BLOOD] Bloqueando LONG en {symbol}. "
-                        f"BTC sangrando {btc_pct_1h:.2f}% en 1h. "
-                        f"NO importa la confluencia del setup. "
-                        f"(veto #{_VALIDATE_VETO_COUNT} total)"
-                    )
-                    return False, "btc_bleeding_1h", {"btc_dump_1h": btc_pct_1h}
-
-        # ── VETO #11: DYNAMIC CEILING (BTC STATE + ALT EXHAUSTION) ─────────────
-        # Techo dinámico según el estado de BTC:
-        # - Si BTC daily es ROJO: techo = 12% (mercado bajista, alts agotadas rápido)
-        # - Si BTC daily es VERDE: techo = 22% (mercado alcista, alts pueden correr más)
-        # Esto permite capturar "Home Runs" (+30-40%) cuando BTC acompaña,
-        # pero sigue protegiendo de techos cuando BTC está en rojo.
-        #
-        # VETO #11.1: ROOM TO BREATHE (Espacio para respirar)
-        # Validamos que haya espacio suficiente para el TP.
-        # Si el espacio restante hasta el techo es menor al TP que necesita la estrategia,
-        # el trade se anula por "insufficient_upside_for_ceiling".
-        # EXCLUSIÓN: No aplica a Standard Scalping y Scalping Clone
-        if btc_filter and side == 0:
-            if profile and profile.get("id") not in ("00000000-0000-0000-0000-000000000000", "00000000-0000-0000-0000-000000000001"):
-                btc_daily_red, btc_daily_open, btc_current = btc_filter.is_btc_daily_red()
-                alt_24h_low = _fetch_24h_low_price(symbol)
-                if alt_24h_low > 0:
-                    alt_move_from_low = ((current_price - alt_24h_low) / alt_24h_low) * 100
-
-                    # Techo dinámico según estado de BTC
-                    # AJUSTE v6.0: Subido de 12.0 a 18.0 para permitir segundo tramo de rally (Era Dorada)
-                    if btc_daily_red:
-                        ceiling_threshold = float(getattr(config, "BTC_RED_ALT_CEILING_PCT", 18.0))
-                        btc_state = "ROJA"
-                    else:
-                        ceiling_threshold = float(getattr(config, "BTC_GREEN_ALT_CEILING_PCT", 22.0))
-                        btc_state = "VERDE"
-
-                    # Calcular el TP que la estrategia necesita (en porcentaje)
-                    target_tp_pct = 0.0
-                    if candidate.get("source") == "LSE":
-                        # Para LSE: TP2 es el take profit objetivo
-                        lse_entry = float(candidate.get("lse_entry_price", 0) or 0)
-                        lse_tp2 = float(candidate.get("lse_take_profit_2", 0) or 0)
-                        if lse_entry > 0 and lse_tp2 > 0:
-                            target_tp_pct = ((lse_tp2 - lse_entry) / lse_entry) * 100
-                    else:
-                        # Para Nexus/SCAR: TP se calcula del rango estimado
-                        estimated_range_pct = float(candidate.get("estimated_range_pct", 2.0) or 2.0)
-                        tp_multiplier = float(profile.get("tpMultiplier", config.TP_MULTIPLIER)) if profile else config.TP_MULTIPLIER
-                        target_tp_pct = estimated_range_pct * tp_multiplier
-
-                    # Espacio restante hasta el techo de cristal
-                    remaining_upside = ceiling_threshold - alt_move_from_low
-
-                    # VETO #11: Si ya pasó el techo absoluto
-                    if alt_move_from_low > ceiling_threshold:
-                        _VALIDATE_VETO_COUNT += 1
-                        logger.warning(
-                            f"❌ [VETO-DYNAMIC-CEILING] Bloqueando LONG en {symbol}. "
-                            f"BTC vela diaria {btc_state} (open={btc_daily_open:.2f}, close={btc_current:.2f}). "
-                            f"Alt subió {alt_move_from_low:.2f}% desde low 24h (límite={ceiling_threshold}%). "
-                            f"Agotamiento extremo - techo dinámico según estado BTC. "
-                            f"(veto #{_VALIDATE_VETO_COUNT} total)"
-                        )
-                        return False, "dynamic_ceiling_exhaustion", {
-                            "btc_daily_open": btc_daily_open,
-                            "btc_current": btc_current,
-                            "btc_state": btc_state,
-                            "alt_move_from_low": alt_move_from_low,
-                            "ceiling_threshold": ceiling_threshold
-                        }
-
-                    # VETO #11.1: Si no hay espacio suficiente para el TP (Room to Breathe)
-                    if remaining_upside < target_tp_pct:
-                        _VALIDATE_VETO_COUNT += 1
-                        logger.warning(
-                            f"❌ [VETO-CEILING-SPACE] Bloqueando LONG en {symbol}. "
-                            f"BTC vela diaria {btc_state}. Espacio restante ({remaining_upside:.2f}%) menor al TP necesario ({target_tp_pct:.2f}%). "
-                            f"Alt ya subió {alt_move_from_low:.2f}% desde low 24h (techo={ceiling_threshold}%). "
-                            f"No hay room to breathe - trade nace asfixiado. "
-                            f"(veto #{_VALIDATE_VETO_COUNT} total)"
-                        )
-                        return False, "insufficient_upside_for_ceiling", {
-                            "btc_daily_open": btc_daily_open,
-                            "btc_current": btc_current,
-                            "btc_state": btc_state,
-                            "alt_move_from_low": alt_move_from_low,
-                            "ceiling_threshold": ceiling_threshold,
-                            "remaining_upside": remaining_upside,
-                            "target_tp_pct": target_tp_pct
-                        }
-
-        # ── BTC CORRELATION PENALTY (Capa 3) — AHORA CON BLOQUEO DURO ──
-        # Si BTC está en DUMPING y la alt tiene alta correlación:
-        #   - correlación > 0.8 → BLOQUEO TOTAL (veto duro, no solo penalización)
-        #   - correlación > 0.6 → penalización del score
+        # ── BTC CORRELATION PENALTY (Capa 3) ──
+        # Penalizar score de confluencia cuando BTC está en DUMPING y la alt tiene alta correlación
         raw_confluence_score = confluence_score
         if btc_filter and btc_corr and candidate.get("source") != "LSE":
             btc_regime = btc_filter.get_regime()
             if btc_regime == "DUMPING":
-                correlation = btc_corr.get_correlation(symbol)
                 penalty = btc_corr.get_score_penalty(symbol, btc_regime)
-                
-                # HARD BLOCK: Correlación alta + BTC DUMPING = veto absoluto
-                btc_hard_block_threshold = float(getattr(config, "BTC_CORR_HARD_BLOCK_THRESHOLD", 0.75))
-                if side == 0 and correlation >= btc_hard_block_threshold:
-                    logger.warning(
-                        f"❌ [VETO-BTC-DUMPING-HIGH-CORR] Bloqueando LONG en {symbol}. "
-                        f"BTC en DUMPING + correlación {correlation:.3f} >= {btc_hard_block_threshold}. "
-                        f"Las alts correlacionadas CAEN con BTC."
-                    )
-                    return False, "btc_dumping_high_correlation", {
-                        "btc_regime": btc_regime, 
-                        "correlation": correlation,
-                        "threshold": btc_hard_block_threshold
-                    }
-                
                 if penalty < 1.0:
                     confluence_score = raw_confluence_score * penalty
                     logger.info(f"[BTC-CORR] {symbol} nexus penalizado {raw_confluence_score:.1f}→{confluence_score:.1f} (penalty={penalty:.2f} régimen={btc_regime})")

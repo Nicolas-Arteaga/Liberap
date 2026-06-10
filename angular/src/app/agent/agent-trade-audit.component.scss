@@ -463,6 +463,12 @@
     border-left: 3px solid #f472b6;
     padding-left: 0.65rem;
   }
+
+  &.panel--golden {
+    border-left: 3px solid #f59e0b;
+    padding-left: 0.65rem;
+    background: rgba(245, 158, 11, 0.04);
+  }
 }
 
 .tp-check, .sl-check {
@@ -705,6 +711,12 @@
     background: rgba(0, 196, 125, 0.15);
     color: #00C47D;
     border-color: rgba(0, 196, 125, 0.35);
+  }
+  &--golden {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+    border-color: rgba(245, 158, 11, 0.4);
+    font-weight: 600;
   }
 }
 

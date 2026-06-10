@@ -17,7 +17,9 @@ export interface AgentDecisionSnapshot {
     entry_reason?: string;
     nexus_group?: string;
     tier?: string;
+    tool_used?: string;
   };
+  structural_analytics?: Record<string, unknown>;
   candidate?: Record<string, unknown>;
   position_sizing?: Record<string, unknown>;
 }
@@ -303,6 +305,9 @@ export class AgentTradeAuditComponent implements OnInit {
   signalSource(trade: SimulatedTradeDto): string {
     if (!this.hasAuditSnapshot(trade)) return '—';
     const snap = this.parseSnapshot(trade);
+    // v9.1: If tool_used is set in agent_meta, show it as the primary tool label
+    const toolUsed = snap?.agent_meta?.['tool_used'] as string | undefined;
+    if (toolUsed === 'Structural_U-Turn_v9.1') return 'Golden U-Turn';
     const src = snap?.candidate?.['source'];
     return typeof src === 'string' ? this.mapSourceToLabel(src) : 'Nexus-15';
   }
@@ -622,6 +627,49 @@ export class AgentTradeAuditComponent implements OnInit {
         label: this.humanizeKey(k),
         value: this.auditIsNested(rec[k]) ? this.safeJson(rec[k]) : this.formatScalarForDisplay(rec[k]),
       }));
+  }
+
+  /**
+   * v9.1: Rows for the Structural Analytics panel (Golden U-Turn calibration data).
+   * Returns an ordered list of {label, value} pairs for display in the modal.
+   */
+  structuralAnalyticsRows(sa: Record<string, unknown>): { label: string; value: string }[] {
+    const labelMap: Record<string, string> = {
+      'tool_used': 'Herramienta',
+      'ma99_angle_at_entry': 'Ángulo MA99 @ entrada',
+      'ma99_drop_magnitude_pct': 'Caída MA99 (%)',
+      'ma99_drop_duration_candles': 'Duración caída (velas 1h)',
+      'price_to_ma99_distance_pct': 'Distancia precio→MA99 (%)',
+      'volume_ignition_ratio_1m': 'Ignición volumen 1m (×)',
+      'atr_volatility_at_entry': 'ATR% @ entrada',
+      'consecutive_flat_candles': 'Velas MA99 plana (consec.)',
+      'sl_strategy': 'Estrategia SL',
+      'tp_multiplier': 'Multiplicador TP',
+    };
+    const order = [
+      'tool_used', 'ma99_angle_at_entry', 'ma99_drop_magnitude_pct',
+      'ma99_drop_duration_candles', 'price_to_ma99_distance_pct',
+      'volume_ignition_ratio_1m', 'atr_volatility_at_entry',
+      'consecutive_flat_candles', 'sl_strategy', 'tp_multiplier',
+    ];
+    const rows: { label: string; value: string }[] = [];
+    for (const k of order) {
+      if (!(k in sa)) continue;
+      let v = sa[k];
+      if (k === 'ma99_angle_at_entry' && v != null) v = `${v}°`;
+      if (k === 'ma99_drop_magnitude_pct' && v != null) v = `${v}%`;
+      if (k === 'price_to_ma99_distance_pct' && v != null) v = `${v}%`;
+      if (k === 'atr_volatility_at_entry' && v != null) v = `${v}%`;
+      if (k === 'volume_ignition_ratio_1m' && v != null) v = `${v}×`;
+      rows.push({ label: labelMap[k] ?? this.humanizeKey(k), value: String(v ?? '—') });
+    }
+    // ma99_raw_values sub-object
+    const raw = sa['ma99_raw_values'] as Record<string, unknown> | undefined;
+    if (raw) {
+      rows.push({ label: 'MA99 actual', value: this.formatScalarForDisplay(raw['current']) });
+      rows.push({ label: 'MA99 hace 60 velas', value: this.formatScalarForDisplay(raw['ago_60_candles']) });
+    }
+    return rows;
   }
 
   downloadAll(): void {

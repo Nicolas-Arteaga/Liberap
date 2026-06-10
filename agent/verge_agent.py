@@ -39,17 +39,24 @@ from btc_correlation import BTCCorrelation
 # The LSE Python service endpoint is part of the same python-service container.
 
 # ── AGENT VERSION — Cambiar en cada release para identificar en logs ─────
-AGENT_VERSION = "v5.0-ROOM-TO-BREATHE"
-AGENT_BUILD_DATE = "2026-06-01"
+AGENT_VERSION = "v9.6-BIG-FISH"
+AGENT_BUILD_DATE = "2026-06-10"
 AGENT_CHANGES = [
-    "FIX: get_regime() ahora usa 3 ventanas (5m/15m/1h) - detecta sangrado gradual",
-    "FIX: get_dump_pct() ahora mide ventana EXACTA - no compara contra hace 5hs",
-    "NEW: VETO #10 BTC Blood Shield - bloqueo DURO si BTC cae >1% en 1h",
-    "NEW: BTC DUMPING + correlacion >0.75 = bloqueo DURO (no penalizacion suave)",
-    "NEW: is_btc_bleeding() metodo para veto duro en tiempo real",
-    "NEW: VETO #11 12% Ceiling - BTC rojo + alt >12% desde low = veto",
-    "NEW: VETO #11.1 Room to Breathe - espacio restante < TP necesario = veto",
-    "NEW: is_btc_daily_red() metodo para detectar vela diaria roja",
+    "FIX v9.6: Big Fish — Golden SL max(low20, 3%) + TP mínimo 10%",
+    "FIX v9.5: Dual Sniper — Golden VIP primero, Nexus-15 estándar después (65% min)",
+    "FIX v9.5: Dist MA99 hasta 15%, MA7 proximidad ±2% (sin exigir cierre encima)",
+    "FIX v9.5: Tier 2 Gravity Scan con volumen $100k, perfiles DB cap minNexus=65%",
+    "FIX v9.4: Piso de Cemento — ángulo MA99 ±0.5° en ventana 12 velas",
+    "FIX v9.4: SL = low 5 velas con buffer 0.1% bajo el piso",
+    "FIX v9.3: Pase VIP Golden U-Turn — bypass MIN_ENTRY_NEXUS (76%) y MIN_UPGRADE_NEXUS",
+    "FIX v9.3: Golden ignora gate Nexus-15 en _execute_trade (10% vs 76% resuelto)",
+    "FIX v9.2: RiskManager atr_signal UnboundLocalError — Golden U-Turn ya no crashea al abrir",
+    "FIX v9.2: Inyección directa Score=99 + prioridad absoluta sobre Nexus-15",
+    "NEW: Golden U-Turn v9.0 — Structural Pivot Hunter (MA99 horizontal tras caída)",
+    "NEW: Gravity Check Step 3.5 (MA99 ±1.5°, drop ≥3% en 100 velas 15m)",
+    "NEW: Bypass Golden Rule — anula VETO RSI, MA7, volumen, ranging",
+    "NEW: [STRAT: GOLDEN-U-TURN] tag + SL custom (low 5 velas)",
+    "v9.1: structural_analytics en audit JSON + tool_used marking",
 ]
 
 LSE_ENABLED = getattr(config, "LSE_ENABLED", True)
@@ -241,9 +248,34 @@ class VergeAgent:
             "boost_applied": candidate.get("nexus5_boost"),
             "is_reversal": candidate.get("nexus5_reversal"),
         }
-        
+
+        # ── v9.1 STRUCTURAL ANALYTICS: Golden U-Turn calibration data ──
+        # Exposes the full geometry of the Structural Pivot for post-trade analysis.
+        gu_audit = candidate.get("agent_audit_context", {}).get("golden_uturn", {})
+        is_golden = bool(candidate.get("golden_uturn_mode") or gu_audit.get("detected", False))
+        tool_used = "Structural_U-Turn_v9.1" if is_golden else "Standard_Pipeline_v9.0"
+
+        structural_analytics = {}
+        if is_golden:
+            structural_analytics = {
+                "tool_used": tool_used,
+                "ma99_angle_at_entry": gu_audit.get("angle"),
+                "ma99_drop_magnitude_pct": gu_audit.get("drop_pct"),
+                "ma99_drop_duration_candles": int(getattr(config, "GOLDEN_UTURN_LOOKBACK_CANDLES", 60)),
+                "price_to_ma99_distance_pct": gu_audit.get("price_to_ma99_distance_pct"),
+                "ma99_raw_values": {
+                    "current": gu_audit.get("ma99_now"),
+                    "ago_60_candles": gu_audit.get("ma99_ago"),
+                },
+                "volume_ignition_ratio_1m": gu_audit.get("volume_ignition_ratio_1m"),
+                "atr_volatility_at_entry": gu_audit.get("atr_volatility_pct"),
+                "consecutive_flat_candles": gu_audit.get("consecutive_flat_candles"),
+                "sl_strategy": "5-candle_low",
+                "tp_multiplier": getattr(config, "TP_MULTIPLIER", 3.5),
+            }
+
         snap = {
-            "schema_version": 1,
+            "schema_version": 2,
             "agent_version": "risk_v5",
             "experiment": "post_sl_fix_may_2026",
             "captured_at_utc": datetime.utcnow().isoformat() + "Z",
@@ -253,10 +285,12 @@ class VergeAgent:
                 "tier": tier,
                 "setup_validation": setup_skip or "ok",
                 "setup_metrics": self._json_safe_for_audit(copy.deepcopy(setup_metrics or {})),
+                "tool_used": tool_used,
             },
             "btc_context": btc_context,
             "temporal_context": temporal_context,
             "nexus5_context": nexus5_context,
+            "structural_analytics": structural_analytics,
             "candidate": self._json_safe_for_audit(copy.deepcopy(candidate)),
             "position_sizing": self._json_safe_for_audit(copy.deepcopy(pos_details)),
         }
@@ -472,13 +506,21 @@ class VergeAgent:
         logger.info("[Step 1/6] Syncing strategy profiles and checking positions...")
         db_profiles = self.positions.get_strategy_profiles() or []
         db_profiles = [p for p in db_profiles if p.get("name") not in ("Standard Scalping", "Scalping Clone")]
+        _profile_nexus_cap = float(getattr(config, "PROFILE_MIN_NEXUS_CONFIDENCE", 65.0))
+        for p in db_profiles:
+            raw_nexus = float(p.get("minNexusConfidence") or _profile_nexus_cap)
+            if raw_nexus > _profile_nexus_cap:
+                p["minNexusConfidence"] = _profile_nexus_cap
+                logger.info(
+                    f"[v9.5] Perfil '{p.get('name')}' minNexus capped {raw_nexus}% → {_profile_nexus_cap}%"
+                )
         
         # Define the virtual legacy profile for "Standard Scalping" (Sniper Mode)
         legacy_profile = {
             "id": STANDARD_PROFILE_ID,
             "name": "Standard Scalping",
             "minConfluenceScore": config.MIN_CONFLUENCE_SCORE,
-            "minNexusConfidence": 76.0,  # Subido a 76% para máxima calidad
+            "minNexusConfidence": _profile_nexus_cap,
             "tpMultiplier": getattr(config, "TP_MULTIPLIER", 2.0),
             "slMultiplier": getattr(config, "SL_MULTIPLIER", 1.0),
             "marginPerTrade": getattr(config, "MAX_MARGIN_PER_TRADE_USD", 150),
@@ -488,7 +530,7 @@ class VergeAgent:
             "nexusMaxPriceDriftPct": 0.002,    # Máximo movimiento de 0.2% desde la señal
             "allowLong": True,
             "allowShort": True,
-            "allowedSources": ["nexus", "scar", "redis_bridge"],
+            "allowedSources": ["nexus", "scar", "redis_bridge", "golden_uturn"],
             "isActive": True
         }
 
@@ -497,7 +539,7 @@ class VergeAgent:
             "id": CLONE_PROFILE_ID,
             "name": "Scalping Clone",
             "minConfluenceScore": config.MIN_CONFLUENCE_SCORE,
-            "minNexusConfidence": 76.0,  # Subido a 76% para máxima calidad
+            "minNexusConfidence": _profile_nexus_cap,
             "tpMultiplier": getattr(config, "TP_MULTIPLIER", 2.0),
             "slMultiplier": getattr(config, "SL_MULTIPLIER", 1.0) * 2,  # 2x Standard Scalping SL (Tanque)
             "marginPerTrade": getattr(config, "MAX_MARGIN_PER_TRADE_USD", 150),
@@ -507,7 +549,7 @@ class VergeAgent:
             "nexusMaxPriceDriftPct": 0.002,    # COPIADO: Máximo 0.2% drift
             "allowLong": True,
             "allowShort": True,
-            "allowedSources": ["nexus", "scar", "redis_bridge"],
+            "allowedSources": ["nexus", "scar", "redis_bridge", "golden_uturn"],
             "isActive": True
         }
 
@@ -559,15 +601,26 @@ class VergeAgent:
         if NEXUS5_ENABLED:
             all_targets_n5 = config.WATCHLIST
             
-            # ── PRE-FILTRADO v7.5: Solo símbolos con volumen >= $500k en 24h ────────────
-            MIN_VOLUME_24H_USD = 500_000  # $500k mínimo (ajustado de $2M por ser demasiado estricto)
+            # ── PRE-FILTRADO v9.5: T1 siempre | T2 >= $100k | resto >= $500k ───────────
+            MIN_VOLUME_TIER2_USD = int(getattr(config, "GOLDEN_UTURN_MIN_VOLUME_TIER2_USD", 100_000))
+            MIN_VOLUME_DEFAULT_USD = int(getattr(config, "GOLDEN_UTURN_MIN_VOLUME_DEFAULT_USD", 500_000))
             filtered_targets_n5 = []
             
-            logger.info(f"[Step 3.5/6] Pre-filtrando {len(all_targets_n5)} símbolos (volumen >= ${MIN_VOLUME_24H_USD/1_000_000}M)...")
+            logger.info(
+                f"[Step 3.5/6] Pre-filtrando {len(all_targets_n5)} símbolos "
+                f"(T1=bypass | T2>=${MIN_VOLUME_TIER2_USD/1000:.0f}k | otros>=${MIN_VOLUME_DEFAULT_USD/1000:.0f}k)..."
+            )
             
-            # ── BYPASS v7.5: TIER 1 siempre se analiza (bypass de emergencia) ─────────────
             tier1_symbols = config.WATCHLIST_TIER1 if hasattr(config, "WATCHLIST_TIER1") else []
+            tier2_symbols = set(config.WATCHLIST_TIER2 if hasattr(config, "WATCHLIST_TIER2") else [])
             logger.info(f"[Step 3.5/6] BYPASS: {len(tier1_symbols)} TIER 1 symbols will be analyzed regardless of volume filter")
+            
+            def _volume_threshold_for(symbol: str) -> int:
+                if symbol in tier1_symbols:
+                    return 0
+                if symbol in tier2_symbols:
+                    return MIN_VOLUME_TIER2_USD
+                return MIN_VOLUME_DEFAULT_USD
             
             # ── DEBUG v7.5: Auditoría de volumen para detectar error de unidades ─────────
             debug_count = 0
@@ -580,20 +633,19 @@ class VergeAgent:
                         quote_volume = float(ticker.get("quoteVolume", ticker.get("quote_volume", ticker.get("volume", 0))) or 0)
                         
                         # Log de auditoría para los primeros 10 símbolos (aumentado de 5)
+                        vol_threshold = _volume_threshold_for(symbol)
                         if debug_count < 10:
                             logger.info(
                                 f"[Step 3.5/6] DEBUG VOLUME: {symbol} | volume_raw={quote_volume} | "
-                                f"volume_formatted=${quote_volume:,.2f} | threshold=${MIN_VOLUME_24H_USD:,.2f} | "
+                                f"volume_formatted=${quote_volume:,.2f} | threshold=${vol_threshold:,.2f} | "
                                 f"ticker_keys={list(ticker.keys())}"
                             )
                             debug_count += 1
                         
-                        # BYPASS v7.5: TIER 1 siempre pasa el filtro
-                        if symbol in tier1_symbols:
+                        if vol_threshold == 0 or quote_volume >= vol_threshold:
                             filtered_targets_n5.append(symbol)
-                            logger.debug(f"[Step 3.5/6] BYPASS: {symbol} (TIER 1) added regardless of volume")
-                        elif quote_volume >= MIN_VOLUME_24H_USD:
-                            filtered_targets_n5.append(symbol)
+                            if vol_threshold == 0:
+                                logger.debug(f"[Step 3.5/6] BYPASS: {symbol} (TIER 1) added regardless of volume")
                     else:
                         # FIX v7.5: Si ticker es None, intentar obtenerlo directamente del MSF
                         logger.debug(f"[Step 3.5/6] DEBUG: {symbol} ticker is None, trying MSF directly...")
@@ -603,14 +655,12 @@ class VergeAgent:
                             if ticker_24h:
                                 # FIX v7.5: Binance usa "quoteVolume" (con V mayúscula)
                                 quote_volume = float(ticker_24h.get("quoteVolume", ticker_24h.get("quote_volume", ticker_24h.get("volume", 0))) or 0)
+                                vol_threshold = _volume_threshold_for(symbol)
                                 logger.info(
                                     f"[Step 3.5/6] DEBUG MSF: {symbol} | volume_raw={quote_volume} | "
-                                    f"volume_formatted=${quote_volume:,.2f} | threshold=${MIN_VOLUME_24H_USD:,.2f}"
+                                    f"volume_formatted=${quote_volume:,.2f} | threshold=${vol_threshold:,.2f}"
                                 )
-                                if symbol in tier1_symbols:
-                                    filtered_targets_n5.append(symbol)
-                                    logger.debug(f"[Step 3.5/6] BYPASS MSF: {symbol} (TIER 1) added regardless of volume")
-                                elif quote_volume >= MIN_VOLUME_24H_USD:
+                                if vol_threshold == 0 or quote_volume >= vol_threshold:
                                     filtered_targets_n5.append(symbol)
                         except Exception as msf_e:
                             logger.debug(f"[Step 3.5/6] MSF failed for {symbol}: {msf_e}")
@@ -626,14 +676,12 @@ class VergeAgent:
             
             logger.info(
                 f"[Step 3.5/6] Pre-filtrado completado: {len(filtered_targets_n5)}/{len(all_targets_n5)} "
-                f"símbolos pasaron el filtro de volumen >= ${MIN_VOLUME_24H_USD/1_000_000}M"
+                f"símbolos pasaron filtro v9.5 (T2=${MIN_VOLUME_TIER2_USD/1000:.0f}k)"
             )
             
-            # ── WARNING v7.2: Si 0 símbolos pasan el filtro, advertir ─────────────────────
             if len(filtered_targets_n5) == 0:
                 logger.warning(
-                    f"[Step 3.5/6] ⚠️ WARNING: High volume filter active (${MIN_VOLUME_24H_USD/1_000_000}M). "
-                    f"NEXUS-5 analysis skipped. Hybrid Sniper Synergy will not activate."
+                    "[Step 3.5/6] ⚠️ WARNING: Volume filter vacío. NEXUS-5 / Gravity Check skipped."
                 )
             
             # ── PARALELIZACIÓN v7.1: ThreadPoolExecutor para descargas ─────────────────
@@ -643,10 +691,12 @@ class VergeAgent:
             logger.info(f"[Step 3.5/6] Escaneando {len(filtered_targets_n5)} símbolos con NEXUS-5 (5m timing) [PARALELIZADO v7.1]...")
             n5_ok = 0
             n5_fail = 0
+            n5_golden = 0  # Golden U-Turn v9.0 counter
             lock = threading.Lock()
             
             def fetch_n5_symbol(symbol):
-                nonlocal n5_ok, n5_fail
+                nonlocal n5_ok, n5_fail, n5_golden
+                # ── NEXUS-5: timing prediction (independent) ──
                 try:
                     n5 = self.signals.get_nexus5_prediction(symbol, limit=500)
                     if n5:
@@ -659,6 +709,40 @@ class VergeAgent:
                 except Exception:
                     with lock:
                         n5_fail += 1
+
+                # ── GOLDEN U-TURN v9.1: Gravity Check (INDEPENDIENTE de Nexus-5) ──
+                # Corre SIEMPRE, incluso si Nexus-5 falla. Esta es la REGLA DE ORO.
+                if getattr(config, "GOLDEN_UTURN_ENABLED", True):
+                    try:
+                        gu = self._check_golden_uturn(symbol)
+                        if gu["passed"]:
+                            with lock:
+                                if symbol not in nexus5_cache:
+                                    nexus5_cache[symbol] = {"symbol": symbol}
+                                nexus5_cache[symbol]["golden_uturn"] = True
+                                nexus5_cache[symbol]["golden_uturn_angle"] = gu["angle"]
+                                nexus5_cache[symbol]["golden_uturn_drop_pct"] = gu["drop_pct"]
+                                nexus5_cache[symbol]["golden_uturn_sl_5low"] = gu["sl_5low"]
+                                # v9.1 audit metrics
+                                nexus5_cache[symbol]["gu_price_to_ma99_distance_pct"] = gu["price_to_ma99_distance_pct"]
+                                nexus5_cache[symbol]["gu_ma99_now"] = gu["ma99_now"]
+                                nexus5_cache[symbol]["gu_ma99_ago"] = gu["ma99_ago"]
+                                nexus5_cache[symbol]["gu_volume_ignition_ratio_1m"] = gu["volume_ignition_ratio_1m"]
+                                nexus5_cache[symbol]["gu_atr_volatility_pct"] = gu["atr_volatility_pct"]
+                                nexus5_cache[symbol]["gu_consecutive_flat_candles"] = gu["consecutive_flat_candles"]
+                                nexus5_cache[symbol]["gu_ma7_now"] = gu["ma7_now"]
+                                nexus5_cache[symbol]["gu_close_above_ma7"] = gu["close_above_ma7"]
+                                n5_golden += 1
+                            logger.info(
+                                f"[GRAVITY-CHECK] {symbol}: MA99 Angle={gu['angle']:.2f}°, "
+                                f"Drop={gu['drop_pct']:.2f}% — GOLDEN U-TURN!"
+                            )
+                        elif gu.get("reject_reason"):
+                            logger.info(
+                                f"[GRAVITY-CHECK] {symbol}: v9.4 RECHAZADO — {gu['reject_reason']}"
+                            )
+                    except Exception as gu_e:
+                        logger.debug(f"[GRAVITY-CHECK] {symbol}: skip - {gu_e}")
             
             # Usar max_workers=10 para paralelizar sin saturar APIs
             with ThreadPoolExecutor(max_workers=10) as executor:
@@ -667,7 +751,8 @@ class VergeAgent:
                     pass  # Los contadores se actualizan dentro de fetch_n5_symbol
             
             logger.info(
-                f"[Step 3.5/6] NEXUS-5: {n5_ok} symbols analyzed, {n5_fail} skipped (no 5m data or error) [PARALELIZADO v7.1]"
+                f"[Step 3.5/6] NEXUS-5: {n5_ok} analyzed, {n5_fail} skipped | "
+                f"GOLDEN U-TURN: {n5_golden} symbols passed Gravity Check [v9.0]"
             )
 
         # 4. Scan T1+T2 watchlist symbols with Nexus-15 (OPTIMIZACIÓN v6.1)
@@ -724,13 +809,43 @@ class VergeAgent:
                 # 🟢 BROADCAST: Batch scores to UI scanner (avoid request spam)
                 broadcast_batch.append(confluence)
 
-                if confluence["confluence_score"] >= config.MIN_CONFLUENCE_SCORE:
+                is_golden_n5 = bool(n5_data and n5_data.get("golden_uturn"))
+                passes_confluence = confluence["confluence_score"] >= config.MIN_CONFLUENCE_SCORE
+                if is_golden_n5 or passes_confluence:
                     enriched = dict(confluence)
                     enriched["agent_audit_context"] = {
                         "nexus15": self._json_safe_for_audit(nexus_data),
                         "scar": self._json_safe_for_audit(scar_data) if scar_data else {},
                         "nexus5": self._json_safe_for_audit(n5_data) if n5_data else {},
+                        "golden_uturn": {
+                            "detected": bool(n5_data.get("golden_uturn", False)) if n5_data else False,
+                            "angle": n5_data.get("golden_uturn_angle") if n5_data else None,
+                            "drop_pct": n5_data.get("golden_uturn_drop_pct") if n5_data else None,
+                            "sl_5low": n5_data.get("golden_uturn_sl_5low") if n5_data else None,
+                            # v9.1 structural analytics for calibration
+                            "price_to_ma99_distance_pct": n5_data.get("gu_price_to_ma99_distance_pct") if n5_data else None,
+                            "ma99_now": n5_data.get("gu_ma99_now") if n5_data else None,
+                            "ma99_ago": n5_data.get("gu_ma99_ago") if n5_data else None,
+                            "volume_ignition_ratio_1m": n5_data.get("gu_volume_ignition_ratio_1m") if n5_data else None,
+                            "atr_volatility_pct": n5_data.get("gu_atr_volatility_pct") if n5_data else None,
+                            "consecutive_flat_candles": n5_data.get("gu_consecutive_flat_candles") if n5_data else None,
+                            "ma7_now": n5_data.get("gu_ma7_now") if n5_data else None,
+                            "close_above_ma7": n5_data.get("gu_close_above_ma7") if n5_data else None,
+                        },
                     }
+
+                    # Golden U-Turn: prioridad absoluta — Score=99, sin depender de Nexus-15
+                    if is_golden_n5:
+                        gu_score = float(getattr(config, "GOLDEN_UTURN_SCORE", 99.0))
+                        enriched["confluence_score"] = gu_score
+                        enriched["golden_uturn_mode"] = True
+                        enriched["source"] = "golden_uturn"
+                        enriched["trade_direction"] = "LONG"
+                        enriched["side"] = 0
+                        sl_5low = n5_data.get("golden_uturn_sl_5low")
+                        if sl_5low and float(sl_5low) > 0:
+                            enriched["golden_uturn_sl_5low"] = sl_5low
+                            enriched["custom_sl_price"] = float(sl_5low)
 
                     # ── BONUS SMC: Aplicar bonus de calidad antes del ranking ──
                     # Usamos price_at_signal (last_close de Nexus) para validar sin latencia REST
@@ -767,10 +882,77 @@ class VergeAgent:
             f"{len(candidates)} candidates | {skipped_trading} skipped | {no_data} no data"
         )
 
-        # Inject Nexus-15 TOP candidates as high-priority entries
+        # ── GOLDEN U-TURN v9.1: Inyección directa (INDEPENDIENTE de Nexus-15) ──
+        # Símbolos que pasaron Gravity Check en Step 3.5 entran con Score=99 sin Nexus-15.
+        if getattr(config, "GOLDEN_UTURN_ENABLED", True):
+            existing_syms = {c.get("symbol") for c in candidates}
+            golden_injected = 0
+            golden_upgraded = 0
+            for symbol, n5_data in nexus5_cache.items():
+                if not n5_data or not n5_data.get("golden_uturn"):
+                    continue
+                if self._should_skip(symbol):
+                    continue
+
+                if symbol in existing_syms:
+                    for c in candidates:
+                        if c.get("symbol") != symbol:
+                            continue
+                        c["confluence_score"] = float(getattr(config, "GOLDEN_UTURN_SCORE", 99.0))
+                        c["golden_uturn_mode"] = True
+                        c["source"] = "golden_uturn"
+                        c["trade_direction"] = "LONG"
+                        c["side"] = 0
+                        sl_5low = n5_data.get("golden_uturn_sl_5low")
+                        if sl_5low and float(sl_5low) > 0:
+                            c["custom_sl_price"] = float(sl_5low)
+                            c["golden_uturn_sl_5low"] = sl_5low
+                        golden_upgraded += 1
+                    continue
+
+                gc = self._build_golden_uturn_candidate(symbol, n5_data)
+                gc_px = gc.get("price_at_signal") or self.fetcher.get_current_price(symbol)
+                if not gc_px or gc_px <= 0:
+                    continue
+                try:
+                    v_ok, v_code, _ = validate_pre_trade(
+                        gc, gc_px, btc_filter=self.btc_filter, btc_corr=self.btc_corr
+                    )
+                    if not v_ok:
+                        logger.info(f"[GOLDEN-INJECT] VETO {symbol}: {v_code}")
+                        continue
+                except Exception as e:
+                    logger.warning(f"[GOLDEN-INJECT] Error validando {symbol}: {e}")
+                    continue
+
+                candidates.append(gc)
+                existing_syms.add(symbol)
+                golden_injected += 1
+                logger.warning(
+                    f"[GOLDEN-INJECT] {symbol} | Score=99 | "
+                    f"Angle={n5_data.get('golden_uturn_angle')}° | "
+                    f"Drop={n5_data.get('golden_uturn_drop_pct')}% — PRIORIDAD ABSOLUTA"
+                )
+
+            if golden_injected or golden_upgraded:
+                logger.info(
+                    f"[GOLDEN-INJECT] {golden_injected} nuevos + {golden_upgraded} upgraded "
+                    f"(total candidates={len(candidates)})"
+                )
+
+        # Inject Nexus-15 TOP candidates (NUNCA pisan Golden U-Turn)
         for nc in nexus_top_candidates:
-            # Avoid duplicate symbols already found in internal scan
             existing_syms = {c["symbol"] for c in candidates}
+            if nc["symbol"] in existing_syms:
+                # Si ya hay Golden U-Turn, Nexus-15 TOP no puede reemplazarlo
+                if any(
+                    c.get("symbol") == nc["symbol"] and self._is_golden_uturn_candidate(c)
+                    for c in candidates
+                ):
+                    logger.info(
+                        f"[NEXUS-TOP] SKIP {nc['symbol']} — Golden U-Turn tiene prioridad absoluta"
+                    )
+                continue
             if nc["symbol"] not in existing_syms:
                 # Pre-validate NEXUS-TOP candidate before injection (consistent with scan flow)
                 try:
@@ -976,6 +1158,14 @@ class VergeAgent:
             logger.info("[KILL] LSE Kill switch active. Filtering LSE candidates.")
             candidates = [c for c in candidates if c.get("source") != "LSE"]
 
+        # Golden U-Turn siempre al frente de la cola (Score=99 > Nexus-15)
+        candidates.sort(
+            key=lambda x: (
+                0 if self._is_golden_uturn_candidate(x) else 1,
+                -float(x.get("confluence_score", 0)),
+            )
+        )
+
         # 6. For EACH active profile: rank and execute candidates
         active_trades = self.positions.get_active_trades() or []
         
@@ -1000,26 +1190,38 @@ class VergeAgent:
                 batch_ok = bool(called and ok and min_symbols_ok and full_scan_ok)
 
             for c in candidates:
+                is_golden = self._is_golden_uturn_candidate(c)
+                if is_golden:
+                    c["golden_uturn_mode"] = True
+                    c["confluence_score"] = float(getattr(config, "GOLDEN_UTURN_SCORE", 99.0))
+
                 if c.get("source") == "LSE":
                     if not batch_ok: continue
                     if self.state.is_lse_symbol_cooldown_active(c.get("symbol")): continue
 
-                if c.get("confluence_score", 0) < min_score:
-                    logger.info(f"[{p_name}] SKIP {c.get('symbol')}: score {c.get('confluence_score')} < {min_score}")
-                    continue
-                if c.get("source") != "LSE" and c.get("nexus_confidence", 0) < min_nexus:
-                    logger.info(f"[{p_name}] SKIP {c.get('symbol')}: nexus {c.get('nexus_confidence')} < {min_nexus}")
-                    continue
+                # v9.5 Dual Sniper: Golden VIP bypass total de score/nexus del perfil
+                if not is_golden:
+                    if c.get("confluence_score", 0) < min_score:
+                        logger.info(f"[{p_name}] SKIP {c.get('symbol')}: score {c.get('confluence_score')} < {min_score}")
+                        continue
+                    if c.get("source") != "LSE" and c.get("nexus_confidence", 0) < min_nexus:
+                        logger.info(f"[{p_name}] SKIP {c.get('symbol')}: nexus {c.get('nexus_confidence')} < {min_nexus}")
+                        continue
+                else:
+                    logger.info(
+                        f"[GOLDEN-VIP] {c.get('symbol')}: bypass perfil {p_name} "
+                        f"(nexus={c.get('nexus_confidence', 0)}%, score={c.get('confluence_score', 0)})"
+                    )
                 
-                # Check if sources are allowed
                 allowed = profile.get("allowedSources")
-                if allowed:
+                if allowed and not is_golden:
                     src = (c.get("source", "") or "").lower()
-                    # Normalize agent internal sources to match .NET StrategyProfile enum values
                     if src in ("nexus_top", "nexus15_ui"):
                         src = "nexus"
                     elif src == "redis_bridge":
                         src = "bridge"
+                    elif src == "golden_uturn":
+                        src = "golden_uturn"
                         
                     if isinstance(allowed, list):
                         if src not in [s.lower() for s in allowed]:
@@ -1045,27 +1247,29 @@ class VergeAgent:
                     continue
 
                 # Fix 2: Filtros RSI y MA7 por perfil (PascalCase del DTO -> camelCase del JSON)
-                max_rsi_long  = profile.get("maxRsiLong")
-                min_rsi_short = profile.get("minRsiShort")
-                cand_rsi = float(c.get("rsi", 50))
+                # BYPASS: Golden U-Turn v9.0 — si el candidato tiene golden_uturn_mode, ignorar estos filtros.
+                if not c.get("golden_uturn_mode"):
+                    max_rsi_long  = profile.get("maxRsiLong")
+                    min_rsi_short = profile.get("minRsiShort")
+                    cand_rsi = float(c.get("rsi", 50))
 
-                if max_rsi_long is not None and cand_side == 0:
-                    if cand_rsi > float(max_rsi_long):
-                        logger.info(f"[VETO] {c['symbol']} RSI {cand_rsi} > max {max_rsi_long} for profile {p_name}")
-                        continue
+                    if max_rsi_long is not None and cand_side == 0:
+                        if cand_rsi > float(max_rsi_long):
+                            logger.info(f"[VETO] {c['symbol']} RSI {cand_rsi} > max {max_rsi_long} for profile {p_name}")
+                            continue
 
-                if min_rsi_short is not None and cand_side == 1:
-                    if cand_rsi < float(min_rsi_short):
-                        logger.info(f"[VETO] {c['symbol']} RSI {cand_rsi} < min {min_rsi_short} for profile {p_name}")
-                        continue
+                    if min_rsi_short is not None and cand_side == 1:
+                        if cand_rsi < float(min_rsi_short):
+                            logger.info(f"[VETO] {c['symbol']} RSI {cand_rsi} < min {min_rsi_short} for profile {p_name}")
+                            continue
 
-                # Filtro distancia MA7 por perfil
-                max_dist_ma7 = profile.get("maxMa7DistancePct")
-                if max_dist_ma7 is not None:
-                    dist = abs(float(c.get("distance_to_ma7_pct", 0)))
-                    if dist > float(max_dist_ma7):
-                        logger.info(f"[VETO] {c['symbol']} MA7 Dist {dist:.2f}% > max {max_dist_ma7}% for profile {p_name}")
-                        continue
+                    # Filtro distancia MA7 por perfil
+                    max_dist_ma7 = profile.get("maxMa7DistancePct")
+                    if max_dist_ma7 is not None:
+                        dist = abs(float(c.get("distance_to_ma7_pct", 0)))
+                        if dist > float(max_dist_ma7):
+                            logger.info(f"[VETO] {c['symbol']} MA7 Dist {dist:.2f}% > max {max_dist_ma7}% for profile {p_name}")
+                            continue
 
                 p_candidates.append(c)
 
@@ -1073,7 +1277,16 @@ class VergeAgent:
                 logger.info(f"No candidates pass profile {p_name}")
                 continue
 
-            p_candidates.sort(key=lambda x: x["confluence_score"], reverse=True)
+            # v9.5 Dual Sniper: motor Golden primero, Nexus-15 estándar después
+            p_golden = [c for c in p_candidates if self._is_golden_uturn_candidate(c)]
+            p_standard = [c for c in p_candidates if not self._is_golden_uturn_candidate(c)]
+            p_golden.sort(key=lambda x: x["confluence_score"], reverse=True)
+            p_standard.sort(key=lambda x: x["confluence_score"], reverse=True)
+            p_candidates = p_golden + p_standard
+            if p_golden:
+                logger.info(
+                    f"[DUAL-SNIPER] {p_name}: {len(p_golden)} Golden VIP + {len(p_standard)} Nexus estándar"
+                )
             
             # Check slot availability for this profile
             p_max_pos = int(profile.get("maxOpenPositions", config.MAX_OPEN_POSITIONS))
@@ -1092,8 +1305,14 @@ class VergeAgent:
                 ])
             
             if p_active_count >= p_max_pos:
-                logger.info(f"[LIMIT] Profile {p_name} is full ({p_active_count}/{p_max_pos}). Skipping new trades.")
-                continue
+                golden_waiting = [c for c in p_candidates if self._is_golden_uturn_candidate(c)]
+                if not golden_waiting:
+                    logger.info(f"[LIMIT] Profile {p_name} is full ({p_active_count}/{p_max_pos}). Skipping new trades.")
+                    continue
+                logger.info(
+                    f"[GOLDEN-VIP] Profile {p_name} lleno pero hay {len(golden_waiting)} "
+                    f"Golden U-Turn — intentando upgrade/reemplazo"
+                )
 
             # Try ranked candidates in order (LSE + Nexus); AGENT_MAX_CANDIDATES_PER_CYCLE enables rank 2..N fallback.
             max_try = max(1, AGENT_MAX_CANDIDATES_PER_CYCLE)
@@ -1844,6 +2063,57 @@ class VergeAgent:
                 return True
         return False
 
+    def _is_golden_uturn_candidate(self, candidate: dict) -> bool:
+        """True si el candidato entró por la Regla de Oro (Golden U-Turn)."""
+        if candidate.get("golden_uturn_mode") or candidate.get("source") == "golden_uturn":
+            return True
+        gu = candidate.get("agent_audit_context", {}).get("golden_uturn", {})
+        return bool(isinstance(gu, dict) and gu.get("detected"))
+
+    def _build_golden_uturn_candidate(self, symbol: str, n5_data: dict, nexus_data: dict = None) -> dict:
+        """
+        Construye candidato Golden U-Turn con Score=99, sin depender de Nexus-15.
+        IF (MA99 plana AND vino de arriba) -> BUY.
+        """
+        price = self.fetcher.get_current_price(symbol)
+        gu_score = float(getattr(config, "GOLDEN_UTURN_SCORE", 99.0))
+        sl_5low = n5_data.get("golden_uturn_sl_5low")
+        cand = {
+            "symbol": symbol,
+            "confluence_score": gu_score,
+            "nexus_confidence": 0,
+            "trade_direction": "LONG",
+            "side": 0,
+            "source": "golden_uturn",
+            "golden_uturn_mode": True,
+            "price_at_signal": price,
+            "estimated_range_pct": float(n5_data.get("gu_atr_volatility_pct") or 5.0),
+            "golden_uturn_sl_5low": sl_5low,
+            "reasons": ["[GOLDEN-U-TURN] MA99 horizontal tras caída vertical — Score=99"],
+            "agent_audit_context": {
+                "nexus15": self._json_safe_for_audit(nexus_data) if nexus_data else {},
+                "scar": {},
+                "nexus5": self._json_safe_for_audit(n5_data),
+                "golden_uturn": {
+                    "detected": True,
+                    "angle": n5_data.get("golden_uturn_angle"),
+                    "drop_pct": n5_data.get("golden_uturn_drop_pct"),
+                    "sl_5low": sl_5low,
+                    "price_to_ma99_distance_pct": n5_data.get("gu_price_to_ma99_distance_pct"),
+                    "ma99_now": n5_data.get("gu_ma99_now"),
+                    "ma99_ago": n5_data.get("gu_ma99_ago"),
+                    "volume_ignition_ratio_1m": n5_data.get("gu_volume_ignition_ratio_1m"),
+                    "atr_volatility_pct": n5_data.get("gu_atr_volatility_pct"),
+                    "consecutive_flat_candles": n5_data.get("gu_consecutive_flat_candles"),
+                    "ma7_now": n5_data.get("gu_ma7_now"),
+                    "close_above_ma7": n5_data.get("gu_close_above_ma7"),
+                },
+            },
+        }
+        if sl_5low and float(sl_5low) > 0 and price and float(sl_5low) < float(price):
+            cand["custom_sl_price"] = float(sl_5low)
+        return cand
+
     def _get_ma99_15m(self, symbol: str) -> Optional[float]:
         try:
             klines = self.fetcher.get_klines_for_nexus(symbol, interval="15m", limit=120)
@@ -1854,6 +2124,222 @@ class VergeAgent:
         except Exception as e:
             logger.error(f"[SNIPER] Error calculating MA99 for {symbol}: {e}")
             return None
+
+    def _compute_big_fish_sl_price(self, entry_price: float, lows: list) -> float:
+        """
+        v9.6 Big Fish SL para LONG: el stop más amplio entre low-20velas y 3% fijo bajo entrada.
+        Retorna el precio de SL (más bajo = más aire al trade).
+        """
+        if entry_price <= 0:
+            return 0.0
+        lookback = int(getattr(config, "GOLDEN_UTURN_SL_CANDLE_LOOKBACK", 20))
+        min_sl_pct = float(getattr(config, "GOLDEN_UTURN_SL_MIN_DISTANCE_PCT", 3.0))
+        buffer_pct = float(getattr(config, "GOLDEN_UTURN_SL_SPREAD_BUFFER_PCT", 0.1))
+        recent = lows[-lookback:] if len(lows) >= lookback else lows
+        raw_low = min(recent) if recent else entry_price
+        struct_sl = raw_low * (1.0 - buffer_pct / 100.0)
+        pct_sl = entry_price * (1.0 - min_sl_pct / 100.0)
+        # Para LONG: menor precio = stop más lejos = más aire
+        return min(struct_sl, pct_sl)
+
+    def _slope_angle_degrees(self, values: list, window: int = None) -> float:
+        """Ángulo de inclinación por regresión lineal sobre los últimos N valores."""
+        import math
+        if not values or len(values) < 2:
+            return 0.0
+        if window is None:
+            window = int(getattr(config, "GOLDEN_UTURN_ANGLE_WINDOW", 12))
+        recent = values[-window:] if len(values) >= window else values
+        if len(recent) < 2 or recent[-1] <= 0:
+            return 0.0
+        n = len(recent)
+        x_vals = list(range(n))
+        sum_x = sum(x_vals)
+        sum_y = sum(recent)
+        sum_xy = sum(xi * yi for xi, yi in zip(x_vals, recent))
+        sum_x2 = sum(xi ** 2 for xi in x_vals)
+        denom = n * sum_x2 - sum_x ** 2
+        if denom == 0:
+            return 0.0
+        slope = (n * sum_xy - sum_x * sum_y) / denom
+        return math.degrees(math.atan(slope / recent[-1]))
+
+    def _check_golden_uturn(self, symbol: str) -> dict:
+        """
+        GOLDEN U-TURN v9.4 — Gravity Check ("Piso de Cemento").
+
+        Detecta si la MA99 (15m) se horizontalizó tras una caída vertical.
+        
+        Condiciones:
+          1. MA99 angle ±0.5° en ventana de 12 velas (mesa, no frenada momentánea)
+          2. MA99 hace 100 velas (15m) cayó ≥3%
+          3. Precio a ≤2% de distancia de MA99 (no cuchillos cayendo)
+          4. Cierre 15m por encima de MA7 (giro confirmado)
+          5. SL = Low 5 velas − 0.1% buffer
+        """
+        interval = getattr(config, "GOLDEN_UTURN_INTERVAL", "15m")
+        lookback = int(getattr(config, "GOLDEN_UTURN_LOOKBACK_CANDLES", 100))
+        result = {
+            "passed": False, "angle": 0.0, "drop_pct": 0.0, "sl_5low": 0.0,
+            "price_to_ma99_distance_pct": 0.0,
+            "ma99_now": 0.0, "ma99_ago": 0.0,
+            "ma7_now": 0.0, "close_above_ma7": False,
+            "reject_reason": "",
+            "volume_ignition_ratio_1m": 0.0,
+            "atr_volatility_pct": 0.0,
+            "consecutive_flat_candles": 0,
+        }
+        try:
+            # Necesitamos al menos 99 + lookback velas para MA99 estable + histórico
+            min_candles = 99 + lookback
+            klines = self.fetcher.get_klines_for_nexus(symbol, interval=interval, limit=min_candles + 10)
+            if not klines or len(klines) < min_candles:
+                return result
+
+            closes = [float(k["close"]) for k in klines]
+            lows = [float(k["low"]) for k in klines]
+
+            # ── Calcular EMA-99 ──
+            period = 99
+            if len(closes) < period:
+                return result
+            multiplier = 2.0 / (period + 1)
+            ema = sum(closes[:period]) / period  # SMA inicial
+            for price in closes[period:]:
+                ema = (price - ema) * multiplier + ema
+            # Reconstruir serie EMA completa para ángulo
+            ema_series = []
+            ema_val = sum(closes[:period]) / period
+            for i, price in enumerate(closes):
+                if i < period:
+                    ema_series.append(sum(closes[:i+1]) / (i + 1))
+                else:
+                    ema_val = (price - ema_val) * multiplier + ema_val
+                    ema_series.append(ema_val)
+
+            # ── Ángulo de MA99 (regresión sobre ventana de 12 velas — inercia real) ──
+            angle_window = int(getattr(config, "GOLDEN_UTURN_ANGLE_WINDOW", 12))
+            angle = self._slope_angle_degrees(ema_series, window=angle_window)
+            if ema_series[-1] <= 0:
+                return result
+            import math
+
+            # ── Drop%: MA99 hace N velas vs actual ──
+            # lookback ya definido al inicio de la función (config: 100 velas 15m)
+            lookback_idx = min(lookback, len(ema_series) - 1)
+            if lookback_idx <= 0:
+                return result
+            ma99_now = ema_series[-1]
+            ma99_ago = ema_series[-lookback_idx - 1]
+            if ma99_ago <= 0 or ma99_now <= 0:
+                return result
+            drop_pct = ((ma99_now - ma99_ago) / ma99_ago) * 100
+            last_close = closes[-1]
+
+            # ── SL v9.6 Big Fish: max(low-20velas, 3% bajo entrada) ──
+            sl_5low = self._compute_big_fish_sl_price(last_close, lows)
+
+            # ── Evaluar condiciones v9.5 "Piso de Cemento" ──
+            angle_threshold = float(getattr(config, "GOLDEN_UTURN_ANGLE_THRESHOLD", 0.5))
+            min_drop = float(getattr(config, "GOLDEN_UTURN_MIN_DROP_PCT", 3.0))
+            max_ma99_dist = float(getattr(config, "GOLDEN_UTURN_MAX_MA99_DISTANCE_PCT", 15.0))
+            max_ma7_dist = float(getattr(config, "GOLDEN_UTURN_MAX_MA7_DISTANCE_PCT", 2.0))
+            ma7_now = sum(closes[-7:]) / 7.0 if len(closes) >= 7 else 0.0
+            ma7_proximity_pct = (
+                abs((last_close - ma7_now) / ma7_now) * 100 if ma7_now > 0 else 999.0
+            )
+            close_above_ma7 = bool(ma7_now > 0 and last_close > ma7_now)
+
+            price_to_ma99_pct = 0.0
+            if ma99_now > 0:
+                price_to_ma99_pct = ((last_close - ma99_now) / ma99_now) * 100
+
+            result["angle"] = round(angle, 4)
+            result["drop_pct"] = round(drop_pct, 4)
+            result["sl_5low"] = sl_5low
+            result["ma7_now"] = round(ma7_now, 6)
+            result["ma7_proximity_pct"] = round(ma7_proximity_pct, 4)
+            result["close_above_ma7"] = close_above_ma7
+            result["price_to_ma99_distance_pct"] = round(price_to_ma99_pct, 4)
+            result["ma99_now"] = round(ma99_now, 6)
+            result["ma99_ago"] = round(ma99_ago, 6)
+
+            is_flat = abs(angle) <= angle_threshold
+            is_drop = drop_pct <= -min_drop
+            is_rise = drop_pct >= min_drop
+            ma99_dist_ok = abs(price_to_ma99_pct) <= max_ma99_dist
+            ma7_ok = ma7_now > 0 and ma7_proximity_pct <= max_ma7_dist
+
+            reject_reasons = []
+            if is_flat and is_rise:
+                reject_reasons.append(f"techo (MA99 subió {drop_pct:.2f}%)")
+            if not is_flat:
+                reject_reasons.append(f"ángulo {angle:.2f}° > ±{angle_threshold}°")
+            if not is_drop:
+                reject_reasons.append(f"caída insuficiente ({drop_pct:.2f}%)")
+            if not ma99_dist_ok:
+                reject_reasons.append(f"dist MA99={price_to_ma99_pct:.2f}% > ±{max_ma99_dist}%")
+            if not ma7_ok:
+                reject_reasons.append(
+                    f"dist MA7={ma7_proximity_pct:.2f}% > ±{max_ma7_dist}% (cerca del rebote, no encima)"
+                )
+
+            result["passed"] = bool(is_flat and is_drop and not is_rise and ma99_dist_ok and ma7_ok)
+            if reject_reasons and not result["passed"]:
+                result["reject_reason"] = "; ".join(reject_reasons)
+                logger.debug(
+                    f"[GRAVITY-CHECK] {symbol}: RECHAZADO v9.4 — {result['reject_reason']}"
+                )
+            elif result["passed"]:
+                logger.info(
+                    f"[GRAVITY-CHECK] {symbol}: v9.5 OK — Angle={angle:.2f}°, "
+                    f"DistMA99={price_to_ma99_pct:.2f}%, DistMA7={ma7_proximity_pct:.2f}%"
+                )
+
+            # ── AUDIT METRICS (siempre, pase o no) ──
+
+            # ATR% from 1h klines (14-period)
+            highs = [float(k["high"]) for k in klines]
+            tr_list = []
+            for i_tr in range(max(1, len(klines) - 14), len(klines)):
+                tr = max(
+                    highs[i_tr] - lows[i_tr],
+                    abs(highs[i_tr] - closes[i_tr - 1]),
+                    abs(lows[i_tr] - closes[i_tr - 1]),
+                )
+                tr_list.append(tr)
+            if tr_list and last_close > 0:
+                atr_avg = sum(tr_list) / len(tr_list)
+                result["atr_volatility_pct"] = round((atr_avg / last_close) * 100, 4)
+
+            # Volume ignition ratio (1m): last 1m candle volume vs 10-candle average
+            try:
+                klines_1m = self.fetcher.get_klines_for_nexus(symbol, interval="1m", limit=15)
+                if klines_1m and len(klines_1m) >= 10:
+                    vols_1m = [float(k["volume"]) for k in klines_1m]
+                    avg_1m = sum(vols_1m[-10:]) / 10.0
+                    if avg_1m > 0:
+                        result["volume_ignition_ratio_1m"] = round(vols_1m[-1] / avg_1m, 4)
+            except Exception:
+                pass  # non-critical for audit; leave 0.0 on failure
+
+            # Consecutive flat candles: MA99 dentro de ±threshold en ventanas de 12 velas
+            consecutive_flat = 0
+            for i_cf in range(len(ema_series) - 1, angle_window - 1, -1):
+                window = ema_series[i_cf - angle_window + 1: i_cf + 1]
+                if len(window) < angle_window:
+                    break
+                a = self._slope_angle_degrees(window, window=angle_window)
+                if abs(a) <= angle_threshold:
+                    consecutive_flat += 1
+                else:
+                    break
+            result["consecutive_flat_candles"] = consecutive_flat
+
+        except Exception as e:
+            logger.debug(f"[GRAVITY-CHECK] {symbol}: Error - {e}")
+
+        return result
 
     def _get_vol_ratio_5m(self, symbol: str) -> float:
         try:
@@ -1917,10 +2403,21 @@ class VergeAgent:
 
     def _execute_trade(self, candidate: dict, profile: dict = None, is_triggered_sniper: bool = False) -> bool:
         symbol = candidate["symbol"]
+        is_golden = self._is_golden_uturn_candidate(candidate)
+        if is_golden:
+            gu_score = float(getattr(config, "GOLDEN_UTURN_SCORE", 99.0))
+            candidate["golden_uturn_mode"] = True
+            candidate["confluence_score"] = gu_score
+            logger.info(
+                f"[GOLDEN-VIP] {symbol}: Pase ejecutivo activo — "
+                f"Nexus-15 ignorado, Score estructural={gu_score:.0f}"
+            )
+
         confluence = candidate.get("confluence_score", 0)
 
         # Sniper mode check for scores > 90%
-        if confluence > 90.0 and not is_triggered_sniper:
+        # BYPASS: Golden U-Turn — estos entran directo, no van a sniper queue.
+        if confluence > 90.0 and not is_triggered_sniper and not is_golden:
             ma99 = self._get_ma99_15m(symbol)
             if ma99:
                 trigger_price = ma99 * 1.005
@@ -2025,6 +2522,36 @@ class VergeAgent:
 
         entry_reason = " ".join(reason_parts) if reason_parts else "Señal de momentum validada por el motor de riesgo."
 
+        # ── GOLDEN U-TURN v9.0: Tag strategy + Custom SL ────────────────────────
+        if candidate.get("golden_uturn_mode"):
+            gu_ctx = candidate.get("agent_audit_context", {}).get("golden_uturn", {})
+            gu_drop = gu_ctx.get("drop_pct", "?")
+            gu_angle = gu_ctx.get("angle", "?")
+            gu_sl = gu_ctx.get("sl_5low", 0) or candidate.get("golden_uturn_sl_5low", 0)
+            
+            # Override entry_reason with Golden U-Turn tag
+            entry_reason = (
+                f"[STRAT: GOLDEN-U-TURN] Entrada por Sinergia Estructural: "
+                f"MA99 Plana (Angle={gu_angle}°) tras caída de {gu_drop}%. "
+                f"Score=99 bypass activo."
+            )
+            
+            # Set custom SL to low of last 5 candles if not already set
+            if gu_sl and gu_sl > 0 and not candidate.get("custom_sl_price"):
+                candidate["custom_sl_price"] = float(gu_sl)
+                sl_pct = (market_px - float(gu_sl)) / market_px * 100 if market_px > 0 else 0
+                min_tp = float(getattr(config, "GOLDEN_UTURN_TP_MIN_DISTANCE_PCT", 10.0))
+                logger.info(
+                    f"[BIG-FISH-RISK] {symbol}: SL estirado a {sl_pct:.2f}% (mín estructural) "
+                    f"para buscar TP del {min_tp:.1f}%"
+                )
+            
+            # Log strategy tag
+            logger.warning(
+                f"[GOLDEN-U-TURN v9.0] {symbol} — STRATEGY TAG APPLIED | "
+                f"Drop={gu_drop}% | Angle={gu_angle}° | SL={gu_sl}"
+            )
+
         audit_json = self._build_agent_decision_snapshot(
             candidate,
             pos_details,
@@ -2082,10 +2609,14 @@ class VergeAgent:
                 can_upgrade = confluence >= lse_upgrade_threshold
                 gate_desc = f"LSE Score={confluence:.1f} vs umbral={lse_upgrade_threshold}"
             else:
-                # Nexus / SCAR / Bridge — usar nexus_confidence real
+                # Nexus / SCAR / Bridge — Golden U-Turn VIP bypass upgrade gate
                 min_upgrade_nexus = float(getattr(config, "MIN_UPGRADE_NEXUS", 80.0))
-                can_upgrade = nexus_conf_pct >= min_upgrade_nexus
-                gate_desc = f"Nexus={nexus_conf_pct:.1f}% vs umbral={min_upgrade_nexus}%"
+                if is_golden:
+                    can_upgrade = True
+                    gate_desc = f"Golden U-Turn VIP (Score={confluence:.0f})"
+                else:
+                    can_upgrade = nexus_conf_pct >= min_upgrade_nexus
+                    gate_desc = f"Nexus={nexus_conf_pct:.1f}% vs umbral={min_upgrade_nexus}%"
 
             if can_upgrade:
                 logger.info(
@@ -2102,9 +2633,14 @@ class VergeAgent:
                 return False
 
         # Slot libre: mínimo de calidad según fuente
+        # Golden U-Turn VIP: la geometría MA99 reemplaza la confianza Nexus-15
         if is_lse:
-            # LSE ya fue filtrado por LSE_MIN_SCORE antes de llegar acá — siempre OK
             pass
+        elif is_golden:
+            logger.info(
+                f"[GOLDEN-VIP] {symbol}: bypass MIN_ENTRY_NEXUS — "
+                f"Nexus={nexus_conf_pct:.1f}% ignorado (pase estructural Score=99)"
+            )
         else:
             min_entry_nexus = float(getattr(config, "MIN_ENTRY_NEXUS", 70.0))
             if nexus_conf_pct < min_entry_nexus:
@@ -2124,7 +2660,10 @@ class VergeAgent:
             features = candidate.get("agent_audit_context", {}).get("nexus15", {}).get("features", {})
             volume_ratio = candidate.get("volume_ratio") or features.get("volume_ratio_20", 0)
             cvd_delta = candidate.get("cvd_delta") or features.get("cvd_delta", 0)
-            nexus_confidence = candidate.get("nexus_confidence", 0) or candidate.get("confluence_score", 0)
+            nexus_confidence = float(
+                candidate.get("confluence_score", 0) if is_golden
+                else (candidate.get("nexus_confidence", 0) or candidate.get("confluence_score", 0))
+            )
             
             btc_decouple = (
                 volume_ratio > config.BTC_DECOUPLE_MIN_VOLUME_RATIO and
@@ -2133,7 +2672,12 @@ class VergeAgent:
             )
             
             if btc_regime == "DUMPING":
-                if btc_decouple:
+                if is_golden:
+                    logger.info(
+                        f"[GOLDEN-VIP] {symbol}: bypass BTC-BLOCK en DUMPING — "
+                        f"entrada estructural en suelo (Score={nexus_confidence:.0f})"
+                    )
+                elif btc_decouple:
                     logger.info(f"[BTC-DECOUPLE] {symbol} permitido — VR={volume_ratio:.2f} CVD={cvd_delta:+.0f} Nexus={nexus_confidence:.1f}%")
                     self.report.record_btc_decouple_allowed()
                 else:

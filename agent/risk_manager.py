@@ -132,23 +132,62 @@ class RiskManager:
 
         cp = float(current_price)
 
-        # ── HYBRID SNIPER SYNERGY v7.0: Custom SL Calibration ─────────────────────
-        # Si structural_sniper_mode está activo, usar custom_sl_price (Spring Low o 0.5x ATR)
+        # Inicializar siempre — Golden U-Turn saltea el bloque estándar de ATR/rango
+        atr_signal = signal_data.get("atr_signal")
+        est_range = signal_data.get("estimated_range_pct")
+        atr_f = float(atr_signal) if atr_signal else 0.0
+        est_range_f = float(est_range) if est_range else 0.0
+        min_sl_pct = float(getattr(config, "MIN_STOP_PCT_OF_PRICE", 0.002))
+        sl_distance_pct = min_sl_pct
+        sl_distance_price = cp * sl_distance_pct
+
+        if atr_f <= 0 and signal_data.get("golden_uturn_mode"):
+            gu_ctx = (signal_data.get("agent_audit_context") or {}).get("golden_uturn") or {}
+            gu_atr_pct = gu_ctx.get("atr_volatility_pct")
+            if gu_atr_pct:
+                atr_f = cp * float(gu_atr_pct) / 100.0
+                atr_signal = atr_f
+
+        # ── HYBRID SNIPER / GOLDEN U-TURN: Custom SL Calibration ─────────────────
+        # Golden U-Turn: SL = low de las últimas 5 velas (piso de lateralización)
         structural_sniper_mode = signal_data.get("structural_sniper_mode", False)
+        golden_uturn_mode = signal_data.get("golden_uturn_mode", False)
         custom_sl_price = signal_data.get("custom_sl_price")
         
-        if structural_sniper_mode and custom_sl_price:
+        if (structural_sniper_mode or golden_uturn_mode) and custom_sl_price:
             try:
                 custom_sl_f = float(custom_sl_price)
-                # Validar que el custom SL sea válido
-                if custom_sl_f > 0 and custom_sl_f < cp:  # Solo para LONGs
+                if custom_sl_f > 0 and custom_sl_f < cp:  # Solo LONGs
                     sl_price = custom_sl_f
                     sl_distance_price = cp - sl_price
                     sl_distance_pct = sl_distance_price / cp
-                    logger.info(
-                        f"[STRUCTURAL-SNIPER-RISK] {symbol}: Usando custom SL={custom_sl_f:.6f} "
-                        f"(distancia={sl_distance_pct:.4f}%)"
-                    )
+
+                    # v9.6 Big Fish: Golden U-Turn exige SL mínimo 3% bajo entrada
+                    if golden_uturn_mode:
+                        min_sl_pct = float(getattr(config, "GOLDEN_UTURN_SL_MIN_DISTANCE_PCT", 3.0)) / 100.0
+                        min_sl_dist = cp * min_sl_pct
+                        if sl_distance_price < min_sl_dist:
+                            sl_distance_price = min_sl_dist
+                            sl_price = cp - sl_distance_price
+                            sl_distance_pct = min_sl_pct
+                            custom_sl_f = sl_price
+                            min_tp_pct = float(getattr(config, "GOLDEN_UTURN_TP_MIN_DISTANCE_PCT", 10.0))
+                            logger.warning(
+                                f"[BIG-FISH-RISK] {symbol}: SL estirado a {min_sl_pct*100:.1f}% "
+                                f"(mínimo estructural) para buscar TP del {min_tp_pct:.1f}%"
+                            )
+                        else:
+                            logger.info(
+                                f"[BIG-FISH-RISK] {symbol}: SL estructural={sl_distance_pct*100:.2f}% "
+                                f"(low-20 o 3% mín)"
+                            )
+
+                    tag = "GOLDEN-U-TURN" if golden_uturn_mode else "STRUCTURAL-SNIPER"
+                    if not golden_uturn_mode:
+                        logger.info(
+                            f"[{tag}-RISK] {symbol}: Usando custom SL={custom_sl_f:.6f} "
+                            f"(distancia={sl_distance_pct:.4f}%)"
+                        )
                 else:
                     logger.warning(
                         f"[STRUCTURAL-SNIPER-RISK] {symbol}: Custom SL inválido ({custom_sl_f}), "
@@ -164,17 +203,11 @@ class RiskManager:
 
         # 1. Distancia SL basada en volatilidad (atr o estimated_range)
         # Solo calcular si no hay custom SL de Sniper Mode
-        if not (structural_sniper_mode and custom_sl_price):
-            atr_signal = signal_data.get("atr_signal")
-            est_range = signal_data.get("estimated_range_pct")
-
+        if not ((structural_sniper_mode or golden_uturn_mode) and custom_sl_price):
             if profile:
                 sl_mult = float(profile.get("slMultiplier", 0.8))
             else:
                 sl_mult = float(getattr(config, "SL_MULTIPLIER", 0.8))
-
-            atr_f = float(atr_signal) if atr_signal else 0.0
-            est_range_f = float(est_range) if est_range else 0.0
 
             if atr_f > 0 and (atr_f / cp) <= 0.20:
                 sl_distance_price = atr_f * sl_mult
@@ -184,15 +217,14 @@ class RiskManager:
             else:
                 sl_distance_pct = 0.015 * sl_mult
 
-            min_sl_pct = float(getattr(config, "MIN_STOP_PCT_OF_PRICE", 0.002))
             if sl_distance_pct < min_sl_pct:
                 sl_distance_pct = min_sl_pct
 
             sl_distance_price = cp * sl_distance_pct
 
         # Calcular base SL sin el multiplicador de Clone para el Take Profit
-        # Para Sniper Mode con custom SL, usar el mismo sl_distance_price calculado
-        if structural_sniper_mode and custom_sl_price:
+        # Para Sniper/Golden con custom SL, usar el mismo sl_distance_price calculado
+        if (structural_sniper_mode or golden_uturn_mode) and custom_sl_price:
             base_sl_distance_price = sl_distance_price
         else:
             if profile and profile.get("name") == "Scalping Clone":
@@ -214,33 +246,34 @@ class RiskManager:
 
             base_sl_distance_price = cp * base_sl_distance_pct
 
-        # Limitar RR según setup_type (caps hard por tipo de señal)
-        if profile:
-            rr_target = float(profile.get("tpMultiplier", 3.0))
+        # Limitar RR según setup_type (Golden U-Turn v9.6 ignora caps de perfil)
+        if golden_uturn_mode:
+            rr_target = float(getattr(config, "GOLDEN_UTURN_TP_MULTIPLIER", getattr(config, "TP_MULTIPLIER", 3.5)))
+            setup_type = "Golden U-Turn Big Fish"
         else:
-            rr_target = float(getattr(config, "TP_MULTIPLIER", 2.0))
-        nexus_conf = signal_data.get("nexus_confidence", 0)
-        setup_type = "Momentum Burst" if nexus_conf > 80 else ("Trend Following" if nexus_conf > 60 else "Mean Reversion")
+            if profile:
+                rr_target = float(profile.get("tpMultiplier", 3.0))
+            else:
+                rr_target = float(getattr(config, "TP_MULTIPLIER", 2.0))
+            nexus_conf = signal_data.get("nexus_confidence", 0)
+            setup_type = "Momentum Burst" if nexus_conf > 80 else ("Trend Following" if nexus_conf > 60 else "Mean Reversion")
 
-        tp_mult_tf_max = float(getattr(config, "TP_MULT_TREND_FOLLOWING_MAX", 2.5))
-        tp_mult_mr_max = float(getattr(config, "TP_MULT_MEAN_REVERSION_MAX", 1.8))
+            tp_mult_tf_max = float(getattr(config, "TP_MULT_TREND_FOLLOWING_MAX", 2.5))
+            tp_mult_mr_max = float(getattr(config, "TP_MULT_MEAN_REVERSION_MAX", 1.8))
 
-        if setup_type == "Trend Following":
-            rr_target = min(rr_target, tp_mult_tf_max)
-        elif setup_type == "Mean Reversion":
-            rr_target = min(rr_target, tp_mult_mr_max)
-        # Momentum Burst: sin cap adicional (ya limitado por config.TP_MULTIPLIER)
+            if setup_type == "Trend Following":
+                rr_target = min(rr_target, tp_mult_tf_max)
+            elif setup_type == "Mean Reversion":
+                rr_target = min(rr_target, tp_mult_mr_max)
 
         logger.info(
-            "[RISK] setup_type=%s | rr_cap=%.2f | rr_effective=%.2f",
-            setup_type,
-            tp_mult_tf_max if setup_type == "Trend Following" else (tp_mult_mr_max if setup_type == "Mean Reversion" else rr_target),
-            rr_target,
+            "[RISK] setup_type=%s | rr_effective=%.2f",
+            setup_type, rr_target,
         )
 
         base_tp_distance_price = base_sl_distance_price * rr_target
 
-        if profile and profile.get("name") == "Scalping Clone":
+        if profile and profile.get("name") == "Scalping Clone" and not golden_uturn_mode:
             boost = float(getattr(config, "CLONE_TP_BOOST", 1.3))
             tp_distance_price = base_tp_distance_price * boost
             logger.info(
@@ -249,6 +282,23 @@ class RiskManager:
             )
         else:
             tp_distance_price = sl_distance_price * rr_target
+
+        # v9.6 Big Fish: TP mínimo 10% para Golden U-Turn
+        if golden_uturn_mode:
+            min_tp_pct = float(getattr(config, "GOLDEN_UTURN_TP_MIN_DISTANCE_PCT", 10.0)) / 100.0
+            min_tp_distance = cp * min_tp_pct
+            tp_from_rr = tp_distance_price
+            if tp_distance_price < min_tp_distance:
+                tp_distance_price = min_tp_distance
+                logger.warning(
+                    f"[BIG-FISH-RISK] {symbol}: TP forzado al {min_tp_pct*100:.1f}% "
+                    f"(3.5x daba {tp_from_rr/cp*100:.2f}%)"
+                )
+            else:
+                logger.info(
+                    f"[BIG-FISH-RISK] {symbol}: TP={tp_distance_price/cp*100:.2f}% "
+                    f"(RR {rr_target:.1f}x sobre SL {sl_distance_pct*100:.2f}%)"
+                )
 
         side = int(signal_data.get("side", 0))
 

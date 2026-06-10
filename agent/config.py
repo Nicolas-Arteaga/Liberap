@@ -98,15 +98,16 @@ AGENT_MAX_RANK_FOR_NEXUS_FALLBACK = int(os.getenv("AGENT_MAX_RANK_FOR_NEXUS_FALL
 
 MAX_OPEN_POSITIONS = 3              # 3 posiciones simultáneas para scalping
 BINANCE_REAL_TRADING = os.getenv("BINANCE_REAL_TRADING", "false").lower() in ("1", "true", "yes")
-MIN_ENTRY_NEXUS  = float(os.getenv("MIN_ENTRY_NEXUS",  "76.0"))  # Nexus mínimo para abrir slot libre (Antes 70.0)
+MIN_ENTRY_NEXUS  = float(os.getenv("MIN_ENTRY_NEXUS",  "65.0"))  # v9.5: 65% — timing momentum (antes 76%)
 MIN_UPGRADE_NEXUS = float(os.getenv("MIN_UPGRADE_NEXUS", "80.0"))  # Nexus mínimo para reemplazar la peor posición
+PROFILE_MIN_NEXUS_CONFIDENCE = float(os.getenv("PROFILE_MIN_NEXUS_CONFIDENCE", "65.0"))  # Techo perfil estrategia (v9.5)
 MAX_TRADES_PER_DAY = 100
 MAX_POSITION_DURATION_HOURS = 48
 MAX_TRADE_DURATION_CANDLES = int(os.getenv("MAX_TRADE_DURATION_CANDLES", "8"))
 DEFAULT_LEVERAGE = 1
 
 # 4. Intelligence Thresholds
-MIN_NEXUS_CONFIDENCE = 76.0          # (Antes 75.0) — Exige más certeza, capturando ganadores PLAY y FIDA
+MIN_NEXUS_CONFIDENCE = float(os.getenv("MIN_NEXUS_CONFIDENCE", "65.0"))  # v9.5: 65% Era Dorada timing
 MIN_SCAR_SCORE = 4
 MIN_CONFLUENCE_SCORE = 60.0          # (Antes 55.0) — Evita picoteo sangrante de baja confluencia (<60)
 LSE_WARNING_OVERRIDE_SCORE = float(os.getenv("LSE_WARNING_OVERRIDE_SCORE", "85.0"))
@@ -147,22 +148,10 @@ HIGH_VOLATILITY_MIN_CONFLUENCE = 90.0   # Requiere confluencia extrema de 90+ pa
 # --- Capa 1: BTC Macro Filter (Régimen + Flash Crash) ---
 BTC_DUMP_THRESHOLD_5M = float(os.getenv("BTC_DUMP_THRESHOLD_5M", "-0.8"))   # % caída 5m para DUMPING
 BTC_DUMP_THRESHOLD_15M = float(os.getenv("BTC_DUMP_THRESHOLD_15M", "-1.5")) # % caída 15m para DUMPING
-BTC_DUMP_THRESHOLD_1H = float(os.getenv("BTC_DUMP_THRESHOLD_1H", "-1.5"))   # % caída 1h para DUMPING (sangrado gradual)
 BTC_PUMP_THRESHOLD_5M = float(os.getenv("BTC_PUMP_THRESHOLD_5M", "0.8"))    # % subida 5m para BULLISH
 BTC_REGIME_CACHE_SEC = int(os.getenv("BTC_REGIME_CACHE_SEC", "60"))        # Caché de régimen (segundos)
 BTC_FLASH_CRASH_PCT_1H = float(os.getenv("BTC_FLASH_CRASH_PCT_1H", "-3.0")) # % caída 1h para flash crash
 BTC_FLASH_CRASH_PAUSE_M = int(os.getenv("BTC_FLASH_CRASH_PAUSE_M", "120"))  # Pausa tras flash crash (minutos)
-
-# --- VETO DURO: BTC Blood Shield (nuevo tras pérdida 20 USDT del 1/6/2026) ---
-BTC_BLEED_1H_THRESHOLD = float(os.getenv("BTC_BLEED_1H_THRESHOLD", "-1.0")) # % caída 1h para veto DURO de LONGs
-BTC_CORR_HARD_BLOCK_THRESHOLD = float(os.getenv("BTC_CORR_HARD_BLOCK_THRESHOLD", "0.75")) # correlación mínima para bloqueo duro cuando BTC=DUMPING
-
-# --- VETO #11: Dynamic Ceiling (BTC State + Alt Exhaustion) ---
-# Techo dinámico según el estado de BTC:
-# - Si BTC daily es ROJO: techo = 12% (mercado bajista, alts agotadas rápido)
-# - Si BTC daily es VERDE: techo = 22% (mercado alcista, alts pueden correr más)
-BTC_RED_ALT_CEILING_PCT = float(os.getenv("BTC_RED_ALT_CEILING_PCT", "18.0")) # % máximo de subida desde low 24h cuando BTC está rojo
-BTC_GREEN_ALT_CEILING_PCT = float(os.getenv("BTC_GREEN_ALT_CEILING_PCT", "22.0")) # % máximo de subida desde low 24h cuando BTC está verde
 
 # --- Capa 2: Bloqueo Inteligente + Decouple + Macro Exit ---
 BTC_EXIT_DUMP_5M = float(os.getenv("BTC_EXIT_DUMP_5M", "-0.7"))              # % dump 5m para trigger salida
@@ -194,6 +183,26 @@ MAX_DAILY_DUMP_SHORT_LIMIT = float(os.getenv("MAX_DAILY_DUMP_SHORT_LIMIT", "-30.
 # TF puede correr hasta 3× el SL. MR tiene menos recorrido histórico, cap más conservador.
 TP_MULT_TREND_FOLLOWING_MAX = float(os.getenv("TP_MULT_TREND_FOLLOWING_MAX", "3.2"))
 TP_MULT_MEAN_REVERSION_MAX = float(os.getenv("TP_MULT_MEAN_REVERSION_MAX", "2.0"))
+
+# 6. Golden U-Turn v9.4 — Structural Pivot Hunter ("Piso de Cemento")
+# Detecta MA99 horizontal tras caída vertical. Solo LONG si MA99 lateraliza después de caer.
+GOLDEN_UTURN_ANGLE_THRESHOLD = float(os.getenv("GOLDEN_UTURN_ANGLE_THRESHOLD", "0.5"))   # +/-0.5° (mesa casi perfecta)
+GOLDEN_UTURN_ANGLE_WINDOW = int(os.getenv("GOLDEN_UTURN_ANGLE_WINDOW", "12"))            # velas para regresión del ángulo (inercia)
+GOLDEN_UTURN_INTERVAL = os.getenv("GOLDEN_UTURN_INTERVAL", "15m")                        # Marco temporal para el análisis (15m = sensibilidad óptima)
+GOLDEN_UTURN_LOOKBACK_CANDLES = int(os.getenv("GOLDEN_UTURN_LOOKBACK_CANDLES", "100"))   # velas 15m (~25 horas = ~1 día)
+GOLDEN_UTURN_MIN_DROP_PCT = float(os.getenv("GOLDEN_UTURN_MIN_DROP_PCT", "3.0"))        # MA99 debe haber caído al menos 3%
+GOLDEN_UTURN_MAX_MA99_DISTANCE_PCT = float(os.getenv("GOLDEN_UTURN_MAX_MA99_DISTANCE_PCT", "15.0"))  # v9.5: suelos post-crash (SAHARA -12% OK)
+GOLDEN_UTURN_MAX_MA7_DISTANCE_PCT = float(os.getenv("GOLDEN_UTURN_MAX_MA7_DISTANCE_PCT", "2.0"))   # proximidad MA7 (no cierre obligatorio)
+# Step 3.5 Gravity Check — umbrales de volumen 24h por tier
+GOLDEN_UTURN_MIN_VOLUME_TIER2_USD = int(os.getenv("GOLDEN_UTURN_MIN_VOLUME_TIER2_USD", "100000"))   # Tier 2: $100k
+GOLDEN_UTURN_MIN_VOLUME_DEFAULT_USD = int(os.getenv("GOLDEN_UTURN_MIN_VOLUME_DEFAULT_USD", "500000"))  # Tier 3+: $500k
+GOLDEN_UTURN_SL_CANDLE_LOOKBACK = int(os.getenv("GOLDEN_UTURN_SL_CANDLE_LOOKBACK", "20"))  # v9.6: low estructural 20 velas
+GOLDEN_UTURN_SL_MIN_DISTANCE_PCT = float(os.getenv("GOLDEN_UTURN_SL_MIN_DISTANCE_PCT", "3.0"))   # v9.6: SL mínimo 3% bajo entrada
+GOLDEN_UTURN_TP_MIN_DISTANCE_PCT = float(os.getenv("GOLDEN_UTURN_TP_MIN_DISTANCE_PCT", "10.0"))  # v9.6: TP mínimo 10% sobre entrada
+GOLDEN_UTURN_TP_MULTIPLIER = float(os.getenv("GOLDEN_UTURN_TP_MULTIPLIER", "3.5"))               # RR sobre SL estirado
+GOLDEN_UTURN_SL_SPREAD_BUFFER_PCT = float(os.getenv("GOLDEN_UTURN_SL_SPREAD_BUFFER_PCT", "0.1"))  # margen bajo el low (spread testnet)
+GOLDEN_UTURN_SCORE = 99.0  # Score de inyección directa (prioridad absoluta sobre Nexus-15)
+GOLDEN_UTURN_ENABLED = True  # Master switch
 
 # Paths
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
