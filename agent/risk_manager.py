@@ -24,6 +24,14 @@ class RiskManager:
     ) -> Optional[Dict[str, Any]]:
         balance = available_balance if available_balance is not None else config.VIRTUAL_CAPITAL_BASE
 
+        # v10.8: THE TRIAD — Validación de margen mínimo (150 USDT)
+        # Evita trades de "miseria" que Binance rechaza (mínimo $5 USDT)
+        if balance < config.MAX_MARGIN_PER_TRADE_USD:
+            logger.warning(
+                f"[THE-TRIAD] {symbol}: Balance insuficiente (${balance:.2f} < ${config.MAX_MARGIN_PER_TRADE_USD:.2f}) — trade bloqueado"
+            )
+            return None
+
         if signal_data.get("source") == "LSE":
             return self._calculate_position_lse(symbol, signal_data, balance, profile)
 
@@ -70,24 +78,36 @@ class RiskManager:
             )
             return None
 
-        risk_usd = balance * float(getattr(config, "EQUITY_RISK_PCT_FOR_STOP", 0.01))
-        qty = risk_usd / stop_distance
-
-        lev = int(getattr(config, "DEFAULT_LEVERAGE", 1))
-        notional = qty * cp
-        margin = notional / max(lev, 1)
-
+        # ── v10.3 Fixed Bullet: Margen fijo de 150 USDT para TODOS los trades LSE ──
+        # Eliminamos el cálculo de qty basado en risk_usd / stop_distance
+        # Ahora usamos siempre el margen configurado ($150 USDT)
+        
         if profile:
-            cap_m = float(profile.get("marginPerTrade", 150))
+            margin = float(profile.get("marginPerTrade", 150))
         else:
-            cap_m = float(getattr(config, "MAX_MARGIN_PER_TRADE_USD", 500))
+            margin = float(getattr(config, "MAX_MARGIN_PER_TRADE_USD", 150))
+        
+        lev = int(getattr(config, "DEFAULT_LEVERAGE", 1))
+        notional = margin * lev
+        qty = notional / cp
+        
+        # Calcular SL porcentual para logs
+        sl_pct = (stop_distance / cp) * 100 if cp > 0 else 0
+        
+        logger.warning(
+            f"[FIXED-MARGIN] {symbol} (LSE): Entrando con bala fija de ${margin:.2f} USDT | SL={sl_pct:.2f}% | qty={qty:.4f}"
+        )
 
-        if margin > cap_m:
-            scale = cap_m / margin
-            margin = cap_m
-            qty *= scale
-            notional *= scale
-
+        # ── FIX v11.6: THE PURGE — Fixed Bullet 150k: Margen fijo o nada ──
+        # Si el balance libre no llega a 150 USDT, prohibir abrir trades.
+        # No más posiciones de $0.01 ni de $109. Es 150 o nada.
+        if balance < config.MAX_MARGIN_PER_TRADE_USD:
+            logger.warning(
+                f"[PURGE v11.6] {symbol}: Balance insuficiente (${balance:.2f} < ${config.MAX_MARGIN_PER_TRADE_USD:.2f}) — trade bloqueado (Fixed Bullet 150k)"
+            )
+            return None
+        
+        # Aplicar límite de balance (no podemos usar más del 99% del balance disponible)
         margin = min(margin, balance * 0.99)
         
         max_no = float(getattr(config, "MAX_NOTIONAL_PER_TRADE_USD", 50000))
@@ -111,10 +131,10 @@ class RiskManager:
             "sl_price": round(sl_price, 8),
             "range_pct_used": None,
             "lse_sizing": {
-                "risk_usd": round(risk_usd, 4),
+                "fixed_margin": round(margin, 4),
                 "stop_distance": round(stop_distance, 8),
-                "qty_est": round(qty, 8),
-                "notional_est": round(notional, 2),
+                "qty": round(qty, 8),
+                "notional": round(notional, 2),
             },
         }
 
@@ -149,7 +169,7 @@ class RiskManager:
                 atr_signal = atr_f
 
         # ── HYBRID SNIPER / GOLDEN U-TURN: Custom SL Calibration ─────────────────
-        # Golden U-Turn: SL = low de las últimas 5 velas (piso de lateralización)
+        # Golden U-Turn: SL = low de las últimas 20 velas (piso estructural)
         structural_sniper_mode = signal_data.get("structural_sniper_mode", False)
         golden_uturn_mode = signal_data.get("golden_uturn_mode", False)
         custom_sl_price = signal_data.get("custom_sl_price")
@@ -315,27 +335,37 @@ class RiskManager:
             logger.error("Nexus stop_distance invalid side=%s cp=%s sl=%s", side, cp, sl_price)
             return None
 
-        # 3. Calcular risk_usd constante
-        risk_usd = balance * float(getattr(config, "EQUITY_RISK_PCT_FOR_STOP", 0.01))
+        # ── v10.3 Fixed Bullet: Margen fijo de 150 USDT para TODOS los trades ──
+        # Eliminamos el cálculo de qty basado en risk_usd / stop_distance
+        # Ahora usamos siempre el margen configurado ($150 USDT)
         
-        # 4. Calcular qty final
-        qty = risk_usd / stop_distance
-
-        # 5. Aplicar caps
-        lev = int(getattr(config, "DEFAULT_LEVERAGE", 1))
-        notional = qty * cp
-        margin = notional / max(lev, 1)
-
         if profile:
-            cap_m = float(profile.get("marginPerTrade", 150))
+            margin = float(profile.get("marginPerTrade", 150))
         else:
-            cap_m = float(getattr(config, "MAX_MARGIN_PER_TRADE_USD", 500))
-        if margin > cap_m:
-            scale = cap_m / margin
-            margin = cap_m
-            qty *= scale
-            notional *= scale
+            margin = float(getattr(config, "MAX_MARGIN_PER_TRADE_USD", 150))
+        
+        lev = int(getattr(config, "DEFAULT_LEVERAGE", 1))
+        notional = margin * lev
+        qty = notional / cp
+        
+        # Calcular SL y TP porcentuales para logs
+        sl_pct = (sl_distance_price / cp) * 100 if cp > 0 else 0
+        tp_pct = (tp_distance_price / cp) * 100 if cp > 0 else 0
+        
+        logger.warning(
+            f"[FIXED-MARGIN] {symbol}: Entrando con bala fija de ${margin:.2f} USDT | SL={sl_pct:.2f}% | TP={tp_pct:.2f}% | qty={qty:.4f}"
+        )
 
+        # ── FIX v11.6: THE PURGE — Fixed Bullet 150k: Margen fijo o nada ──
+        # Si el balance libre no llega a 150 USDT, prohibir abrir trades.
+        # No más posiciones de $0.01 ni de $109. Es 150 o nada.
+        if balance < config.MAX_MARGIN_PER_TRADE_USD:
+            logger.warning(
+                f"[PURGE v11.6] {symbol}: Balance insuficiente (${balance:.2f} < ${config.MAX_MARGIN_PER_TRADE_USD:.2f}) — trade bloqueado (Fixed Bullet 150k)"
+            )
+            return None
+        
+        # Aplicar límite de balance (no podemos usar más del 99% del balance disponible)
         margin = min(margin, balance * 0.99)
 
         max_no = float(getattr(config, "MAX_NOTIONAL_PER_TRADE_USD", 50000))
@@ -350,16 +380,12 @@ class RiskManager:
         range_pct = sl_distance_pct
 
         # Validación post-caps
-        real_risk_usd = qty * stop_distance
         sl_pct = stop_distance / cp
         atr_ratio = sl_pct / atr_pct if atr_pct > 0 else 0
 
         logger.info(
-            f"[RISK] ATR={atr_pct:.4f} | SL%={sl_pct:.4f} "
-            f"| RR={rr_target:.2f} | Qty={qty:.4f} | RiskUSD={risk_usd:.2f}"
+            f"[RISK-FINAL] {symbol} | Margin: ${margin:.2f} | Qty: {qty:.4f} | SL: {sl_pct:.2f}% | TP: {tp_pct:.2f}%"
         )
-        logger.info(f"[RISK_FINAL] Intended={risk_usd:.2f} | Real={real_risk_usd:.2f}")
-        logger.info(f"[RISK_CHECK] SL/ATR ratio={atr_ratio:.2f}")
 
         # ── Validación hard: niveles inválidos → bloquear trade ──
         if sl_price <= 0:
@@ -393,7 +419,7 @@ class RiskManager:
             "sl_price": round(sl_price, 8),
             "range_pct_used": round(range_pct * 100, 2),
             "nexus_sizing": {
-                "risk_usd": round(risk_usd, 4),
+                "fixed_margin": round(margin, 4),
                 "stop_distance": round(stop_distance, 8),
                 "qty_est": round(qty, 8),
                 "notional_est": round(notional, 2),

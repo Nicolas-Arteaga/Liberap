@@ -93,17 +93,17 @@ def _fetch_24h_low_price(symbol: str) -> float:
 # Bypass (Score 99) solo si MA99 horizontal (-1.5°/+1.5°) y venimos de caída >2%.
 # Fast path: usa datos pre-calculados por el agente en Step 3.5 (Gravity Check).
 
-def _calculate_ma99_slope_angle(ma99_values: list, window: int = None) -> float:
+def _calculate_ma99_slope_angle(ma_values: list, window: int = None) -> float:
     """
-    Calcula el ángulo de inclinación de la MA99 en grados.
+    Calcula el ángulo de inclinación de una MA (MA99 o MA7) en grados.
     Retorna el ángulo en grados (positivo = subiendo, negativo = bajando).
     """
-    if not ma99_values or len(ma99_values) < 2:
+    if not ma_values or len(ma_values) < 2:
         return 0.0
 
     if window is None:
         window = int(getattr(config, "GOLDEN_UTURN_ANGLE_WINDOW", 12))
-    recent_values = ma99_values[-window:] if len(ma99_values) >= window else ma99_values
+    recent_values = ma_values[-window:] if len(ma_values) >= window else ma_values
     if len(recent_values) < 2:
         return 0.0
     
@@ -223,10 +223,53 @@ def check_uturn_detector(
         
         candidate["golden_uturn_mode"] = True
         if sl_5low > 0 and sl_5low < current_price:
-            candidate["custom_sl_price"] = sl_5low
+            candidate["custom_sl_price"] = sl_5low  # v9.6: usa low de 20 velas (config GOLDEN_UTURN_SL_CANDLE_LOOKBACK)
+        
+        # ── v10.1 The Surgical Hook: Regla del Gancho ─────────────────────────
+        # Solo para GOLDEN-U-TURN: el cierre de 15m debe ser estrictamente MAYOR a la MA7
+        # La MA7 debe estar plana o subiendo (Slope MA7 > -1°)
+        ma7_now = float(golden_ctx.get("ma7_now", 0))
+        close_above_ma7 = float(golden_ctx.get("close_above_ma7", False))
+        
+        hook_pass = True
+        hook_reason = ""
+        
+        if ma7_now > 0:
+            # Verificar que el cierre sea estrictamente MAYOR a la MA7
+            if not close_above_ma7:
+                hook_pass = False
+                hook_reason = "cierre_no_sobre_ma7"
+                logger.warning(
+                    f"[THE-HOOK] {symbol} - FAIL: Cierre no sobre MA7 (close={current_price:.6f}, MA7={ma7_now:.6f}) - HARD RETURN v11.2"
+                )
+                metrics["hook_veto"] = hook_reason
+                return False, "the_hook_veto_cierre_bajo_ma7", metrics
+            else:
+                # Verificar slope de MA7 (usando ma7_history si está disponible)
+                ma7_history = golden_ctx.get("ma7_history", [])
+                if ma7_history and len(ma7_history) >= 2:
+                    ma7_slope = _calculate_ma99_slope_angle(ma7_history)
+                    if ma7_slope < -1.0:
+                        hook_pass = False
+                        hook_reason = f"ma7_slope_negativo_{ma7_slope:.2f}"
+                        logger.warning(
+                            f"[THE-HOOK] {symbol} - FAIL: MA7 slope={ma7_slope:.2f}° < -1° (bajando rápido)"
+                        )
+                    else:
+                        logger.info(
+                            f"[THE-HOOK] {symbol} - PASS: Cierre sobre MA7, MA7 slope={ma7_slope:.2f}° (plana/subiendo)"
+                        )
+                else:
+                    logger.info(f"[THE-HOOK] {symbol} - PASS: Cierre sobre MA7 (sin datos de slope)")
+        else:
+            logger.warning(f"[THE-HOOK] {symbol} - SKIP: No hay datos de MA7")
+        
+        if not hook_pass:
+            metrics["hook_veto"] = hook_reason
+            return False, f"the_hook_veto_{hook_reason}", metrics
         
         logger.warning(
-            f"[GOLDEN-U-TURN v9.4] {symbol} - PISO DE CEMENTO! "
+            f"[GOLDEN-U-TURN v10.1] {symbol} - PISO DE CEMENTO + THE HOOK! "
             f"MA99 Angle={angle:.2f}° | Drop={drop_pct:.2f}% | "
             f"DistMA99={golden_ctx.get('price_to_ma99_distance_pct')}% | SL={sl_5low:.6f}"
         )
@@ -490,6 +533,16 @@ def validate_nexus_confluence_setup(
 
     # ── GOLDEN U-TURN v9.1: Detector estructural (TODOS los perfiles, incl. Standard Scalping) ──
     uturn_detected, uturn_reason, uturn_metrics = check_uturn_detector(candidate, cp)
+    
+    # ── FIX v11.3: TOTAL OBEDIENCE — El validador manda sobre ejecución ──
+    # Si check_uturn_detector devuelve False, respetar el veto inmediatamente
+    # El Hook es la última palabra: si close_above_ma7 es False, no importa el Score 99
+    if not uturn_detected and uturn_reason:
+        logger.warning(
+            f"[TOTAL-OBEDIENCE v11.3] {symbol}: VETO del detector respetado — {uturn_reason} (Score 99 NO puede pisar esto)"
+        )
+        return False, uturn_reason, metrics
+    
     if uturn_reason == "uturn_top_block_long" and side == 0:
         logger.warning(
             f"[GOLDEN-U-TURN v9.1] {symbol}: TECHO — MA99 subió {uturn_metrics.get('ma99_change_pct', 0):.2f}% y lateraliza. BLOCK LONG."
@@ -556,12 +609,13 @@ def validate_nexus_confluence_setup(
 
     # ── VETO #8: Ranging sin volumen = trampa ──────────────────────────────
     # Prod 24h: Ranging + sin vol_expl = 0% WR, -7 USDT neto — dinero regalado.
-    # Solo pasa si volume_ratio_20 >= 2.0 (doble del promedio confirma movimiento).
+    # v10.1 The Surgical Hook: MIN_VOLUME_RATIO_20 = 0.15 (más permisivo para ranging)
+    min_vol_ratio = float(getattr(config, "MIN_VOLUME_RATIO_20", 0.15))
     bridge_regime = str(candidate.get("bridge_regime", "")).lower()
     nexus_regime = str(nexus15_ctx.get("regime", "")).lower() if isinstance(nexus15_ctx, dict) else ""
     regime = bridge_regime or nexus_regime
 
-    if not is_golden and "ranging" in regime and not volume_surge_bullish and volume_ratio_20 < 2.0:
+    if not is_golden and "ranging" in regime and not volume_surge_bullish and volume_ratio_20 < min_vol_ratio:
         if getattr(config, "MIN_CONFLUENCE_SCORE", 50.0) > 30.0:
             logger.info(
                 "[VETO] ranging_no_momentum — %s | regime=%s vol_ratio=%.2f surge=False",
@@ -587,28 +641,32 @@ def validate_nexus_confluence_setup(
     if not is_golden and candle_body_ratio < 0.05:
         return False, "no_body_no_trade", metrics
 
-    # Golden U-Turn v9.6 Big Fish: SL = min(low-20velas, 3% bajo entrada)
+    # Golden U-Turn v9.6 Big Fish: SL = MAYOR entre (low-20velas, 3% bajo entrada)
     if is_golden:
         gu_sl = (
             candidate.get("custom_sl_price")
             or uturn_metrics.get("golden_uturn_sl_5low")
             or (candidate.get("agent_audit_context", {}).get("golden_uturn", {}) or {}).get("sl_5low")
         )
+        # v9.6: SL = MAYOR entre (low estructural 20 velas, 3% fijo bajo entrada)
+        min_sl_pct = float(getattr(config, "GOLDEN_UTURN_SL_MIN_DISTANCE_PCT", 3.0)) / 100.0
+        pct_sl = cp * (1.0 - min_sl_pct)
+        # Usar el MAYOR entre el low estructural y el 3% fijo
         if gu_sl and float(gu_sl) > 0:
-            min_sl_pct = float(getattr(config, "GOLDEN_UTURN_SL_MIN_DISTANCE_PCT", 3.0)) / 100.0
-            pct_sl = cp * (1.0 - min_sl_pct)
-            final_sl = min(float(gu_sl), pct_sl)
+            final_sl = max(float(gu_sl), pct_sl)
             if final_sl > 0 and final_sl < cp:
                 candidate["custom_sl_price"] = final_sl
                 sl_dist = (cp - final_sl) / cp * 100
                 min_tp = float(getattr(config, "GOLDEN_UTURN_TP_MIN_DISTANCE_PCT", 10.0))
                 logger.info(
-                    f"[BIG-FISH-RISK] {symbol}: SL={sl_dist:.2f}% bajo entrada, TP objetivo ≥{min_tp:.1f}%"
+                    f"[BIG-FISH-RISK] {symbol}: SL={sl_dist:.2f}% bajo entrada (MAYOR entre low-20 y 3%), TP objetivo ≥{min_tp:.1f}%"
                 )
 
     # Volume check only blocks when volume is very weak AND no surge at all
     # BYPASS: Golden U-Turn v9.0 — el volumen suele ser bajo en el suelo exacto.
-    if not candidate.get("golden_uturn_mode") and volume_ratio_20 < 0.8 and not volume_surge_bullish:
+    # v10.1 The Surgical Hook: MIN_VOLUME_RATIO_20 = 0.15 (mata a CRDOUSDT, permite a UBUSDT)
+    min_vol_ratio = float(getattr(config, "MIN_VOLUME_RATIO_20", 0.15))
+    if not candidate.get("golden_uturn_mode") and volume_ratio_20 < min_vol_ratio and not volume_surge_bullish:
         if getattr(config, "MIN_CONFLUENCE_SCORE", 50.0) > 30.0:
             logger.info(
                 "[SKIP] no_volume_confirmation — %s | volume_ratio_20=%.2f surge=False",
@@ -827,6 +885,17 @@ def validate_pre_trade(
             symbol, estimated_range_pct, max_range_pct
         )
         return False, "range_too_large", {"estimated_range_pct": estimated_range_pct, "max_limit": max_range_pct}
+
+    # ── FIX A v11.1: VETO DE VOLATILIDAD EXTREMA (THE BARRIER) ──
+    # Solo aplica a Momentum Burst / Nexus-15 standalone (NO Golden U-Turn)
+    # Golden U-Turn usa SL estructural (low de 5 velas), no basado en rango estimado
+    # EPICUSDT (01:48) tenía rango 10.76% y causó -$12.32 en 8 minutos
+    volatility_barrier_pct = 5.0
+    if not is_golden and estimated_range_pct > volatility_barrier_pct:
+        logger.warning(
+            f"[THE-BARRIER] {symbol} RECHAZADO: Volatilidad extrema {estimated_range_pct:.2f}% > {volatility_barrier_pct}% (FIX A v11.1 - Momentum Burst only)"
+        )
+        return False, "volatility_barrier_veto", {"estimated_range_pct": estimated_range_pct, "barrier_limit": volatility_barrier_pct}
 
     # ── VETO GLOBAL: Stop Loss Porcentual Máximo (MAX_STOP_LOSS_PCT) ──
     max_sl_pct = float(profile.get("maxStopLossPct", getattr(config, "MAX_STOP_LOSS_PCT", 4.0))) if profile else float(getattr(config, "MAX_STOP_LOSS_PCT", 4.0))

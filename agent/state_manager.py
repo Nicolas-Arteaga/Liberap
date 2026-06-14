@@ -73,8 +73,8 @@ class StateManager:
 
     def can_trade_today(self) -> bool:
         """Check if we haven't hit the daily maximum trades limit."""
-        stats = self.get_daily_stats()
-        return stats["trades_count"] < config.MAX_TRADES_PER_DAY
+        # v10.4: Sin límite diario - siempre devuelve True
+        return True
 
     def has_traded_symbol_today(self, symbol: str) -> bool:
         """Anti-churn: check if we already traded this symbol today."""

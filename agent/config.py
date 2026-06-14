@@ -96,12 +96,12 @@ AGENT_MAX_CANDIDATES_PER_CYCLE = int(os.getenv("AGENT_MAX_CANDIDATES_PER_CYCLE",
 # Si > 0: solo los ranks 1..N pueden ejecutar candidatos no-LSE (evita rank 9 Nexus "por descarte").
 AGENT_MAX_RANK_FOR_NEXUS_FALLBACK = int(os.getenv("AGENT_MAX_RANK_FOR_NEXUS_FALLBACK", "0"))
 
-MAX_OPEN_POSITIONS = 3              # 3 posiciones simultáneas para scalping
+MAX_OPEN_POSITIONS = 3              # v10.8: THE TRIAD — 3 posiciones simultáneas por estrategia
 BINANCE_REAL_TRADING = os.getenv("BINANCE_REAL_TRADING", "false").lower() in ("1", "true", "yes")
-MIN_ENTRY_NEXUS  = float(os.getenv("MIN_ENTRY_NEXUS",  "65.0"))  # v9.5: 65% — timing momentum (antes 76%)
+MIN_ENTRY_NEXUS  = float(os.getenv("MIN_ENTRY_NEXUS",  "76.0"))  # v10.8: THE TRIAD — 76% mínimo de seguridad
 MIN_UPGRADE_NEXUS = float(os.getenv("MIN_UPGRADE_NEXUS", "80.0"))  # Nexus mínimo para reemplazar la peor posición
-PROFILE_MIN_NEXUS_CONFIDENCE = float(os.getenv("PROFILE_MIN_NEXUS_CONFIDENCE", "65.0"))  # Techo perfil estrategia (v9.5)
-MAX_TRADES_PER_DAY = 100
+PROFILE_MIN_NEXUS_CONFIDENCE = float(os.getenv("PROFILE_MIN_NEXUS_CONFIDENCE", "76.0"))  # v10.8: THE TRIAD — 76% mínimo de seguridad
+MAX_TRADES_PER_DAY = 50            # v10.8: THE TRIAD — 50 trades diarios (suficiente para 3 estrategias)
 MAX_POSITION_DURATION_HOURS = 48
 MAX_TRADE_DURATION_CANDLES = int(os.getenv("MAX_TRADE_DURATION_CANDLES", "8"))
 DEFAULT_LEVERAGE = 1
@@ -191,7 +191,7 @@ GOLDEN_UTURN_ANGLE_WINDOW = int(os.getenv("GOLDEN_UTURN_ANGLE_WINDOW", "12"))   
 GOLDEN_UTURN_INTERVAL = os.getenv("GOLDEN_UTURN_INTERVAL", "15m")                        # Marco temporal para el análisis (15m = sensibilidad óptima)
 GOLDEN_UTURN_LOOKBACK_CANDLES = int(os.getenv("GOLDEN_UTURN_LOOKBACK_CANDLES", "100"))   # velas 15m (~25 horas = ~1 día)
 GOLDEN_UTURN_MIN_DROP_PCT = float(os.getenv("GOLDEN_UTURN_MIN_DROP_PCT", "3.0"))        # MA99 debe haber caído al menos 3%
-GOLDEN_UTURN_MAX_MA99_DISTANCE_PCT = float(os.getenv("GOLDEN_UTURN_MAX_MA99_DISTANCE_PCT", "15.0"))  # v9.5: suelos post-crash (SAHARA -12% OK)
+GOLDEN_UTURN_MAX_MA99_DISTANCE_PCT = float(os.getenv("GOLDEN_UTURN_MAX_MA99_DISTANCE_PCT", "3.0"))  # v11.5: MASTER-SNIPER — Precio pegado a MA99 (±3% máximo)
 GOLDEN_UTURN_MAX_MA7_DISTANCE_PCT = float(os.getenv("GOLDEN_UTURN_MAX_MA7_DISTANCE_PCT", "2.0"))   # proximidad MA7 (no cierre obligatorio)
 # Step 3.5 Gravity Check — umbrales de volumen 24h por tier
 GOLDEN_UTURN_MIN_VOLUME_TIER2_USD = int(os.getenv("GOLDEN_UTURN_MIN_VOLUME_TIER2_USD", "100000"))   # Tier 2: $100k
@@ -199,10 +199,13 @@ GOLDEN_UTURN_MIN_VOLUME_DEFAULT_USD = int(os.getenv("GOLDEN_UTURN_MIN_VOLUME_DEF
 GOLDEN_UTURN_SL_CANDLE_LOOKBACK = int(os.getenv("GOLDEN_UTURN_SL_CANDLE_LOOKBACK", "20"))  # v9.6: low estructural 20 velas
 GOLDEN_UTURN_SL_MIN_DISTANCE_PCT = float(os.getenv("GOLDEN_UTURN_SL_MIN_DISTANCE_PCT", "3.0"))   # v9.6: SL mínimo 3% bajo entrada
 GOLDEN_UTURN_TP_MIN_DISTANCE_PCT = float(os.getenv("GOLDEN_UTURN_TP_MIN_DISTANCE_PCT", "10.0"))  # v9.6: TP mínimo 10% sobre entrada
-GOLDEN_UTURN_TP_MULTIPLIER = float(os.getenv("GOLDEN_UTURN_TP_MULTIPLIER", "3.5"))               # RR sobre SL estirado
+GOLDEN_UTURN_TP_MULTIPLIER = float(os.getenv("GOLDEN_UTURN_TP_MULTIPLIER", "4.5"))               # v10.1: 4.5x si VolRatio > 2.0, 10% fijo mínimo
 GOLDEN_UTURN_SL_SPREAD_BUFFER_PCT = float(os.getenv("GOLDEN_UTURN_SL_SPREAD_BUFFER_PCT", "0.1"))  # margen bajo el low (spread testnet)
 GOLDEN_UTURN_SCORE = 99.0  # Score de inyección directa (prioridad absoluta sobre Nexus-15)
 GOLDEN_UTURN_ENABLED = True  # Master switch
+
+# v10.1 The Surgical Hook — Veto Zombi
+MIN_VOLUME_RATIO_20 = float(os.getenv("MIN_VOLUME_RATIO_20", "0.15"))  # v10.1: 0.15x mata a CRDOUSDT, permite a UBUSDT
 
 # Paths
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")

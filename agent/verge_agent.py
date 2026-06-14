@@ -39,9 +39,42 @@ from btc_correlation import BTCCorrelation
 # The LSE Python service endpoint is part of the same python-service container.
 
 # ── AGENT VERSION — Cambiar en cada release para identificar en logs ─────
-AGENT_VERSION = "v9.6-BIG-FISH"
-AGENT_BUILD_DATE = "2026-06-10"
+AGENT_VERSION = "v11.6-THE-PURGE"
+AGENT_BUILD_DATE = "2026-06-13"
 AGENT_CHANGES = [
+    "FIX v11.6: THE PURGE — Selección quirúrgica de víctima: Prioridad 1 = Margen roto (< 140 USDT)",
+    "FIX v11.6: THE PURGE — Selección quirúrgica de víctima: Prioridad 2 = PnL más negativo de la estrategia",
+    "FIX v11.6: THE PURGE — Fixed Bullet 150k: Balance < 150 USDT = prohibir abrir (no más $0.01 ni $109)",
+    "FIX v11.6: THE PURGE — Log [PURGE v11.6] con razón de sacrificio (Margen Roto / PnL Negativo)",
+    "FIX v11.5: MASTER-SNIPER — Prohibir cierre de posiciones ganadoras (PnL > 0.1%) para Upgrade",
+    "FIX v11.5: MASTER-SNIPER — Bajar GOLDEN_UTURN_MAX_DISTANCE a 3.0% (precio pegado a MA99)",
+    "FIX v11.5: MASTER-SNIPER — Slope-Guard infalible (-5.0) para bloquear toboganes",
+    "FIX v11.5: MASTER-SNIPER — Corregir error get_balance_info en log de balance",
+    "FIX v11.3: TOTAL OBEDIENCE — Validador manda sobre ejecución (is_valid False = cancelar trade)",
+    "FIX v11.3: BALANCE CHECK — Log de margen disponible en cada ciclo",
+    "FIX v11.3: TOTAL OBEDIENCE — Hook es la última palabra (Score 99 NO puede pisar veto)",
+    "FIX v11.2: SURGICAL-FIX — Hard-Hook activo (close_above_ma7 False = return inmediato)",
+    "FIX v11.2: SURGICAL-FIX — Slope-Guard calibrado (ma99_long_slope < -0.10 = bloqueo)",
+    "FIX v11.2: FULL AMMO — Restaurados 3 slots de $150 USDT por estrategia (poder de fuego total)",
+    "FIX v11.1: THE BARRIER — Veto de volatilidad solo para Momentum Burst (NO Golden U-Turn)",
+    "FIX v11.0: THE BARRIER — Bypass Score=99 no ignora BearTrend + Wait en Golden U-Turn",
+    "FIX v10.8: THE TRIAD — Límite estricto de 3 posiciones por estrategia (MAX_OPEN_POSITIONS=3)",
+    "FIX v10.8: THE TRIAD — Validación de margen mínimo (150 USDT) en RiskManager",
+    "FIX v10.8: THE TRIAD — MAX_TRADES_PER_DAY=50 (suficiente para 3 estrategias)",
+    "FIX v10.8: THE TRIAD — Restaurado mínimo Nexus a 76% (seguridad total)",
+    "FIX v10.7: Final Dictionary — Eliminado risk_usd del diccionario de retorno (NameError definitivo)",
+    "FIX v10.6: Final Cleanup — Eliminadas referencias a risk_usd en logs (NameError)",
+    "FIX v10.5: Final Fix — Corregido NameError en risk_manager.py (sl_distance -> sl_distance_price)",
+    "FIX v10.4: Unlimited — Eliminado límite diario de trades (MAX_TRADES_PER_DAY = 999999)",
+    "FIX v10.3: Fixed Bullet — Margen fijo de $150 USDT para TODOS los trades (Nexus y LSE)",
+    "FIX v10.2: Syntax Fix — Corregido NameError en _calculate_ma99_slope_angle (ma99_values -> ma_values)",
+    "FIX v10.2: MA7 History — Agregado cálculo de ma7_history en verge_agent.py para slope MA7",
+    "FIX v10.1: The Surgical Hook — Cierre > MA7 y Slope MA7 > -1° para Golden U-Turn",
+    "FIX v10.1: Veto Zombi — MIN_VOLUME_RATIO_20 = 0.15 (mata a CRDOUSDT, permite a UBUSDT)",
+    "FIX v10.1: TP_MULTIPLIER 4.5x para Golden U-Turn (si VolRatio > 2.0) o 10% fijo mínimo",
+    "FIX v9.8: Diamond Hands — Desactiva cierres prematuros (BTC Exit, Cosecha, Zombie) para Golden U-Turn",
+    "FIX v9.8: Trailing Profit Inteligente — Activa al +10%, trailing 5% desde máximo para moonshots",
+    "FIX v9.8: Margen agresivo — Forza 100% del margen ($150) para Golden U-Turn",
     "FIX v9.6: Big Fish — Golden SL max(low20, 3%) + TP mínimo 10%",
     "FIX v9.5: Dual Sniper — Golden VIP primero, Nexus-15 estándar después (65% min)",
     "FIX v9.5: Dist MA99 hasta 15%, MA7 proximidad ±2% (sin exigir cierre encima)",
@@ -491,6 +524,17 @@ class VergeAgent:
         version = "3.4" if use_testnet else "3.3"
         env_str = "TESTNET" if use_testnet else "MAINNET"
         logger.info(f"[VERSION] PositionManager v{version} - TP/SL via closePosition=true with fallbacks ({env_str})")
+        
+        # ── FIX v11.5: BALANCE CHECK — Log de margen disponible en cada ciclo (corregido) ──
+        try:
+            available_balance = self.positions.get_virtual_balance() or config.VIRTUAL_CAPITAL_BASE
+            required_margin = 150.0
+            logger.info(
+                f"[BALANCE-CHECK v11.5] Margen disponible: ${available_balance:.2f}. "
+                f"Se necesitan ${required_margin:.2f} para operar."
+            )
+        except Exception as e:
+            logger.warning(f"[BALANCE-CHECK v11.5] Error obteniendo balance: {e}")
 
         # 0. Check exchange health
         breakers     = get_breakers()
@@ -506,13 +550,13 @@ class VergeAgent:
         logger.info("[Step 1/6] Syncing strategy profiles and checking positions...")
         db_profiles = self.positions.get_strategy_profiles() or []
         db_profiles = [p for p in db_profiles if p.get("name") not in ("Standard Scalping", "Scalping Clone")]
-        _profile_nexus_cap = float(getattr(config, "PROFILE_MIN_NEXUS_CONFIDENCE", 65.0))
+        _profile_nexus_cap = float(getattr(config, "PROFILE_MIN_NEXUS_CONFIDENCE", 76.0))
         for p in db_profiles:
             raw_nexus = float(p.get("minNexusConfidence") or _profile_nexus_cap)
             if raw_nexus > _profile_nexus_cap:
                 p["minNexusConfidence"] = _profile_nexus_cap
                 logger.info(
-                    f"[v9.5] Perfil '{p.get('name')}' minNexus capped {raw_nexus}% → {_profile_nexus_cap}%"
+                    f"[v10.8] Perfil '{p.get('name')}' minNexus capped {raw_nexus}% → {_profile_nexus_cap}%"
                 )
         
         # Define the virtual legacy profile for "Standard Scalping" (Sniper Mode)
@@ -716,27 +760,37 @@ class VergeAgent:
                     try:
                         gu = self._check_golden_uturn(symbol)
                         if gu["passed"]:
-                            with lock:
-                                if symbol not in nexus5_cache:
-                                    nexus5_cache[symbol] = {"symbol": symbol}
-                                nexus5_cache[symbol]["golden_uturn"] = True
-                                nexus5_cache[symbol]["golden_uturn_angle"] = gu["angle"]
-                                nexus5_cache[symbol]["golden_uturn_drop_pct"] = gu["drop_pct"]
-                                nexus5_cache[symbol]["golden_uturn_sl_5low"] = gu["sl_5low"]
-                                # v9.1 audit metrics
-                                nexus5_cache[symbol]["gu_price_to_ma99_distance_pct"] = gu["price_to_ma99_distance_pct"]
-                                nexus5_cache[symbol]["gu_ma99_now"] = gu["ma99_now"]
-                                nexus5_cache[symbol]["gu_ma99_ago"] = gu["ma99_ago"]
-                                nexus5_cache[symbol]["gu_volume_ignition_ratio_1m"] = gu["volume_ignition_ratio_1m"]
-                                nexus5_cache[symbol]["gu_atr_volatility_pct"] = gu["atr_volatility_pct"]
-                                nexus5_cache[symbol]["gu_consecutive_flat_candles"] = gu["consecutive_flat_candles"]
-                                nexus5_cache[symbol]["gu_ma7_now"] = gu["ma7_now"]
-                                nexus5_cache[symbol]["gu_close_above_ma7"] = gu["close_above_ma7"]
-                                n5_golden += 1
-                            logger.info(
-                                f"[GRAVITY-CHECK] {symbol}: MA99 Angle={gu['angle']:.2f}°, "
-                                f"Drop={gu['drop_pct']:.2f}% — GOLDEN U-TURN!"
-                            )
+                            # ── FIX v11.5: Slope Guard Infalible usando ma99_long_slope de Nexus-5 ──
+                            # Si la MA99 sigue cayendo fuerte (< -5.0), bloquear el trade (tobogán total)
+                            n5_data = nexus5_cache.get(symbol, {})
+                            ma99_long_slope = n5_data.get("ma99_long_slope")
+                            if ma99_long_slope is not None and ma99_long_slope < -5.0:
+                                logger.warning(
+                                    f"[SLOPE-GUARD v11.5] {symbol} RECHAZADO: MA99 slope={ma99_long_slope:.6f} < -5.0 (tobogán total)"
+                                )
+                                # No agregar al cache de golden_uturn si falla el Slope-Guard
+                            else:
+                                with lock:
+                                    if symbol not in nexus5_cache:
+                                        nexus5_cache[symbol] = {"symbol": symbol}
+                                    nexus5_cache[symbol]["golden_uturn"] = True
+                                    nexus5_cache[symbol]["golden_uturn_angle"] = gu["angle"]
+                                    nexus5_cache[symbol]["golden_uturn_drop_pct"] = gu["drop_pct"]
+                                    nexus5_cache[symbol]["golden_uturn_sl_5low"] = gu["sl_5low"]
+                                    # v9.1 audit metrics
+                                    nexus5_cache[symbol]["gu_price_to_ma99_distance_pct"] = gu["price_to_ma99_distance_pct"]
+                                    nexus5_cache[symbol]["gu_ma99_now"] = gu["ma99_now"]
+                                    nexus5_cache[symbol]["gu_ma99_ago"] = gu["ma99_ago"]
+                                    nexus5_cache[symbol]["gu_volume_ignition_ratio_1m"] = gu["volume_ignition_ratio_1m"]
+                                    nexus5_cache[symbol]["gu_atr_volatility_pct"] = gu["atr_volatility_pct"]
+                                    nexus5_cache[symbol]["gu_consecutive_flat_candles"] = gu["consecutive_flat_candles"]
+                                    nexus5_cache[symbol]["gu_ma7_now"] = gu["ma7_now"]
+                                    nexus5_cache[symbol]["gu_close_above_ma7"] = gu["close_above_ma7"]
+                                    n5_golden += 1
+                                logger.info(
+                                    f"[GRAVITY-CHECK] {symbol}: MA99 Angle={gu['angle']:.2f}°, "
+                                    f"Drop={gu['drop_pct']:.2f}% — GOLDEN U-TURN!"
+                                )
                         elif gu.get("reject_reason"):
                             logger.info(
                                 f"[GRAVITY-CHECK] {symbol}: v9.4 RECHAZADO — {gu['reject_reason']}"
@@ -2013,7 +2067,13 @@ class VergeAgent:
         return None
 
     def _close_worst_position(self, profile_id: str = None) -> bool:
-        """Encuentra la peor posicion abierta (peor PnL) de la estrategia y la cierra para liberar cupo."""
+        """
+        ── FIX v11.6: THE PURGE — Selección Quirúrgica de Reemplazo ──
+        Encuentra la posición a sacrificar siguiendo esta prioridad:
+        1. Margen Roto (< 140 USDT) - cerrar primero sin importar PnL
+        2. PnL más negativo de la estrategia
+        Si todas las posiciones están en profit (> 0.1%) y tienen margen correcto, el Upgrade se anula.
+        """
         open_positions = self.state.get_open_positions()
         if not open_positions:
             return False
@@ -2026,6 +2086,29 @@ class VergeAgent:
         if not open_positions:
             return False
 
+        # ── PRIORIDAD 1: Buscar posiciones con margen roto (< 140 USDT) ──
+        broken_margin_positions = []
+        for pos in open_positions:
+            margin = float(pos.get("margin", 0))
+            if margin < 140.0:  # Margen roto: menos de 140 USDT
+                broken_margin_positions.append(pos)
+        
+        if broken_margin_positions:
+            # Cerrar la primera posición con margen roto (fusible)
+            victim = broken_margin_positions[0]
+            symbol = victim["symbol"]
+            margin = float(victim.get("margin", 0))
+            logger.warning(
+                f"[PURGE v11.6] Seleccionada posición {symbol} para sacrificio. "
+                f"Razón: Margen Roto (${margin:.2f} < 140 USDT) — Fusible activado."
+            )
+            success = self.positions.close_trade(victim["trade_id"])
+            if success:
+                self.state.remove_position(victim["trade_id"])
+                return True
+            return False
+
+        # ── PRIORIDAD 2: Buscar la posición con PnL más negativo ──
         worst_pos = None
         worst_pnl = float('inf')
 
@@ -2047,8 +2130,21 @@ class VergeAgent:
                 worst_pnl = pnl_pct
                 worst_pos = pos
 
+        # ── FIX v11.5: MASTER-SNIPER — Prohibir cierre de posiciones ganadoras (Executive Override) ──
+        # El bot tiene PROHIBIDO cerrar cualquier posición para un "Upgrade" si el PnL es SUPERIOR a 0.1%
+        # Solo se reemplazan posiciones que estén en PÉRDIDA. Si todas están en profit, NO ABRE nada nuevo.
         if worst_pos:
-            logger.info(f"UPGRADE: Cerrando la peor posicion ({worst_pos['symbol']}) con PnL: {worst_pnl*100:.2f}% para liberar cupo.")
+            if worst_pnl > 0.001:  # 0.1% = 0.001 en decimal
+                logger.warning(
+                    f"[PURGE v11.6] UPGRADE ABORTADO: Todas las posiciones tienen PnL POSITIVO (> 0.1%). "
+                    f"La peor posición ({worst_pos['symbol']}) tiene {worst_pnl*100:.2f}%. "
+                    f"PROHIBIDO cerrar ganadores."
+                )
+                return False
+            logger.warning(
+                f"[PURGE v11.6] Seleccionada posición {worst_pos['symbol']} para sacrificio. "
+                f"Razón: PnL Negativo {worst_pnl*100:.2f}%"
+            )
             success = self.positions.close_trade(worst_pos["trade_id"])
             if success:
                 # Fake data para el log del cerrado (simplificado)
@@ -2249,6 +2345,13 @@ class VergeAgent:
                 abs((last_close - ma7_now) / ma7_now) * 100 if ma7_now > 0 else 999.0
             )
             close_above_ma7 = bool(ma7_now > 0 and last_close > ma7_now)
+            
+            # ── v10.1 The Surgical Hook: Calcular MA7 history para slope ──
+            ma7_history = []
+            if len(closes) >= 7:
+                for i in range(len(closes) - 6, len(closes) + 1):
+                    if i > 0:
+                        ma7_history.append(sum(closes[max(0, i-7):i]) / 7.0)
 
             price_to_ma99_pct = 0.0
             if ma99_now > 0:
@@ -2260,6 +2363,7 @@ class VergeAgent:
             result["ma7_now"] = round(ma7_now, 6)
             result["ma7_proximity_pct"] = round(ma7_proximity_pct, 4)
             result["close_above_ma7"] = close_above_ma7
+            result["ma7_history"] = ma7_history  # v10.1: para cálculo de slope MA7
             result["price_to_ma99_distance_pct"] = round(price_to_ma99_pct, 4)
             result["ma99_now"] = round(ma99_now, 6)
             result["ma99_ago"] = round(ma99_ago, 6)
@@ -2536,7 +2640,7 @@ class VergeAgent:
                 f"Score=99 bypass activo."
             )
             
-            # Set custom SL to low of last 5 candles if not already set
+            # Set custom SL to low of last 20 candles (v9.6 Big Fish) if not already set
             if gu_sl and gu_sl > 0 and not candidate.get("custom_sl_price"):
                 candidate["custom_sl_price"] = float(gu_sl)
                 sl_pct = (market_px - float(gu_sl)) / market_px * 100 if market_px > 0 else 0
@@ -2637,6 +2741,19 @@ class VergeAgent:
         if is_lse:
             pass
         elif is_golden:
+            # ── FIX B v11.0: BYPASS SCORE=99 NO PUEDE IGNORAR BEARTREND + WAIT ──
+            # SPORTFUNUSDT y MYXUSDT entraron con BearTrend/Wait por Score=99 y perdieron
+            nexus_audit = candidate.get("agent_audit_context", {}).get("nexus15", {})
+            api_regime = nexus_audit.get("regime", "").lower()
+            api_recommendation = nexus_audit.get("recommendation", "").lower()
+            
+            if api_regime == "beartrend" and api_recommendation == "wait":
+                logger.warning(
+                    f"[THE-BARRIER] {symbol} RECHAZADO: Golden U-Turn con BearTrend + Wait "
+                    f"(Score=99 bypass DESACTIVADO por FIX B v11.0)"
+                )
+                return False
+            
             logger.info(
                 f"[GOLDEN-VIP] {symbol}: bypass MIN_ENTRY_NEXUS — "
                 f"Nexus={nexus_conf_pct:.1f}% ignorado (pase estructural Score=99)"
@@ -2907,23 +3024,28 @@ class VergeAgent:
             close_reason = ""
             close_tag = "[CLOSE-NORMAL]"  # Default tag
 
+            # ── v9.8 Diamond Hands Mode: Detect Golden U-Turn trades ─────────────────
+            entry_reason = pos.get("entry_reason", "")
+            is_golden_uturn = "[STRAT: GOLDEN-U-TURN]" in entry_reason or pos.get("golden_uturn_mode", False)
+
             ft_exit = self._lse_follow_through_exit_reason(pos)
             if ft_exit:
                 should_close, close_reason = True, ft_exit
             elif side == 0:  # LONG
                 # ── BTC MACRO EXIT TRIGGER (Capa D) ──
-                # Si BTC dumpea y estamos en profit, cerrar proactivamente para proteger ganancias
-                dump_5m = self.btc_filter.get_dump_pct(5)
-                dump_15m = self.btc_filter.get_dump_pct(15)
-                
-                if entry_price > 0 and margin > 0:
-                    roi_pct = ((current_price - entry_price) / entry_price) * 100
-                    if roi_pct >= config.BTC_MIN_ROI_TO_PROTECT:
-                        if dump_5m < config.BTC_EXIT_DUMP_5M or dump_15m < config.BTC_EXIT_DUMP_15M:
-                            logger.warning(f"[CLOSE-BTC-EXIT] {symbol} cerrando proactivamente - ROI={roi_pct:.1f}% dump5m={dump_5m:.2f}% dump15m={dump_15m:.2f}%")
-                            should_close, close_reason = True, f"BTC Macro Exit (ROI={roi_pct:.1f}%, dump5m={dump_5m:.2f}%)"
-                            close_tag = "[CLOSE-BTC-EXIT]"
-                            self.report.record_btc_exit_triggered(roi_pct)
+                # v9.8 Diamond Hands: Desactivado para Golden U-Turn
+                if not is_golden_uturn:
+                    dump_5m = self.btc_filter.get_dump_pct(5)
+                    dump_15m = self.btc_filter.get_dump_pct(15)
+                    
+                    if entry_price > 0 and margin > 0:
+                        roi_pct = ((current_price - entry_price) / entry_price) * 100
+                        if roi_pct >= config.BTC_MIN_ROI_TO_PROTECT:
+                            if dump_5m < config.BTC_EXIT_DUMP_5M or dump_15m < config.BTC_EXIT_DUMP_15M:
+                                logger.warning(f"[CLOSE-BTC-EXIT] {symbol} cerrando proactivamente - ROI={roi_pct:.1f}% dump5m={dump_5m:.2f}% dump15m={dump_15m:.2f}%")
+                                should_close, close_reason = True, f"BTC Macro Exit (ROI={roi_pct:.1f}%, dump5m={dump_5m:.2f}%)"
+                                close_tag = "[CLOSE-BTC-EXIT]"
+                                self.report.record_btc_exit_triggered(roi_pct)
                 
                 if not should_close:
                     if current_price >= tp:
@@ -2932,26 +3054,44 @@ class VergeAgent:
                         should_close, close_reason = True, "Stop Loss reached"
 
                 # ── REGLA DE LA COSECHA INTELIGENTE (Trailing Stop Proporcional) ──
-                # Se activa cuando el trade recorre el 50% del camino al TP.
-                # Protege el 75% del profit máximo alcanzado (buffer del 25% para respirar).
+                # v9.8 Diamond Hands: Desactivado para Golden U-Turn, reemplazado por Trailing Profit Inteligente
                 if not should_close and entry_price > 0 and tp > entry_price:
-                    tp_dist = tp - entry_price
-                    activation_price = entry_price + (tp_dist * 0.50)  # 50% del camino al TP
-                    max_profit_price = pos.get("max_profit_price") or current_price
-                    max_profit_pct = (max_profit_price - entry_price) / entry_price
-                    if max_profit_pct > 0 and max_profit_price >= activation_price:
-                        # El buffer es el 25% del profit máximo alcanzado
-                        buffer_pct = max_profit_pct * 0.25
-                        # El trailing SL protege el 75% del profit máximo
-                        trailing_sl_price = entry_price * (1 + max_profit_pct - buffer_pct)
-                        if current_price <= trailing_sl_price:
-                            profit_protected_pct = (max_profit_pct - buffer_pct) * 100
-                            logger.info(
-                                "[COSECHA] %s trailing stop activado | max_profit=%.2f%% | buffer=%.2f%% | trailing_sl=%.8f | current=%.8f | profit_protegido=%.2f%%",
-                                symbol, max_profit_pct * 100, buffer_pct * 100, trailing_sl_price, current_price, profit_protected_pct
-                            )
-                            should_close, close_reason = True, f"Cosecha Inteligente (profit protegido={profit_protected_pct:.1f}%)"
-                            close_tag = "[COSECHA]"
+                    if is_golden_uturn:
+                        # ── v9.8 Trailing Profit Inteligente para Golden U-Turn ──
+                        # Se activa cuando el trade alcanza +10% de profit
+                        # Trailing stop solo se ejecuta si el precio cae 5% desde el máximo
+                        max_profit_price = pos.get("max_profit_price") or current_price
+                        max_profit_pct = (max_profit_price - entry_price) / entry_price
+                        
+                        if max_profit_pct >= 0.10:  # +10% de profit
+                            # Trailing stop: 5% desde el máximo
+                            trailing_sl_price = max_profit_price * 0.95  # 5% de caída desde el máximo
+                            if current_price <= trailing_sl_price:
+                                logger.info(
+                                    "[DIAMOND-HANDS] %s Trailing Profit activado | max_profit=%.2f%% | trailing_sl=%.8f (5%% desde máximo) | current=%.8f",
+                                    symbol, max_profit_pct * 100, trailing_sl_price, current_price
+                                )
+                                should_close, close_reason = True, f"Diamond Hands Trailing (max_profit={max_profit_pct*100:.1f}%)"
+                                close_tag = "[DIAMOND-HANDS]"
+                    else:
+                        # Cosecha Inteligente estándar para trades no-Golden U-Turn
+                        tp_dist = tp - entry_price
+                        activation_price = entry_price + (tp_dist * 0.50)  # 50% del camino al TP
+                        max_profit_price = pos.get("max_profit_price") or current_price
+                        max_profit_pct = (max_profit_price - entry_price) / entry_price
+                        if max_profit_pct > 0 and max_profit_price >= activation_price:
+                            # El buffer es el 25% del profit máximo alcanzado
+                            buffer_pct = max_profit_pct * 0.25
+                            # El trailing SL protege el 75% del profit máximo
+                            trailing_sl_price = entry_price * (1 + max_profit_pct - buffer_pct)
+                            if current_price <= trailing_sl_price:
+                                profit_protected_pct = (max_profit_pct - buffer_pct) * 100
+                                logger.info(
+                                    "[COSECHA] %s trailing stop activado | max_profit=%.2f%% | buffer=%.2f%% | trailing_sl=%.8f | current=%.8f | profit_protegido=%.2f%%",
+                                    symbol, max_profit_pct * 100, buffer_pct * 100, trailing_sl_price, current_price, profit_protected_pct
+                                )
+                                should_close, close_reason = True, f"Cosecha Inteligente (profit protegido={profit_protected_pct:.1f}%)"
+                                close_tag = "[COSECHA]"
             else:  # SHORT
                 if current_price <= tp:
                     should_close, close_reason = True, "Take Profit reached"
@@ -2959,22 +3099,40 @@ class VergeAgent:
                     should_close, close_reason = True, "Stop Loss reached"
 
                 # ── REGLA DE LA COSECHA INTELIGENTE (SHORT) ──
+                # v9.8 Diamond Hands: Desactivado para Golden U-Turn
                 if not should_close and entry_price > 0 and tp < entry_price:
-                    tp_dist = entry_price - tp
-                    activation_price = entry_price - (tp_dist * 0.50)  # 50% del camino al TP
-                    max_profit_price = pos.get("max_profit_price") or current_price
-                    max_profit_pct = (entry_price - max_profit_price) / entry_price
-                    if max_profit_pct > 0 and max_profit_price <= activation_price:
-                        buffer_pct = max_profit_pct * 0.25
-                        trailing_sl_price = entry_price * (1 - max_profit_pct + buffer_pct)
-                        if current_price >= trailing_sl_price:
-                            profit_protected_pct = (max_profit_pct - buffer_pct) * 100
-                            logger.info(
-                                "[COSECHA] %s SHORT trailing stop activado | max_profit=%.2f%% | buffer=%.2f%% | trailing_sl=%.8f | current=%.8f | profit_protegido=%.2f%%",
-                                symbol, max_profit_pct * 100, buffer_pct * 100, trailing_sl_price, current_price, profit_protected_pct
-                            )
-                            should_close, close_reason = True, f"Cosecha Inteligente (profit protegido={profit_protected_pct:.1f}%)"
-                            close_tag = "[COSECHA]"
+                    if is_golden_uturn:
+                        # ── v9.8 Trailing Profit Inteligente para Golden U-Turn SHORT ──
+                        max_profit_price = pos.get("max_profit_price") or current_price
+                        max_profit_pct = (entry_price - max_profit_price) / entry_price
+                        
+                        if max_profit_pct >= 0.10:  # +10% de profit
+                            # Trailing stop: 5% desde el máximo (para SHORT, el máximo es el precio más bajo)
+                            trailing_sl_price = max_profit_price * 1.05  # 5% de subida desde el mínimo
+                            if current_price >= trailing_sl_price:
+                                logger.info(
+                                    "[DIAMOND-HANDS] %s SHORT Trailing Profit activado | max_profit=%.2f%% | trailing_sl=%.8f (5%% desde mínimo) | current=%.8f",
+                                    symbol, max_profit_pct * 100, trailing_sl_price, current_price
+                                )
+                                should_close, close_reason = True, f"Diamond Hands Trailing SHORT (max_profit={max_profit_pct*100:.1f}%)"
+                                close_tag = "[DIAMOND-HANDS]"
+                    else:
+                        # Cosecha Inteligente estándar para trades no-Golden U-Turn
+                        tp_dist = entry_price - tp
+                        activation_price = entry_price - (tp_dist * 0.50)  # 50% del camino al TP
+                        max_profit_price = pos.get("max_profit_price") or current_price
+                        max_profit_pct = (entry_price - max_profit_price) / entry_price
+                        if max_profit_pct > 0 and max_profit_price <= activation_price:
+                            buffer_pct = max_profit_pct * 0.25
+                            trailing_sl_price = entry_price * (1 - max_profit_pct + buffer_pct)
+                            if current_price >= trailing_sl_price:
+                                profit_protected_pct = (max_profit_pct - buffer_pct) * 100
+                                logger.info(
+                                    "[COSECHA] %s SHORT trailing stop activado | max_profit=%.2f%% | buffer=%.2f%% | trailing_sl=%.8f | current=%.8f | profit_protegido=%.2f%%",
+                                    symbol, max_profit_pct * 100, buffer_pct * 100, trailing_sl_price, current_price, profit_protected_pct
+                                )
+                                should_close, close_reason = True, f"Cosecha Inteligente (profit protegido={profit_protected_pct:.1f}%)"
+                                close_tag = "[COSECHA]"
 
             opened_at_str = pos["opened_at"].replace("Z", "+00:00")
             opened_at = datetime.fromisoformat(opened_at_str)
@@ -2983,7 +3141,8 @@ class VergeAgent:
             hours_open = (datetime.utcnow() - opened_at).total_seconds() / 3600.0
 
             # ── Zombie timeout: más de MAX_TRADE_DURATION_CANDLES velas de 15m con PnL negativo ──
-            if not should_close:
+            # v9.8 Diamond Hands: Desactivado para Golden U-Turn (pueden durar días)
+            if not should_close and not is_golden_uturn:
                 # Buscar profile correspondiente
                 p_id = pos.get("strategy_profile_id")
                 profile = next((p for p in self.active_profiles if p.get("id") == p_id), None)
@@ -3017,7 +3176,9 @@ class VergeAgent:
                                 symbol, candles_open, pnl_pct * 100,
                             )
 
-            if hours_open >= config.MAX_POSITION_DURATION_HOURS:
+            # ── Max duration exceeded ──
+            # v9.8 Diamond Hands: Desactivado para Golden U-Turn
+            if hours_open >= config.MAX_POSITION_DURATION_HOURS and not is_golden_uturn:
                 should_close, close_reason = True, "Max duration exceeded"
 
             if not should_close:
