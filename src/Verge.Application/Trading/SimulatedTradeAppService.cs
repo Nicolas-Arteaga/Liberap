@@ -111,11 +111,10 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
                 var profileForUpdate = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId)
                     ?? throw new UserFriendlyException("Trader profile not found.");
 
-                if (profileForUpdate.VirtualBalance < totalCostToAdd)
-                {
-                     Logger.LogWarning("⚠️ [Simulation] Insufficient balance to increase {Symbol}. Skipping.", symbol);
-                     return null; // Return null instead of throwing to avoid blocking the agent
-                }
+                // v11.12 NO MORE LIES: Ya no bloqueamos add-to-position por balance virtual.
+                Logger.LogInformation(
+                    "[BILLETERA-REAL v11.12] AddToPosition {Symbol}: deducting {Amount:N2} USDT (virtual before: {Balance:N2})",
+                    symbol, totalCostToAdd, profileForUpdate.VirtualBalance);
 
                 // Calculate new size and weighted entry price
                 var sizeToAdd = _simulationService.CalculatePositionSize(exposureToAdd, entryPrice.Value);
@@ -266,15 +265,16 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
     }
 
     /// <summary>
-    /// AI-GRADE AUDIT: Update exit reason and BTC price at close.
+    /// AI-GRADE AUDIT: Update exit reason, BTC price at close, and full exit audit block.
     /// </summary>
-    public async Task UpdateExitInfoAsync(Guid tradeId, string exitReason, decimal? btcPriceAtClose = null)
+    public async Task UpdateExitInfoAsync(Guid tradeId, UpdateExitInfoInputDto input)
     {
         var trade = await _tradeRepo.GetAsync(tradeId);
-        trade.ExitReason = exitReason;
-        trade.BtcPriceAtClose = btcPriceAtClose;
+        trade.ExitReason = input.ExitReason;
+        trade.BtcPriceAtClose = input.BtcPriceAtClose;
+        trade.ExitAuditJson = input.ExitAuditJson;
         await _tradeRepo.UpdateAsync(trade, autoSave: true);
-        Logger.LogDebug("[AUDIT] Exit info updated for trade {TradeId}: {Reason} | BTC={BTC}", tradeId, exitReason, btcPriceAtClose);
+        Logger.LogDebug("[AUDIT] Exit info updated for trade {TradeId}: {Reason} | BTC={BTC}", tradeId, input.ExitReason, input.BtcPriceAtClose);
     }
 
     public async Task<SimulatedTradeDto> CloseTradeAsync(Guid tradeId)
@@ -745,8 +745,12 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
                     var profile = await repo.FirstOrDefaultAsync(p => p.UserId == userId);
                     if (profile != null)
                     {
-                        if (profile.VirtualBalance < amount)
-                            throw new UserFriendlyException($"Insufficient virtual balance. Required: {amount:N2} USDT, Available: {profile.VirtualBalance:N2} USDT.");
+                        // v11.12 NO MORE LIES: Ya no bloqueamos por balance virtual.
+                        // El balance real de Binance ($4882) es el que manda.
+                        // Permitimos balance negativo para tracking contable.
+                        Logger.LogInformation(
+                            "[BILLETERA-REAL v11.12] Deducting {Amount:N2} USDT from virtual balance. Before: {Before:N2}, After: {After:N2}",
+                            amount, profile.VirtualBalance, profile.VirtualBalance - amount);
 
                         profile.VirtualBalance -= amount;
                         await repo.UpdateAsync(profile, autoSave: true);

@@ -84,6 +84,12 @@ public class SimulatedTrade : FullAuditedAggregateRoot<Guid>
     public decimal? BtcPriceAtClose { get; set; }
 
     /// <summary>
+    /// Full exit audit JSON block (v12.1): MAE%, MFE%, candles_held, BTC context at exit, etc.
+    /// Populated by the Python agent via update-exit-info endpoint.
+    /// </summary>
+    public string? ExitAuditJson { get; set; }
+
+    /// <summary>
     /// Links this trade to the StrategyProfile that generated it.
     /// Null for trades opened before multi-strategy was implemented.
     /// </summary>

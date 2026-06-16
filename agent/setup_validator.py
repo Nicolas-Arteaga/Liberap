@@ -137,6 +137,208 @@ def _is_flat_market(ma99_angle: float, threshold_deg: float = 5.0) -> bool:
     return abs(ma99_angle) <= threshold_deg
 
 
+def _profile_has_veto_bypass(profile: dict) -> bool:
+    """
+    Determina si el profile tiene bypass de vetos #1-#8.
+    
+    Estrategias con bypass (solo aplican vetos #9+):
+    - MA Clone (id: 3a21db74-5d45-fcbf-f186-a284d59e97fb)
+    - Scalping Clone (id: 00000000-0000-0000-0000-000000000001)
+    - Standard Scalping (id: 00000000-0000-0000-0000-000000000000)
+    
+    Estrategia sin bypass (aplica TODOS los vetos):
+    - MA Cross Momentum (id: 3a214744-f0b9-68bb-f235-438a39d39d33)
+    """
+    if not profile:
+        return False
+    
+    profile_id = profile.get("id", "")
+    profile_name = profile.get("name", "")
+    
+    # IDs de estrategias con bypass
+    bypass_ids = [
+        "3a21db74-5d45-fcbf-f186-a284d59e97fb",  # MA Clone
+        "00000000-0000-0000-0000-000000000001",  # Scalping Clone
+        "00000000-0000-0000-0000-000000000000",  # Standard Scalping
+    ]
+    
+    # MA Cross Momentum NO tiene bypass (aplica todos los vetos)
+    ma_cross_id = "3a214744-f0b9-68bb-f235-438a39d39d33"
+    if profile_id == ma_cross_id or profile_name == "MA Cross Momentum":
+        return False
+    
+    return profile_id in bypass_ids
+
+
+def _is_ma_cross_momentum(profile: dict) -> bool:
+    """
+    Determina si el profile es MA Cross Momentum.
+    
+    Esta estrategia aplica la LEY DE NICO v12.0 (The L-Shape).
+    """
+    if not profile:
+        return False
+    
+    profile_id = profile.get("id", "")
+    profile_name = profile.get("name", "")
+    
+    ma_cross_id = "3a214744-f0b9-68bb-f235-438a39d39d33"
+    return profile_id == ma_cross_id or profile_name == "MA Cross Momentum"
+
+
+def _check_nico_l_shape(
+    candidate: dict,
+    current_price: float,
+    symbol: str = "?"
+) -> Tuple[bool, str, Dict[str, Any]]:
+    """
+    LEY DE NICO v12.0 (The L-Shape) - Detector exclusivo para MA Cross Momentum.
+    
+    PASO 1 (La Caída): MA99 debe haber caído al menos 5% en las últimas 100 velas (15m).
+    PASO 2 (El Cemento): Precio y MA50 pegados (<0.5%) y horizontales (±0.2°) por 12 velas consecutivas.
+    PASO 3 (La Compresión): MA99 entre 1.5% y 4.0% del precio durante el cemento.
+    
+    GATILLO DE NICO: MA50 slope > 0.2° (primer giro positivo) y cierre > MA50.
+    
+    Si se cumple: Score = 100, bypass total de IA/RSI/Wait.
+    """
+    metrics: Dict[str, Any] = {"l_shape_detected": False}
+    
+    # Extraer datos estructurales del contexto de auditoría
+    audit_ctx = candidate.get("agent_audit_context", {})
+    nexus15_ctx = audit_ctx.get("nexus15", {}) if isinstance(audit_ctx, dict) else {}
+    nexus_features = nexus15_ctx.get("features", {}) if isinstance(nexus15_ctx, dict) else {}
+    
+    # Obtener históricos de MA99 y MA50
+    ma99_history = nexus_features.get("ma99_history", [])
+    ma50_history = nexus_features.get("ma50_history", [])
+    
+    if not ma99_history or len(ma99_history) < 100:
+        return False, "l_shape_no_ma99_history", metrics
+    
+    if not ma50_history or len(ma50_history) < 20:
+        return False, "l_shape_no_ma50_history", metrics
+    
+    # ── PASO 1: La Caída (MA99 debe haber caído ≥5% en 100 velas) ──
+    ma99_100_ago = float(ma99_history[-100]) if len(ma99_history) >= 100 else float(ma99_history[0])
+    ma99_now = float(ma99_history[-1])
+    ma99_drop_pct = ((ma99_now - ma99_100_ago) / ma99_100_ago) * 100
+    
+    min_drop_pct = float(getattr(config, "NICO_L_SHAPE_MIN_DROP_PCT", 5.0))
+    if ma99_drop_pct > -min_drop_pct:
+        logger.info(
+            f"[NICO-L-SHAPE] {symbol}: FAIL Paso 1 - MA99 cayó {ma99_drop_pct:.2f}% (necesita ≥{min_drop_pct}%)"
+        )
+        return False, "l_shape_no_drop", metrics
+    
+    metrics["ma99_drop_pct"] = round(ma99_drop_pct, 2)
+    logger.info(f"[NICO-L-SHAPE] {symbol}: PASS Paso 1 - MA99 cayó {ma99_drop_pct:.2f}%")
+    
+    # ── PASO 2: El Cemento (Precio/MA50 pegados y horizontales por 12 velas) ──
+    min_cement_candles = int(getattr(config, "NICO_L_SHAPE_MIN_CEMENT_CANDLES", 12))
+    max_price_ma50_dist_pct = float(getattr(config, "NICO_L_SHAPE_MAX_PRICE_MA50_DIST_PCT", 0.5))
+    max_ma50_slope_deg = float(getattr(config, "NICO_L_SHAPE_MAX_MA50_SLOPE_DEG", 0.2))
+    reset_threshold_pct = float(getattr(config, "NICO_L_SHAPE_RESET_THRESHOLD_PCT", 1.0))
+    
+    cement_candles = 0
+    max_cement_candles = 0
+    cement_low = float('inf')
+    
+    # Analizar las últimas 20 velas buscando cemento consecutivo
+    recent_ma50 = ma50_history[-20:] if len(ma50_history) >= 20 else ma50_history
+    recent_prices = nexus_features.get("close_history", [])
+    
+    if not recent_prices or len(recent_prices) < 20:
+        return False, "l_shape_no_price_history", metrics
+    
+    recent_prices = recent_prices[-20:] if len(recent_prices) >= 20 else recent_prices
+    
+    for i in range(len(recent_ma50) - 1, -1, -1):
+        if i >= len(recent_prices):
+            break
+            
+        price = float(recent_prices[i])
+        ma50 = float(recent_ma50[i])
+        
+        # Calcular distancia precio/MA50
+        price_ma50_dist_pct = abs((price - ma50) / ma50) * 100 if ma50 > 0 else 999
+        
+        # Calcular slope de MA50 en ventana de 5 velas
+        ma50_window_start = max(0, i - 5)
+        ma50_window = recent_ma50[ma50_window_start:i+1]
+        ma50_slope = _calculate_ma99_slope_angle(ma50_window, window=len(ma50_window))
+        
+        # Regla de Hierro: Reset si el precio se aleja >1%
+        if price_ma50_dist_pct > reset_threshold_pct:
+            cement_candles = 0
+            continue
+        
+        # Verificar condiciones de cemento
+        if (price_ma50_dist_pct <= max_price_ma50_dist_pct and 
+            abs(ma50_slope) <= max_ma50_slope_deg):
+            cement_candles += 1
+            max_cement_candles = max(max_cement_candles, cement_candles)
+            cement_low = min(cement_low, price)
+        else:
+            cement_candles = 0
+    
+    metrics["cement_candles"] = max_cement_candles
+    metrics["cement_low"] = cement_low if cement_low != float('inf') else 0
+    
+    if max_cement_candles < min_cement_candles:
+        logger.info(
+            f"[NICO-L-SHAPE] {symbol}: FAIL Paso 2 - Solo {max_cement_candles} velas de cemento (necesita {min_cement_candles})"
+        )
+        return False, "l_shape_insufficient_cement", metrics
+    
+    logger.info(f"[NICO-L-SHAPE] {symbol}: PASS Paso 2 - {max_cement_candles} velas de cemento")
+    
+    # ── PASO 3: La Compresión (MA99 entre 1.5% y 4.0% del precio) ──
+    ma99_price_dist_pct = abs((current_price - ma99_now) / ma99_now) * 100 if ma99_now > 0 else 0
+    min_ma99_dist_pct = float(getattr(config, "NICO_L_SHAPE_MIN_MA99_DIST_PCT", 1.5))
+    max_ma99_dist_pct = float(getattr(config, "NICO_L_SHAPE_MAX_MA99_DIST_PCT", 4.0))
+    
+    if not (min_ma99_dist_pct <= ma99_price_dist_pct <= max_ma99_dist_pct):
+        logger.info(
+            f"[NICO-L-SHAPE] {symbol}: FAIL Paso 3 - MA99 a {ma99_price_dist_pct:.2f}% del precio (necesita {min_ma99_dist_pct}%-{max_ma99_dist_pct}%)"
+        )
+        return False, "l_shape_ma99_not_compressed", metrics
+    
+    metrics["ma99_price_dist_pct"] = round(ma99_price_dist_pct, 2)
+    logger.info(f"[NICO-L-SHAPE] {symbol}: PASS Paso 3 - MA99 a {ma99_price_dist_pct:.2f}% del precio")
+    
+    # ── GATILLO DE NICO: MA50 slope > 0.2° y cierre > MA50 ──
+    ma50_now = float(ma50_history[-1])
+    ma50_slope_now = _calculate_ma99_slope_angle(ma50_history[-10:], window=10)
+    close_above_ma50 = current_price > ma50_now
+    
+    min_trigger_slope = float(getattr(config, "NICO_L_SHAPE_MIN_TRIGGER_SLOPE_DEG", 0.2))
+    
+    if not (ma50_slope_now > min_trigger_slope and close_above_ma50):
+        logger.info(
+            f"[NICO-L-SHAPE] {symbol}: WAIT Gatillo - MA50 slope={ma50_slope_now:.2f}° (necesita >{min_trigger_slope}°), "
+            f"cierre>MA50={close_above_ma50}"
+        )
+        return False, "l_shape_waiting_trigger", metrics
+    
+    metrics["ma50_slope_now"] = round(ma50_slope_now, 2)
+    metrics["close_above_ma50"] = close_above_ma50
+    logger.info(f"[NICO-L-SHAPE] {symbol}: GATILLO ACTIVADO - MA50 slope={ma50_slope_now:.2f}°, cierre>MA50={close_above_ma50}")
+    
+    # ── L-SHAPE COMPLETA: Bypass Total ──
+    metrics["l_shape_detected"] = True
+    metrics["internal_score"] = 100.0
+    metrics["l_shape_type"] = "nico_l_shape_v12"
+    
+    logger.warning(
+        f"[NICO-L-SHAPE v12.0] {symbol} - L DE CEMENTO COMPLETA! "
+        f"MA99 Drop={ma99_drop_pct:.2f}% | Cemento={max_cement_candles} velas | "
+        f"MA99 Dist={ma99_price_dist_pct:.2f}% | MA50 Slope={ma50_slope_now:.2f}° | SCORE=100"
+    )
+    
+    return True, "nico_l_shape_bypass", metrics
+
+
 def _validate_golden_cement_floor(
     current_price: float,
     golden_ctx: dict,
@@ -531,15 +733,57 @@ def validate_nexus_confluence_setup(
         nexus15_ctx.get("features", {}) if isinstance(nexus15_ctx, dict) else {}
     )
 
-    # ── GOLDEN U-TURN v9.1: Detector estructural (TODOS los perfiles, incl. Standard Scalping) ──
-    uturn_detected, uturn_reason, uturn_metrics = check_uturn_detector(candidate, cp)
+    # ── GOLDEN U-TURN v12.1: DESHABILITADO COMPLETAMENTE ──
+    # 2/2 trades reales perdieron. Deshabilitado hasta nueva revisión.
+    # El detector NO se llama — siempre False.
+    uturn_detected, uturn_reason, uturn_metrics = False, "", {}
     
-    # ── FIX v11.3: TOTAL OBEDIENCE — El validador manda sobre ejecución ──
-    # Si check_uturn_detector devuelve False, respetar el veto inmediatamente
-    # El Hook es la última palabra: si close_above_ma7 es False, no importa el Score 99
-    if not uturn_detected and uturn_reason:
+    # ── LEY DE NICO v12.0 (The L-Shape) — Exclusivo para MA Cross Momentum ──
+    # Este detector tiene prioridad sobre Golden U-Turn para MA Cross Momentum
+    if _is_ma_cross_momentum(profile) and getattr(config, "NICO_L_SHAPE_ENABLED", False):
+        l_shape_detected, l_shape_reason, l_shape_metrics = _check_nico_l_shape(candidate, cp, symbol)
+        if l_shape_detected:
+            # L-SHAPE COMPLETA: Bypass Total
+            candidate["nico_l_shape_mode"] = True
+            candidate["confluence_score"] = float(getattr(config, "NICO_L_SHAPE_SCORE", 100.0))
+            metrics.update(l_shape_metrics)
+            
+            # SL: low de las 12 velas de cemento
+            cement_low = l_shape_metrics.get("cement_low", 0)
+            if cement_low > 0:
+                sl_buffer_pct = float(getattr(config, "NICO_L_SHAPE_SL_SPREAD_BUFFER_PCT", "0.1")) / 100.0
+                custom_sl = cement_low * (1.0 - sl_buffer_pct)
+                candidate["custom_sl_price"] = custom_sl
+                logger.info(f"[NICO-L-SHAPE] {symbol}: SL Diamond Hands = {custom_sl:.6f} (low cemento {cement_low:.6f})")
+            
+            # TP: mínimo 10%
+            min_tp_pct = float(getattr(config, "NICO_L_SHAPE_TP_MIN_DISTANCE_PCT", 10.0)) / 100.0
+            custom_tp = cp * (1.0 + min_tp_pct)
+            candidate["custom_tp_price"] = custom_tp
+            logger.info(f"[NICO-L-SHAPE] {symbol}: TP Diamond Hands = {custom_tp:.6f} (mínimo {min_tp_pct*100:.1f}%)")
+            
+            # Marcar para trailing 5% después del 10%
+            candidate["nico_trailing_enabled"] = True
+            candidate["nico_trailing_pct"] = float(getattr(config, "NICO_L_SHAPE_TP_TRAILING_PCT", 5.0))
+            
+            logger.warning(
+                f"[NICO-L-SHAPE v12.0] {symbol} - BYPASS TOTAL ACTIVADO! Score=100. "
+                f"Ignorando IA, RSI, Wait. Solo la L de Nico manda."
+            )
+            return True, "nico_l_shape_bypass", metrics
+    
+    # ── FIX v11.10: TOTAL OBEDIENCE — SOLO para Golden U-Turn ──
+    # Si check_uturn_detector devuelve False, respetar el veto SOLO si es candidato Golden.
+    # Los candidatos Nexus regulares (como JTOUSDT con 94.5%) NO deben ser bloqueados
+    # por falta de MA99 data. El MA99 es irrelevante para señales Nexus de alta confianza.
+    _is_golden_candidate = bool(
+        candidate.get("golden_uturn_mode")
+        or candidate.get("source") == "golden_uturn"
+        or (candidate.get("agent_audit_context", {}).get("golden_uturn", {}) or {}).get("detected")
+    )
+    if _is_golden_candidate and not uturn_detected and uturn_reason:
         logger.warning(
-            f"[TOTAL-OBEDIENCE v11.3] {symbol}: VETO del detector respetado — {uturn_reason} (Score 99 NO puede pisar esto)"
+            f"[TOTAL-OBEDIENCE v11.10] {symbol}: VETO del detector respetado — {uturn_reason} (Score 99 NO puede pisar esto)"
         )
         return False, uturn_reason, metrics
     
@@ -581,7 +825,10 @@ def validate_nexus_confluence_setup(
 
     # ── VETO #6: RSI Extreme Exhaustion (Parametrizado por Profile) ──────
     # BYPASS: Golden U-Turn v9.0 — un suelo real siempre tiene RSI bajo, no bloquear.
-    if not candidate.get("golden_uturn_mode"):
+    # BYPASS v11.12: Nexus-15 confianza ≥80% — la IA ya factorizó el RSI en su score.
+    #   Si Nexus dice 94.5% con RSI 78, la IA sabe lo que hace. No la contradigamos.
+    _nexus_high_conf = float(candidate.get("nexus_confidence", 0) or 0) >= 80.0
+    if not candidate.get("golden_uturn_mode") and not _nexus_high_conf:
         if profile:
             max_rsi_long = float(profile.get("maxRsiLong", getattr(config, "MAX_RSI_LONG_LIMIT", 75.0)))
             min_rsi_short = float(profile.get("minRsiShort", 15.0))
@@ -596,10 +843,13 @@ def validate_nexus_confluence_setup(
         if side == 1 and rsi_14 < min_rsi_short:
             logger.info("[VETO] rsi_extreme — %s | RSI=%.1f < limit=%.1f", candidate.get("symbol"), rsi_14, min_rsi_short)
             return False, "rsi_extreme_exhaustion", metrics
+    elif _nexus_high_conf and not candidate.get("golden_uturn_mode"):
+        logger.info(f"[NEXUS-BYPASS v11.12] {symbol}: Nexus={float(candidate.get('nexus_confidence', 0)):.1f}% >= 80% — RSI={rsi_14:.1f} ignorado (la IA ya lo factorizó)")
 
     # ── VETO #7: MA7 Distance (Parametrizado por Profile) ────────────────
     # BYPASS: Golden U-Turn v9.0 — no importa distancia a MA7, compramos el pivot.
-    if not candidate.get("golden_uturn_mode"):
+    # BYPASS v11.12: Nexus-15 confianza ≥80% — momentum fuerte = distancia normal.
+    if not candidate.get("golden_uturn_mode") and not _nexus_high_conf:
         if profile and ma7 > 0:
             max_dist_pct = float(profile.get("maxMa7DistancePct", 3.5))
             dist_pct = abs(cp - ma7) / ma7 * 100
@@ -614,7 +864,7 @@ def validate_nexus_confluence_setup(
     bridge_regime = str(candidate.get("bridge_regime", "")).lower()
     nexus_regime = str(nexus15_ctx.get("regime", "")).lower() if isinstance(nexus15_ctx, dict) else ""
     regime = bridge_regime or nexus_regime
-
+    
     if not is_golden and "ranging" in regime and not volume_surge_bullish and volume_ratio_20 < min_vol_ratio:
         if getattr(config, "MIN_CONFLUENCE_SCORE", 50.0) > 30.0:
             logger.info(
@@ -665,16 +915,18 @@ def validate_nexus_confluence_setup(
     # Volume check only blocks when volume is very weak AND no surge at all
     # BYPASS: Golden U-Turn v9.0 — el volumen suele ser bajo en el suelo exacto.
     # v10.1 The Surgical Hook: MIN_VOLUME_RATIO_20 = 0.15 (mata a CRDOUSDT, permite a UBUSDT)
-    min_vol_ratio = float(getattr(config, "MIN_VOLUME_RATIO_20", 0.15))
-    if not candidate.get("golden_uturn_mode") and volume_ratio_20 < min_vol_ratio and not volume_surge_bullish:
-        if getattr(config, "MIN_CONFLUENCE_SCORE", 50.0) > 30.0:
-            logger.info(
-                "[SKIP] no_volume_confirmation — %s | volume_ratio_20=%.2f surge=False",
-                candidate.get("symbol"), volume_ratio_20,
-            )
-            return False, "no_volume_confirmation", metrics
-        else:
-            logger.info("[TESTING] Bypassed no_volume_confirmation veto for %s", candidate.get("symbol"))
+    # BYPASS: MA Clone, Scalping Clone, Standard Scalping (solo aplican vetos #9+)
+    if not _profile_has_veto_bypass(profile):
+        min_vol_ratio = float(getattr(config, "MIN_VOLUME_RATIO_20", 0.15))
+        if not candidate.get("golden_uturn_mode") and volume_ratio_20 < min_vol_ratio and not volume_surge_bullish:
+            if getattr(config, "MIN_CONFLUENCE_SCORE", 50.0) > 30.0:
+                logger.info(
+                    "[SKIP] no_volume_confirmation — %s | volume_ratio_20=%.2f surge=False",
+                    candidate.get("symbol"), volume_ratio_20,
+                )
+                return False, "no_volume_confirmation", metrics
+            else:
+                logger.info("[TESTING] Bypassed no_volume_confirmation veto for %s", candidate.get("symbol"))
 
     # ── VETO #3: Post-Pump/Dump Distance from MA7 ────────────────────────
     # Si el precio ya se alejó >3.5% de la MA7, el movimiento ya ocurrió.
@@ -866,20 +1118,34 @@ def validate_pre_trade(
         )
         return False, "daily_dump_exhaustion_short", {"daily_change_pct": daily_change_pct, "limit": max_daily_dump}
 
-    # ── GOLDEN U-TURN v9.1: Activar modo estructural antes de vetos globales ──
-    is_golden = bool(
-        candidate.get("golden_uturn_mode")
-        or candidate.get("source") == "golden_uturn"
-        or (candidate.get("agent_audit_context", {}).get("golden_uturn", {}) or {}).get("detected")
-    )
-    if is_golden:
-        candidate["golden_uturn_mode"] = True
-        candidate["confluence_score"] = float(getattr(config, "GOLDEN_UTURN_SCORE", 99.0))
+    # ── GOLDEN U-TURN v12.1: DESHABILITADO COMPLETAMENTE ──
+    # 2/2 trades reales perdieron. Forzamos is_golden = False siempre.
+    is_golden = False
+    # Si algún candidato trae golden_uturn_mode, lo limpiamos
+    candidate.pop("golden_uturn_mode", None)
+
+    # ── NUEVO VETO: TECHO DE CONFLUENCIA (confluence_ceiling_veto) v12.1 ──
+    # Score > 90 correlaciona con pérdida en la muestra actual (3 de 5 perdedores tuvieron 96.6-99).
+    # Posible inflado artificial de bonus (SMC, grupos, SCAR) que no refleja condición real.
+    # Aplica a TODAS las estrategias (Golden U-Turn ya está deshabilitado).
+    confluence_score_for_ceiling = float(candidate.get("confluence_score", 0) or 0)
+    if confluence_score_for_ceiling > 90:
+        logger.warning(
+            f"[CONFLUENCE-CEILING v12.1] {symbol}: Score={confluence_score_for_ceiling:.1f} > 90 — VETO. "
+            f"Nexus={candidate.get('nexus_confidence', 0):.1f}% | "
+            f"Source={candidate.get('source', 'N/A')}"
+        )
+        return False, "confluence_ceiling_veto", {
+            "confluence_score": confluence_score_for_ceiling,
+            "nexus_confidence": float(candidate.get("nexus_confidence", 0) or 0),
+            "reasoning": f"Score {confluence_score_for_ceiling:.1f} > 90 threshold"
+        }
 
     # ── VETO GLOBAL: Rango Estimado Máximo (MAX_ESTIMATED_RANGE_PCT) ──
+    # v11.7: Exclusivo para MA Cross Momentum - las estrategias de scalping operan en volátiles
     estimated_range_pct = float(candidate.get("estimated_range_pct", 0) or 0)
     max_range_pct = float(profile.get("maxEstimatedRangePct", getattr(config, "MAX_ESTIMATED_RANGE_PCT", 7.0))) if profile else float(getattr(config, "MAX_ESTIMATED_RANGE_PCT", 7.0))
-    if not is_golden and max_range_pct > 0 and estimated_range_pct > max_range_pct:
+    if not is_golden and _is_ma_cross_momentum(profile) and max_range_pct > 0 and estimated_range_pct > max_range_pct:
         logger.info(
             "[VETO] range_too_large — %s | range=%.2f%% > limit=%.1f%% (Evita hiper-volatilidad)",
             symbol, estimated_range_pct, max_range_pct
@@ -887,17 +1153,19 @@ def validate_pre_trade(
         return False, "range_too_large", {"estimated_range_pct": estimated_range_pct, "max_limit": max_range_pct}
 
     # ── FIX A v11.1: VETO DE VOLATILIDAD EXTREMA (THE BARRIER) ──
-    # Solo aplica a Momentum Burst / Nexus-15 standalone (NO Golden U-Turn)
+    # Solo aplica a MA Cross Momentum (NO Golden U-Turn, NO otras estrategias)
     # Golden U-Turn usa SL estructural (low de 5 velas), no basado en rango estimado
     # EPICUSDT (01:48) tenía rango 10.76% y causó -$12.32 en 8 minutos
+    # v11.7: Exclusivo para MA Cross Momentum - las estrategias de scalping operan en volátiles
     volatility_barrier_pct = 5.0
-    if not is_golden and estimated_range_pct > volatility_barrier_pct:
+    if not is_golden and _is_ma_cross_momentum(profile) and estimated_range_pct > volatility_barrier_pct:
         logger.warning(
-            f"[THE-BARRIER] {symbol} RECHAZADO: Volatilidad extrema {estimated_range_pct:.2f}% > {volatility_barrier_pct}% (FIX A v11.1 - Momentum Burst only)"
+            f"[THE-BARRIER] {symbol} RECHAZADO: Volatilidad extrema {estimated_range_pct:.2f}% > {volatility_barrier_pct}% (FIX A v11.7 - MA Cross Momentum only)"
         )
         return False, "volatility_barrier_veto", {"estimated_range_pct": estimated_range_pct, "barrier_limit": volatility_barrier_pct}
 
     # ── VETO GLOBAL: Stop Loss Porcentual Máximo (MAX_STOP_LOSS_PCT) ──
+    # v11.7: Exclusivo para MA Cross Momentum - las estrategias de scalping operan en volátiles
     max_sl_pct = float(profile.get("maxStopLossPct", getattr(config, "MAX_STOP_LOSS_PCT", 4.0))) if profile else float(getattr(config, "MAX_STOP_LOSS_PCT", 4.0))
     
     # Calcular SL % correspondiente
@@ -913,7 +1181,7 @@ def validate_pre_trade(
         sl_dist = range_pct * (float(profile.get("slMultiplier", config.SL_MULTIPLIER)) if profile else config.SL_MULTIPLIER)
         sl_pct = sl_dist * 100
 
-    if max_sl_pct > 0 and sl_pct > max_sl_pct:
+    if _is_ma_cross_momentum(profile) and max_sl_pct > 0 and sl_pct > max_sl_pct:
         logger.info(
             "[VETO] stop_loss_too_expensive — %s | sl_pct=%.2f%% > limit=%.1f%% (Evita stop carísimo)",
             symbol, sl_pct, max_sl_pct
@@ -961,8 +1229,9 @@ def validate_pre_trade(
                     candidate["confluence_score"] = confluence_score
 
         # Regla de Oro (Veto Dinámico de Volatilidad / Confluencia):
+        # v11.7: Exclusivo para MA Cross Momentum - las estrategias de scalping operan en volátiles
         vol_threshold = float(getattr(config, "HIGH_VOLATILITY_RANGE_THRESHOLD", 7.0))
-        if estimated_range_pct >= vol_threshold:
+        if _is_ma_cross_momentum(profile) and estimated_range_pct >= vol_threshold:
             high_vol_min_conf = float(profile.get("highVolMinConfluence", getattr(config, "HIGH_VOLATILITY_MIN_CONFLUENCE", 90.0))) if profile else float(getattr(config, "HIGH_VOLATILITY_MIN_CONFLUENCE", 90.0))
             if confluence_score < high_vol_min_conf:
                 logger.info(

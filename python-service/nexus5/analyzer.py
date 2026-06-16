@@ -93,6 +93,16 @@ class Nexus5Analyzer:
             feats["relative_vol_multiplier"] >= RSI_BYPASS_VOL_THRESHOLD
         )
 
+        # 7b. Bottom Sniper Phase Override — if is_bottom_sniper and phase is IDLE,
+        # force COMPRESSION so it is never filtered out by the C# IDLE check.
+        # The score here reflects how close MA50 and MA99 are.
+        _is_bs_check = feats.get("is_bottom_sniper", False)
+        _ma50_ma99_dist_check = feats.get("ma50_ma99_dist", 1.0)
+        if _is_bs_check and phase == "IDLE":
+            phase = "COMPRESSION"
+            # Score based on MA50/MA99 proximity: dist=0 → 100, dist=0.05 → 75
+            phase_score = max(65.0, 100.0 - _ma50_ma99_dist_check * 500)
+
         # 8. AI Confidence — REGLAS DE ORO v8.0 (BOTTOM SNIPER)
         # ── REGLAS DE ORO ESTRUCTURALES (v8.0) ───────────────────────────────────
         # NEXUS-5 ahora es un BOTTOM SNIPER: detecta acumulación debajo de MA99
@@ -150,14 +160,14 @@ class Nexus5Analyzer:
         # Lógica de Score para el TOP-5
         if is_bottom_sniper:
             # ES EL SETUP DE FIDA. Ignoramos todo lo demás.
-            base_score = 95.0 
+            base_score = 95.0
             # Cuanto más cerca estén la MA50 y la MA99, más puntaje (compresión final)
             proximity_bonus = (1 - ma50_ma99_dist) * 5
             ai_confidence = base_score + proximity_bonus
             direction = "BULLISH"
-            recommendation = "Strong Buy"
+            recommendation = "Long"  # Bottom Sniper = entrada directa
         else:
-            # Si no es un Bottom Sniper, bajamos el score drásticamente 
+            # Si no es un Bottom Sniper, bajamos el score drásticamente
             # para que no ensucie el TOP 5 con pumps ya empezados.
             ai_confidence = combined_raw * 20
             direction = "NEUTRAL"
@@ -165,13 +175,14 @@ class Nexus5Analyzer:
 
         ai_confidence = round(min(100.0, max(0.0, ai_confidence)), 1)
 
-        # 9. Recommendation
-        recommendation = "Wait"
-        if ai_confidence >= STRONG_SIGNAL_THRESHOLD:
-            if direction == "BULLISH":
-                recommendation = "Long"
-            elif direction == "BEARISH":
-                recommendation = "Short"
+        # 9. Recommendation (solo sobreescribir si NO es Bottom Sniper)
+        if not is_bottom_sniper:
+            recommendation = "Wait"
+            if ai_confidence >= STRONG_SIGNAL_THRESHOLD:
+                if direction == "BULLISH":
+                    recommendation = "Long"
+                elif direction == "BEARISH":
+                    recommendation = "Short"
 
         # 10. Entry Timeframe Logic
         entry_timeframe = self._determine_entry_timeframe(phase, phase_score, feats)

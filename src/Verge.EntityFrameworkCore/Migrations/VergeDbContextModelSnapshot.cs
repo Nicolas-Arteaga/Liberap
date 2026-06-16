@@ -743,6 +743,9 @@ namespace Verge.Migrations
                     b.Property<string>("ExitReason")
                         .HasColumnType("text");
 
+                    b.Property<string>("ExitAuditJson")
+                        .HasColumnType("text");
+
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
                         .HasColumnType("text")

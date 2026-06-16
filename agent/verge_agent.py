@@ -228,6 +228,7 @@ class VergeAgent:
         tier: str,
         setup_metrics: Optional[dict] = None,
         setup_skip: Optional[str] = None,
+        cycle_rejected: Optional[list] = None,
     ) -> str:
         # ── BTC Context for AgentDecisionJson ──
         btc_regime = self.btc_filter.get_regime()
@@ -307,9 +308,45 @@ class VergeAgent:
                 "tp_multiplier": getattr(config, "TP_MULTIPLIER", 3.5),
             }
 
+        # ── v12.1: Compression snapshot at entry (computed from klines + Nexus-15 features) ──
+        nexus_features = candidate.get("agent_audit_context", {}).get("nexus15", {}).get("features", {})
+        compression_snapshot_at_entry = self._compute_compression_snapshot(symbol, nexus_features)
+
+        # ── v12.1: Structural distances (from candidate data) ──
+        structural_distances = {
+            "distance_to_ma7_pct": candidate.get("distance_to_ma7_pct"),
+            "distance_to_ma50_pct": candidate.get("distance_to_ma50_pct"),
+            "distance_to_ma99_pct": candidate.get("distance_to_ma99_pct"),
+            "swing_high_50": candidate.get("swing_high_50"),
+            "swing_low_50": candidate.get("swing_low_50"),
+        }
+        # Calculate distance to swing high/low if available
+        cur_px = candidate.get("price_at_signal") or candidate.get("current_price")
+        swing_hi = candidate.get("swing_high_50")
+        swing_lo = candidate.get("swing_low_50")
+        if cur_px and swing_hi:
+            structural_distances["distance_to_swing_high_pct"] = round(
+                ((float(swing_hi) - float(cur_px)) / float(cur_px)) * 100, 4
+            )
+        if cur_px and swing_lo:
+            structural_distances["distance_to_swing_low_pct"] = round(
+                ((float(cur_px) - float(swing_lo)) / float(cur_px)) * 100, 4
+            )
+
+        # ── v12.1: Spread/liquidez (2.4) — desde orderbook si está disponible ──
+        try:
+            if hasattr(self, 'fetcher') and hasattr(self.fetcher, 'get_orderbook_snapshot'):
+                _ob = self.fetcher.get_orderbook_snapshot(symbol)
+                if _ob and _ob.get("spread_pct") is not None:
+                    structural_distances["bid_ask_spread_pct"] = float(_ob["spread_pct"])
+                    structural_distances["orderbook_depth_5_usdt"] = float(_ob.get("depth_5_usdt", 0) or 0)
+                    structural_distances["orderbook_imbalance"] = float(_ob.get("imbalance", 0) or 0)
+        except Exception as _ob_ex:
+            logger.debug(f"[AUDIT] Spread capture for {symbol}: {_ob_ex}")
+
         snap = {
-            "schema_version": 2,
-            "agent_version": "risk_v5",
+            "schema_version": 3,
+            "agent_version": "v12.1",
             "experiment": "post_sl_fix_may_2026",
             "captured_at_utc": datetime.utcnow().isoformat() + "Z",
             "agent_meta": {
@@ -324,6 +361,10 @@ class VergeAgent:
             "temporal_context": temporal_context,
             "nexus5_context": nexus5_context,
             "structural_analytics": structural_analytics,
+            "compression_snapshot_at_entry": compression_snapshot_at_entry,
+            "structural_distances": structural_distances,
+            "cycle_candidates_rejected": cycle_rejected or [],
+            "human_label": "",
             "candidate": self._json_safe_for_audit(copy.deepcopy(candidate)),
             "position_sizing": self._json_safe_for_audit(copy.deepcopy(pos_details)),
         }
@@ -412,6 +453,123 @@ class VergeAgent:
         except Exception as e:
             logger.warning(f"[AUDIT] Market context capture failed for {symbol}: {e}")
             return {"error": str(e)}
+
+    def _compute_compression_snapshot(self, symbol: str, nexus_features: dict) -> dict:
+        """
+        v12.1 — Compute real compression metrics from 15m klines + Nexus-15 features.
+        Maps to the 9 fields from the original compression snapshot spec.
+        Never crashes the audit pipeline.
+        """
+        result = {
+            # Nexus-15 native features (always available)
+            "candle_body_ratio": float(nexus_features.get("candle_body_ratio", 0) or 0),
+            "upper_wick_ratio": float(nexus_features.get("upper_wick_ratio", 0) or 0),
+            "lower_wick_ratio": float(nexus_features.get("lower_wick_ratio", 0) or 0),
+            "volume_ratio_20": float(nexus_features.get("volume_ratio_20", 0) or 0),
+            "rsi_14": float(nexus_features.get("rsi_14", 50) or 50),
+            "atr_percent": float(nexus_features.get("atr_percent", 0) or 0),
+            "trend_structure": int(nexus_features.get("trend_structure", 0) or 0),
+            "wyckoff_phase": str(nexus_features.get("wyckoff_phase", "") or ""),
+            "bos_detected": bool(nexus_features.get("bos_detected", False)),
+            "order_block_detected": bool(nexus_features.get("order_block_detected", False)),
+            "explosion_bullish": bool(nexus_features.get("explosion_bullish", False)),
+            "explosion_bearish": bool(nexus_features.get("explosion_bearish", False)),
+            # Computed from klines (may be None if data unavailable)
+            "caida_pct": None,
+            "cement_duration": None,
+            "cement_valid": None,
+            "noise_pct": None,
+            "slope_ema50_deg": None,
+            "near_bottom": None,
+            "ma99_cluster_dist_pct": None,
+            "u_shape_count": None,
+            "klines_used": 0,
+        }
+
+        try:
+            klines = self.fetcher.get_klines_for_nexus(symbol, interval="15m", limit=150)
+            if not klines or len(klines) < 50:
+                return result
+
+            closes = [float(k.get("close", 0)) for k in klines]
+            highs = [float(k.get("high", 0)) for k in klines]
+            lows = [float(k.get("low", 0)) for k in klines]
+            n = len(closes)
+            result["klines_used"] = n
+
+            # ── MA99 / MA50 ──
+            def _sma(arr, period, idx):
+                start = max(0, idx - period + 1)
+                window = arr[start:idx + 1]
+                return sum(window) / len(window) if window else 0.0
+
+            ma99_vals = [_sma(closes, 99, i) for i in range(n)]
+            ma50_vals = [_sma(closes, 50, i) for i in range(n)]
+            current_price = closes[-1]
+            ma99_now = ma99_vals[-1]
+            ma50_now = ma50_vals[-1]
+
+            # ── 1. caída_pct: MA99 drop from recent 100-bar peak ──
+            if len(ma99_vals) >= 20:
+                ma99_lookback = ma99_vals[-min(100, len(ma99_vals)):]
+                ma99_peak = max(ma99_lookback)
+                if ma99_peak > 0:
+                    result["caida_pct"] = round(((ma99_peak - ma99_now) / ma99_peak) * 100, 4)
+
+            # ── 2. cement_duration: consecutive candles where price ≈ MA50 (±0.5%) ──
+            cement = 0
+            for i in range(n - 1, -1, -1):
+                if ma50_vals[i] > 0:
+                    dist_pct = abs((closes[i] - ma50_vals[i]) / ma50_vals[i]) * 100
+                    if dist_pct <= 0.5:
+                        cement += 1
+                    else:
+                        break
+                else:
+                    break
+            result["cement_duration"] = cement
+            result["cement_valid"] = cement >= 6
+
+            # ── 3. noise_pct: (max_high - min_low) / price over last 20 candles ──
+            lookback = min(20, n)
+            recent_highs = highs[-lookback:]
+            recent_lows = lows[-lookback:]
+            if current_price > 0 and recent_highs and recent_lows:
+                noise_range = max(recent_highs) - min(recent_lows)
+                result["noise_pct"] = round((noise_range / current_price) * 100, 4)
+
+            # ── 4. slope_ema50_deg: angle of MA50 over last 10 bars ──
+            if n >= 10 and ma50_vals[-1] > 0 and ma50_vals[-10] > 0:
+                slope_raw = (ma50_vals[-1] - ma50_vals[-10]) / ma50_vals[-10]
+                import math
+                result["slope_ema50_deg"] = round(math.degrees(math.atan(slope_raw * 100)), 4)
+
+            # ── 5. near_bottom: price within 2% of 50-bar low ──
+            if recent_lows:
+                low_50 = min(recent_lows)
+                if low_50 > 0:
+                    result["near_bottom"] = bool(current_price <= low_50 * 1.02)
+
+            # ── 6. ma99_cluster_dist_pct: |price - MA99| / MA99 * 100 ──
+            if ma99_now > 0:
+                result["ma99_cluster_dist_pct"] = round(
+                    abs((current_price - ma99_now) / ma99_now) * 100, 4
+                )
+
+            # ── 7. u_shape_count: count of local minima in last 50 candles ──
+            if n >= 10:
+                u_count = 0
+                window = closes[-min(50, n):]
+                for i in range(2, len(window) - 2):
+                    if (window[i] <= window[i - 1] and window[i] <= window[i - 2]
+                            and window[i] <= window[i + 1] and window[i] <= window[i + 2]):
+                        u_count += 1
+                result["u_shape_count"] = u_count
+
+        except Exception as ex:
+            logger.debug(f"[COMPRESSION-SNAP] {symbol}: compute error (non-fatal): {ex}")
+
+        return result
 
     def _determine_exit_reason(self, close_reason: str, side: int, current_price: float, tp: float, sl: float, entry_price: float) -> str:
         """
@@ -525,16 +683,19 @@ class VergeAgent:
         env_str = "TESTNET" if use_testnet else "MAINNET"
         logger.info(f"[VERSION] PositionManager v{version} - TP/SL via closePosition=true with fallbacks ({env_str})")
         
-        # ── FIX v11.5: BALANCE CHECK — Log de margen disponible en cada ciclo (corregido) ──
+        # ── FIX v11.12: BILLETERA REAL — Balance real de Binance, no contabilidad virtual ──
         try:
-            available_balance = self.positions.get_virtual_balance() or config.VIRTUAL_CAPITAL_BASE
+            binance_balance = self.positions.get_binance_wallet_balance()
+            virtual_balance = self.positions.get_virtual_balance() or config.VIRTUAL_CAPITAL_BASE
+            available_balance = max(binance_balance, virtual_balance)
             required_margin = 150.0
             logger.info(
-                f"[BALANCE-CHECK v11.5] Margen disponible: ${available_balance:.2f}. "
-                f"Se necesitan ${required_margin:.2f} para operar."
+                f"[BILLETERA-REAL v11.12] Binance=${binance_balance:.2f} | Virtual=${virtual_balance:.2f} | "
+                f"Usando=${available_balance:.2f} (requerido=${required_margin:.2f})"
             )
         except Exception as e:
-            logger.warning(f"[BALANCE-CHECK v11.5] Error obteniendo balance: {e}")
+            logger.warning(f"[BILLETERA-REAL v11.12] Error obteniendo balance Binance, fallback a 10000: {e}")
+            available_balance = config.VIRTUAL_CAPITAL_BASE
 
         # 0. Check exchange health
         breakers     = get_breakers()
@@ -837,33 +998,50 @@ class VergeAgent:
             logger.info("[Step 4/6] Nexus-15 TOP: no results from backend (offline or no signal).")
 
         # 5. Run Nexus-15 on all watchlist symbols (internal scan with local data)
+        # ── PARALELIZACIÓN v7.3: ThreadPoolExecutor para NEXUS-15 ─────────────────
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        import threading
+        
         candidates = []
         skipped_trading = 0
         analyzed = 0
         no_data = 0
         broadcast_batch = []
-
-        for symbol in all_targets:
+        
+        # Locks para thread-safety
+        candidates_lock = threading.Lock()
+        counters_lock = threading.Lock()
+        broadcast_lock = threading.Lock()
+        
+        def analyze_nexus15_symbol(symbol):
+            """Analiza un símbolo con NEXUS-15 de forma thread-safe."""
+            nonlocal skipped_trading, analyzed, no_data
+            
             try:
                 if self._should_skip(symbol):
-                    skipped_trading += 1
-                    continue
+                    with counters_lock:
+                        skipped_trading += 1
+                    return None
 
                 # Fetch prediction with a strict timeout (handled inside signal_engine)
                 nexus_data = self.signals.get_nexus15_prediction(symbol)
                 if not nexus_data:
-                    no_data += 1
-                    continue
+                    with counters_lock:
+                        no_data += 1
+                    return None
 
-                analyzed += 1
+                with counters_lock:
+                    analyzed += 1
+                
                 scar_data  = scar_alerts.get(symbol, {})
                 n5_data    = nexus5_cache.get(symbol)
                 confluence = self.signals.calculate_confluence(symbol, scar_data, nexus_data, nexus5_data=n5_data)
 
                 # 🟢 BROADCAST: Batch scores to UI scanner (avoid request spam)
-                broadcast_batch.append(confluence)
+                with broadcast_lock:
+                    broadcast_batch.append(confluence)
 
-                is_golden_n5 = bool(n5_data and n5_data.get("golden_uturn"))
+                is_golden_n5 = False  # v12.1: Golden U-Turn deshabilitado completamente
                 passes_confluence = confluence["confluence_score"] >= config.MIN_CONFLUENCE_SCORE
                 if is_golden_n5 or passes_confluence:
                     enriched = dict(confluence)
@@ -888,18 +1066,11 @@ class VergeAgent:
                         },
                     }
 
-                    # Golden U-Turn: prioridad absoluta — Score=99, sin depender de Nexus-15
-                    if is_golden_n5:
-                        gu_score = float(getattr(config, "GOLDEN_UTURN_SCORE", 99.0))
-                        enriched["confluence_score"] = gu_score
-                        enriched["golden_uturn_mode"] = True
-                        enriched["source"] = "golden_uturn"
-                        enriched["trade_direction"] = "LONG"
-                        enriched["side"] = 0
-                        sl_5low = n5_data.get("golden_uturn_sl_5low")
-                        if sl_5low and float(sl_5low) > 0:
-                            enriched["golden_uturn_sl_5low"] = sl_5low
-                            enriched["custom_sl_price"] = float(sl_5low)
+                    # Golden U-Turn v11.12: SOLO para MA Cross Momentum.
+                    # Otras estrategias (Standard Scalping, MA Clone, etc.) NO usan Golden U-Turn.
+                    # El audit_context golden_uturn se preserva para todos (data enrichment),
+                    # pero el Score=99 y golden_uturn_mode solo se activan en MA Cross Momentum.
+                    # El Score=99 se asigna en el profile execution loop cuando el profile es MA Cross Momentum.
 
                     # ── BONUS SMC: Aplicar bonus de calidad antes del ranking ──
                     # Usamos price_at_signal (last_close de Nexus) para validar sin latencia REST
@@ -912,7 +1083,9 @@ class VergeAgent:
                                 enriched["confluence_score"] += bonus
                                 enriched["smc_bonus_applied"] = bonus
 
-                            candidates.append(enriched)
+                            with candidates_lock:
+                                candidates.append(enriched)
+                            
                             logger.info(
                                 f"✅ CANDIDATE: {symbol} | Score={enriched['confluence_score']:.1f} | "
                                 f"Dir={enriched['trade_direction']} | Nexus={enriched['nexus_confidence']}%" +
@@ -920,9 +1093,18 @@ class VergeAgent:
                             )
                         else:
                             logger.info(f"❌ [VETO] {symbol} rechazado en scan: {v_code}")
+                return None
             except Exception as e:
                 logger.error(f"⚠️ Error analyzing {symbol}: {e}")
-                continue
+                return None
+        
+        logger.info(f"[Step 4/6] Escaneando {len(all_targets)} símbolos con NEXUS-15 [PARALELIZADO v7.3]...")
+        
+        # Usar max_workers=10 para paralelizar sin saturar APIs
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = [executor.submit(analyze_nexus15_symbol, symbol) for symbol in all_targets]
+            for future in as_completed(futures):
+                pass  # Los contadores se actualizan dentro de analyze_nexus15_symbol
 
         # Flush batch once per cycle (one HTTP request instead of ~183)
         try:
@@ -1230,6 +1412,7 @@ class VergeAgent:
 
             # Filter candidates for THIS profile
             p_candidates = []
+            p_rejected = []  # v12.1: Track rejected candidates for audit
             min_score = float(profile.get("minConfluenceScore", config.MIN_CONFLUENCE_SCORE))
             min_nexus = float(profile.get("minNexusConfidence", 70.0))
 
@@ -1245,21 +1428,84 @@ class VergeAgent:
 
             for c in candidates:
                 is_golden = self._is_golden_uturn_candidate(c)
-                if is_golden:
-                    c["golden_uturn_mode"] = True
-                    c["confluence_score"] = float(getattr(config, "GOLDEN_UTURN_SCORE", 99.0))
+                
+                # v12.1: Golden U-Turn DESHABILITADO — nunca inyectar Score=99 ni golden_uturn_mode
+                is_golden = False
+                c.pop("golden_uturn_mode", None)
+                logger.debug(f"[GOLDEN-OFF v12.1] {c.get('symbol')}: Golden U-Turn deshabilitado, flags limpiados")
 
                 if c.get("source") == "LSE":
-                    if not batch_ok: continue
-                    if self.state.is_lse_symbol_cooldown_active(c.get("symbol")): continue
+                    if not batch_ok:
+                        p_rejected.append({"symbol": c.get("symbol"), "score": c.get("confluence_score", 0), "nexus": c.get("nexus_confidence", 0), "reason": "lse_batch_not_ok"})
+                        continue
+                    if self.state.is_lse_symbol_cooldown_active(c.get("symbol")):
+                        p_rejected.append({"symbol": c.get("symbol"), "score": c.get("confluence_score", 0), "nexus": c.get("nexus_confidence", 0), "reason": "lse_cooldown"})
+                        continue
+
+                # v12.0 LEY DE NICO: Filtro TOP-5 para MA Cross Momentum
+                # Eliminar monedas que no tengan al menos 6 velas de cemento acumuladas
+                if p_id == "3a214744-f0b9-68bb-f235-438a39d39d33" or p_name == "MA Cross Momentum":
+                    audit_ctx = c.get("agent_audit_context", {})
+                    nexus15_ctx = audit_ctx.get("nexus15", {}) if isinstance(audit_ctx, dict) else {}
+                    nexus_features = nexus15_ctx.get("features", {}) if isinstance(nexus15_ctx, dict) else {}
+                    
+                    # Calcular velas de cemento (similar a _check_nico_l_shape)
+                    ma50_history = nexus_features.get("ma50_history", [])
+                    recent_prices = nexus_features.get("close_history", [])
+                    
+                    if ma50_history and recent_prices:
+                        min_cement_for_top5 = int(getattr(config, "NICO_L_SHAPE_MIN_CEMENT_FOR_TOP5", 6))
+                        max_price_ma50_dist_pct = float(getattr(config, "NICO_L_SHAPE_MAX_PRICE_MA50_DIST_PCT", 0.5))
+                        max_ma50_slope_deg = float(getattr(config, "NICO_L_SHAPE_MAX_MA50_SLOPE_DEG", 0.2))
+                        reset_threshold_pct = float(getattr(config, "NICO_L_SHAPE_RESET_THRESHOLD_PCT", 1.0))
+                        
+                        cement_candles = 0
+                        max_cement_candles = 0
+                        
+                        recent_ma50 = ma50_history[-20:] if len(ma50_history) >= 20 else ma50_history
+                        recent_prices = recent_prices[-20:] if len(recent_prices) >= 20 else recent_prices
+                        
+                        for i in range(len(recent_ma50) - 1, -1, -1):
+                            if i >= len(recent_prices):
+                                break
+                            
+                            price = float(recent_prices[i])
+                            ma50 = float(recent_ma50[i])
+                            
+                            price_ma50_dist_pct = abs((price - ma50) / ma50) * 100 if ma50 > 0 else 999
+                            
+                            ma50_window_start = max(0, i - 5)
+                            ma50_window = recent_ma50[ma50_window_start:i+1]
+                            ma50_slope = self._calculate_ma99_slope_angle(ma50_window, window=len(ma50_window))
+                            
+                            if price_ma50_dist_pct > reset_threshold_pct:
+                                cement_candles = 0
+                                continue
+                            
+                            if (price_ma50_dist_pct <= max_price_ma50_dist_pct and 
+                                abs(ma50_slope) <= max_ma50_slope_deg):
+                                cement_candles += 1
+                                max_cement_candles = max(max_cement_candles, cement_candles)
+                            else:
+                                cement_candles = 0
+                        
+                        if max_cement_candles < min_cement_for_top5:
+                            logger.info(
+                                f"[NICO-L-SHAPE TOP-5] {p_name} SKIP {c.get('symbol')}: "
+                                f"Solo {max_cement_candles} velas de cemento (necesita {min_cement_for_top5})"
+                            )
+                            p_rejected.append({"symbol": c.get("symbol"), "score": c.get("confluence_score", 0), "nexus": c.get("nexus_confidence", 0), "reason": f"top5_cement({max_cement_candles}<{min_cement_for_top5})"})
+                            continue
 
                 # v9.5 Dual Sniper: Golden VIP bypass total de score/nexus del perfil
                 if not is_golden:
                     if c.get("confluence_score", 0) < min_score:
                         logger.info(f"[{p_name}] SKIP {c.get('symbol')}: score {c.get('confluence_score')} < {min_score}")
+                        p_rejected.append({"symbol": c.get("symbol"), "score": c.get("confluence_score", 0), "nexus": c.get("nexus_confidence", 0), "reason": f"score<{min_score}"})
                         continue
                     if c.get("source") != "LSE" and c.get("nexus_confidence", 0) < min_nexus:
                         logger.info(f"[{p_name}] SKIP {c.get('symbol')}: nexus {c.get('nexus_confidence')} < {min_nexus}")
+                        p_rejected.append({"symbol": c.get("symbol"), "score": c.get("confluence_score", 0), "nexus": c.get("nexus_confidence", 0), "reason": f"nexus<{min_nexus}"})
                         continue
                 else:
                     logger.info(
@@ -1280,12 +1526,14 @@ class VergeAgent:
                     if isinstance(allowed, list):
                         if src not in [s.lower() for s in allowed]:
                             logger.info(f"[{p_name}] SKIP {c.get('symbol')}: src {src} not in {allowed}")
+                            p_rejected.append({"symbol": c.get("symbol"), "score": c.get("confluence_score", 0), "nexus": c.get("nexus_confidence", 0), "reason": f"src_not_allowed({src})"})
                             continue
                     elif isinstance(allowed, str):
                         # .NET serializes as "LSE,Nexus,Bridge"
                         allowed_list = [s.strip().lower() for s in allowed.split(",")]
                         if src not in allowed_list:
                             logger.info(f"[{p_name}] SKIP {c.get('symbol')}: src {src} not in {allowed_list}")
+                            p_rejected.append({"symbol": c.get("symbol"), "score": c.get("confluence_score", 0), "nexus": c.get("nexus_confidence", 0), "reason": f"src_not_allowed({src})"})
                             continue
                 
                 # Profile side filters
@@ -1295,9 +1543,11 @@ class VergeAgent:
                 
                 if cand_side == 0 and not allow_long:
                     logger.info(f"[{p_name}] SKIP {c.get('symbol')}: Long not allowed")
+                    p_rejected.append({"symbol": c.get("symbol"), "score": c.get("confluence_score", 0), "nexus": c.get("nexus_confidence", 0), "reason": "long_not_allowed"})
                     continue
                 if cand_side == 1 and not allow_short:
                     logger.info(f"[{p_name}] SKIP {c.get('symbol')}: Short not allowed")
+                    p_rejected.append({"symbol": c.get("symbol"), "score": c.get("confluence_score", 0), "nexus": c.get("nexus_confidence", 0), "reason": "short_not_allowed"})
                     continue
 
                 # Fix 2: Filtros RSI y MA7 por perfil (PascalCase del DTO -> camelCase del JSON)
@@ -1310,11 +1560,13 @@ class VergeAgent:
                     if max_rsi_long is not None and cand_side == 0:
                         if cand_rsi > float(max_rsi_long):
                             logger.info(f"[VETO] {c['symbol']} RSI {cand_rsi} > max {max_rsi_long} for profile {p_name}")
+                            p_rejected.append({"symbol": c.get("symbol"), "score": c.get("confluence_score", 0), "nexus": c.get("nexus_confidence", 0), "reason": f"rsi>{max_rsi_long}"})
                             continue
 
                     if min_rsi_short is not None and cand_side == 1:
                         if cand_rsi < float(min_rsi_short):
                             logger.info(f"[VETO] {c['symbol']} RSI {cand_rsi} < min {min_rsi_short} for profile {p_name}")
+                            p_rejected.append({"symbol": c.get("symbol"), "score": c.get("confluence_score", 0), "nexus": c.get("nexus_confidence", 0), "reason": f"rsi<{min_rsi_short}"})
                             continue
 
                     # Filtro distancia MA7 por perfil
@@ -1323,6 +1575,7 @@ class VergeAgent:
                         dist = abs(float(c.get("distance_to_ma7_pct", 0)))
                         if dist > float(max_dist_ma7):
                             logger.info(f"[VETO] {c['symbol']} MA7 Dist {dist:.2f}% > max {max_dist_ma7}% for profile {p_name}")
+                            p_rejected.append({"symbol": c.get("symbol"), "score": c.get("confluence_score", 0), "nexus": c.get("nexus_confidence", 0), "reason": f"ma7_dist>{max_dist_ma7}"})
                             continue
 
                 p_candidates.append(c)
@@ -1368,13 +1621,17 @@ class VergeAgent:
                     f"Golden U-Turn — intentando upgrade/reemplazo"
                 )
 
+            # v12.1: Sort rejected candidates by score desc, take top 10 for audit
+            p_rejected.sort(key=lambda x: x.get("score", 0), reverse=True)
+            cycle_rejected = p_rejected[:10]
+
             # Try ranked candidates in order (LSE + Nexus); AGENT_MAX_CANDIDATES_PER_CYCLE enables rank 2..N fallback.
             max_try = max(1, AGENT_MAX_CANDIDATES_PER_CYCLE)
             p_ranked = p_candidates[:max_try]
             
             for idx, cand in enumerate(p_ranked):
                 sym = cand.get("symbol", "")
-                if self._execute_trade(cand, profile=profile):
+                if self._execute_trade(cand, profile=profile, cycle_rejected=cycle_rejected):
                     logger.info(f"✅ Trade executed for profile {p_name} on {sym}")
                     # Update active_trades list for next profile in same cycle
                     active_trades = self.positions.get_active_trades() or []
@@ -2163,8 +2420,43 @@ class VergeAgent:
         """True si el candidato entró por la Regla de Oro (Golden U-Turn)."""
         if candidate.get("golden_uturn_mode") or candidate.get("source") == "golden_uturn":
             return True
-        gu = candidate.get("agent_audit_context", {}).get("golden_uturn", {})
-        return bool(isinstance(gu, dict) and gu.get("detected"))
+
+    def _calculate_ma99_slope_angle(self, ma_values: list, window: int = 12) -> float:
+        """
+        Calcula el ángulo de inclinación de una media móvil en grados.
+        Usa regresión lineal sobre los últimos 'window' valores.
+        """
+        if not ma_values or len(ma_values) < 2:
+            return 0.0
+        
+        # Usar los últimos 'window' valores
+        values = ma_values[-window:] if len(ma_values) >= window else ma_values
+        
+        n = len(values)
+        if n < 2:
+            return 0.0
+        
+        # Regresión lineal simple: y = mx + b
+        x = list(range(n))
+        y = values
+        
+        sum_x = sum(x)
+        sum_y = sum(y)
+        sum_xy = sum(xi * yi for xi, yi in zip(x, y))
+        sum_x2 = sum(xi * xi for xi in x)
+        
+        # Calcular pendiente (m)
+        denominator = n * sum_x2 - sum_x * sum_x
+        if denominator == 0:
+            return 0.0
+        
+        m = (n * sum_xy - sum_x * sum_y) / denominator
+        
+        # Convertir pendiente a ángulo en grados
+        # Ángulo = atan(m) * (180 / π)
+        angle_deg = math.degrees(math.atan(m))
+        
+        return angle_deg
 
     def _build_golden_uturn_candidate(self, symbol: str, n5_data: dict, nexus_data: dict = None) -> dict:
         """
@@ -2505,7 +2797,7 @@ class VergeAgent:
         for sym in to_remove:
             self.state.remove_pending_sniper(sym)
 
-    def _execute_trade(self, candidate: dict, profile: dict = None, is_triggered_sniper: bool = False) -> bool:
+    def _execute_trade(self, candidate: dict, profile: dict = None, is_triggered_sniper: bool = False, cycle_rejected: list = None) -> bool:
         symbol = candidate["symbol"]
         is_golden = self._is_golden_uturn_candidate(candidate)
         if is_golden:
@@ -2539,7 +2831,8 @@ class VergeAgent:
             else:
                 logger.warning(f"[SNIPER] Could not set trap for {symbol}: failed to calculate MA99.")
 
-        balance = self.positions.get_virtual_balance()
+        # v11.12: BILLETERA REAL — Binance wallet balance para decisiones de margen
+        balance = self.positions.get_binance_wallet_balance() or self.positions.get_virtual_balance() or config.VIRTUAL_CAPITAL_BASE
         setup_metrics: dict = {}
 
         market_px = self.fetcher.get_current_price(symbol)
@@ -2664,6 +2957,7 @@ class VergeAgent:
             self._get_tier_for_symbol(symbol),
             setup_metrics=setup_metrics if setup_metrics else None,
             setup_skip=setup_skip,
+            cycle_rejected=cycle_rejected,
         )
         pos_details["agent_decision_json"] = audit_json
 
@@ -2907,7 +3201,8 @@ class VergeAgent:
             logger.info(f"[CLONE] Profile Scalping Clone is full ({len(clone_active)}/{clone_max}). Skipping clone for {symbol}.")
             return False
 
-        balance = self.positions.get_virtual_balance() or config.VIRTUAL_CAPITAL_BASE
+        # v11.12: BILLETERA REAL — Binance wallet balance para clone
+        balance = self.positions.get_binance_wallet_balance() or self.positions.get_virtual_balance() or config.VIRTUAL_CAPITAL_BASE
         clone_pos = self.risk.calculate_position(symbol, candidate, available_balance=balance, profile=self.clone_profile)
         if not clone_pos:
             logger.warning(f"[CLONE] Failed to calculate clone position for {symbol}. Skipping clone.")
@@ -3194,35 +3489,89 @@ class VergeAgent:
                 # ── AI-GRADE AUDIT: Determine exit_reason ──
                 exit_reason = self._determine_exit_reason(close_reason, side, current_price, tp, sl, entry_price)
                 
-                # ── AI-GRADE AUDIT: Get BTC price at close ──
+                # ── AI-GRADE AUDIT: Get BTC context at exit (full regime, not just price) ──
                 btc_price_at_close = None
+                btc_context_at_exit = {}
                 try:
                     btc_price_at_close = self.fetcher.get_current_price("BTCUSDT")
+                    btc_context_at_exit = {
+                        "btc_price": btc_price_at_close,
+                        "regime": self.btc_filter.get_regime(),
+                        "pct_5m": round(self.btc_filter.get_dump_pct(5), 4),
+                        "pct_15m": round(self.btc_filter.get_dump_pct(15), 4),
+                        "pct_1h": round(self.btc_filter.get_dump_pct(60), 4),
+                    }
                 except Exception as e:
-                    logger.debug(f"[AUDIT] Failed to get BTC price at close: {e}")
+                    logger.debug(f"[AUDIT] Failed to get BTC context at close: {e}")
+                
+                # ── AI-GRADE AUDIT: Calculate MAE% and MFE% ──
+                mae_pct = None
+                mfe_pct = None
+                max_adv = pos.get("max_adverse_price")
+                max_fav = pos.get("max_profit_price")
+                if entry_price > 0:
+                    if max_adv is not None:
+                        if side == 0:  # LONG
+                            mae_pct = round(((float(max_adv) - entry_price) / entry_price) * 100, 4)
+                        else:  # SHORT
+                            mae_pct = round(((entry_price - float(max_adv)) / entry_price) * 100, 4)
+                    if max_fav is not None:
+                        if side == 0:  # LONG
+                            mfe_pct = round(((float(max_fav) - entry_price) / entry_price) * 100, 4)
+                        else:  # SHORT
+                            mfe_pct = round(((entry_price - float(max_fav)) / entry_price) * 100, 4)
+                
+                # ── AI-GRADE AUDIT: Calculate candles_held (exact 15m candles) ──
+                candles_held = None
+                try:
+                    opened_at_str = pos["opened_at"].replace("Z", "+00:00")
+                    opened_at_dt = datetime.fromisoformat(opened_at_str)
+                    if opened_at_dt.tzinfo is not None:
+                        opened_at_dt = opened_at_dt.replace(tzinfo=None)
+                    seconds_open = (datetime.utcnow() - opened_at_dt).total_seconds()
+                    candles_held = round(seconds_open / 900, 1)  # 15m = 900s
+                except Exception:
+                    pass
+                
+                # ── AI-GRADE AUDIT: Build exit_audit block ──
+                exit_audit = {
+                    "exit_reason": exit_reason,
+                    "close_reason_raw": close_reason,
+                    "mae_pct": mae_pct,
+                    "mfe_pct": mfe_pct,
+                    "max_adverse_price": float(max_adv) if max_adv is not None else None,
+                    "max_favorable_price": float(max_fav) if max_fav is not None else None,
+                    "candles_held": candles_held,
+                    "btc_context_at_exit": btc_context_at_exit,
+                    "close_price": current_price,
+                    "entry_price": entry_price,
+                }
+                
+                logger.info(
+                    f"[EXIT-AUDIT v12.1] {symbol}: exit={exit_reason} | MAE={mae_pct}% | MFE={mfe_pct}% | "
+                    f"candles={candles_held} | BTC regime={btc_context_at_exit.get('regime', 'N/A')}"
+                )
                 
                 # ── Sync max adverse price to backend before closing ──
-                max_adv = pos.get("max_adverse_price")
-                logger.info(f" [MAE] Before closing trade {trade_id}, max_adverse_price = {max_adv}")
                 if max_adv is not None:
-                    logger.info(f" [MAE] Calling update_max_adverse_price for {trade_id}: {max_adv}")
-                    result = self.positions.update_max_adverse_price(trade_id, float(max_adv))
-                    logger.info(f" [MAE] update_max_adverse_price result: {result}")
-                else:
-                    logger.warning(f" [MAE] max_adverse_price is None for trade {trade_id}, skipping update")
+                    try:
+                        self.positions.update_max_adverse_price(trade_id, float(max_adv))
+                    except Exception as e:
+                        logger.warning(f" [MAE] Failed to update max_adverse_price: {e}")
                 
-                # ── AI-GRADE AUDIT: Sync max favorable price ──
-                max_fav = pos.get("max_profit_price")
+                # ── Sync max favorable price ──
                 if max_fav is not None:
                     try:
                         self.positions.update_max_favorable_price(trade_id, float(max_fav))
-                        logger.info(f" [MFE] Updated max_favorable_price for {trade_id}: {max_fav}")
                     except Exception as e:
                         logger.warning(f" [MFE] Failed to update max_favorable_price: {e}")
                 
-                # ── AI-GRADE AUDIT: Sync exit_reason and BTC price ──
+                # ── Sync exit_reason + full exit_audit to backend ──
                 try:
-                    self.positions.update_trade_exit_info(trade_id, exit_reason, btc_price_at_close)
+                    self.positions.update_trade_exit_info(
+                        trade_id, exit_reason, btc_price_at_close,
+                        exit_audit_json=exit_audit
+                    )
                 except Exception as e:
                     logger.warning(f" [AUDIT] Failed to update exit info: {e}")
 

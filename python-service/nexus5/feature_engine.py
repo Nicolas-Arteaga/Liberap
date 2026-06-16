@@ -604,8 +604,9 @@ class Nexus5FeatureEngine:
                 ma99_long_slope = 0.0
             
             # MA99 no debe estar subiendo fuerte (descartamos pumps que ya pasaron la MA99)
-            # Si la MA99 sube >0.5% ya el precio no está "debajo acumulando", está persiguiendo
-            ma99_not_pumping = ma99_long_slope <= 0.005
+            # Si la MA99 sube >2% en los últimos 40 periodos de 15m (~10h), ya es pump activo.
+            # Umbral relajado de 0.5% a 2% para no perder setups de acumulación gentle.
+            ma99_not_pumping = ma99_long_slope <= 0.02
 
             # 2. Detectar HORIZONTALIDAD ACTUAL (MA50 plana o cayendo)
             ma50_valid = ma50.dropna()

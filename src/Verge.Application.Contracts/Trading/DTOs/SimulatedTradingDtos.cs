@@ -66,6 +66,11 @@ public class SimulatedTradeDto : EntityDto<Guid>
     /// BTC price at the moment this trade was closed. Used for BTC correlation analysis.
     /// </summary>
     public decimal? BtcPriceAtClose { get; set; }
+
+    /// <summary>
+    /// Full exit audit JSON block (v12.1): MAE%, MFE%, candles_held, BTC context at exit, etc.
+    /// </summary>
+    public string? ExitAuditJson { get; set; }
 }
 
 public class OpenTradeInputDto
@@ -119,4 +124,11 @@ public class UpdateTpSlInputDto
 public class UpdateMaxAdversePriceInputDto
 {
     public decimal MaxAdversePrice { get; set; }
+}
+
+public class UpdateExitInfoInputDto
+{
+    public string ExitReason { get; set; } = string.Empty;
+    public decimal? BtcPriceAtClose { get; set; }
+    public string? ExitAuditJson { get; set; }
 }

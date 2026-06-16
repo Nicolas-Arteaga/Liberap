@@ -202,7 +202,24 @@ GOLDEN_UTURN_TP_MIN_DISTANCE_PCT = float(os.getenv("GOLDEN_UTURN_TP_MIN_DISTANCE
 GOLDEN_UTURN_TP_MULTIPLIER = float(os.getenv("GOLDEN_UTURN_TP_MULTIPLIER", "4.5"))               # v10.1: 4.5x si VolRatio > 2.0, 10% fijo mínimo
 GOLDEN_UTURN_SL_SPREAD_BUFFER_PCT = float(os.getenv("GOLDEN_UTURN_SL_SPREAD_BUFFER_PCT", "0.1"))  # margen bajo el low (spread testnet)
 GOLDEN_UTURN_SCORE = 99.0  # Score de inyección directa (prioridad absoluta sobre Nexus-15)
-GOLDEN_UTURN_ENABLED = True  # Master switch
+GOLDEN_UTURN_ENABLED = False  # Master switch — DISABLED (2/2 trades lost, Nexus-15 said Wait)
+
+# 7. LEY DE NICO v12.0 (The L-Shape) — Exclusivo para MA Cross Momentum
+# Detector de "L de Cemento": Caída -> Cemento -> Giro
+NICO_L_SHAPE_ENABLED = os.getenv("NICO_L_SHAPE_ENABLED", "true").lower() in ("1", "true", "yes")
+NICO_L_SHAPE_MIN_DROP_PCT = float(os.getenv("NICO_L_SHAPE_MIN_DROP_PCT", "5.0"))           # PASO 1: MA99 debe caer ≥5% en 100 velas
+NICO_L_SHAPE_MIN_CEMENT_CANDLES = int(os.getenv("NICO_L_SHAPE_MIN_CEMENT_CANDLES", "12"))  # PASO 2: Mínimo 12 velas de cemento (3 horas)
+NICO_L_SHAPE_MAX_PRICE_MA50_DIST_PCT = float(os.getenv("NICO_L_SHAPE_MAX_PRICE_MA50_DIST_PCT", "0.5"))  # Precio/MA50 pegados <0.5%
+NICO_L_SHAPE_MAX_MA50_SLOPE_DEG = float(os.getenv("NICO_L_SHAPE_MAX_MA50_SLOPE_DEG", "0.2"))  # MA50 horizontal ±0.2°
+NICO_L_SHAPE_RESET_THRESHOLD_PCT = float(os.getenv("NICO_L_SHAPE_RESET_THRESHOLD_PCT", "1.0"))  # Reset si precio se aleja >1% de MA50
+NICO_L_SHAPE_MIN_MA99_DIST_PCT = float(os.getenv("NICO_L_SHAPE_MIN_MA99_DIST_PCT", "1.5"))  # PASO 3: MA99 mínimo 1.5% del precio
+NICO_L_SHAPE_MAX_MA99_DIST_PCT = float(os.getenv("NICO_L_SHAPE_MAX_MA99_DIST_PCT", "4.0"))  # PASO 3: MA99 máximo 4.0% del precio
+NICO_L_SHAPE_MIN_TRIGGER_SLOPE_DEG = float(os.getenv("NICO_L_SHAPE_MIN_TRIGGER_SLOPE_DEG", "0.2"))  # GATILLO: MA50 slope > 0.2°
+NICO_L_SHAPE_SCORE = 100.0  # Score de inyección directa (bypass total)
+NICO_L_SHAPE_SL_CANDLE_LOOKBACK = int(os.getenv("NICO_L_SHAPE_SL_CANDLE_LOOKBACK", "12"))  # SL: low de 12 velas de cemento
+NICO_L_SHAPE_TP_MIN_DISTANCE_PCT = float(os.getenv("NICO_L_SHAPE_TP_MIN_DISTANCE_PCT", "10.0"))  # TP: mínimo 10%
+NICO_L_SHAPE_TP_TRAILING_PCT = float(os.getenv("NICO_L_SHAPE_TP_TRAILING_PCT", "5.0"))  # Trailing: 5% después del 10%
+NICO_L_SHAPE_MIN_CEMENT_FOR_TOP5 = int(os.getenv("NICO_L_SHAPE_MIN_CEMENT_FOR_TOP5", "6"))  # Filtro TOP-5: mínimo 6 velas de cemento
 
 # v10.1 The Surgical Hook — Veto Zombi
 MIN_VOLUME_RATIO_20 = float(os.getenv("MIN_VOLUME_RATIO_20", "0.15"))  # v10.1: 0.15x mata a CRDOUSDT, permite a UBUSDT
@@ -349,14 +366,14 @@ _FALLBACK_SYMBOLS = [
 
 
 def _load_open_position_symbols() -> list:
-    """Returns symbols in local open positions. Always placed at front of T1."""
-    try:
-        if os.path.exists(POSITIONS_FILE):
-            with open(POSITIONS_FILE, "r") as f:
-                positions = json.load(f)
-                return [p["symbol"] for p in positions if p.get("symbol")]
-    except Exception as e:
-        print(f"[Config] Warning: Could not read positions ({e})")
+    """
+    Returns symbols in local open positions. Always placed at front of T1.
+    v11.8: LIMPIEZA ATÓMICA - Prohibido cargar desde caché local.
+    Siempre retorna lista vacía para forzar sincronización con Binance.
+    """
+    # v11.8: NO cargar desde POSITIONS_FILE - usar solo Binance API
+    # Esto evita posiciones fantasmas que bloquean el margen
+    print("[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only")
     return []
 
 

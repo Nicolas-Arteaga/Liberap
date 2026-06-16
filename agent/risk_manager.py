@@ -24,13 +24,8 @@ class RiskManager:
     ) -> Optional[Dict[str, Any]]:
         balance = available_balance if available_balance is not None else config.VIRTUAL_CAPITAL_BASE
 
-        # v10.8: THE TRIAD — Validación de margen mínimo (150 USDT)
-        # Evita trades de "miseria" que Binance rechaza (mínimo $5 USDT)
-        if balance < config.MAX_MARGIN_PER_TRADE_USD:
-            logger.warning(
-                f"[THE-TRIAD] {symbol}: Balance insuficiente (${balance:.2f} < ${config.MAX_MARGIN_PER_TRADE_USD:.2f}) — trade bloqueado"
-            )
-            return None
+        # v11.12 NO MORE LIES: Balance check eliminado. Siempre $150 fijo.
+        logger.info(f"[BILLETERA-REAL v11.12] {symbol}: Balance reportado=${balance:.2f}. Forzando bala fija de $150 USDT.")
 
         if signal_data.get("source") == "LSE":
             return self._calculate_position_lse(symbol, signal_data, balance, profile)
@@ -98,17 +93,8 @@ class RiskManager:
             f"[FIXED-MARGIN] {symbol} (LSE): Entrando con bala fija de ${margin:.2f} USDT | SL={sl_pct:.2f}% | qty={qty:.4f}"
         )
 
-        # ── FIX v11.6: THE PURGE — Fixed Bullet 150k: Margen fijo o nada ──
-        # Si el balance libre no llega a 150 USDT, prohibir abrir trades.
-        # No más posiciones de $0.01 ni de $109. Es 150 o nada.
-        if balance < config.MAX_MARGIN_PER_TRADE_USD:
-            logger.warning(
-                f"[PURGE v11.6] {symbol}: Balance insuficiente (${balance:.2f} < ${config.MAX_MARGIN_PER_TRADE_USD:.2f}) — trade bloqueado (Fixed Bullet 150k)"
-            )
-            return None
-        
-        # Aplicar límite de balance (no podemos usar más del 99% del balance disponible)
-        margin = min(margin, balance * 0.99)
+        # v11.12 NO MORE LIES: PURGE eliminado. Bala fija $150 sin chequeo de saldo.
+        # margin ya es 150 fijo, no se cap contra balance virtual mentiroso.
         
         max_no = float(getattr(config, "MAX_NOTIONAL_PER_TRADE_USD", 50000))
         if notional > max_no:
@@ -356,17 +342,8 @@ class RiskManager:
             f"[FIXED-MARGIN] {symbol}: Entrando con bala fija de ${margin:.2f} USDT | SL={sl_pct:.2f}% | TP={tp_pct:.2f}% | qty={qty:.4f}"
         )
 
-        # ── FIX v11.6: THE PURGE — Fixed Bullet 150k: Margen fijo o nada ──
-        # Si el balance libre no llega a 150 USDT, prohibir abrir trades.
-        # No más posiciones de $0.01 ni de $109. Es 150 o nada.
-        if balance < config.MAX_MARGIN_PER_TRADE_USD:
-            logger.warning(
-                f"[PURGE v11.6] {symbol}: Balance insuficiente (${balance:.2f} < ${config.MAX_MARGIN_PER_TRADE_USD:.2f}) — trade bloqueado (Fixed Bullet 150k)"
-            )
-            return None
-        
-        # Aplicar límite de balance (no podemos usar más del 99% del balance disponible)
-        margin = min(margin, balance * 0.99)
+        # v11.12 NO MORE LIES: PURGE eliminado. Bala fija $150 sin chequeo de saldo.
+        # margin ya es 150 fijo, no se cap contra balance virtual mentiroso.
 
         max_no = float(getattr(config, "MAX_NOTIONAL_PER_TRADE_USD", 50000))
         if notional > max_no:

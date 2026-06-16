@@ -1,3 +1,4 @@
+import json
 import requests
 import logging
 import hashlib
@@ -277,6 +278,61 @@ class BinanceDirectClient:
         logger.info("[BinanceDirect] ========== open_position END ==========")
         return True
 
+    def get_wallet_balance(self) -> float:
+        """
+        Queries Binance Futures Account Balance (real wallet, not simulated).
+        Returns the USDT available balance.
+        """
+        url = f"{self.base_url}/fapi/v2/balance"
+        params = self._sign({})
+        try:
+            resp = requests.get(url, params=params, headers=self._headers(), timeout=15)
+            if resp.status_code == 200:
+                balances = resp.json()
+                for asset in balances:
+                    if asset.get("asset") == "USDT":
+                        available = float(asset.get("availableBalance", 0))
+                        wallet = float(asset.get("crossWalletBalance", 0))
+                        logger.info(
+                            f"[BILLETERA-REAL] Binance USDT: available=${available:.2f} | wallet=${wallet:.2f}"
+                        )
+                        return available
+                logger.warning("[BILLETERA-REAL] USDT asset not found in Binance balance response")
+                return 0.0
+            else:
+                logger.error(f"[BILLETERA-REAL] Balance query failed HTTP {resp.status_code}: {resp.text}")
+                return 0.0
+        except Exception as e:
+            logger.error(f"[BILLETERA-REAL] Exception querying Binance balance: {e}")
+            return 0.0
+
+    def get_all_open_positions(self) -> list:
+        """Queries Binance Futures for all open positions (non-zero qty)."""
+        url = f"{self.base_url}/fapi/v2/positionRisk"
+        params = self._sign({})
+        try:
+            resp = requests.get(url, params=params, headers=self._headers(), timeout=15)
+            if resp.status_code == 200:
+                all_positions = resp.json()
+                open_positions = []
+                for p in all_positions:
+                    qty = float(p.get("positionAmt", 0))
+                    if qty != 0:
+                        open_positions.append({
+                            "symbol": p.get("symbol"),
+                            "side": "LONG" if qty > 0 else "SHORT",
+                            "qty": abs(qty),
+                            "entry_price": float(p.get("entryPrice", 0)),
+                            "unrealized_pnl": float(p.get("unRealizedProfit", 0)),
+                        })
+                logger.info(f"[BILLETERA-REAL] Binance open positions: {len(open_positions)}")
+                return open_positions
+            else:
+                return []
+        except Exception as e:
+            logger.error(f"[BILLETERA-REAL] Error querying open positions: {e}")
+            return []
+
     def close_position(self, symbol: str) -> bool:
         """Cancels open TP/SL orders and closes the active position at market."""
         if not self.api_key or not self.api_secret:
@@ -455,9 +511,9 @@ class PositionManager:
             logger.error(f" Connection error updating MFE: {e}")
             return False
 
-    def update_trade_exit_info(self, trade_id: str, exit_reason: str, btc_price_at_close: float = None) -> bool:
+    def update_trade_exit_info(self, trade_id: str, exit_reason: str, btc_price_at_close: float = None, exit_audit_json: dict = None) -> bool:
         """
-        AI-GRADE AUDIT: Update exit reason and BTC price at close.
+        AI-GRADE AUDIT: Update exit reason, BTC price at close, and full exit audit block.
         """
         headers = self.auth_manager.get_auth_headers()
         if not headers:
@@ -468,6 +524,7 @@ class PositionManager:
         payload = {
             "exitReason": exit_reason,
             "btcPriceAtClose": btc_price_at_close,
+            "exitAuditJson": json.dumps(exit_audit_json, ensure_ascii=False) if exit_audit_json else None,
         }
         
         try:
@@ -532,6 +589,7 @@ class PositionManager:
     def get_active_trades(self) -> list:
         """
         Retrieves active trades from the backend to sync state if needed.
+        v11.8: Log para diagnosticar posiciones fantasmas en backend.
         """
         headers = self.auth_manager.get_auth_headers()
         if not headers:
@@ -541,7 +599,12 @@ class PositionManager:
         try:
             response = requests.get(url, headers=headers, verify=False, timeout=30)
             if response.status_code == 200:
-                return response.json()
+                trades = response.json()
+                logger.info(f"[PositionManager] v11.8: Backend returned {len(trades)} active trades")
+                if trades:
+                    symbols = [t.get("symbol", "UNKNOWN") for t in trades]
+                    logger.info(f"[PositionManager] v11.8: Active symbols from backend: {symbols}")
+                return trades
         except Exception as e:
             logger.error(f"Error fetching active trades: {e}")
             
@@ -564,6 +627,14 @@ class PositionManager:
             logger.warning(f"Error fetching virtual balance, using default: {e}")
             
         return config.VIRTUAL_CAPITAL_BASE
+
+    def get_binance_wallet_balance(self) -> float:
+        """Queries Binance Futures real wallet balance (USDT available)."""
+        return get_binance_direct().get_wallet_balance()
+
+    def get_binance_open_positions(self) -> list:
+        """Queries Binance Futures for all open positions."""
+        return get_binance_direct().get_all_open_positions()
 
     def broadcast_signal(self, signal_data: dict) -> bool:
         """

@@ -84,7 +84,13 @@ class StateManager:
     # --- Open Positions Management ---
 
     def get_open_positions(self) -> list:
-        return self._load_json(self.positions_file)
+        """
+        v11.8: LIMPIEZA ATÓMICA - Prohibido cargar desde caché local.
+        Siempre retorna lista vacía para forzar sincronización con Binance.
+        Las posiciones se obtienen exclusivamente desde el backend (PositionManager).
+        """
+        logger.info("[StateManager] v11.8: Local positions cache DISABLED - forcing Binance sync only")
+        return []
 
     def add_position(self, position: dict):
         """Adds a position to the local state."""

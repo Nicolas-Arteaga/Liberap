@@ -99,13 +99,18 @@ public class Nexus5AppService : ApplicationService, INexus5AppService
     /// </summary>
     public async Task<List<Nexus5ResultDto>> AnalyzeTopAvailableAsync(int topN = 5)
     {
-        _logger.LogInformation("⚡ [Nexus5] Initiating Top Scan — targeting Phase 1/2 symbols, top {Top}", topN);
+        _logger.LogInformation("⚡ [Nexus5] Initiating Bottom Sniper Scan — targeting price below MA99, top {Top}", topN);
 
         var tickers = await _marketData.GetTickersAsync();
+
+        // Bottom Sniper: queremos un universo amplio ordenado por volumen.
+        // Los que ya subieron fuerte (>MA99) serán vetados automáticamente por el analizador.
+        // Así capturamos también los que están acumulando silenciosamente debajo de MA99.
+        // Tomamos los top 120 por volumen (excluye coins sin liquidez).
         var topSymbols = tickers
             .Where(t => t.Volume > 500_000m && t.Symbol.EndsWith("USDT"))
-            .OrderByDescending(t => Math.Abs(t.PriceChangePercent))
-            .Take(80)
+            .OrderByDescending(t => t.Volume)
+            .Take(120)
             .Select(t => t.Symbol)
             .ToList();
 
@@ -128,20 +133,22 @@ public class Nexus5AppService : ApplicationService, INexus5AppService
         });
 
         await Task.WhenAll(tasks);
-        _logger.LogInformation("✅ [Nexus5] Top scan finished. {Count} active signals found.", results.Count);
+        _logger.LogInformation("✅ [Nexus5] Bottom Sniper scan finished. {Count} active signals found.", results.Count);
 
-        // ── BOTTOM SNIPER ORDERING (v8.0) ───────────────────────────────────────
-        // Ordenar por cercanía al pivote: medias cercanas + precio debajo de MA99
-        // Prioridad: ma50_ma99_distance (menor = mejor) → price_to_ma99_pct (más negativo = mejor)
+        // ── BOTTOM SNIPER ORDERING (v9.0) ───────────────────────────────────────
+        // Prioridad absoluta: is_bottom_sniper=True + MA50/MA99 más cercanas
+        // Luego: mayor confianza, luego más debajo de MA99 (más comprimido)
         var sorted = results
             .Where(r => r.Features != null)
-            .OrderBy(r => r.Features.Ma50Ma99Distance)  // Medias más cercanas primero
-            .ThenBy(r => r.Features.PriceToMa99Pct)     // Más debajo de MA99 primero
-            .ThenByDescending(r => r.AiConfidence)       // Mayor confianza primero
+            .OrderByDescending(r => r.AiConfidence >= 90 ? 1 : 0)  // Bottom Snipers primero (95+)
+            .ThenBy(r => r.Features.Ma50Ma99Distance)               // Medias más cercanas = más comprimido
+            .ThenBy(r => r.Features.PriceToMa99Pct)                 // Más debajo de MA99 primero
+            .ThenByDescending(r => r.AiConfidence)                  // Mayor confianza al final
             .ToList();
 
         return sorted.Take(topN).ToList();
     }
+
 
     /// <summary>
     /// Agent endpoint: returns ALL qualifying pairs in Phase 1 or Phase 2.
