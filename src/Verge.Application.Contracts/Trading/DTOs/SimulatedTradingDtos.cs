@@ -126,6 +126,11 @@ public class UpdateMaxAdversePriceInputDto
     public decimal MaxAdversePrice { get; set; }
 }
 
+public class UpdateMaxFavorablePriceInputDto
+{
+    public decimal MaxFavorablePrice { get; set; }
+}
+
 public class UpdateExitInfoInputDto
 {
     public string ExitReason { get; set; } = string.Empty;

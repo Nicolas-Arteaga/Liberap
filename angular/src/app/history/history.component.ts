@@ -261,6 +261,12 @@ export class HistoryComponent {
     this.recomputeAll();
   }
 
+  onPageSizeChange(size: number) {
+    this.pageSize = size;
+    this.currentPage = 1;
+    this.recomputeAll();
+  }
+
   // ── TrackBy ──────────────────────────────────────────────────────────────
   trackByTradeId(_: number, trade: SimulatedTradeDto): string {
     return trade.id;

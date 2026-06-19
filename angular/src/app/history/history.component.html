@@ -164,7 +164,8 @@
           [totalItems]="filteredTrades.length"
           [pageSize]="pageSize"
           [currentPage]="currentPage"
-          (pageChange)="onPageChange($event)">
+          (pageChange)="onPageChange($event)"
+          (pageSizeChange)="onPageSizeChange($event)">
         </app-paginator>
         
       </app-card-content>

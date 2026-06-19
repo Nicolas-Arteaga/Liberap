@@ -256,25 +256,63 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
     /// <summary>
     /// AI-GRADE AUDIT: Update max favorable price (MFE) for a trade.
     /// </summary>
-    public async Task UpdateMaxFavorablePriceAsync(Guid tradeId, decimal maxFavorablePrice)
+    [HttpPost("api/app/simulated-trade/update-max-favorable-price/{tradeId}")]
+    public async Task UpdateMaxFavorablePriceAsync(Guid tradeId, [FromBody] UpdateMaxFavorablePriceInputDto input)
     {
-        var trade = await _tradeRepo.GetAsync(tradeId);
-        trade.MaxFavorablePrice = maxFavorablePrice;
-        await _tradeRepo.UpdateAsync(trade, autoSave: true);
-        Logger.LogDebug("[AUDIT] MFE updated for trade {TradeId}: {Price}", tradeId, maxFavorablePrice);
+        int maxRetries = 5;
+        for (int i = 0; i < maxRetries; i++)
+        {
+            try
+            {
+                using (var scope = _scopeFactory.CreateScope())
+                {
+                    var repo = scope.ServiceProvider.GetRequiredService<IRepository<SimulatedTrade, Guid>>();
+                    var trade = await repo.GetAsync(tradeId);
+                    trade.MaxFavorablePrice = input.MaxFavorablePrice;
+                    await repo.UpdateAsync(trade, autoSave: true);
+                    Logger.LogDebug("[AUDIT] MFE updated for trade {TradeId}: {Price}", tradeId, input.MaxFavorablePrice);
+                    break;
+                }
+            }
+            catch (AbpDbConcurrencyException)
+            {
+                if (i == maxRetries - 1) throw;
+                Logger.LogWarning("[Simulation] Concurrency retry {0}/5 for updating MFE on trade {1}", i + 1, tradeId);
+                await Task.Delay(200);
+            }
+        }
     }
 
     /// <summary>
     /// AI-GRADE AUDIT: Update exit reason, BTC price at close, and full exit audit block.
     /// </summary>
-    public async Task UpdateExitInfoAsync(Guid tradeId, UpdateExitInfoInputDto input)
+    [HttpPost("api/app/simulated-trade/update-exit-info/{tradeId}")]
+    public async Task UpdateExitInfoAsync(Guid tradeId, [FromBody] UpdateExitInfoInputDto input)
     {
-        var trade = await _tradeRepo.GetAsync(tradeId);
-        trade.ExitReason = input.ExitReason;
-        trade.BtcPriceAtClose = input.BtcPriceAtClose;
-        trade.ExitAuditJson = input.ExitAuditJson;
-        await _tradeRepo.UpdateAsync(trade, autoSave: true);
-        Logger.LogDebug("[AUDIT] Exit info updated for trade {TradeId}: {Reason} | BTC={BTC}", tradeId, input.ExitReason, input.BtcPriceAtClose);
+        int maxRetries = 5;
+        for (int i = 0; i < maxRetries; i++)
+        {
+            try
+            {
+                using (var scope = _scopeFactory.CreateScope())
+                {
+                    var repo = scope.ServiceProvider.GetRequiredService<IRepository<SimulatedTrade, Guid>>();
+                    var trade = await repo.GetAsync(tradeId);
+                    trade.ExitReason = input.ExitReason;
+                    trade.BtcPriceAtClose = input.BtcPriceAtClose;
+                    trade.ExitAuditJson = input.ExitAuditJson;
+                    await repo.UpdateAsync(trade, autoSave: true);
+                    Logger.LogDebug("[AUDIT] Exit info updated for trade {TradeId}: {Reason} | BTC={BTC}", tradeId, input.ExitReason, input.BtcPriceAtClose);
+                    break;
+                }
+            }
+            catch (AbpDbConcurrencyException)
+            {
+                if (i == maxRetries - 1) throw;
+                Logger.LogWarning("[Simulation] Concurrency retry {0}/5 for updating exit info on trade {1}", i + 1, tradeId);
+                await Task.Delay(200);
+            }
+        }
     }
 
     public async Task<SimulatedTradeDto> CloseTradeAsync(Guid tradeId)
