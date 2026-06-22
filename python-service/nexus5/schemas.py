@@ -21,6 +21,7 @@ class Nexus5Request(BaseModel):
     symbol: str
     timeframe: str = "5m"
     candles: List[CandleInput]            # 5m candles — mínimo 30
+    candles_15m: Optional[List[CandleInput]] = None  # Native 15m candles for structural MA50/MA99
     candles_1m: Optional[List[CandleInput]] = None  # optional, for entry timing
     candles_3m: Optional[List[CandleInput]] = None  # optional, for entry timing
 
@@ -72,17 +73,20 @@ class Nexus5Features(BaseModel):
     minutes_to_next_pump: float      # minutos restantes para el próximo pump esperado
     confidence_boost: float         # boost de confianza basado en proximidad al pump
 
-    # ── ESTRUCTURAL ANALYSIS — Reglas de Oro (v9.0 Bottom Sniper) ────────────────
+    # ── ESTRUCTURAL ANALYSIS — Reglas de Oro (v11.0 Bottom Sniper) ────────────────
     # Basado en temporalidad de 15m para MA50/MA99 reales
+    # v11.0: Tres prerrequisitos OBLIGATORIOS: SUPER CAÍDA + MA99 diagonal + lateralización
     slope_ma50: float               # Pendiente de MA50 (0.0 = horizontal, <0 = diagonal abajo)
     ma99_long_slope: float          # Pendiente de MA99 a largo plazo (40 velas) - detecta caída previa
-    is_bottom_sniper: bool          # True si cumple setup de FIDA (caída larga + plano + debajo MA99)
+    is_bottom_sniper: bool          # True si cumple los 3 prerrequisitos obligatorios
     gravity_ma99_safe: bool         # True si MA99 NO está en caída en picada
     vol_ratio: float               # Volumen actual / promedio últimas 10 velas
     compression_viper: bool        # True si precio y MA50 hacen zig-zag y distancia MA50-MA99 < 1.5%
     ma50_horizontal: bool          # True si MA50 está horizontal (slope < 0.1% en últimas 10 velas)
     ma50_ma99_dist: float           # Distancia entre MA50 y MA99 (para compresión)
     price_to_ma99_pct: float        # Precio relativo a MA99 (para Deep Bottom y Anti-FOMO)
+    super_crash_pct: float          # Magnitud de la caída (peak→trough) en velas 15m (0.15 = 15%)
+    crash_detected: bool            # True si se detectó SUPER CAÍDA >= 12%
 
 
 class Nexus5Response(BaseModel):

@@ -18,6 +18,17 @@ export interface Nexus5FeaturesDto {
   atrExpansion: number;
   zScore: number;
   rsiVelocity: number;
+  // Structural Analysis (v10.0 — native 15m)
+  slopeMa50: number;
+  slopeMa99: number;
+  gravityMa99Safe: boolean;
+  volRatio: number;
+  compressionViper: boolean;
+  ma50Horizontal: boolean;
+  ma50Ma99Distance: number;
+  priceToMa99Pct: number;
+  superCrashPct: number;
+  crashDetected: boolean;
 }
 
 export interface Nexus5GroupScoresDto {

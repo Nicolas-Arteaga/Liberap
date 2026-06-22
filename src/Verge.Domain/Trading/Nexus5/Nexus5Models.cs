@@ -119,7 +119,7 @@ public class Nexus5FeaturesModel
     // ── ESTRUCTURAL ANALYSIS — Reglas de Oro (v8.0) ───────────────────────────
     [JsonPropertyName("slope_ma50")]
     public double SlopeMa50 { get; set; }
-    [JsonPropertyName("slope_ma99")]
+    [JsonPropertyName("ma99_long_slope")]
     public double SlopeMa99 { get; set; }
     [JsonPropertyName("gravity_ma99_safe")]
     public bool GravityMa99Safe { get; set; }
@@ -129,13 +129,17 @@ public class Nexus5FeaturesModel
     public bool CompressionViper { get; set; }
     [JsonPropertyName("ma50_horizontal")]
     public bool Ma50Horizontal { get; set; }
-    [JsonPropertyName("ma50_ma99_distance")]
+    [JsonPropertyName("ma50_ma99_dist")]
     public double Ma50Ma99Distance { get; set; }
     [JsonPropertyName("price_to_ma99_pct")]
     public double PriceToMa99Pct { get; set; }
+    [JsonPropertyName("super_crash_pct")]
+    public double SuperCrashPct { get; set; }
+    [JsonPropertyName("crash_detected")]
+    public bool CrashDetected { get; set; }
 }
 
 public interface IPythonNexus5Service
 {
-    Task<Nexus5ResponseModel?> AnalyzeNexus5Async(string symbol, List<MarketCandleModel> candles);
+    Task<Nexus5ResponseModel?> AnalyzeNexus5Async(string symbol, List<MarketCandleModel> candles, List<MarketCandleModel>? candles15m = null);
 }

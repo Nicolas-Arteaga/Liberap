@@ -93,6 +93,7 @@ public class SimulationMarkPriceWorker : BackgroundService
 
             foreach (var trade in openTrades)
             {
+                await TradingSimulationService.ProfileLock.WaitAsync();
                 try
                 {
                     using var uow = uowManager.Begin();
@@ -220,7 +221,6 @@ public class SimulationMarkPriceWorker : BackgroundService
                         bool balanceUpdated = false;
                         for (int br = 0; br < balanceRetries && !balanceUpdated; br++)
                         {
-                            await TradingSimulationService.ProfileLock.WaitAsync();
                             try
                             {
                                 using (var balanceScope = _serviceProvider.CreateScope())
@@ -240,10 +240,6 @@ public class SimulationMarkPriceWorker : BackgroundService
                                 if (br == balanceRetries - 1) throw;
                                 _logger.LogWarning("[SimulationWorker] Concurrency exception crediting balance for {UserId}. Retry {0}/5", trade.UserId, br + 1);
                                 await Task.Delay(200);
-                            }
-                            finally
-                            {
-                                TradingSimulationService.ProfileLock.Release();
                             }
                         }
 
@@ -279,6 +275,10 @@ public class SimulationMarkPriceWorker : BackgroundService
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "💥 [SimulationWorker] ERROR updating trade {Id}", trade.Id);
+                }
+                finally
+                {
+                    TradingSimulationService.ProfileLock.Release();
                 }
             }
 

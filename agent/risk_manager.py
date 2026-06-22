@@ -24,8 +24,8 @@ class RiskManager:
     ) -> Optional[Dict[str, Any]]:
         balance = available_balance if available_balance is not None else config.VIRTUAL_CAPITAL_BASE
 
-        # v11.12 NO MORE LIES: Balance check eliminado. Siempre $150 fijo.
-        logger.info(f"[BILLETERA-REAL v11.12] {symbol}: Balance reportado=${balance:.2f}. Forzando bala fija de $150 USDT.")
+        # v12.0-BERSERKER: Balance ignorado. Siempre $150 fijo.
+        logger.info(f"[BERSERKER v12.0] {symbol}: Bala fija $150 USDT. Sin chequeo de saldo.")
 
         if signal_data.get("source") == "LSE":
             return self._calculate_position_lse(symbol, signal_data, balance, profile)
@@ -93,8 +93,8 @@ class RiskManager:
             f"[FIXED-MARGIN] {symbol} (LSE): Entrando con bala fija de ${margin:.2f} USDT | SL={sl_pct:.2f}% | qty={qty:.4f}"
         )
 
-        # v11.12 NO MORE LIES: PURGE eliminado. Bala fija $150 sin chequeo de saldo.
-        # margin ya es 150 fijo, no se cap contra balance virtual mentiroso.
+        # v12.0-BERSERKER: PURGE eliminado. Bala fija $150 sin chequeo de saldo.
+        # margin ya es 150 fijo, no se cap contra balance.
         
         max_no = float(getattr(config, "MAX_NOTIONAL_PER_TRADE_USD", 50000))
         if notional > max_no:
@@ -342,8 +342,8 @@ class RiskManager:
             f"[FIXED-MARGIN] {symbol}: Entrando con bala fija de ${margin:.2f} USDT | SL={sl_pct:.2f}% | TP={tp_pct:.2f}% | qty={qty:.4f}"
         )
 
-        # v11.12 NO MORE LIES: PURGE eliminado. Bala fija $150 sin chequeo de saldo.
-        # margin ya es 150 fijo, no se cap contra balance virtual mentiroso.
+        # v12.0-BERSERKER: PURGE eliminado. Bala fija $150 sin chequeo de saldo.
+        # margin ya es 150 fijo, no se cap contra balance.
 
         max_no = float(getattr(config, "MAX_NOTIONAL_PER_TRADE_USD", 50000))
         if notional > max_no:

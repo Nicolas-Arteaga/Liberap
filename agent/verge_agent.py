@@ -39,9 +39,15 @@ from btc_correlation import BTCCorrelation
 # The LSE Python service endpoint is part of the same python-service container.
 
 # ── AGENT VERSION — Cambiar en cada release para identificar en logs ─────
-AGENT_VERSION = "v11.6-THE-PURGE"
-AGENT_BUILD_DATE = "2026-06-13"
+AGENT_VERSION = "v12.0-BERSERKER"
+AGENT_BUILD_DATE = "2026-06-21"
 AGENT_CHANGES = [
+    "FIX v12.0: BERSERKER — Eliminación Total de Trabas Contables",
+    "FIX v12.0: BERSERKER — Balance check DESACTIVADO. Nunca consulta saldo antes de disparar.",
+    "FIX v12.0: BERSERKER — Fixed Bullet $150 USDT sin filtro de balance. El exchange rebota si quiere.",
+    "FIX v12.0: BERSERKER — THE TRIAD contable eliminado. Solo queda límite de 3 slots por estrategia.",
+    "FIX v12.0: BERSERKER — virtual_balance / binance_balance removidos del flujo de decisión.",
+    "FIX v13.0: TOTAL-SWEEP — Sinfonia Final: NEXUS-5 Bottom Sniper + Volume Radar + Ley de Nico G>R",
     "FIX v11.6: THE PURGE — Selección quirúrgica de víctima: Prioridad 1 = Margen roto (< 140 USDT)",
     "FIX v11.6: THE PURGE — Selección quirúrgica de víctima: Prioridad 2 = PnL más negativo de la estrategia",
     "FIX v11.6: THE PURGE — Fixed Bullet 150k: Balance < 150 USDT = prohibir abrir (no más $0.01 ni $109)",
@@ -683,19 +689,13 @@ class VergeAgent:
         env_str = "TESTNET" if use_testnet else "MAINNET"
         logger.info(f"[VERSION] PositionManager v{version} - TP/SL via closePosition=true with fallbacks ({env_str})")
         
-        # ── FIX v11.12: BILLETERA REAL — Balance real de Binance, no contabilidad virtual ──
-        try:
-            binance_balance = self.positions.get_binance_wallet_balance()
-            virtual_balance = self.positions.get_virtual_balance() or config.VIRTUAL_CAPITAL_BASE
-            available_balance = max(binance_balance, virtual_balance)
-            required_margin = 150.0
-            logger.info(
-                f"[BILLETERA-REAL v11.12] Binance=${binance_balance:.2f} | Virtual=${virtual_balance:.2f} | "
-                f"Usando=${available_balance:.2f} (requerido=${required_margin:.2f})"
-            )
-        except Exception as e:
-            logger.warning(f"[BILLETERA-REAL v11.12] Error obteniendo balance Binance, fallback a 10000: {e}")
-            available_balance = config.VIRTUAL_CAPITAL_BASE
+        # ── v12.0-BERSERKER: Balance check ELIMINADO. El bot NO consulta saldo. ──
+        # Fixed Bullet: siempre $150 USDT por trade. Que el exchange rebote si quiere.
+        available_balance = 999_999.0  # Dummy infinito — nunca se usa para bloquear
+        logger.info(
+            f"[BERSERKER v12.0] Balance check DESACTIVADO. Bala fija $150 USDT. "
+            f"Slots={config.MAX_OPEN_POSITIONS} por estrategia. SIN PREGUNTAR."
+        )
 
         # 0. Check exchange health
         breakers     = get_breakers()
@@ -735,7 +735,7 @@ class VergeAgent:
             "nexusMaxPriceDriftPct": 0.002,    # Máximo movimiento de 0.2% desde la señal
             "allowLong": True,
             "allowShort": True,
-            "allowedSources": ["nexus", "scar", "redis_bridge", "golden_uturn"],
+            "allowedSources": ["nexus", "scar", "redis_bridge", "golden_uturn", "total_sweep"],
             "isActive": True
         }
 
@@ -754,7 +754,7 @@ class VergeAgent:
             "nexusMaxPriceDriftPct": 0.002,    # COPIADO: Máximo 0.2% drift
             "allowLong": True,
             "allowShort": True,
-            "allowedSources": ["nexus", "scar", "redis_bridge", "golden_uturn"],
+            "allowedSources": ["nexus", "scar", "redis_bridge", "golden_uturn", "total_sweep"],
             "isActive": True
         }
 
@@ -1176,6 +1176,95 @@ class VergeAgent:
                     f"(total candidates={len(candidates)})"
                 )
 
+        # ── TOTAL-SWEEP v13.0: The Sinfonía Final ───────────────────────────────────────
+        # NEXUS-5 Bottom Sniper > 90% → HUNTING_READY → Volume Radar → Ley de Nico G>R
+        if getattr(config, "TOTAL_SWEEP_ENABLED", True):
+            self.state.cleanup_expired_hunting(
+                max_candles_15m=int(getattr(config, "TOTAL_SWEEP_HUNTING_DURATION_CANDLES", 6))
+            )
+            hunting = self.state.get_hunting_ready()
+            existing_syms_ts = {c.get("symbol") for c in candidates}
+            ts_injected = 0
+            ts_hunting_new = 0
+            ts_min_conf = float(getattr(config, "TOTAL_SWEEP_MIN_NEXUS5_CONFIDENCE", 90.0))
+            ts_slope_threshold = float(getattr(config, "TOTAL_SWEEP_VOLUME_SLOPE_THRESHOLD", -5.0))
+
+            for symbol, n5_data in nexus5_cache.items():
+                if not n5_data:
+                    continue
+                features = n5_data.get("features", {})
+                is_bs = features.get("is_bottom_sniper", False) if isinstance(features, dict) else False
+                n5_conf = float(n5_data.get("ai_confidence", 0))
+
+                # Phase 1: NEW — Activate HUNTING_READY if NEXUS-5 > threshold
+                if is_bs and n5_conf >= ts_min_conf and symbol not in hunting:
+                    if self._should_skip(symbol):
+                        continue
+                    vol_slope = self._calculate_volume_slope_15m(symbol)
+                    sweep_likely = vol_slope < ts_slope_threshold
+                    self.state.set_hunting_ready(symbol, {
+                        "activated_at": datetime.now(timezone.utc).timestamp(),
+                        "n5_confidence": n5_conf,
+                        "volume_slope": round(vol_slope, 4),
+                        "sweep_likely": sweep_likely,
+                        "radar_mode": "SWEEP_LIKELY" if sweep_likely else "DIRECT_BOOM",
+                    })
+                    hunting[symbol] = {"activated_at": datetime.now(timezone.utc).timestamp(),
+                                       "n5_confidence": n5_conf, "volume_slope": round(vol_slope, 4),
+                                       "sweep_likely": sweep_likely}
+                    ts_hunting_new += 1
+                    logger.warning(
+                        f"[TOTAL-SWEEP] 🎯 HUNTING_READY activated: {symbol} | "
+                        f"N5={n5_conf:.1f}% | VolSlope={vol_slope:.2f} | "
+                        f"Radar={'SWEEP_LIKELY' if sweep_likely else 'DIRECT_BOOM'}"
+                    )
+
+                # Phase 2: CHECK TRIGGER for symbols already in HUNTING_READY
+                if symbol in hunting and symbol not in existing_syms_ts:
+                    triggered, red_low, details = self._check_green_beats_red_15m(symbol)
+                    if not triggered:
+                        logger.info(
+                            f"[TOTAL-SWEEP] {symbol}: Esperando gatillo G>R | "
+                            f"prev_red={details.get('prev_red')} curr_green={details.get('curr_green')} "
+                            f"prev_body={details.get('prev_body')} curr_body={details.get('curr_body')}"
+                        )
+                        continue
+
+                    # GATILLO DISPARADO — Build and inject candidate
+                    vol_slope = self._calculate_volume_slope_15m(symbol)
+                    gc = self._build_total_sweep_candidate(symbol, n5_data, vol_slope, red_low)
+                    gc_px = gc.get("price_at_signal") or self.fetcher.get_current_price(symbol)
+                    if not gc_px or gc_px <= 0:
+                        continue
+                    try:
+                        v_ok, v_code, _ = validate_pre_trade(
+                            gc, gc_px, btc_filter=self.btc_filter, btc_corr=self.btc_corr
+                        )
+                        if not v_ok:
+                            logger.info(f"[TOTAL-SWEEP] VETO {symbol}: {v_code}")
+                            continue
+                    except Exception as e:
+                        logger.warning(f"[TOTAL-SWEEP] Error validando {symbol}: {e}")
+                        continue
+
+                    candidates.append(gc)
+                    existing_syms_ts.add(symbol)
+                    self.state.remove_hunting_ready(symbol)
+                    ts_injected += 1
+                    logger.warning(
+                        f"[TOTAL-SWEEP] 🔥 TRIGGERED {symbol} | Score=99.5 | "
+                        f"VolSlope={vol_slope:.2f} | SL={red_low} | "
+                        f"Radar={'SWEEP_LIKELY' if vol_slope < ts_slope_threshold else 'DIRECT_BOOM'} — "
+                        f"[STRAT: TOTAL-SWEEP-v13.0]"
+                    )
+
+            still_hunting = len(self.state.get_hunting_ready())
+            if ts_hunting_new or ts_injected or still_hunting:
+                logger.info(
+                    f"[TOTAL-SWEEP] {ts_hunting_new} nuevos HUNTING + {ts_injected} TRIGGERED | "
+                    f"{still_hunting} aún esperando G>R"
+                )
+
         # Inject Nexus-15 TOP candidates (NUNCA pisan Golden U-Turn)
         for nc in nexus_top_candidates:
             existing_syms = {c["symbol"] for c in candidates}
@@ -1394,10 +1483,10 @@ class VergeAgent:
             logger.info("[KILL] LSE Kill switch active. Filtering LSE candidates.")
             candidates = [c for c in candidates if c.get("source") != "LSE"]
 
-        # Golden U-Turn siempre al frente de la cola (Score=99 > Nexus-15)
+        # Golden U-Turn + TOTAL-SWEEP siempre al frente de la cola (Score=99/99.5 > Nexus-15)
         candidates.sort(
             key=lambda x: (
-                0 if self._is_golden_uturn_candidate(x) else 1,
+                0 if self._is_total_sweep_candidate(x) else (1 if self._is_golden_uturn_candidate(x) else 2),
                 -float(x.get("confluence_score", 0)),
             )
         )
@@ -1584,15 +1673,15 @@ class VergeAgent:
                 logger.info(f"No candidates pass profile {p_name}")
                 continue
 
-            # v9.5 Dual Sniper: motor Golden primero, Nexus-15 estándar después
-            p_golden = [c for c in p_candidates if self._is_golden_uturn_candidate(c)]
-            p_standard = [c for c in p_candidates if not self._is_golden_uturn_candidate(c)]
-            p_golden.sort(key=lambda x: x["confluence_score"], reverse=True)
+            # v9.5 Dual Sniper + v13.0 TOTAL-SWEEP: VIP motors first, Nexus-15 estándar después
+            p_vip = [c for c in p_candidates if self._is_golden_uturn_candidate(c) or self._is_total_sweep_candidate(c)]
+            p_standard = [c for c in p_candidates if not self._is_golden_uturn_candidate(c) and not self._is_total_sweep_candidate(c)]
+            p_vip.sort(key=lambda x: x["confluence_score"], reverse=True)
             p_standard.sort(key=lambda x: x["confluence_score"], reverse=True)
-            p_candidates = p_golden + p_standard
-            if p_golden:
+            p_candidates = p_vip + p_standard
+            if p_vip:
                 logger.info(
-                    f"[DUAL-SNIPER] {p_name}: {len(p_golden)} Golden VIP + {len(p_standard)} Nexus estándar"
+                    f"[DUAL-SNIPER] {p_name}: {len(p_vip)} VIP (Golden+TOTAL-SWEEP) + {len(p_standard)} Nexus estándar"
                 )
             
             # Check slot availability for this profile
@@ -1612,13 +1701,13 @@ class VergeAgent:
                 ])
             
             if p_active_count >= p_max_pos:
-                golden_waiting = [c for c in p_candidates if self._is_golden_uturn_candidate(c)]
-                if not golden_waiting:
+                vip_waiting = [c for c in p_candidates if self._is_golden_uturn_candidate(c) or self._is_total_sweep_candidate(c)]
+                if not vip_waiting:
                     logger.info(f"[LIMIT] Profile {p_name} is full ({p_active_count}/{p_max_pos}). Skipping new trades.")
                     continue
                 logger.info(
-                    f"[GOLDEN-VIP] Profile {p_name} lleno pero hay {len(golden_waiting)} "
-                    f"Golden U-Turn — intentando upgrade/reemplazo"
+                    f"[VIP-PRIORITY] Profile {p_name} lleno pero hay {len(vip_waiting)} "
+                    f"VIP (Golden+TOTAL-SWEEP) — intentando upgrade/reemplazo"
                 )
 
             # v12.1: Sort rejected candidates by score desc, take top 10 for audit
@@ -2502,6 +2591,108 @@ class VergeAgent:
             cand["custom_sl_price"] = float(sl_5low)
         return cand
 
+    # ── TOTAL-SWEEP v13.0: Helper Methods ────────────────────────────────────────────
+
+    def _calculate_volume_slope_15m(self, symbol: str) -> float:
+        """
+        [TOTAL-SWEEP v13.0] Radar de Intenciones del MM.
+        Linear regression slope on last N 15m candles' volume.
+        Returns raw slope (negative = volume dying = SWEEP_LIKELY).
+        """
+        lookback = int(getattr(config, "TOTAL_SWEEP_VOLUME_LOOKBACK", 15))
+        try:
+            klines = self.fetcher.get_klines_for_nexus(symbol, interval="15m", limit=lookback + 5)
+            if not klines or len(klines) < lookback:
+                return 0.0
+            volumes = [float(k.get("volume", 0)) for k in klines[-lookback:]]
+            n = len(volumes)
+            sum_x = sum(range(n))
+            sum_y = sum(volumes)
+            sum_xy = sum(i * v for i, v in enumerate(volumes))
+            sum_x2 = sum(i * i for i in range(n))
+            denom = n * sum_x2 - sum_x * sum_x
+            if denom == 0:
+                return 0.0
+            slope = (n * sum_xy - sum_x * sum_y) / denom
+            return slope
+        except Exception as e:
+            logger.debug(f"[TOTAL-SWEEP] Volume slope error for {symbol}: {e}")
+            return 0.0
+
+    def _check_green_beats_red_15m(self, symbol: str) -> tuple:
+        """
+        [TOTAL-SWEEP v13.0] Ley de Nico — Universal Trigger on 15m.
+        Previous candle (n-1) = RED, Current candle (n) = GREEN, Green body > Red body.
+        Returns (triggered: bool, red_candle_low: float, details: dict)
+        """
+        try:
+            klines = self.fetcher.get_klines_for_nexus(symbol, interval="15m", limit=5)
+            if not klines or len(klines) < 2:
+                return False, 0.0, {}
+            prev = klines[-2]
+            curr = klines[-1]
+            prev_open, prev_close = float(prev["open"]), float(prev["close"])
+            curr_open, curr_close = float(curr["open"]), float(curr["close"])
+            prev_body = prev_open - prev_close
+            curr_body = curr_close - curr_open
+            is_prev_red = prev_body > 0
+            is_curr_green = curr_body > 0
+            triggered = is_prev_red and is_curr_green and curr_body > prev_body
+            red_low = float(prev.get("low", 0))
+            return triggered, red_low, {
+                "prev_body": round(prev_body, 8),
+                "curr_body": round(curr_body, 8),
+                "prev_red": is_prev_red,
+                "curr_green": is_curr_green,
+            }
+        except Exception as e:
+            logger.debug(f"[TOTAL-SWEEP] Green>Red check error for {symbol}: {e}")
+            return False, 0.0, {}
+
+    def _build_total_sweep_candidate(self, symbol: str, n5_data: dict, volume_slope: float, red_candle_low: float) -> dict:
+        """
+        [TOTAL-SWEEP v13.0] Build bypass candidate with Score=99.5.
+        SL = low of previous red candle, TP = entry + 12%.
+        """
+        price = self.fetcher.get_current_price(symbol)
+        ts_score = float(getattr(config, "TOTAL_SWEEP_SCORE", 99.5))
+        tp_min_pct = float(getattr(config, "TOTAL_SWEEP_TP_MIN_DISTANCE_PCT", 12.0))
+        tp_price = price * (1 + tp_min_pct / 100) if price and price > 0 else 0
+        sweep_likely = volume_slope < float(getattr(config, "TOTAL_SWEEP_VOLUME_SLOPE_THRESHOLD", -5.0))
+        cand = {
+            "symbol": symbol,
+            "confluence_score": ts_score,
+            "nexus_confidence": n5_data.get("ai_confidence", 0),
+            "trade_direction": "LONG",
+            "side": 0,
+            "source": "total_sweep",
+            "total_sweep_mode": True,
+            "price_at_signal": price,
+            "estimated_range_pct": tp_min_pct,
+            "reasons": ["[TOTAL-SWEEP-v13.0] Bottom Sniper + Volume Radar + Ley de Nico G>R"],
+            "custom_sl_price": red_candle_low if red_candle_low > 0 and (not price or red_candle_low < price) else None,
+            "custom_tp_price": tp_price if tp_price > 0 else None,
+            "agent_audit_context": {
+                "nexus5": self._json_safe_for_audit(n5_data),
+                "total_sweep": {
+                    "detected": True,
+                    "volume_slope": round(volume_slope, 4),
+                    "sweep_likely": sweep_likely,
+                    "radar_mode": "SWEEP_LIKELY" if sweep_likely else "DIRECT_BOOM",
+                    "red_candle_low": red_candle_low,
+                    "tp_min_pct": tp_min_pct,
+                    "n5_confidence": n5_data.get("ai_confidence", 0),
+                },
+                "scar": {},
+                "nexus15": {},
+            },
+        }
+        return cand
+
+    def _is_total_sweep_candidate(self, candidate: dict) -> bool:
+        """True si el candidato entró por TOTAL-SWEEP v13.0."""
+        return candidate.get("total_sweep_mode", False) or candidate.get("source") == "total_sweep"
+
     def _get_ma99_15m(self, symbol: str) -> Optional[float]:
         try:
             klines = self.fetcher.get_klines_for_nexus(symbol, interval="15m", limit=120)
@@ -2800,6 +2991,7 @@ class VergeAgent:
     def _execute_trade(self, candidate: dict, profile: dict = None, is_triggered_sniper: bool = False, cycle_rejected: list = None) -> bool:
         symbol = candidate["symbol"]
         is_golden = self._is_golden_uturn_candidate(candidate)
+        is_total_sweep = self._is_total_sweep_candidate(candidate)
         if is_golden:
             gu_score = float(getattr(config, "GOLDEN_UTURN_SCORE", 99.0))
             candidate["golden_uturn_mode"] = True
@@ -2812,8 +3004,8 @@ class VergeAgent:
         confluence = candidate.get("confluence_score", 0)
 
         # Sniper mode check for scores > 90%
-        # BYPASS: Golden U-Turn — estos entran directo, no van a sniper queue.
-        if confluence > 90.0 and not is_triggered_sniper and not is_golden:
+        # BYPASS: Golden U-Turn + TOTAL-SWEEP — estos entran directo, no van a sniper queue.
+        if confluence > 90.0 and not is_triggered_sniper and not is_golden and not is_total_sweep:
             ma99 = self._get_ma99_15m(symbol)
             if ma99:
                 trigger_price = ma99 * 1.005
@@ -2831,8 +3023,8 @@ class VergeAgent:
             else:
                 logger.warning(f"[SNIPER] Could not set trap for {symbol}: failed to calculate MA99.")
 
-        # v11.12: BILLETERA REAL — Binance wallet balance para decisiones de margen
-        balance = self.positions.get_binance_wallet_balance() or self.positions.get_virtual_balance() or config.VIRTUAL_CAPITAL_BASE
+        # v12.0-BERSERKER: Balance NO se consulta. Bala fija $150.
+        balance = 999_999.0
         setup_metrics: dict = {}
 
         market_px = self.fetcher.get_current_price(symbol)
@@ -2949,6 +3141,37 @@ class VergeAgent:
                 f"Drop={gu_drop}% | Angle={gu_angle}° | SL={gu_sl}"
             )
 
+        # ── TOTAL-SWEEP v13.0: Tag strategy + Custom SL/TP ────────────────────
+        if candidate.get("total_sweep_mode"):
+            ts_ctx = candidate.get("agent_audit_context", {}).get("total_sweep", {})
+            ts_vol_slope = ts_ctx.get("volume_slope", 0)
+            ts_radar = ts_ctx.get("radar_mode", "?")
+            ts_red_low = ts_ctx.get("red_candle_low", 0)
+            ts_n5_conf = ts_ctx.get("n5_confidence", 0)
+            tp_min_pct = float(getattr(config, "TOTAL_SWEEP_TP_MIN_DISTANCE_PCT", 12.0))
+
+            # Override entry_reason with TOTAL-SWEEP tag
+            entry_reason = (
+                f"[STRAT: TOTAL-SWEEP-v13.0] Bottom Sniper N5={ts_n5_conf:.1f}% + "
+                f"Radar={ts_radar} (VolSlope={ts_vol_slope:.2f}) + "
+                f"Ley de Nico G>R. SL=RedLow({ts_red_low}). TP>={tp_min_pct}%."
+            )
+
+            # Ensure custom SL = red candle low
+            if ts_red_low and ts_red_low > 0 and not candidate.get("custom_sl_price"):
+                candidate["custom_sl_price"] = float(ts_red_low)
+
+            # Ensure custom TP = entry + min 12%
+            if market_px and market_px > 0:
+                tp_price = market_px * (1 + tp_min_pct / 100)
+                if not candidate.get("custom_tp_price"):
+                    candidate["custom_tp_price"] = tp_price
+
+            logger.warning(
+                f"[TOTAL-SWEEP-v13.0] {symbol} — STRATEGY TAG APPLIED | "
+                f"N5={ts_n5_conf:.1f}% | Radar={ts_radar} | SL={ts_red_low} | TP>={tp_min_pct}%"
+            )
+
         audit_json = self._build_agent_decision_snapshot(
             candidate,
             pos_details,
@@ -3009,9 +3232,10 @@ class VergeAgent:
             else:
                 # Nexus / SCAR / Bridge — Golden U-Turn VIP bypass upgrade gate
                 min_upgrade_nexus = float(getattr(config, "MIN_UPGRADE_NEXUS", 80.0))
-                if is_golden:
+                if is_golden or is_total_sweep:
                     can_upgrade = True
-                    gate_desc = f"Golden U-Turn VIP (Score={confluence:.0f})"
+                    strat_label = "TOTAL-SWEEP VIP" if is_total_sweep else "Golden U-Turn VIP"
+                    gate_desc = f"{strat_label} (Score={confluence:.0f})"
                 else:
                     can_upgrade = nexus_conf_pct >= min_upgrade_nexus
                     gate_desc = f"Nexus={nexus_conf_pct:.1f}% vs umbral={min_upgrade_nexus}%"
@@ -3052,6 +3276,12 @@ class VergeAgent:
                 f"[GOLDEN-VIP] {symbol}: bypass MIN_ENTRY_NEXUS — "
                 f"Nexus={nexus_conf_pct:.1f}% ignorado (pase estructural Score=99)"
             )
+        elif is_total_sweep:
+            # TOTAL-SWEEP v13.0: bypass MIN_ENTRY_NEXUS — NEXUS-5 Bottom Sniper replaces Nexus-15
+            logger.info(
+                f"[TOTAL-SWEEP-VIP] {symbol}: bypass MIN_ENTRY_NEXUS — "
+                f"Nexus-5 Bottom Sniper structural (Score=99.5)"
+            )
         else:
             min_entry_nexus = float(getattr(config, "MIN_ENTRY_NEXUS", 70.0))
             if nexus_conf_pct < min_entry_nexus:
@@ -3083,9 +3313,10 @@ class VergeAgent:
             )
             
             if btc_regime == "DUMPING":
-                if is_golden:
+                if is_golden or is_total_sweep:
+                    strat_tag = "TOTAL-SWEEP" if is_total_sweep else "GOLDEN"
                     logger.info(
-                        f"[GOLDEN-VIP] {symbol}: bypass BTC-BLOCK en DUMPING — "
+                        f"[{strat_tag}-VIP] {symbol}: bypass BTC-BLOCK en DUMPING — "
                         f"entrada estructural en suelo (Score={nexus_confidence:.0f})"
                     )
                 elif btc_decouple:
@@ -3106,6 +3337,19 @@ class VergeAgent:
         elif side == 1:  # SHORT
             # SHORTs: no bloquear, el dump de BTC los favorece. Solo loggear contexto.
             logger.info(f"[BTC-INFO] {symbol} SHORT con régimen BTC={btc_regime}")
+
+        # ── NEXUS-5 AUTO-EXECUTION GATE ────────────────────────────────────────────
+        # If NEXUS5_ONLY_AUTO_EXECUTE is True: only trades from NEXUS-5 (total_sweep) execute automatically.
+        # All other sources are logged as PENDING_CONFIRMATION and skipped.
+        if getattr(config, "NEXUS5_ONLY_AUTO_EXECUTE", False) and not is_total_sweep:
+            source_label = candidate.get("source", "unknown")
+            logger.warning(
+                f"[PENDING-CONFIRM] 🛑 {symbol} NO es NEXUS-5 (source={source_label}). "
+                f"Trade registrado pero NO ejecutado. Confirmar manualmente."
+                f" | Score={confluence:.1f} | Nexus={nexus_conf_pct:.1f}% | "
+                f"Margin={pos_details.get('margin')} | Entry={market_px}"
+            )
+            return False
 
         logger.info(f"Opening {candidate['trade_direction']} on {symbol}. Margin: {pos_details['margin']}")
         trade_result = self.positions.open_trade(pos_details)
@@ -3201,8 +3445,8 @@ class VergeAgent:
             logger.info(f"[CLONE] Profile Scalping Clone is full ({len(clone_active)}/{clone_max}). Skipping clone for {symbol}.")
             return False
 
-        # v11.12: BILLETERA REAL — Binance wallet balance para clone
-        balance = self.positions.get_binance_wallet_balance() or self.positions.get_virtual_balance() or config.VIRTUAL_CAPITAL_BASE
+        # v12.0-BERSERKER: Balance NO se consulta para clone. Bala fija $150.
+        balance = 999_999.0
         clone_pos = self.risk.calculate_position(symbol, candidate, available_balance=balance, profile=self.clone_profile)
         if not clone_pos:
             logger.warning(f"[CLONE] Failed to calculate clone position for {symbol}. Skipping clone.")
@@ -3322,14 +3566,17 @@ class VergeAgent:
             # ── v9.8 Diamond Hands Mode: Detect Golden U-Turn trades ─────────────────
             entry_reason = pos.get("entry_reason", "")
             is_golden_uturn = "[STRAT: GOLDEN-U-TURN]" in entry_reason or pos.get("golden_uturn_mode", False)
+            # ── v13.0 Diamond Hands: TOTAL-SWEEP trades get same treatment ──
+            is_total_sweep_pos = "[STRAT: TOTAL-SWEEP-v13.0]" in entry_reason or pos.get("total_sweep_mode", False)
+            is_diamond = is_golden_uturn or is_total_sweep_pos
 
             ft_exit = self._lse_follow_through_exit_reason(pos)
             if ft_exit:
                 should_close, close_reason = True, ft_exit
             elif side == 0:  # LONG
                 # ── BTC MACRO EXIT TRIGGER (Capa D) ──
-                # v9.8 Diamond Hands: Desactivado para Golden U-Turn
-                if not is_golden_uturn:
+                # v9.8 Diamond Hands: Desactivado para Golden U-Turn / TOTAL-SWEEP
+                if not is_diamond:
                     dump_5m = self.btc_filter.get_dump_pct(5)
                     dump_15m = self.btc_filter.get_dump_pct(15)
                     
@@ -3349,9 +3596,9 @@ class VergeAgent:
                         should_close, close_reason = True, "Stop Loss reached"
 
                 # ── REGLA DE LA COSECHA INTELIGENTE (Trailing Stop Proporcional) ──
-                # v9.8 Diamond Hands: Desactivado para Golden U-Turn, reemplazado por Trailing Profit Inteligente
+                # v9.8 Diamond Hands: Desactivado para Golden U-Turn / TOTAL-SWEEP, reemplazado por Trailing Profit Inteligente
                 if not should_close and entry_price > 0 and tp > entry_price:
-                    if is_golden_uturn:
+                    if is_diamond:
                         # ── v9.8 Trailing Profit Inteligente para Golden U-Turn ──
                         # Se activa cuando el trade alcanza +10% de profit
                         # Trailing stop solo se ejecuta si el precio cae 5% desde el máximo
@@ -3394,9 +3641,9 @@ class VergeAgent:
                     should_close, close_reason = True, "Stop Loss reached"
 
                 # ── REGLA DE LA COSECHA INTELIGENTE (SHORT) ──
-                # v9.8 Diamond Hands: Desactivado para Golden U-Turn
+                # v9.8 Diamond Hands: Desactivado para Golden U-Turn / TOTAL-SWEEP
                 if not should_close and entry_price > 0 and tp < entry_price:
-                    if is_golden_uturn:
+                    if is_diamond:
                         # ── v9.8 Trailing Profit Inteligente para Golden U-Turn SHORT ──
                         max_profit_price = pos.get("max_profit_price") or current_price
                         max_profit_pct = (entry_price - max_profit_price) / entry_price
@@ -3437,7 +3684,7 @@ class VergeAgent:
 
             # ── Zombie timeout: más de MAX_TRADE_DURATION_CANDLES velas de 15m con PnL negativo ──
             # v9.8 Diamond Hands: Desactivado para Golden U-Turn (pueden durar días)
-            if not should_close and not is_golden_uturn:
+            if not should_close and not is_diamond:
                 # Buscar profile correspondiente
                 p_id = pos.get("strategy_profile_id")
                 profile = next((p for p in self.active_profiles if p.get("id") == p_id), None)
@@ -3473,7 +3720,7 @@ class VergeAgent:
 
             # ── Max duration exceeded ──
             # v9.8 Diamond Hands: Desactivado para Golden U-Turn
-            if hours_open >= config.MAX_POSITION_DURATION_HOURS and not is_golden_uturn:
+            if hours_open >= config.MAX_POSITION_DURATION_HOURS and not is_diamond:
                 should_close, close_reason = True, "Max duration exceeded"
 
             if not should_close:

@@ -233,3 +233,53 @@ class StateManager:
         filtered = [s for s in snipers if s.get("symbol") != symbol]
         if len(filtered) != len(snipers):
             self._save_json(self.snipers_file, filtered)
+
+    # --- TOTAL-SWEEP v13.0 HUNTING_READY State ---
+
+    def _hunting_file(self):
+        return os.path.join(config.DATA_DIR, "hunting_ready.json")
+
+    def get_hunting_ready(self) -> dict:
+        """Returns dict of symbol → {activated_at, n5_confidence, volume_slope, sweep_likely}"""
+        try:
+            with open(self._hunting_file(), 'r') as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    def set_hunting_ready(self, symbol: str, data: dict):
+        """Add/update a symbol in HUNTING_READY state."""
+        hunting = self.get_hunting_ready()
+        hunting[symbol] = data
+        try:
+            with open(self._hunting_file(), 'w') as f:
+                json.dump(hunting, f, indent=2)
+        except Exception as e:
+            logger.error(f"Error saving hunting_ready state: {e}")
+
+    def remove_hunting_ready(self, symbol: str):
+        """Remove a symbol from HUNTING_READY (after entry or expiration)."""
+        hunting = self.get_hunting_ready()
+        if symbol in hunting:
+            del hunting[symbol]
+            try:
+                with open(self._hunting_file(), 'w') as f:
+                    json.dump(hunting, f, indent=2)
+            except Exception as e:
+                logger.error(f"Error removing hunting_ready for {symbol}: {e}")
+
+    def cleanup_expired_hunting(self, max_candles_15m: int = 6):
+        """Remove entries older than max_candles_15m * 15 minutes."""
+        hunting = self.get_hunting_ready()
+        now = time.time()
+        max_age_seconds = max_candles_15m * 15 * 60  # 6 * 15min = 90 min
+        expired = [s for s, d in hunting.items() if now - d.get("activated_at", 0) > max_age_seconds]
+        for s in expired:
+            del hunting[s]
+            logger.info(f"[HUNTING] Expired {s} (>{max_candles_15m} velas 15m)")
+        if expired:
+            try:
+                with open(self._hunting_file(), 'w') as f:
+                    json.dump(hunting, f, indent=2)
+            except Exception as e:
+                logger.error(f"Error cleaning up hunting_ready: {e}")

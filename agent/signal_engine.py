@@ -70,11 +70,15 @@ class SignalEngine:
     def get_nexus5_prediction(self, symbol: str, limit: int = 500) -> Optional[Dict[str, Any]]:
         """
         Fetches the NEXUS-5 prediction for a symbol (5m candles, Phase 1/2 detection).
+        Also sends native 15m candles for structural MA50/MA99 (Bottom Sniper v10.0).
         Returns None silently on ANY error — never crashes the agent cycle.
         """
         klines = self.fetcher.get_klines_for_nexus(symbol, interval="5m", limit=limit)
         if not klines or len(klines) < 30:
             return None
+
+        # Fetch native 15m candles for structural MA50/MA99
+        klines_15m = self.fetcher.get_klines_for_nexus(symbol, interval="15m", limit=200)
 
         url = f"{self.base_url}/nexus5/analyze"
         payload = {
@@ -82,6 +86,10 @@ class SignalEngine:
             "timeframe": "5m",
             "candles": klines
         }
+
+        # Add native 15m candles if available (Bottom Sniper v10.0)
+        if klines_15m and len(klines_15m) >= 30:
+            payload["candles_15m"] = klines_15m
 
         try:
             response = requests.post(url, json=payload, timeout=10)

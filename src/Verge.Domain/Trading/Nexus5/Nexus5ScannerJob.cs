@@ -85,15 +85,23 @@ public class Nexus5ScannerJob : BackgroundService
             await sem.WaitAsync(ct);
             try
             {
-                // NEXUS-5 uses 5m candles (interval="5"), needs at least 450 for MA99 (15m resampled + 40 slope lookback)
+                // NEXUS-5 uses 5m candles for features (G1-G6), needs at least 30
                 var candles = await marketData.GetCandlesAsync(symbol, "5", 500);
-                if (candles == null || candles.Count < 450)
+                if (candles == null || candles.Count < 30)
                 {
                     _logger.LogDebug("⏭️ [Nexus5] Skipping {Symbol}: insufficient 5m candles ({Count})", symbol, candles?.Count ?? 0);
                     return;
                 }
 
-                var result = await pythonSvc.AnalyzeNexus5Async(symbol, candles);
+                // Fetch NATIVE 15m candles for structural Bottom Sniper v11.0
+                var candles15m = await marketData.GetCandlesAsync(symbol, "15", 200);
+                if (candles15m == null || candles15m.Count < 100)
+                {
+                    _logger.LogDebug("⚠️ [Nexus5] {Symbol}: insufficient 15m candles ({Count}). Structural analysis will use sentinel.", symbol, candles15m?.Count ?? 0);
+                    candles15m = null;
+                }
+
+                var result = await pythonSvc.AnalyzeNexus5Async(symbol, candles, candles15m);
                 if (result == null) return;
 
                 // Skip IDLE phase — only publish active signals

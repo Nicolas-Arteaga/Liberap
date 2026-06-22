@@ -15,9 +15,10 @@ EPSILON = 1e-9
 class Nexus5FeatureEngine:
     """Calcula los 18 features de los 6 grupos de NEXUS-5 Ignition Core."""
 
-    def compute(self, df: pd.DataFrame) -> Dict[str, Any]:
+    def compute(self, df: pd.DataFrame, df_15m: pd.DataFrame = None) -> Dict[str, Any]:
         """
-        df debe tener columnas: open, high, low, close, volume
+        df debe tener columnas: open, high, low, close, volume (5m candles)
+        df_15m: optional DataFrame with native 15m candles for structural MA50/MA99.
         Retorna dict con los 18 features + cyclicity features + structural features.
         """
         features: Dict[str, Any] = {}
@@ -28,7 +29,7 @@ class Nexus5FeatureEngine:
         features.update(self._group5_volume(df))
         features.update(self._group6_ml_features(df))
         features.update(self._calculate_pump_cyclicity(df))
-        features.update(self._calculate_structural_analysis(df))
+        features.update(self._calculate_structural_analysis(df, df_15m))
         return features
 
     # ══════════════════════════════════════════════════════════════════════════
@@ -537,42 +538,45 @@ class Nexus5FeatureEngine:
             }
 
     # ══════════════════════════════════════════════════════════════════════════
-    # ESTRUCTURAL ANALYSIS — Reglas de Oro (v7.0)
-    # Basado en temporalidad de 15m para MA50/MA99 (resample interno de 5m a 15m)
+    # ESTRUCTURAL ANALYSIS — Reglas de Oro (v7.0 → v10.0 Native 15m)
+    # MA50/MA99 calculadas directamente de velas NATIVAS de 15m (sin resample)
     # ══════════════════════════════════════════════════════════════════════════
-    def _calculate_structural_analysis(self, df: pd.DataFrame) -> dict:
+    def _calculate_structural_analysis(self, df: pd.DataFrame, df_15m: pd.DataFrame = None) -> dict:
         """
-        Calcula características estructurales basadas en MA50 y MA99 (15m).
+        Calcula características estructurales basadas en MA50 y MA99 de 15m NATIVAS.
         
-        El dataframe de entrada es de 5m, pero resampleamos a 15m para calcular MA50/MA99.
+        Bottom Sniper v11.0 — Tres prerrequisitos OBLIGATORIOS:
+        1. SUPER CAÍDA: crash >= 12% visible en velas 15m recientes
+        2. MA99 descendiendo en diagonal: slope < -1% (no solo "no subiendo")
+        3. Precio lateralizando: rango reciente < 4% en 15m
+        
+        Si las 3 condiciones no se cumplen → is_bottom_sniper = False.
         """
         n = len(df)
         
-        # REQUERIMIENTO: Al menos 30 velas 5m para empezar el análisis estructural.
-        # Las ventanas de MA son adaptativas: min(50, n_15m) y min(99, n_15m).
-        if n < 30:
+        # Sin velas 15m nativas → sentinel (no vetar, no decidir)
+        if df_15m is None or len(df_15m) < 30:
+            n_15m = len(df_15m) if df_15m is not None else 0
+            print(f"[Structural] SKIP: solo {n_15m} velas 15m (mínimo 30)")
             return {
                 "slope_ma50": 0.0,
                 "ma99_long_slope": 0.0,
                 "is_bottom_sniper": False,
                 "ma50_ma99_dist": 1.0,
-                "price_to_ma99_pct": -999.0,  # Sentinel: sin datos suficientes, no aplicar veto
+                "price_to_ma99_pct": -999.0,  # Sentinel: sin datos, no aplicar veto
                 "vol_ratio": 1.0,
                 "gravity_ma99_safe": True,
                 "compression_viper": False,
                 "ma50_horizontal": False,
+                "super_crash_pct": 0.0,
+                "crash_detected": False,
             }
         
         try:
-            # Resample a 15m
-            df_15m = df.copy()
-            df_15m['timestamp'] = pd.to_datetime(df_15m['timestamp'])
-            df_15m = df_15m.set_index('timestamp').resample('15min').agg({'close': 'last'}).dropna()
-
             n_15m = len(df_15m)
-            print(f"[Structural] Velas 15m disponibles: {n_15m}")
+            print(f"[Structural] Usando {n_15m} velas 15m NATIVAS (sin resample)")
 
-            # MEDIAS REALES: usamos lo que hay
+            # MEDIAS REALES: calculadas directamente de velas nativas de 15m
             ma50_window = min(50, n_15m)
             ma99_window = min(99, n_15m)
 
@@ -592,53 +596,81 @@ class Nexus5FeatureEngine:
                     "gravity_ma99_safe": True,
                     "compression_viper": False,
                     "ma50_horizontal": False,
+                    "super_crash_pct": 0.0,
+                    "crash_detected": False,
                 }
 
-            # 1. MA99 tendencia: no debe estar subiendo fuerte (pendiente <= 0.5%)
-            # Setup: precio debajo de MA99 que ya cayó y empieza a lateralizarse
+            # ── 1. PENDIENTE MA99 (largo plazo, 40 velas) ──────────────────────
             lookback_slope = min(40, n_15m - 1)
             ma99_valid = ma99.dropna()
             if len(ma99_valid) >= 2:
                 ma99_long_slope = (ma99_valid.iloc[-1] - ma99_valid.iloc[max(0, -lookback_slope)]) / (ma99_valid.iloc[max(0, -lookback_slope)] + EPSILON)
             else:
                 ma99_long_slope = 0.0
-            
-            # MA99 no debe estar subiendo fuerte (descartamos pumps que ya pasaron la MA99)
-            # Si la MA99 sube >2% en los últimos 40 periodos de 15m (~10h), ya es pump activo.
-            # Umbral relajado de 0.5% a 2% para no perder setups de acumulación gentle.
-            ma99_not_pumping = ma99_long_slope <= 0.02
 
-            # 2. Detectar HORIZONTALIDAD ACTUAL (MA50 plana o cayendo)
+            # ── 2. MA50 horizontalidad ──────────────────────────────────────────
             ma50_valid = ma50.dropna()
             slope_lookback = min(10, len(ma50_valid) - 1)
             if slope_lookback > 0:
                 slope_ma50 = (ma50_valid.iloc[-1] - ma50_valid.iloc[-slope_lookback]) / (ma50_valid.iloc[-slope_lookback] + EPSILON)
             else:
                 slope_ma50 = 0.0
-            # RELAJADO: MA50 plana o bajando (pendiente < 1%)
             ma50_horizontal = abs(slope_ma50) < 0.01
 
-            # 3. Detectar PRECIO POR DEBAJO DE MA99 (el setup principal)
+            # ── 3. PRECIO vs MA99 ──────────────────────────────────────────────
             current_price = df['close'].iloc[-1]
             ma99_current = ma99.iloc[-1]
             price_below_ma99 = current_price < ma99_current
             price_to_ma99_pct = (current_price - ma99_current) / (ma99_current + EPSILON)
 
-            # ── 4. Calcular distancia entre MA50 y MA99 (compresión) ───────────────
+            # ── 4. Distancia MA50-MA99 ──────────────────────────────────────────
             ma50_current = ma50.iloc[-1]
             ma50_ma99_dist = abs(ma50_current - ma99_current) / (ma99_current + EPSILON)
             
-            # ── 5. Calcular vol_ratio ─────────────────────────────────────────────
+            # ── 5. Vol ratio ────────────────────────────────────────────────────
             vol_ma_10 = df['volume'].iloc[-10:].mean()
             vol_current = df['volume'].iloc[-1]
             vol_ratio = vol_current / (vol_ma_10 + EPSILON)
 
-            # BOTTOM SNIPER: precio debajo de MA99 + MA99 no está subiendo fuerte
-            # Condición principal: precio < MA99 (ya cayó, acumulando debajo)
-            # Condición secundaria: MA99 no pumpeando (no estamos persiguiendo un pump)
-            is_bs = bool(price_below_ma99 and ma99_not_pumping)
-            print(f"[Structural] ma99_slope={ma99_long_slope:.4f} not_pumping={ma99_not_pumping} | ma50_slope={slope_ma50:.4f} horiz={ma50_horizontal} | price_to_ma99={price_to_ma99_pct:.4f} below={price_below_ma99} | is_bottom_sniper={is_bs}")
+            # ════════════════════════════════════════════════════════════════════
+            # BOTTOM SNIPER v11.0 — TRES PRERREQUISITOS OBLIGATORIOS
+            # ════════════════════════════════════════════════════════════════════
 
+            # ── PRERREQUISITO #1: SUPER CAÍDA (crash >= 12%) ────────────────────
+            # Buscar el pico más alto en la primera mitad de las velas 15m,
+            # luego el valle más bajo después del pico.
+            search_end = max(int(n_15m * 0.75), 30)  # pico en las primeras 75% de velas
+            peak_idx = df_15m['close'].iloc[:search_end].idxmax()
+            peak_price = df_15m['close'].iloc[peak_idx]
+
+            # Valle: el mínimo después del pico
+            if peak_idx < n_15m - 5:
+                trough_idx = df_15m['close'].iloc[peak_idx:].idxmin()
+                trough_price = df_15m['close'].iloc[trough_idx]
+                crash_pct = (peak_price - trough_price) / (peak_price + EPSILON)
+            else:
+                crash_pct = 0.0
+                trough_price = df_15m['close'].iloc[-1]
+
+            super_crash = crash_pct >= 0.12  # crash >= 12%
+
+            # ── PRERREQUISITO #2: MA99 BAJANDO EN DIAGONAL ──────────────────────
+            # La MA99 debe estar activamente cayendo, no solo "no subiendo".
+            # slope < -1% en las últimas 40 velas = diagonal visible.
+            ma99_descending = ma99_long_slope < -0.01
+
+            # ── PRERREQUISITO #3: PRECIO LATERALIZANDO ──────────────────────────
+            # El rango de las últimas 20 velas 15m debe ser < 4% (lateralización clara).
+            lat_lookback = min(20, n_15m)
+            lat_window = df_15m.iloc[-lat_lookback:]
+            lat_range = (lat_window['high'].max() - lat_window['low'].min()) / (lat_window['close'].iloc[-1] + EPSILON)
+            price_lateralizing = lat_range < 0.04
+
+            # ── VEREDICTO FINAL: las 3 deben ser True ───────────────────────────
+            is_bs = bool(super_crash and ma99_descending and price_lateralizing)
+
+            print(f"[Structural] 15m NATIVO: crash={crash_pct:.4f}(>={0.12})={super_crash} | ma99_slope={ma99_long_slope:.4f}(<-0.01)={ma99_descending} | lat_range={lat_range:.4f}(<0.04)={price_lateralizing} | BELOW={price_below_ma99}")
+            print(f"[Structural] is_bottom_sniper={is_bs}")
 
             return {
                 "slope_ma50": round(float(slope_ma50), 6),
@@ -650,6 +682,8 @@ class Nexus5FeatureEngine:
                 "gravity_ma99_safe": True,
                 "compression_viper": False,
                 "ma50_horizontal": bool(ma50_horizontal),
+                "super_crash_pct": round(float(crash_pct), 6),
+                "crash_detected": bool(super_crash),
             }
             
         except Exception as e:
@@ -665,4 +699,6 @@ class Nexus5FeatureEngine:
                 "gravity_ma99_safe": True,
                 "compression_viper": False,
                 "ma50_horizontal": False,
+                "super_crash_pct": 0.0,
+                "crash_detected": False,
             }

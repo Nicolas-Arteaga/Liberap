@@ -48,7 +48,7 @@ public class Nexus5AppService : ApplicationService, INexus5AppService
         });
     }
 
-    /// <summary>On-demand analysis: fetch 5m candles → call Python → return result.</summary>
+    /// <summary>On-demand analysis: fetch 5m candles + 15m candles → call Python → return result.</summary>
     public async Task<Nexus5ResultDto?> AnalyzeOnDemandAsync(string symbol)
     {
         try
@@ -56,7 +56,7 @@ public class Nexus5AppService : ApplicationService, INexus5AppService
             var normalized = symbol.Contains(':') ? symbol.Split(':')[0] : symbol;
             var cleanSymbol = normalized.ToUpper().Replace("/", "").Replace("-", "").Trim();
 
-            // NEXUS-5 uses 5m candles (interval="5"), need at least 450 for MA99 (15m resampled + 40 slope lookback)
+            // NEXUS-5 uses 5m candles for G1-G6 features
             var candles = await _marketData.GetCandlesAsync(cleanSymbol, "5", 500);
             if (candles == null || candles.Count < 450)
             {
@@ -64,9 +64,19 @@ public class Nexus5AppService : ApplicationService, INexus5AppService
                 return null;
             }
 
-            _logger.LogInformation("⚡ [Nexus5] OnDemand: {Symbol} — {Count} 5m candles loaded", cleanSymbol, candles.Count);
+            // Fetch NATIVE 15m candles for structural MA50/MA99 (Bottom Sniper v10.0)
+            // Need at least 150 (99 for MA99 + 40 for slope lookback + buffer)
+            var candles15m = await _marketData.GetCandlesAsync(cleanSymbol, "15", 200);
+            if (candles15m == null || candles15m.Count < 100)
+            {
+                _logger.LogWarning("⚠️ [Nexus5] Insufficient 15m candles for {Symbol} (got {Count}). Structural MA99 will use sentinel.", cleanSymbol, candles15m?.Count ?? 0);
+                candles15m = null; // Pass null → Python returns sentinel values (no veto)
+            }
 
-            var result = await _pythonService.AnalyzeNexus5Async(cleanSymbol, candles);
+            _logger.LogInformation("⚡ [Nexus5] OnDemand: {Symbol} — {Count} 5m candles + {Count15m} 15m candles loaded", 
+                cleanSymbol, candles.Count, candles15m?.Count ?? 0);
+
+            var result = await _pythonService.AnalyzeNexus5Async(cleanSymbol, candles, candles15m);
             if (result == null) return null;
 
             var dto = MapToDto(result);

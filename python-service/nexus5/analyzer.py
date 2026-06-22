@@ -33,8 +33,16 @@ class Nexus5Analyzer:
         df['timestamp'] = pd.to_datetime(df['timestamp'])
         df = df.sort_values('timestamp').reset_index(drop=True)
 
+        # Build native 15m DataFrame if provided (for structural MA50/MA99)
+        df_15m = None
+        if req.candles_15m and len(req.candles_15m) >= 30:
+            df_15m = pd.DataFrame([c.model_dump() for c in req.candles_15m])
+            df_15m['timestamp'] = pd.to_datetime(df_15m['timestamp'])
+            df_15m = df_15m.sort_values('timestamp').reset_index(drop=True)
+            print(f"[NEXUS5] {req.symbol}: {len(df_15m)} velas 15m NATIVAS recibidas")
+
         # 1. Calcular features
-        feats = self.engine.compute(df)
+        feats = self.engine.compute(df, df_15m)
 
         # 2. Scores por grupo (0.0 a 1.0)
         g1 = self._score_g1(feats)
@@ -152,11 +160,11 @@ class Nexus5Analyzer:
                     g5_volume=round(g5 * 100, 2),
                     g6_ml=round(g6 * 100, 2),
                 ),
-                features=Nexus5Features(**{k: feats.get(k, 0.0 if k in ["slope_ma50", "ma99_long_slope", "vol_ratio", "ma50_ma99_dist", "price_to_ma99_pct", "minutes_to_next_pump", "confidence_boost"] else False if k in ["gravity_ma99_safe", "compression_viper", "ma50_horizontal", "is_bottom_sniper", "cycle_detected"] else "") for k in Nexus5Features.model_fields}),
+                features=Nexus5Features(**{k: feats.get(k, 0.0 if k in ["slope_ma50", "ma99_long_slope", "vol_ratio", "ma50_ma99_dist", "price_to_ma99_pct", "minutes_to_next_pump", "confidence_boost", "super_crash_pct"] else False if k in ["gravity_ma99_safe", "compression_viper", "ma50_horizontal", "is_bottom_sniper", "cycle_detected", "crash_detected"] else "") for k in Nexus5Features.model_fields}),
                 detectivity=self._build_detectivity(feats, g1, g2, g3, g4, g5, g6),
             )
 
-        # ── SCORING BOTTOM SNIPER (v9.0) ─────────────────────────────────────────
+        # ── SCORING BOTTOM SNIPER (v11.0) ─────────────────────────────────────────
         # Lógica de Score para el TOP-5
         if is_bottom_sniper:
             # ES EL SETUP DE FIDA. Ignoramos todo lo demás.
@@ -236,7 +244,7 @@ class Nexus5Analyzer:
                 g5_volume=round(g5 * 100, 2),
                 g6_ml=round(g6 * 100, 2),
             ),
-            features=Nexus5Features(**{k: feats.get(k, 0.0 if k in ["slope_ma50", "slope_ma99", "vol_ratio", "ma50_ma99_distance", "price_to_ma99_pct", "minutes_to_next_pump", "confidence_boost"] else False if k in ["gravity_ma99_safe", "compression_viper", "ma50_horizontal", "cycle_detected"] else "") for k in Nexus5Features.model_fields}),
+            features=Nexus5Features(**{k: feats.get(k, 0.0 if k in ["slope_ma50", "ma99_long_slope", "vol_ratio", "ma50_ma99_dist", "price_to_ma99_pct", "minutes_to_next_pump", "confidence_boost", "super_crash_pct"] else False if k in ["gravity_ma99_safe", "compression_viper", "ma50_horizontal", "cycle_detected", "crash_detected"] else "") for k in Nexus5Features.model_fields}),
             detectivity=self._build_detectivity(feats, g1, g2, g3, g4, g5, g6),
         )
 
@@ -576,6 +584,15 @@ class Nexus5Analyzer:
             structural_score += 15
         if not gravity_safe:
             structural_score = 0  # Veto absoluto
+
+        # Info del crash (v11.0)
+        super_crash_pct = f.get("super_crash_pct", 0.0)
+        crash_detected = f.get("crash_detected", False)
+
+        detectivity["structural_crash"] = (
+            f"💥 SUPER CAÍDA: {super_crash_pct*100:.1f}% | "
+            f"Detectada: {'✅' if crash_detected else '❌'}"
+        )
 
         detectivity["structural_summary"] = (
             f"🏆 Estructural Score: {structural_score}/85 | "

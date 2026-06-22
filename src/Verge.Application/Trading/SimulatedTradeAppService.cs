@@ -56,7 +56,7 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
 
         if (!entryPrice.HasValue)
         {
-            Logger.LogWarning("🚫 [Simulation] Skipping trade for {Symbol}: Price not found in any source.", symbol);
+            Logger.LogWarning("🚫 [Simulation-Veto] SKIPPED: {Symbol} is temporarily unavailable or filtered. Reason: Price not found in any source.", symbol);
             return null;
         }
 
@@ -65,12 +65,12 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         {
             if (input.SlPrice.HasValue && input.SlPrice.Value >= entryPrice.Value)
             {
-                Logger.LogWarning("🚫 [Simulation] Rejecting LONG for {Symbol}: requested SL ({Sl}) is >= live Entry ({Entry}).", symbol, input.SlPrice.Value, entryPrice.Value);
+                Logger.LogWarning("🚫 [Simulation-Veto] SKIPPED: {Symbol} is temporarily unavailable or filtered. Reason: requested LONG SL ({Sl}) is >= live Entry ({Entry}).", symbol, input.SlPrice.Value, entryPrice.Value);
                 return null;
             }
             if (input.TpPrice.HasValue && input.TpPrice.Value <= entryPrice.Value)
             {
-                Logger.LogWarning("🚫 [Simulation] Rejecting LONG for {Symbol}: requested TP ({Tp}) is <= live Entry ({Entry}).", symbol, input.TpPrice.Value, entryPrice.Value);
+                Logger.LogWarning("🚫 [Simulation-Veto] SKIPPED: {Symbol} is temporarily unavailable or filtered. Reason: requested LONG TP ({Tp}) is <= live Entry ({Entry}).", symbol, input.TpPrice.Value, entryPrice.Value);
                 return null;
             }
         }
@@ -78,179 +78,201 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         {
             if (input.SlPrice.HasValue && input.SlPrice.Value <= entryPrice.Value)
             {
-                Logger.LogWarning("🚫 [Simulation] Rejecting SHORT for {Symbol}: requested SL ({Sl}) is <= live Entry ({Entry}).", symbol, input.SlPrice.Value, entryPrice.Value);
+                Logger.LogWarning("🚫 [Simulation-Veto] SKIPPED: {Symbol} is temporarily unavailable or filtered. Reason: requested SHORT SL ({Sl}) is <= live Entry ({Entry}).", symbol, input.SlPrice.Value, entryPrice.Value);
                 return null;
             }
             if (input.TpPrice.HasValue && input.TpPrice.Value >= entryPrice.Value)
             {
-                Logger.LogWarning("🚫 [Simulation] Rejecting SHORT for {Symbol}: requested TP ({Tp}) is >= live Entry ({Entry}).", symbol, input.TpPrice.Value, entryPrice.Value);
+                Logger.LogWarning("🚫 [Simulation-Veto] SKIPPED: {Symbol} is temporarily unavailable or filtered. Reason: requested SHORT TP ({Tp}) is >= live Entry ({Entry}).", symbol, input.TpPrice.Value, entryPrice.Value);
                 return null;
             }
         }
 
-        // 2.5. SMART POSITION MANAGEMENT: If position exists for this strategy profile, ADD to it (Average Price) instead of blocking
-        var existingTrade = await _tradeRepo.FirstOrDefaultAsync(t => 
-            t.UserId == userId && 
-            t.Symbol == symbol && 
-            t.Status == TradeStatus.Open &&
-            t.StrategyProfileId == input.StrategyProfileId);
-
-        if (existingTrade != null)
+        await TradingSimulationService.ProfileLock.WaitAsync();
+        try
         {
-            if (existingTrade.Side == input.Side)
+            // 2.5. SMART POSITION MANAGEMENT: If position exists for this strategy profile, ADD to it (Average Price) instead of blocking
+            var existingTrade = await _tradeRepo.FirstOrDefaultAsync(t => 
+                t.UserId == userId && 
+                t.Symbol == symbol && 
+                t.Status == TradeStatus.Open &&
+                t.StrategyProfileId == input.StrategyProfileId);
+
+            if (existingTrade != null)
             {
-                Logger.LogInformation("➕ [Simulation] Increasing existing position for {Symbol} (User: {UserId}). Averaging entry price...", symbol, userId);
+                if (existingTrade.Side == input.Side)
+                {
+                    Logger.LogInformation("➕ [Simulation] Increasing existing position for {Symbol} (User: {UserId}). Averaging entry price...", symbol, userId);
 
-                // Calculate new cost
-                var marginToAdd = input.Amount;
-                var exposureToAdd = marginToAdd * input.Leverage;
-                var entryFeeToAdd = _simulationService.CalculateEntryFee(exposureToAdd);
-                var totalCostToAdd = marginToAdd + entryFeeToAdd;
+                    // Calculate new cost
+                    var marginToAdd = input.Amount;
+                    var exposureToAdd = marginToAdd * input.Leverage;
+                    var entryFeeToAdd = _simulationService.CalculateEntryFee(exposureToAdd);
+                    var totalCostToAdd = marginToAdd + entryFeeToAdd;
 
-                // Validate balance
-                var profileForUpdate = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId)
-                    ?? throw new UserFriendlyException("Trader profile not found.");
+                    // Validate balance
+                    var profileForUpdate = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId)
+                        ?? throw new UserFriendlyException("Trader profile not found.");
 
-                // v11.12 NO MORE LIES: Ya no bloqueamos add-to-position por balance virtual.
-                Logger.LogInformation(
-                    "[BILLETERA-REAL v11.12] AddToPosition {Symbol}: deducting {Amount:N2} USDT (virtual before: {Balance:N2})",
-                    symbol, totalCostToAdd, profileForUpdate.VirtualBalance);
+                    // v11.12 NO MORE LIES: Ya no bloqueamos add-to-position por balance virtual.
+                    Logger.LogInformation(
+                        "[BILLETERA-REAL v11.12] AddToPosition {Symbol}: deducting {Amount:N2} USDT (virtual before: {Balance:N2})",
+                        symbol, totalCostToAdd, profileForUpdate.VirtualBalance);
 
-                // Calculate new size and weighted entry price
-                var sizeToAdd = _simulationService.CalculatePositionSize(exposureToAdd, entryPrice.Value);
-                
-                var oldNotional = existingTrade.Size * existingTrade.EntryPrice;
-                var addedNotional = sizeToAdd * entryPrice.Value;
-                
-                var newTotalSize = existingTrade.Size + sizeToAdd;
-                var newEntryPrice = (oldNotional + addedNotional) / newTotalSize;
+                    // Calculate new size and weighted entry price
+                    var sizeToAdd = _simulationService.CalculatePositionSize(exposureToAdd, entryPrice.Value);
+                    
+                    var oldNotional = existingTrade.Size * existingTrade.EntryPrice;
+                    var addedNotional = sizeToAdd * entryPrice.Value;
+                    
+                    var newTotalSize = existingTrade.Size + sizeToAdd;
+                    var newEntryPrice = (oldNotional + addedNotional) / newTotalSize;
 
-                // Deduct balance safely
-                await DeductVirtualBalanceAsync(userId, totalCostToAdd);
+                    // Deduct balance safely
+                    profileForUpdate.VirtualBalance -= totalCostToAdd;
+                    await _profileRepo.UpdateAsync(profileForUpdate, autoSave: true);
 
-                // Update existing trade properties
-                existingTrade.EntryPrice = newEntryPrice;
-                existingTrade.Size = newTotalSize;
-                existingTrade.Margin += marginToAdd;
-                existingTrade.Amount += exposureToAdd;
-                existingTrade.EntryFee += entryFeeToAdd;
-                existingTrade.Leverage = input.Leverage; 
-                
-                existingTrade.LiquidationPrice = _simulationService.CalculateLiquidationPrice(newEntryPrice, existingTrade.Leverage, existingTrade.Side);
+                    // Update existing trade properties
+                    existingTrade.EntryPrice = newEntryPrice;
+                    existingTrade.Size = newTotalSize;
+                    existingTrade.Margin += marginToAdd;
+                    existingTrade.Amount += exposureToAdd;
+                    existingTrade.EntryFee += entryFeeToAdd;
+                    existingTrade.Leverage = input.Leverage; 
+                    
+                    existingTrade.LiquidationPrice = _simulationService.CalculateLiquidationPrice(newEntryPrice, existingTrade.Leverage, existingTrade.Side);
 
-                if (input.TpPrice.HasValue && input.TpPrice.Value > 0) existingTrade.TpPrice = input.TpPrice;
-                if (input.SlPrice.HasValue && input.SlPrice.Value > 0) existingTrade.SlPrice = input.SlPrice;
-                if (input.StrategyProfileId.HasValue) existingTrade.StrategyProfileId = input.StrategyProfileId;
+                    if (input.TpPrice.HasValue && input.TpPrice.Value > 0) existingTrade.TpPrice = input.TpPrice;
+                    if (input.SlPrice.HasValue && input.SlPrice.Value > 0) existingTrade.SlPrice = input.SlPrice;
+                    if (input.StrategyProfileId.HasValue) existingTrade.StrategyProfileId = input.StrategyProfileId;
 
-                await _tradeRepo.UpdateAsync(existingTrade, autoSave: true);
-                
-                var updatedDto = MapToDto(existingTrade);
-                await _hubContext.Clients.User(userId.ToString()).SendAsync("ReceiveTradeUpdate", updatedDto);
+                    await _tradeRepo.UpdateAsync(existingTrade, autoSave: true);
+                    
+                    var updatedDto = MapToDto(existingTrade);
+                    await _hubContext.Clients.User(userId.ToString()).SendAsync("ReceiveTradeUpdate", updatedDto);
 
-                Logger.LogInformation("✅ [Simulation] Position updated for {Symbol}: New Entry {Price}, New Size {Size}", 
-                    symbol, newEntryPrice, newTotalSize);
+                    Logger.LogInformation("✅ [Simulation] Position updated for {Symbol}: New Entry {Price}, New Size {Size}", 
+                        symbol, newEntryPrice, newTotalSize);
 
-                return updatedDto;
+                    return updatedDto;
+                }
+                else 
+                {
+                    // POSITION FLIP: If side is different, automatically CLOSE the old one first.
+                    Logger.LogInformation("🔄 [Simulation] Position Flip detected for {Symbol}. Closing {OldSide} to open {NewSide}.", 
+                        symbol, existingTrade.Side, input.Side);
+                    
+                    TradingSimulationService.ProfileLock.Release();
+                    try
+                    {
+                        await CloseTradeAsync(existingTrade.Id);
+                    }
+                    finally
+                    {
+                        await TradingSimulationService.ProfileLock.WaitAsync();
+                    }
+                    // After closing, we continue to the normal 'Open' logic below
+                }
             }
-            else 
+
+            // 3. Calculate position values
+            var margin = input.Amount;
+            var exposureValue = margin * input.Leverage;
+            var entryFee = _simulationService.CalculateEntryFee(exposureValue);
+            var totalCost = margin + entryFee;
+
+            // 5. Calculate position size (quantity) and liquidation price
+            var size = _simulationService.CalculatePositionSize(exposureValue, entryPrice.Value);
+            var liquidationPrice = _simulationService.CalculateLiquidationPrice(entryPrice.Value, input.Leverage, input.Side);
+
+            if (input.TpPrice.HasValue)
             {
-                // POSITION FLIP: If side is different, automatically CLOSE the old one first.
-                Logger.LogInformation("🔄 [Simulation] Position Flip detected for {Symbol}. Closing {OldSide} to open {NewSide}.", 
-                    symbol, existingTrade.Side, input.Side);
-                
-                await CloseTradeAsync(existingTrade.Id);
-                // After closing, we continue to the normal 'Open' logic below
+                var expectedProfit = Math.Abs(input.TpPrice.Value - entryPrice.Value) * size;
+                var exitFeeEst = _simulationService.CalculateExitFee(size, input.TpPrice.Value);
+                var expectedTotalFee = entryFee + exitFeeEst;
+
+                if (expectedProfit <= expectedTotalFee * 1.2m)
+                {
+                    Logger.LogWarning("🚫 [Simulation-Veto] SKIPPED: {Symbol} is temporarily unavailable or filtered. Reason: expected profit {ExpectedProfit:N4} is <= total fees {ExpectedTotalFee:N4} * 1.2.", symbol, expectedProfit, expectedTotalFee);
+                    return null;
+                }
             }
-        }
 
-        // 3. Calculate position values
-        var margin = input.Amount;
-        var exposureValue = margin * input.Leverage;
-        var entryFee = _simulationService.CalculateEntryFee(exposureValue);
-        var totalCost = margin + entryFee;
-
-        // 5. Calculate position size (quantity) and liquidation price
-        var size = _simulationService.CalculatePositionSize(exposureValue, entryPrice.Value);
-        var liquidationPrice = _simulationService.CalculateLiquidationPrice(entryPrice.Value, input.Leverage, input.Side);
-
-        if (input.TpPrice.HasValue)
-        {
-            var expectedProfit = Math.Abs(input.TpPrice.Value - entryPrice.Value) * size;
-            var exitFeeEst = _simulationService.CalculateExitFee(size, input.TpPrice.Value);
-            var expectedTotalFee = entryFee + exitFeeEst;
-
-            if (expectedProfit <= expectedTotalFee * 1.2m)
+            // 6. Anti-slippage guard: reject if SL/TP levels are already crossed at entry price
+            if (input.SlPrice.HasValue && input.SlPrice.Value > 0)
             {
-                Logger.LogWarning("⚠️ [Simulation] SKIP('no_edge_after_fees'): {Symbol} expected profit {ExpectedProfit:N4} is too small compared to total fees {ExpectedTotalFee:N4}.", symbol, expectedProfit, expectedTotalFee);
-                return null;
+                bool slAlreadyCrossed = input.Side == SignalDirection.Long
+                    ? entryPrice.Value <= input.SlPrice.Value   // Long: entry should be ABOVE SL
+                    : entryPrice.Value >= input.SlPrice.Value;  // Short: entry should be BELOW SL
+
+                if (slAlreadyCrossed)
+                {
+                    Logger.LogWarning(
+                        "🚫 [Simulation-Veto] SKIPPED: {Symbol} is temporarily unavailable or filtered. Reason: {Side} Entry={Entry} SL={Sl} (SL already crossed).",
+                        symbol, input.Side, entryPrice.Value, input.SlPrice.Value);
+                    return null;
+                }
             }
-        }
 
-        // 6. Anti-slippage guard: reject if SL/TP levels are already crossed at entry price
-        if (input.SlPrice.HasValue && input.SlPrice.Value > 0)
-        {
-            bool slAlreadyCrossed = input.Side == SignalDirection.Long
-                ? entryPrice.Value <= input.SlPrice.Value   // Long: entry should be ABOVE SL
-                : entryPrice.Value >= input.SlPrice.Value;  // Short: entry should be BELOW SL
-
-            if (slAlreadyCrossed)
+            // 7. Deduct balance safely
+            var profile = await _profileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
+            if (profile != null)
             {
+                profile.VirtualBalance -= totalCost;
+                await _profileRepo.UpdateAsync(profile, autoSave: true);
+            }
+
+            // 8. Create trade record
+            var trade = new SimulatedTrade(
+                id: GuidGenerator.Create(),
+                userId: userId,
+                symbol: symbol,
+                side: input.Side,
+                leverage: input.Leverage,
+                entryPrice: entryPrice.Value,
+                size: size, // Coin quantity
+                amount: exposureValue, // Nominal exposure in USDT
+                margin: margin,
+                liquidationPrice: liquidationPrice,
+                entryFee: entryFee,
+                tpPrice: input.TpPrice,
+                slPrice: input.SlPrice,
+                tradingSignalId: input.TradingSignalId,
+                exchange: input.Exchange ?? "Binance");
+
+            if (!string.IsNullOrWhiteSpace(input.AgentDecisionJson))
+                trade.AgentDecisionJson = input.AgentDecisionJson.Trim();
+            
+            if (input.StrategyProfileId.HasValue)
+                trade.StrategyProfileId = input.StrategyProfileId;
+            else
                 Logger.LogWarning(
-                    "⛔ [Simulation] SKIP('sl_already_crossed'): {Symbol} {Side} | Entry={Entry} SL={Sl} — el SL ya está cruzado por el precio de entrada. Trade rechazado.",
-                    symbol, input.Side, entryPrice.Value, input.SlPrice.Value);
-                return null;
-            }
+                    "⚠️ [Simulation] OpenTrade for {Symbol} sin AgentDecisionJson — la pantalla de auditoría no podrá mostrar el contexto Nexus/SCAR/LSE para este trade.",
+                    symbol);
+
+            if (input.StrategyProfileId.HasValue)
+                trade.StrategyProfileId = input.StrategyProfileId;
+
+            // Set MA7 distance at entry for Sniper filter validation
+            if (input.Ma7DistancePctAtEntry.HasValue)
+                trade.Ma7DistancePctAtEntry = input.Ma7DistancePctAtEntry;
+
+            await _tradeRepo.InsertAsync(trade, autoSave: true);
+
+            var dto = MapToDto(trade);
+
+            // 8. Broadcast new trade to user
+            await _hubContext.Clients.User(userId.ToString()).SendAsync("ReceiveTradeOpened", dto);
+
+            Logger.LogInformation("✅ [Simulation] Trade opened: {Side} {Symbol} x{Leverage} @ {Price} | Margin: {Margin} USDT",
+                input.Side, symbol, input.Leverage, entryPrice, margin);
+
+            return dto;
         }
-
-        // 7. Deduct balance safely using global lock to avoid Concurrency issues
-        await DeductVirtualBalanceAsync(userId, totalCost);
-
-        // 8. Create trade record
-        var trade = new SimulatedTrade(
-            id: GuidGenerator.Create(),
-            userId: userId,
-            symbol: symbol,
-            side: input.Side,
-            leverage: input.Leverage,
-            entryPrice: entryPrice.Value,
-            size: size, // Coin quantity
-            amount: exposureValue, // Nominal exposure in USDT
-            margin: margin,
-            liquidationPrice: liquidationPrice,
-            entryFee: entryFee,
-            tpPrice: input.TpPrice,
-            slPrice: input.SlPrice,
-            tradingSignalId: input.TradingSignalId,
-            exchange: input.Exchange ?? "Binance");
-
-        if (!string.IsNullOrWhiteSpace(input.AgentDecisionJson))
-            trade.AgentDecisionJson = input.AgentDecisionJson.Trim();
-        
-        if (input.StrategyProfileId.HasValue)
-            trade.StrategyProfileId = input.StrategyProfileId;
-        else
-            Logger.LogWarning(
-                "⚠️ [Simulation] OpenTrade for {Symbol} sin AgentDecisionJson — la pantalla de auditoría no podrá mostrar el contexto Nexus/SCAR/LSE para este trade.",
-                symbol);
-
-        if (input.StrategyProfileId.HasValue)
-            trade.StrategyProfileId = input.StrategyProfileId;
-
-        // Set MA7 distance at entry for Sniper filter validation
-        if (input.Ma7DistancePctAtEntry.HasValue)
-            trade.Ma7DistancePctAtEntry = input.Ma7DistancePctAtEntry;
-
-        await _tradeRepo.InsertAsync(trade, autoSave: true);
-
-        var dto = MapToDto(trade);
-
-        // 8. Broadcast new trade to user
-        await _hubContext.Clients.User(userId.ToString()).SendAsync("ReceiveTradeOpened", dto);
-
-        Logger.LogInformation("✅ [Simulation] Trade opened: {Side} {Symbol} x{Leverage} @ {Price} | Margin: {Margin} USDT",
-            input.Side, symbol, input.Leverage, entryPrice, margin);
-
-        return dto;
+        finally
+        {
+            TradingSimulationService.ProfileLock.Release();
+        }
     }
 
     /// <summary>
@@ -262,6 +284,7 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         int maxRetries = 5;
         for (int i = 0; i < maxRetries; i++)
         {
+            await TradingSimulationService.ProfileLock.WaitAsync();
             try
             {
                 using (var scope = _scopeFactory.CreateScope())
@@ -280,6 +303,10 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
                 Logger.LogWarning("[Simulation] Concurrency retry {0}/5 for updating MFE on trade {1}", i + 1, tradeId);
                 await Task.Delay(200);
             }
+            finally
+            {
+                TradingSimulationService.ProfileLock.Release();
+            }
         }
     }
 
@@ -292,6 +319,7 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         int maxRetries = 5;
         for (int i = 0; i < maxRetries; i++)
         {
+            await TradingSimulationService.ProfileLock.WaitAsync();
             try
             {
                 using (var scope = _scopeFactory.CreateScope())
@@ -311,6 +339,10 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
                 if (i == maxRetries - 1) throw;
                 Logger.LogWarning("[Simulation] Concurrency retry {0}/5 for updating exit info on trade {1}", i + 1, tradeId);
                 await Task.Delay(200);
+            }
+            finally
+            {
+                TradingSimulationService.ProfileLock.Release();
             }
         }
     }
@@ -337,6 +369,7 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
 
         for (int i = 0; i < maxRetries; i++)
         {
+            await TradingSimulationService.ProfileLock.WaitAsync();
             try
             {
                 using (var scope = _scopeFactory.CreateScope())
@@ -416,7 +449,13 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
                     await tRepo.UpdateAsync(trade, autoSave: true);
                     
                     // 4. Return margin + entryFee + realizedPnl to user balance
-                    await CreditVirtualBalanceAsync(userId, trade.Margin + trade.EntryFee + realizedPnl);
+                    var bProfileRepo = scope.ServiceProvider.GetRequiredService<IRepository<TraderProfile, Guid>>();
+                    var profileToCredit = await bProfileRepo.FirstOrDefaultAsync(p => p.UserId == userId);
+                    if (profileToCredit != null)
+                    {
+                        profileToCredit.VirtualBalance += (trade.Margin + trade.EntryFee + realizedPnl);
+                        await bProfileRepo.UpdateAsync(profileToCredit, autoSave: true);
+                    }
 
                     resultDto = MapToDto(trade);
                     
@@ -431,6 +470,10 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
                 if (i == maxRetries - 1) throw;
                 Logger.LogWarning("[Simulation] Concurrency retry {0}/5 for closing trade {1}", i + 1, tradeId);
                 await Task.Delay(200);
+            }
+            finally
+            {
+                TradingSimulationService.ProfileLock.Release();
             }
         }
 

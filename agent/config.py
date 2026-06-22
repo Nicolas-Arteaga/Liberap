@@ -204,6 +204,23 @@ GOLDEN_UTURN_SL_SPREAD_BUFFER_PCT = float(os.getenv("GOLDEN_UTURN_SL_SPREAD_BUFF
 GOLDEN_UTURN_SCORE = 99.0  # Score de inyección directa (prioridad absoluta sobre Nexus-15)
 GOLDEN_UTURN_ENABLED = False  # Master switch — DISABLED (2/2 trades lost, Nexus-15 said Wait)
 
+# 6b. TOTAL-SWEEP v13.0 (The Total Sweep) — Sinfonía Final
+# NEXUS-5 Bottom Sniper > 90% → HUNTING_READY → Volume Slope Radar → Green>Red Trigger
+TOTAL_SWEEP_ENABLED = os.getenv("TOTAL_SWEEP_ENABLED", "true").lower() in ("1", "true", "yes")
+TOTAL_SWEEP_MIN_NEXUS5_CONFIDENCE = float(os.getenv("TOTAL_SWEEP_MIN_NEXUS5_CONFIDENCE", "90.0"))  # NEXUS-5 >= 90% para HUNTING_READY
+TOTAL_SWEEP_HUNTING_DURATION_CANDLES = int(os.getenv("TOTAL_SWEEP_HUNTING_DURATION_CANDLES", "6"))  # 6 velas de 15m = 90 min de vigencia
+TOTAL_SWEEP_VOLUME_LOOKBACK = int(os.getenv("TOTAL_SWEEP_VOLUME_LOOKBACK", "15"))  # Regresión lineal sobre 15 velas 15m
+TOTAL_SWEEP_VOLUME_SLOPE_THRESHOLD = float(os.getenv("TOTAL_SWEEP_VOLUME_SLOPE_THRESHOLD", "-5.0"))  # < -5.0 = SWEEP_LIKELY
+TOTAL_SWEEP_TP_MIN_DISTANCE_PCT = float(os.getenv("TOTAL_SWEEP_TP_MIN_DISTANCE_PCT", "12.0"))  # TP mínimo 12%
+TOTAL_SWEEP_SCORE = 99.5  # Score de inyección directa (superior a Golden U-Turn y L-Shape)
+TOTAL_SWEEP_TRAILING_ACTIVATION_PCT = float(os.getenv("TOTAL_SWEEP_TRAILING_ACTIVATION_PCT", "10.0"))  # Trailing se activa al +10%
+TOTAL_SWEEP_TRAILING_DISTANCE_PCT = float(os.getenv("TOTAL_SWEEP_TRAILING_DISTANCE_PCT", "5.0"))  # Trailing 5% desde máximo
+
+# 6c. NEXUS-5 AUTO-EXECUTION GATE
+# If True: ONLY trades from NEXUS-5 (total_sweep source) execute automatically.
+# All other sources (Nexus-15, SCAR, Golden U-Turn, Bridge, LSE) require manual confirmation.
+NEXUS5_ONLY_AUTO_EXECUTE = os.getenv("NEXUS5_ONLY_AUTO_EXECUTE", "false").lower() in ("1", "true", "yes")
+
 # 7. LEY DE NICO v12.0 (The L-Shape) — Exclusivo para MA Cross Momentum
 # Detector de "L de Cemento": Caída -> Cemento -> Giro
 NICO_L_SHAPE_ENABLED = os.getenv("NICO_L_SHAPE_ENABLED", "true").lower() in ("1", "true", "yes")

@@ -24,15 +24,15 @@ public class PythonNexus5Service : IPythonNexus5Service
         _logger = logger;
     }
 
-    public async Task<Nexus5ResponseModel?> AnalyzeNexus5Async(string symbol, List<MarketCandleModel> candles)
+    public async Task<Nexus5ResponseModel?> AnalyzeNexus5Async(string symbol, List<MarketCandleModel> candles, List<MarketCandleModel>? candles15m = null)
     {
         try
         {
-            var payload = new
+            var payload = new Dictionary<string, object>
             {
-                symbol = symbol,
-                timeframe = "5m",
-                candles = candles.Select(c => new
+                ["symbol"] = symbol,
+                ["timeframe"] = "5m",
+                ["candles"] = candles.Select(c => new
                 {
                     timestamp = DateTimeOffset.FromUnixTimeMilliseconds(c.Timestamp).ToString("o"),
                     open = (double)c.Open,
@@ -40,8 +40,22 @@ public class PythonNexus5Service : IPythonNexus5Service
                     low = (double)c.Low,
                     close = (double)c.Close,
                     volume = (double)c.Volume,
-                })
+                }).ToList()
             };
+
+            // Add native 15m candles for structural MA50/MA99 (Bottom Sniper v10.0)
+            if (candles15m != null && candles15m.Count >= 30)
+            {
+                payload["candles_15m"] = candles15m.Select(c => new
+                {
+                    timestamp = DateTimeOffset.FromUnixTimeMilliseconds(c.Timestamp).ToString("o"),
+                    open = (double)c.Open,
+                    high = (double)c.High,
+                    low = (double)c.Low,
+                    close = (double)c.Close,
+                    volume = (double)c.Volume,
+                }).ToList();
+            }
 
             var response = await _http.PostAsJsonAsync("/nexus5/analyze", payload);
             response.EnsureSuccessStatusCode();
