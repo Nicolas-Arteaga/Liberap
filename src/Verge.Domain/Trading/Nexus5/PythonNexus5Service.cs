@@ -24,7 +24,7 @@ public class PythonNexus5Service : IPythonNexus5Service
         _logger = logger;
     }
 
-    public async Task<Nexus5ResponseModel?> AnalyzeNexus5Async(string symbol, List<MarketCandleModel> candles, List<MarketCandleModel>? candles15m = null)
+    public async Task<Nexus5ResponseModel?> AnalyzeNexus5Async(string symbol, List<MarketCandleModel> candles, List<MarketCandleModel>? candles15m = null, List<MarketCandleModel>? candles1m = null)
     {
         try
         {
@@ -47,6 +47,20 @@ public class PythonNexus5Service : IPythonNexus5Service
             if (candles15m != null && candles15m.Count >= 30)
             {
                 payload["candles_15m"] = candles15m.Select(c => new
+                {
+                    timestamp = DateTimeOffset.FromUnixTimeMilliseconds(c.Timestamp).ToString("o"),
+                    open = (double)c.Open,
+                    high = (double)c.High,
+                    low = (double)c.Low,
+                    close = (double)c.Close,
+                    volume = (double)c.Volume,
+                }).ToList();
+            }
+
+            // Add native 1m candles for Sweep Detector (v13.0)
+            if (candles1m != null && candles1m.Count >= 30)
+            {
+                payload["candles_1m"] = candles1m.Select(c => new
                 {
                     timestamp = DateTimeOffset.FromUnixTimeMilliseconds(c.Timestamp).ToString("o"),
                     open = (double)c.Open,

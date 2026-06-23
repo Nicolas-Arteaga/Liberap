@@ -52,3 +52,21 @@ export interface Nexus15ResultDto {
   features: Nexus15FeaturesDto;
   detectivity: Record<string, string>;
 }
+
+export interface Strike15mItemDto {
+  symbol?: string;
+  forceScore: number;
+  ma99DistancePct: number;
+  volume15m: number;
+  currentPrice: number;
+  ma99Value: number;
+  candleOpen: number;
+  atr20_15m: number;
+  isPerfectShot: boolean;
+}
+
+export interface Strike15mResponseDto {
+  top5: Strike15mItemDto[];
+  scannedCount: number;
+  analyzedAt?: string;
+}

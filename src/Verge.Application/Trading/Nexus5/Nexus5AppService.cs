@@ -73,10 +73,18 @@ public class Nexus5AppService : ApplicationService, INexus5AppService
                 candles15m = null; // Pass null → Python returns sentinel values (no veto)
             }
 
-            _logger.LogInformation("⚡ [Nexus5] OnDemand: {Symbol} — {Count} 5m candles + {Count15m} 15m candles loaded", 
-                cleanSymbol, candles.Count, candles15m?.Count ?? 0);
+            // Fetch 1m candles for Sweep Detector (v13.0)
+            var candles1m = await _marketData.GetCandlesAsync(cleanSymbol, "1", 150);
+            if (candles1m == null || candles1m.Count < 30)
+            {
+                _logger.LogWarning("⚠️ [Nexus5] Insufficient 1m candles for {Symbol} (got {Count}). Sweep detection will be skipped.", cleanSymbol, candles1m?.Count ?? 0);
+                candles1m = null;
+            }
 
-            var result = await _pythonService.AnalyzeNexus5Async(cleanSymbol, candles, candles15m);
+            _logger.LogInformation("⚡ [Nexus5] OnDemand: {Symbol} — {Count} 5m + {Count15m} 15m + {Count1m} 1m candles loaded", 
+                cleanSymbol, candles.Count, candles15m?.Count ?? 0, candles1m?.Count ?? 0);
+
+            var result = await _pythonService.AnalyzeNexus5Async(cleanSymbol, candles, candles15m, candles1m);
             if (result == null) return null;
 
             var dto = MapToDto(result);
@@ -278,9 +286,117 @@ public class Nexus5AppService : ApplicationService, INexus5AppService
                 CompressionViper = result.Features.CompressionViper,
                 Ma50Horizontal = result.Features.Ma50Horizontal,
                 Ma50Ma99Distance = result.Features.Ma50Ma99Distance,
-                PriceToMa99Pct = result.Features.PriceToMa99Pct
+                PriceToMa99Pct = result.Features.PriceToMa99Pct,
+                // Sweep Detector (v13.0)
+                SweepDetected = result.Features.SweepDetected,
+                SweepDepthPct = result.Features.SweepDepthPct,
+                HalfUForming = result.Features.HalfUForming,
+                Lateralization1m = result.Features.Lateralization1m,
+                MasAligned1m = result.Features.MasAligned1m
             },
             Detectivity = result.Detectivity ?? new Dictionary<string, string>()
         };
+    }
+
+    /// <summary>
+    /// Sweep on-demand: fetch 5m+15m+1m candles → call Python → return result ONLY if sweep_detected=true.
+    /// </summary>
+    public async Task<Nexus5ResultDto?> AnalyzeSweepOnDemandAsync(string symbol)
+    {
+        _logger.LogInformation("🧹 [Nexus5-Sweep] OnDemand sweep scan for {Symbol}", symbol);
+        var result = await AnalyzeOnDemandAsync(symbol);
+        if (result == null) return null;
+
+        if (result.Features == null || !result.Features.SweepDetected)
+        {
+            _logger.LogInformation("🧹 [Nexus5-Sweep] {Symbol}: No sweep detected", symbol);
+            return null;
+        }
+
+        _logger.LogInformation("✅ [Nexus5-Sweep] {Symbol}: SWEEP DETECTED — depth={Depth:F2}% halfU={HalfU}",
+            symbol, result.Features.SweepDepthPct, result.Features.HalfUForming);
+        return result;
+    }
+
+    /// <summary>
+    /// Top Sweep scan: scans top 120 symbols by volume, returns only sweep-detected pairs
+    /// sorted by sweep_depth_pct descending.
+    /// </summary>
+    public async Task<List<Nexus5ResultDto>> AnalyzeSweepTopAsync(int topN = 5)
+    {
+        _logger.LogInformation("🧹 [Nexus5-Sweep] Initiating TOP SWEEP scan — top {Top}", topN);
+
+        var tickers = await _marketData.GetTickersAsync();
+        var topSymbols = tickers
+            .Where(t => t.Volume > 500_000m && t.Symbol.EndsWith("USDT"))
+            .OrderByDescending(t => t.Volume)
+            .Take(80)
+            .Select(t => t.Symbol)
+            .ToList();
+
+        // ── PRE-FILTER: only fetch 15m candles to check lateralization ──
+        // Pairs that aren't lateralizing (< 8% range) get skipped entirely
+        // This avoids wasting API calls on 5m + 1m for non-sweep candidates
+        var preFilterSemaphore = new SemaphoreSlim(15);
+        var lateralPairs = new ConcurrentBag<string>();
+
+        var preFilterTasks = topSymbols.Select(async symbol =>
+        {
+            await preFilterSemaphore.WaitAsync();
+            try
+            {
+                var candles15m = await _marketData.GetCandlesAsync(symbol, "15", 200);
+                if (candles15m != null && candles15m.Count >= 20)
+                {
+                    var last20 = candles15m.TakeLast(20).ToList();
+                    var maxHigh = last20.Max(c => c.High);
+                    var minLow = last20.Min(c => c.Low);
+                    var currentClose = last20.Last().Close;
+                    var range = (maxHigh - minLow) / (currentClose > 0 ? currentClose : 1m);
+                    if (range < 0.08m) // < 8% range = lateralizing enough for sweep
+                    {
+                        lateralPairs.Add(symbol);
+                    }
+                }
+            }
+            finally
+            {
+                preFilterSemaphore.Release();
+            }
+        });
+
+        await Task.WhenAll(preFilterTasks);
+        _logger.LogInformation("🧹 [Nexus5-Sweep] Pre-filter: {Count}/{Total} pairs are lateralizing", lateralPairs.Count, topSymbols.Count);
+
+        // ── FULL ANALYSIS: only for lateralizing pairs ──
+        var results = new ConcurrentBag<Nexus5ResultDto>();
+        using var semaphore = new SemaphoreSlim(15);
+
+        var tasks = lateralPairs.Select(async symbol =>
+        {
+            await semaphore.WaitAsync();
+            try
+            {
+                var res = await AnalyzeSweepOnDemandAsync(symbol);
+                if (res != null)
+                    results.Add(res);
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        });
+
+        await Task.WhenAll(tasks);
+        _logger.LogInformation("✅ [Nexus5-Sweep] Scan finished. {Count} sweep signals found from {Scanned} candidates.", results.Count, lateralPairs.Count);
+
+        // Sort by sweep depth (deepest first)
+        var sorted = results
+            .Where(r => r.Features != null && r.Features.SweepDetected)
+            .OrderByDescending(r => r.Features.SweepDepthPct)
+            .Take(topN)
+            .ToList();
+
+        return sorted;
     }
 }

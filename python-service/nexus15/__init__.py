@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
-from .schemas import Nexus15Request, Nexus15Response
+from .schemas import Nexus15Request, Nexus15Response, Strike15mRequest, Strike15mResponse
 from .analyzer import Nexus15Analyzer
+from .strike_analyzer import Strike15mAnalyzer
 import logging
 import json
 import time
@@ -8,6 +9,7 @@ import time
 router = APIRouter(prefix="/nexus15", tags=["nexus15"])
 logger = logging.getLogger("NEXUS15")
 _analyzer = Nexus15Analyzer()
+_strike_analyzer = Strike15mAnalyzer()
 
 # Redis publisher (optional — if Redis is unavailable, analysis still works)
 _redis_client = None
@@ -85,5 +87,22 @@ async def analyze_nexus15(request: Nexus15Request):
         return result
     except Exception as e:
         logger.exception(f"NEXUS-15 error for {request.symbol}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/strike15m", response_model=Strike15mResponse)
+async def analyze_strike15m(request: Strike15mRequest):
+    """
+    Endpoint STRIKE 15m: Detecta velas de ignición de alta potencia en MA99.
+    Escanea múltiples símbolos y devuelve el TOP 5 con mayor fuerza.
+    """
+    if not request.symbols or len(request.symbols) == 0:
+        raise HTTPException(status_code=400, detail="Se requiere al menos un símbolo para escanear")
+    try:
+        result = _strike_analyzer.analyze(request)
+        logger.info(f"STRIKE-15m: Scanned {result.scanned_count} symbols, found {len(result.top_5)} opportunities")
+        return result
+    except Exception as e:
+        logger.exception(f"STRIKE-15m error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 

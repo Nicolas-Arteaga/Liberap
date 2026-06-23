@@ -6,7 +6,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { Nexus15Service } from '../proxy/trading/nexus15/nexus15.service';
-import { Nexus15ResultDto, Nexus15FeaturesDto } from '../proxy/trading/nexus15/models';
+import { Nexus15ResultDto, Nexus15FeaturesDto, Strike15mItemDto } from '../proxy/trading/nexus15/models';
 
 import { BotService } from '../proxy/trading/bot.service';
 import { ScarService } from '../proxy/trading/scar/scar.service';
@@ -78,6 +78,8 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
   scanCount      = signal(0);
   topResults     = signal<Nexus15ResultDto[]>([]);
   isTopLoading   = signal(false);
+  strikeResults  = signal<Strike15mItemDto[]>([]);
+  isStrikeLoading = signal(false);
 
 
 
@@ -354,6 +356,30 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
         const msg = err?.error?.error?.message || err?.message || 'unknown error';
         this.pushTerminal(`⚠ TOP SCAN ERROR: ${msg}`);
         console.error('TOP SCAN ERROR:', err);
+      }
+    });
+  }
+
+  runStrike15m() {
+    this.isStrikeLoading.set(true);
+    this.strikeResults.set([]);
+    this.pushTerminal('> ⚡ STRIKE 15m SCAN INIT: MA99 IGNITION DETECTION...');
+    
+    // Use top 80 volume pairs for STRIKE scan
+    const symbolsToScan = BINANCE_FUTURES_PAIRS.slice(0, 80);
+    
+    this.nexus15Svc.analyzeStrike15m(symbolsToScan).subscribe({
+      next: res => {
+        const arr = (res as any)?.top5 || res || [];
+        this.strikeResults.set(arr);
+        this.isStrikeLoading.set(false);
+        this.pushTerminal(`✓ STRIKE SCAN COMPLETE: ${arr.length} OPPORTUNITIES FOUND`);
+      },
+      error: err => {
+        this.isStrikeLoading.set(false);
+        const msg = err?.error?.error?.message || err?.message || 'unknown error';
+        this.pushTerminal(`⚠ STRIKE SCAN ERROR: ${msg}`);
+        console.error('STRIKE SCAN ERROR:', err);
       }
     });
   }

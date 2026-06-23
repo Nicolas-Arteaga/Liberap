@@ -14,4 +14,7 @@ public interface INexus15AppService : IApplicationService
 
     /// <summary>Analiza el mercado y trae el top 5 de oportunidades Long/Short.</summary>
     Task<List<Nexus15ResultDto>> AnalyzeTopAvailableAsync(int topN = 5);
+
+    /// <summary>Analiza STRIKE 15m: detecta velas de ignición en MA99.</summary>
+    Task<Strike15mResponseDto> AnalyzeStrike15mAsync(List<string> symbols);
 }

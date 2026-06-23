@@ -60,4 +60,33 @@ public class PythonNexus15Service : IPythonNexus15Service
             return null;   // Graceful degradation: el scanner no se rompe
         }
     }
+
+    public async Task<Strike15mResponseModel?> AnalyzeStrike15mAsync(List<string> symbols)
+    {
+        try
+        {
+            var payload = new
+            {
+                symbols = symbols,
+                timeframe = "15m"
+            };
+
+            var response = await _http.PostAsJsonAsync("/nexus15/strike15m", payload);
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync();
+            _logger.LogInformation("DEBUG STRIKE15m: Raw JSON from Python: {Json}", json);
+            
+            return JsonSerializer.Deserialize<Strike15mResponseModel>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ [STRIKE15m] Python Service call failed");
+            return null;
+        }
+    }
 }

@@ -88,6 +88,13 @@ class Nexus5Features(BaseModel):
     super_crash_pct: float          # Magnitud de la caída (peak→trough) en velas 15m (0.15 = 15%)
     crash_detected: bool            # True si se detectó SUPER CAÍDA >= 12%
 
+    # ── SWEEP DETECTOR — Dual timeframe 15m+1m (v13.0) ──────────────────────
+    sweep_detected: bool            # True si patrón SWEEP completo (15m macro + 1m micro + half-U)
+    sweep_depth_pct: float          # Profundidad del barrido bajo el piso de lateralización (%)
+    half_u_forming: bool            # True si la mitad de la "U" se está formando (barrido + recovery)
+    lateralization_1m: bool         # True si precio lateraliza en 1m (range < 2%)
+    mas_aligned_1m: bool            # True si todas las MAs de 1m están planas (slopes < 0.05%)
+
 
 class Nexus5Response(BaseModel):
     """Response from NEXUS-5 Ignition Core analysis."""

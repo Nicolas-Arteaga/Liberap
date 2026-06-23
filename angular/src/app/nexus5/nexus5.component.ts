@@ -71,6 +71,8 @@ export class Nexus5Component implements OnInit, AfterViewInit, OnDestroy {
   scanCount      = signal(0);
   topResults     = signal<Nexus5ResultDto[]>([]);
   isTopLoading   = signal(false);
+  sweepResults   = signal<Nexus5ResultDto[]>([]);
+  isSweepLoading = signal(false);
 
   // ── Dynamic Pair Selector ──────────────────────────────────────────────────
   availableSymbols = signal<string[]>(BINANCE_FUTURES_PAIRS);
@@ -276,6 +278,60 @@ export class Nexus5Component implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
     this.executeOnDemand();
+  }
+
+  runSweepOnDemand() {
+    const q = this.symbolSearch().toUpperCase().trim();
+    if (q && (q.endsWith('USDT') || q.length >= 5 || this.availableSymbols().includes(q))) {
+      this.onSymbolChange(q);
+      setTimeout(() => this.executeSweepOnDemand(), 50);
+      return;
+    }
+    this.executeSweepOnDemand();
+  }
+
+  private executeSweepOnDemand() {
+    this.isSweepLoading.set(true);
+    this.errorMsg.set(null);
+    this.pushTerminal(`> SWEEP SCAN: ${this.selectedSymbol()}`);
+    this.nexus5Svc.analyzeSweepOnDemand(this.selectedSymbol()).subscribe({
+      next: r => {
+        this.isSweepLoading.set(false);
+        if (!r) {
+          this.pushTerminal(`⚠ SWEEP: no sweep detected for ${this.selectedSymbol()}`);
+          return;
+        }
+        this.data.set(r);
+        this.scanCount.update(n => n + 1);
+        this.pushTerminal(`✓ SWEEP DETECTED: ${r.symbol} depth=${(r.features?.sweepDepthPct ?? 0).toFixed(2)}% halfU=${r.features?.halfUForming}`);
+        this.renderProjection(r);
+      },
+      error: err => {
+        this.isSweepLoading.set(false);
+        const msg = err?.error?.error || err?.message || 'check service';
+        this.pushTerminal(`⚠ SWEEP error: ${msg}`);
+      }
+    });
+  }
+
+  runSweepScan() {
+    this.isSweepLoading.set(true);
+    this.sweepResults.set([]);
+    this.pushTerminal('> SWEEP SCAN: TOP 5 SWEEP ZONE PAIRS...');
+    this.nexus5Svc.analyzeSweepTop(5).subscribe({
+      next: res => {
+        const arr = (res as any)?.items || res || [];
+        arr.sort((a: any, b: any) => (b.features?.sweepDepthPct ?? 0) - (a.features?.sweepDepthPct ?? 0));
+        this.sweepResults.set(arr);
+        this.isSweepLoading.set(false);
+        this.pushTerminal(`✓ SWEEP SCAN COMPLETE: ${arr.length} SWEEP PAIRS FOUND`);
+      },
+      error: err => {
+        this.isSweepLoading.set(false);
+        const msg = err?.error?.error?.message || err?.message || 'unknown';
+        this.pushTerminal(`⚠ SWEEP SCAN ERROR: ${msg}`);
+      }
+    });
   }
 
   private executeOnDemand() {

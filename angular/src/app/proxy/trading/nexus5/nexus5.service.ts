@@ -27,6 +27,24 @@ export class Nexus5Service {
     { apiName: this.apiName,...config });
   
 
+  analyzeSweepOnDemand = (symbol: string, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, Nexus5ResultDto>({
+      method: 'POST',
+      url: '/api/app/nexus5/analyze-sweep-on-demand',
+      params: { symbol },
+    },
+    { apiName: this.apiName,...config });
+  
+
+  analyzeSweepTop = (topN: number = 5, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, Nexus5ResultDto[]>({
+      method: 'POST',
+      url: '/api/app/nexus5/analyze-sweep-top',
+      params: { topN },
+    },
+    { apiName: this.apiName,...config });
+  
+
   analyzeTopAvailable = (topN: number = 5, config?: Partial<Rest.Config>) =>
     this.restService.request<any, Nexus5ResultDto[]>({
       method: 'POST',

@@ -71,3 +71,25 @@ class Nexus15Response(BaseModel):
     group_scores: GroupScores
     features: Nexus15Features
     detectivity: Dict[str, str]
+
+# ── STRIKE 15m Schemas ────────────────────────────────────────────────────────────
+
+class Strike15mRequest(BaseModel):
+    symbols: List[str]  # List of symbols to scan
+    timeframe: str = "15m"  # Always 15m for STRIKE
+
+class Strike15mItem(BaseModel):
+    symbol: str
+    force_score: float  # 7.0 - 10.0
+    ma99_distance_pct: float  # 0.0 - 1.0%
+    volume_15m: float
+    current_price: float
+    ma99_value: float
+    candle_open: float
+    atr_20_15m: float
+    is_perfect_shot: bool  # True if score 10/10 and 0% MA99 distance
+
+class Strike15mResponse(BaseModel):
+    top_5: List[Strike15mItem]
+    scanned_count: int
+    analyzed_at: str

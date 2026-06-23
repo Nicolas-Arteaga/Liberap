@@ -198,4 +198,56 @@ public class Nexus15AppService : ApplicationService, INexus15AppService
 
         return directional.Concat(neutralFill).Take(topN).ToList();
     }
+
+    /// <summary>Analiza STRIKE 15m: detecta velas de ignición en MA99.</summary>
+    public async Task<Strike15mResponseDto> AnalyzeStrike15mAsync(List<string> symbols)
+    {
+        try
+        {
+            _logger.LogInformation("⚡ [STRIKE15m] Initiating scan for {Count} symbols...", symbols.Count);
+
+            var result = await _pythonService.AnalyzeStrike15mAsync(symbols);
+            if (result == null)
+            {
+                _logger.LogWarning("⚠️ [STRIKE15m] No results from Python service");
+                return new Strike15mResponseDto
+                {
+                    Top5 = new List<Strike15mItemDto>(),
+                    ScannedCount = symbols.Count,
+                    AnalyzedAt = DateTime.UtcNow
+                };
+            }
+
+            var dto = new Strike15mResponseDto
+            {
+                Top5 = result.Top5?.Select(item => new Strike15mItemDto
+                {
+                    Symbol = item.Symbol,
+                    ForceScore = item.ForceScore,
+                    Ma99DistancePct = item.Ma99DistancePct,
+                    Volume15m = item.Volume15m,
+                    CurrentPrice = item.CurrentPrice,
+                    Ma99Value = item.Ma99Value,
+                    CandleOpen = item.CandleOpen,
+                    Atr20_15m = item.Atr20_15m,
+                    IsPerfectShot = item.IsPerfectShot
+                }).ToList() ?? new List<Strike15mItemDto>(),
+                ScannedCount = result.ScannedCount,
+                AnalyzedAt = result.AnalyzedAt
+            };
+
+            _logger.LogInformation("✅ [STRIKE15m] Scan complete: {Count} opportunities found", dto.Top5.Count);
+            return dto;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ [STRIKE15m] Analysis failed");
+            return new Strike15mResponseDto
+            {
+                Top5 = new List<Strike15mItemDto>(),
+                ScannedCount = symbols.Count,
+                AnalyzedAt = DateTime.UtcNow
+            };
+        }
+    }
 }

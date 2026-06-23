@@ -41,8 +41,22 @@ class Nexus5Analyzer:
             df_15m = df_15m.sort_values('timestamp').reset_index(drop=True)
             print(f"[NEXUS5] {req.symbol}: {len(df_15m)} velas 15m NATIVAS recibidas")
 
+        # Build native 1m DataFrame if provided (for Sweep Detector v13.0)
+        df_1m = None
+        if req.candles_1m and len(req.candles_1m) >= 30:
+            df_1m = pd.DataFrame([c.model_dump() for c in req.candles_1m])
+            df_1m['timestamp'] = pd.to_datetime(df_1m['timestamp'])
+            df_1m = df_1m.sort_values('timestamp').reset_index(drop=True)
+            print(f"[NEXUS5] {req.symbol}: {len(df_1m)} velas 1m recibidas")
+
         # 1. Calcular features
         feats = self.engine.compute(df, df_15m)
+
+        # 1b. Sweep Detection — dual timeframe 15m+1m (v13.0)
+        if df_15m is not None and df_1m is not None:
+            sweep_results = self.engine._detect_sweep(df_15m, df_1m)
+            feats.update(sweep_results)
+            print(f"[NEXUS5] {req.symbol}: SWEEP detection → {sweep_results.get('sweep_detected', False)}")
 
         # 2. Scores por grupo (0.0 a 1.0)
         g1 = self._score_g1(feats)
@@ -126,10 +140,14 @@ class Nexus5Analyzer:
         price_to_ma99 = feats.get("price_to_ma99_pct", 0.0)
         ma50_ma99_dist = feats.get("ma50_ma99_dist", 1.0)
 
+        # 7b. Sweep Override — if sweep detected, bypass MA99 veto
+        _is_sweep = feats.get("sweep_detected", False)
+
         # ── VETO #1: PRECIO POR ENCIMA DE MA99 = SCORE 0 ────────────────────────────────
         # Si precio >= MA99, ya llegamos tarde. Descartar inmediatamente.
         # EXCEPCIÓN: si price_to_ma99 < -900 es un sentinel (datos insuficientes), no vetar.
-        if price_to_ma99 >= 0 and price_to_ma99 > -900:  # Precio >= MA99 (y no es sentinel de datos insuficientes)
+        # EXCEPCIÓN: si sweep_detected = True, el sweep opera con lógica independiente.
+        if not _is_sweep and price_to_ma99 >= 0 and price_to_ma99 > -900:
             ai_confidence = 0.0
             direction = "NEUTRAL"
             recommendation = "Wait"
@@ -160,13 +178,27 @@ class Nexus5Analyzer:
                     g5_volume=round(g5 * 100, 2),
                     g6_ml=round(g6 * 100, 2),
                 ),
-                features=Nexus5Features(**{k: feats.get(k, 0.0 if k in ["slope_ma50", "ma99_long_slope", "vol_ratio", "ma50_ma99_dist", "price_to_ma99_pct", "minutes_to_next_pump", "confidence_boost", "super_crash_pct"] else False if k in ["gravity_ma99_safe", "compression_viper", "ma50_horizontal", "is_bottom_sniper", "cycle_detected", "crash_detected"] else "") for k in Nexus5Features.model_fields}),
+                features=Nexus5Features(**{k: feats.get(k, 0.0 if k in ["slope_ma50", "ma99_long_slope", "vol_ratio", "ma50_ma99_dist", "price_to_ma99_pct", "minutes_to_next_pump", "confidence_boost", "super_crash_pct", "sweep_depth_pct"] else False if k in ["gravity_ma99_safe", "compression_viper", "ma50_horizontal", "is_bottom_sniper", "cycle_detected", "crash_detected", "sweep_detected", "half_u_forming", "lateralization_1m", "mas_aligned_1m"] else "") for k in Nexus5Features.model_fields}),
                 detectivity=self._build_detectivity(feats, g1, g2, g3, g4, g5, g6),
             )
 
+        # ── SCORING SWEEP (v13.0) ─────────────────────────────────────────────────
+        _is_sweep = feats.get("sweep_detected", False)
+        _sweep_depth = feats.get("sweep_depth_pct", 0.0)
+
         # ── SCORING BOTTOM SNIPER (v11.0) ─────────────────────────────────────────
         # Lógica de Score para el TOP-5
-        if is_bottom_sniper:
+        if _is_sweep:
+            # SWEEP detectado — alta confianza, dirección BULLISH
+            base_score = 92.0
+            depth_bonus = min(5.0, _sweep_depth * 10)  # Más profundo = más confianza
+            # Bonus por compresión activa (nice-to-have, no obligatorio)
+            _has_compression = feats.get("sweep_15m_compression", False)
+            compression_bonus = 3.0 if _has_compression else 0.0
+            ai_confidence = base_score + depth_bonus + compression_bonus
+            direction = "BULLISH"
+            recommendation = "Long"
+        elif is_bottom_sniper:
             # ES EL SETUP DE FIDA. Ignoramos todo lo demás.
             base_score = 95.0
             # Cuanto más cerca estén la MA50 y la MA99, más puntaje (compresión final)
@@ -175,7 +207,7 @@ class Nexus5Analyzer:
             direction = "BULLISH"
             recommendation = "Long"  # Bottom Sniper = entrada directa
         else:
-            # Si no es un Bottom Sniper, bajamos el score drásticamente
+            # Si no es un Bottom Sniper ni Sweep, bajamos el score drásticamente
             # para que no ensucie el TOP 5 con pumps ya empezados.
             ai_confidence = combined_raw * 20
             direction = "NEUTRAL"
@@ -183,8 +215,8 @@ class Nexus5Analyzer:
 
         ai_confidence = round(min(100.0, max(0.0, ai_confidence)), 1)
 
-        # 9. Recommendation (solo sobreescribir si NO es Bottom Sniper)
-        if not is_bottom_sniper:
+        # 9. Recommendation (solo sobreescribir si NO es Bottom Sniper ni Sweep)
+        if not is_bottom_sniper and not _is_sweep:
             recommendation = "Wait"
             if ai_confidence >= STRONG_SIGNAL_THRESHOLD:
                 if direction == "BULLISH":
@@ -244,7 +276,7 @@ class Nexus5Analyzer:
                 g5_volume=round(g5 * 100, 2),
                 g6_ml=round(g6 * 100, 2),
             ),
-            features=Nexus5Features(**{k: feats.get(k, 0.0 if k in ["slope_ma50", "ma99_long_slope", "vol_ratio", "ma50_ma99_dist", "price_to_ma99_pct", "minutes_to_next_pump", "confidence_boost", "super_crash_pct"] else False if k in ["gravity_ma99_safe", "compression_viper", "ma50_horizontal", "cycle_detected", "crash_detected"] else "") for k in Nexus5Features.model_fields}),
+            features=Nexus5Features(**{k: feats.get(k, 0.0 if k in ["slope_ma50", "ma99_long_slope", "vol_ratio", "ma50_ma99_dist", "price_to_ma99_pct", "minutes_to_next_pump", "confidence_boost", "super_crash_pct", "sweep_depth_pct"] else False if k in ["gravity_ma99_safe", "compression_viper", "ma50_horizontal", "is_bottom_sniper", "cycle_detected", "crash_detected", "sweep_detected", "half_u_forming", "lateralization_1m", "mas_aligned_1m"] else "") for k in Nexus5Features.model_fields}),
             detectivity=self._build_detectivity(feats, g1, g2, g3, g4, g5, g6),
         )
 
@@ -597,6 +629,23 @@ class Nexus5Analyzer:
         detectivity["structural_summary"] = (
             f"🏆 Estructural Score: {structural_score}/85 | "
             f"Reglas Activas: {sum([ma50_horiz, viper, vol_ratio >= 2.5, gravity_safe])}/4"
+        )
+
+        # ── SWEEP DETECTOR (v13.0) ────────────────────────────────────────────
+        sweep_detected = f.get("sweep_detected", False)
+        sweep_depth = f.get("sweep_depth_pct", 0.0)
+        half_u = f.get("half_u_forming", False)
+        lat_1m = f.get("lateralization_1m", False)
+        mas_1m = f.get("mas_aligned_1m", False)
+
+        detectivity["sweep_status"] = (
+            f"🧹 SWEEP: {'✅ DETECTED' if sweep_detected else '❌'} | "
+            f"Depth: {sweep_depth:.2f}% | "
+            f"Half-U: {'✅' if half_u else '❌'}"
+        )
+        detectivity["sweep_1m"] = (
+            f"📊 1m Lat: {'✅' if lat_1m else '❌'} | "
+            f"MAs Flat: {'✅' if mas_1m else '❌'}"
         )
 
         return detectivity

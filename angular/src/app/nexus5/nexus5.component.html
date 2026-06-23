@@ -169,7 +169,7 @@
       </div>
 
       <!-- Top 5 List -->
-      <div class="nx5-top-banner" *ngIf="topResults().length > 0">
+      <div class="nx5-top-banner" *ngIf="topResults().length > 0 && sweepResults().length === 0">
         <div class="tb-title">⚡ TOP 5 IGNITION</div>
         <div class="tb-items">
           <div class="tb-item" *ngFor="let tr of topResults(); let i = index" (click)="onSymbolChange(tr.symbol!, tr)">
@@ -190,6 +190,25 @@
           </div>
         </div>
         <div class="tb-clear" (click)="topResults.set([])">⨯</div>
+      </div>
+
+      <!-- Sweep Results List -->
+      <div class="nx5-top-banner sweep-banner" *ngIf="sweepResults().length > 0">
+        <div class="tb-title">🧹 SWEEP ZONE</div>
+        <div class="tb-items">
+          <div class="tb-item" *ngFor="let sr of sweepResults(); let i = index" (click)="onSymbolChange(sr.symbol!, sr)">
+            <span class="tb-rank">{{ i + 1 }}.</span>
+            <span class="tb-sym">{{ sr.symbol?.replace('USDT','') }}</span>
+            <span class="tb-phase" [ngClass]="sr.features?.halfUForming ? 'phase-compression' : 'phase-idle'">
+              {{ sr.features?.halfUForming ? 'HALF-U' : 'SWEEP' }}
+            </span>
+            <span class="tb-conf" [style.color]="(sr.features?.sweepDepthPct ?? 0) >= 0.3 ? '#00ff88' : '#ffdd00'">
+               {{ sr.features?.sweepDepthPct | number:'1.2-2' }}%
+            </span>
+            <span class="tb-dir bullish">▲</span>
+          </div>
+        </div>
+        <div class="tb-clear" (click)="sweepResults.set([])">⨯</div>
       </div>
 
       <!-- Chart -->
@@ -322,16 +341,28 @@
 
       <!-- ACTION BUTTONS -->
       <div class="nx5-actions-panel">
-        <button class="nx5-activate" (click)="runOnDemand()" [disabled]="isLoading() || isTopLoading()">
+        <button class="nx5-activate" (click)="runOnDemand()" [disabled]="isLoading() || isTopLoading() || isSweepLoading()">
           <span class="act-icon">⚡</span>
           <span class="act-text">ACTIVAR NEXUS-5</span>
           <span class="act-spin" *ngIf="isLoading()"> ⟳</span>
         </button>
 
-        <button class="nx5-activate btn-top5" (click)="runTopScan()" [disabled]="isLoading() || isTopLoading()">
+        <button class="nx5-activate btn-top5" (click)="runTopScan()" [disabled]="isLoading() || isTopLoading() || isSweepLoading()">
           <span class="act-icon">🏆</span>
           <span class="act-text">TOP IGNITION</span>
           <span class="act-spin" *ngIf="isTopLoading()"> ⟳</span>
+        </button>
+
+        <button class="nx5-activate btn-sweep" (click)="runSweepOnDemand()" [disabled]="isLoading() || isTopLoading() || isSweepLoading()">
+          <span class="act-icon">🧹</span>
+          <span class="act-text">SWEEP</span>
+          <span class="act-spin" *ngIf="isSweepLoading()"> ⟳</span>
+        </button>
+
+        <button class="nx5-activate btn-sweep-top" (click)="runSweepScan()" [disabled]="isLoading() || isTopLoading() || isSweepLoading()">
+          <span class="act-icon">🧹</span>
+          <span class="act-text">TOP SWEEP</span>
+          <span class="act-spin" *ngIf="isSweepLoading()"> ⟳</span>
         </button>
       </div>
 

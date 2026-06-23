@@ -1,4 +1,4 @@
-import type { Nexus15ResultDto } from './models';
+import type { Nexus15ResultDto, Strike15mResponseDto } from './models';
 import { RestService, Rest } from '@abp/ng.core';
 import { Injectable, inject } from '@angular/core';
 
@@ -15,6 +15,15 @@ export class Nexus15Service {
       method: 'POST',
       url: '/api/app/nexus15/analyze-on-demand',
       params: { symbol },
+    },
+    { apiName: this.apiName,...config });
+  
+
+  analyzeStrike15m = (symbols: string[], config?: Partial<Rest.Config>) =>
+    this.restService.request<any, Strike15mResponseDto>({
+      method: 'POST',
+      url: '/api/app/nexus15/analyze-strike15m',
+      body: symbols,
     },
     { apiName: this.apiName,...config });
   

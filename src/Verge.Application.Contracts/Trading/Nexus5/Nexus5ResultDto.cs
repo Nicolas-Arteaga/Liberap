@@ -74,4 +74,11 @@ public class Nexus5FeaturesDto
     public bool Ma50Horizontal { get; set; }
     public double Ma50Ma99Distance { get; set; }
     public double PriceToMa99Pct { get; set; }
+
+    // ── SWEEP DETECTOR — Dual timeframe 15m+1m (v13.0) ──────────────
+    public bool SweepDetected { get; set; }
+    public double SweepDepthPct { get; set; }
+    public bool HalfUForming { get; set; }
+    public bool Lateralization1m { get; set; }
+    public bool MasAligned1m { get; set; }
 }

@@ -387,6 +387,26 @@ $border:  rgba(255, 68, 0, 0.15);
     border-color: $fire; box-shadow: 0 0 24px rgba($fire,0.4);
   }
 }
+.btn-sweep {
+  border-color: rgba($cyan,0.7); background: linear-gradient(135deg, rgba($cyan,0.20), rgba($cyan,0.05));
+  .act-icon { filter: drop-shadow(0 0 6px $cyan); }
+  &:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgba($cyan,0.35), rgba($cyan,0.15));
+    border-color: $cyan; box-shadow: 0 0 24px rgba($cyan,0.4);
+  }
+}
+.btn-sweep-top {
+  border-color: rgba($cyan,0.7); background: linear-gradient(135deg, rgba($cyan,0.15), rgba($cyan,0.03));
+  .act-icon { filter: drop-shadow(0 0 6px $cyan); }
+  &:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgba($cyan,0.30), rgba($cyan,0.12));
+    border-color: $cyan; box-shadow: 0 0 24px rgba($cyan,0.4);
+  }
+}
+.sweep-banner {
+  .tb-title { color: $cyan !important; }
+  .tb-item:hover { border-color: rgba($cyan,0.5); }
+}
 
 // ── Responsive ──
 @media (max-width: 900px) {

@@ -1,4 +1,4 @@
-import type { OpenTradeInputDto, SimulatedTradeDto, SimulationPerformanceDto, UpdateMaxAdversePriceInputDto, UpdateTpSlInputDto } from './dtos/models';
+import type { OpenTradeInputDto, SimulatedTradeDto, SimulationPerformanceDto, UpdateExitInfoInputDto, UpdateMaxAdversePriceInputDto, UpdateMaxFavorablePriceInputDto, UpdateTpSlInputDto } from './dtos/models';
 import { RestService, Rest } from '@abp/ng.core';
 import { Injectable, inject } from '@angular/core';
 
@@ -77,11 +77,11 @@ export class SimulatedTradeService {
     { apiName: this.apiName,...config });
   
 
-  updateExitInfo = (tradeId: string, exitReason: string, btcPriceAtClose?: number, config?: Partial<Rest.Config>) =>
+  updateExitInfo = (tradeId: string, input: UpdateExitInfoInputDto, config?: Partial<Rest.Config>) =>
     this.restService.request<any, void>({
-      method: 'PUT',
-      url: `/api/app/simulated-trade/exit-info/${tradeId}`,
-      params: { exitReason, btcPriceAtClose },
+      method: 'POST',
+      url: `/api/app/simulated-trade/update-exit-info/${tradeId}`,
+      body: input,
     },
     { apiName: this.apiName,...config });
   
@@ -95,11 +95,11 @@ export class SimulatedTradeService {
     { apiName: this.apiName,...config });
   
 
-  updateMaxFavorablePrice = (tradeId: string, maxFavorablePrice: number, config?: Partial<Rest.Config>) =>
+  updateMaxFavorablePrice = (tradeId: string, input: UpdateMaxFavorablePriceInputDto, config?: Partial<Rest.Config>) =>
     this.restService.request<any, void>({
-      method: 'PUT',
-      url: `/api/app/simulated-trade/max-favorable-price/${tradeId}`,
-      params: { maxFavorablePrice },
+      method: 'POST',
+      url: `/api/app/simulated-trade/update-max-favorable-price/${tradeId}`,
+      body: input,
     },
     { apiName: this.apiName,...config });
   

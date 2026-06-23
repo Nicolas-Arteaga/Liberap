@@ -2532,6 +2532,23 @@
                     "type": "System.Collections.Generic.List<Verge.Trading.Nexus15.Nexus15ResultDto>",
                     "typeSimple": "[Verge.Trading.Nexus15.Nexus15ResultDto]"
                   }
+                },
+                {
+                  "name": "AnalyzeStrike15mAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "symbols",
+                      "typeAsString": "System.Collections.Generic.List`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                      "type": "System.Collections.Generic.List<System.String>",
+                      "typeSimple": "[string]",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "Verge.Trading.Nexus15.Strike15mResponseDto",
+                    "typeSimple": "Verge.Trading.Nexus15.Strike15mResponseDto"
+                  }
                 }
               ]
             }
@@ -2647,6 +2664,43 @@
               },
               "allowAnonymous": null,
               "implementFrom": "Verge.Trading.Nexus15.INexus15AppService"
+            },
+            "AnalyzeStrike15mAsyncBySymbols": {
+              "uniqueName": "AnalyzeStrike15mAsyncBySymbols",
+              "name": "AnalyzeStrike15mAsync",
+              "httpMethod": "POST",
+              "url": "api/app/nexus15/analyze-strike15m",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "symbols",
+                  "typeAsString": "System.Collections.Generic.List`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                  "type": "System.Collections.Generic.List<System.String>",
+                  "typeSimple": "[string]",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "symbols",
+                  "name": "symbols",
+                  "jsonName": null,
+                  "type": "System.Collections.Generic.List<System.String>",
+                  "typeSimple": "[string]",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "Body",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "Verge.Trading.Nexus15.Strike15mResponseDto",
+                "typeSimple": "Verge.Trading.Nexus15.Strike15mResponseDto"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.Nexus15.INexus15AppService"
             }
           }
         },
@@ -2716,6 +2770,40 @@
                 {
                   "name": "AnalyzeAllCandidatesAsync",
                   "parametersOnMethod": [],
+                  "returnValue": {
+                    "type": "System.Collections.Generic.List<Verge.Trading.Nexus5.Nexus5ResultDto>",
+                    "typeSimple": "[Verge.Trading.Nexus5.Nexus5ResultDto]"
+                  }
+                },
+                {
+                  "name": "AnalyzeSweepOnDemandAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "symbol",
+                      "typeAsString": "System.String, System.Private.CoreLib",
+                      "type": "System.String",
+                      "typeSimple": "string",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "Verge.Trading.Nexus5.Nexus5ResultDto",
+                    "typeSimple": "Verge.Trading.Nexus5.Nexus5ResultDto"
+                  }
+                },
+                {
+                  "name": "AnalyzeSweepTopAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "topN",
+                      "typeAsString": "System.Int32, System.Private.CoreLib",
+                      "type": "System.Int32",
+                      "typeSimple": "number",
+                      "isOptional": true,
+                      "defaultValue": 5
+                    }
+                  ],
                   "returnValue": {
                     "type": "System.Collections.Generic.List<Verge.Trading.Nexus5.Nexus5ResultDto>",
                     "typeSimple": "[Verge.Trading.Nexus5.Nexus5ResultDto]"
@@ -2844,6 +2932,80 @@
               "supportedVersions": [],
               "parametersOnMethod": [],
               "parameters": [],
+              "returnValue": {
+                "type": "System.Collections.Generic.List<Verge.Trading.Nexus5.Nexus5ResultDto>",
+                "typeSimple": "[Verge.Trading.Nexus5.Nexus5ResultDto]"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.Nexus5.INexus5AppService"
+            },
+            "AnalyzeSweepOnDemandAsyncBySymbol": {
+              "uniqueName": "AnalyzeSweepOnDemandAsyncBySymbol",
+              "name": "AnalyzeSweepOnDemandAsync",
+              "httpMethod": "POST",
+              "url": "api/app/nexus5/analyze-sweep-on-demand",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "symbol",
+                  "typeAsString": "System.String, System.Private.CoreLib",
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "symbol",
+                  "name": "symbol",
+                  "jsonName": null,
+                  "type": "System.String",
+                  "typeSimple": "string",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "Verge.Trading.Nexus5.Nexus5ResultDto",
+                "typeSimple": "Verge.Trading.Nexus5.Nexus5ResultDto"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.Nexus5.INexus5AppService"
+            },
+            "AnalyzeSweepTopAsyncByTopN": {
+              "uniqueName": "AnalyzeSweepTopAsyncByTopN",
+              "name": "AnalyzeSweepTopAsync",
+              "httpMethod": "POST",
+              "url": "api/app/nexus5/analyze-sweep-top",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "topN",
+                  "typeAsString": "System.Int32, System.Private.CoreLib",
+                  "type": "System.Int32",
+                  "typeSimple": "number",
+                  "isOptional": true,
+                  "defaultValue": 5
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "topN",
+                  "name": "topN",
+                  "jsonName": null,
+                  "type": "System.Int32",
+                  "typeSimple": "number",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                }
+              ],
               "returnValue": {
                 "type": "System.Collections.Generic.List<Verge.Trading.Nexus5.Nexus5ResultDto>",
                 "typeSimple": "[Verge.Trading.Nexus5.Nexus5ResultDto]"
@@ -3665,6 +3827,56 @@
                     "type": "System.Void",
                     "typeSimple": "System.Void"
                   }
+                },
+                {
+                  "name": "UpdateMaxFavorablePriceAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "tradeId",
+                      "typeAsString": "System.Guid, System.Private.CoreLib",
+                      "type": "System.Guid",
+                      "typeSimple": "string",
+                      "isOptional": false,
+                      "defaultValue": null
+                    },
+                    {
+                      "name": "input",
+                      "typeAsString": "Verge.Trading.DTOs.UpdateMaxFavorablePriceInputDto, Verge.Application.Contracts",
+                      "type": "Verge.Trading.DTOs.UpdateMaxFavorablePriceInputDto",
+                      "typeSimple": "Verge.Trading.DTOs.UpdateMaxFavorablePriceInputDto",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "System.Void",
+                    "typeSimple": "System.Void"
+                  }
+                },
+                {
+                  "name": "UpdateExitInfoAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "tradeId",
+                      "typeAsString": "System.Guid, System.Private.CoreLib",
+                      "type": "System.Guid",
+                      "typeSimple": "string",
+                      "isOptional": false,
+                      "defaultValue": null
+                    },
+                    {
+                      "name": "input",
+                      "typeAsString": "Verge.Trading.DTOs.UpdateExitInfoInputDto, Verge.Application.Contracts",
+                      "type": "Verge.Trading.DTOs.UpdateExitInfoInputDto",
+                      "typeSimple": "Verge.Trading.DTOs.UpdateExitInfoInputDto",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "System.Void",
+                    "typeSimple": "System.Void"
+                  }
                 }
               ]
             }
@@ -3707,11 +3919,11 @@
               "allowAnonymous": null,
               "implementFrom": "Verge.Trading.ISimulatedTradeAppService"
             },
-            "UpdateMaxFavorablePriceAsyncByTradeIdAndMaxFavorablePrice": {
-              "uniqueName": "UpdateMaxFavorablePriceAsyncByTradeIdAndMaxFavorablePrice",
+            "UpdateMaxFavorablePriceAsyncByTradeIdAndInput": {
+              "uniqueName": "UpdateMaxFavorablePriceAsyncByTradeIdAndInput",
               "name": "UpdateMaxFavorablePriceAsync",
-              "httpMethod": "PUT",
-              "url": "api/app/simulated-trade/max-favorable-price/{tradeId}",
+              "httpMethod": "POST",
+              "url": "api/app/simulated-trade/update-max-favorable-price/{tradeId}",
               "supportedVersions": [],
               "parametersOnMethod": [
                 {
@@ -3723,10 +3935,10 @@
                   "defaultValue": null
                 },
                 {
-                  "name": "maxFavorablePrice",
-                  "typeAsString": "System.Decimal, System.Private.CoreLib",
-                  "type": "System.Decimal",
-                  "typeSimple": "number",
+                  "name": "input",
+                  "typeAsString": "Verge.Trading.DTOs.UpdateMaxFavorablePriceInputDto, Verge.Application.Contracts",
+                  "type": "Verge.Trading.DTOs.UpdateMaxFavorablePriceInputDto",
+                  "typeSimple": "Verge.Trading.DTOs.UpdateMaxFavorablePriceInputDto",
                   "isOptional": false,
                   "defaultValue": null
                 }
@@ -3745,15 +3957,15 @@
                   "descriptorName": ""
                 },
                 {
-                  "nameOnMethod": "maxFavorablePrice",
-                  "name": "maxFavorablePrice",
+                  "nameOnMethod": "input",
+                  "name": "input",
                   "jsonName": null,
-                  "type": "System.Decimal",
-                  "typeSimple": "number",
+                  "type": "Verge.Trading.DTOs.UpdateMaxFavorablePriceInputDto",
+                  "typeSimple": "Verge.Trading.DTOs.UpdateMaxFavorablePriceInputDto",
                   "isOptional": false,
                   "defaultValue": null,
                   "constraintTypes": null,
-                  "bindingSourceId": "ModelBinding",
+                  "bindingSourceId": "Body",
                   "descriptorName": ""
                 }
               ],
@@ -3762,13 +3974,13 @@
                 "typeSimple": "System.Void"
               },
               "allowAnonymous": null,
-              "implementFrom": "Verge.Trading.SimulatedTradeAppService"
+              "implementFrom": "Verge.Trading.ISimulatedTradeAppService"
             },
-            "UpdateExitInfoAsyncByTradeIdAndExitReasonAndBtcPriceAtClose": {
-              "uniqueName": "UpdateExitInfoAsyncByTradeIdAndExitReasonAndBtcPriceAtClose",
+            "UpdateExitInfoAsyncByTradeIdAndInput": {
+              "uniqueName": "UpdateExitInfoAsyncByTradeIdAndInput",
               "name": "UpdateExitInfoAsync",
-              "httpMethod": "PUT",
-              "url": "api/app/simulated-trade/exit-info/{tradeId}",
+              "httpMethod": "POST",
+              "url": "api/app/simulated-trade/update-exit-info/{tradeId}",
               "supportedVersions": [],
               "parametersOnMethod": [
                 {
@@ -3780,19 +3992,11 @@
                   "defaultValue": null
                 },
                 {
-                  "name": "exitReason",
-                  "typeAsString": "System.String, System.Private.CoreLib",
-                  "type": "System.String",
-                  "typeSimple": "string",
+                  "name": "input",
+                  "typeAsString": "Verge.Trading.DTOs.UpdateExitInfoInputDto, Verge.Application.Contracts",
+                  "type": "Verge.Trading.DTOs.UpdateExitInfoInputDto",
+                  "typeSimple": "Verge.Trading.DTOs.UpdateExitInfoInputDto",
                   "isOptional": false,
-                  "defaultValue": null
-                },
-                {
-                  "name": "btcPriceAtClose",
-                  "typeAsString": "System.Nullable`1[[System.Decimal, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
-                  "type": "System.Decimal?",
-                  "typeSimple": "number?",
-                  "isOptional": true,
                   "defaultValue": null
                 }
               ],
@@ -3810,27 +4014,15 @@
                   "descriptorName": ""
                 },
                 {
-                  "nameOnMethod": "exitReason",
-                  "name": "exitReason",
+                  "nameOnMethod": "input",
+                  "name": "input",
                   "jsonName": null,
-                  "type": "System.String",
-                  "typeSimple": "string",
+                  "type": "Verge.Trading.DTOs.UpdateExitInfoInputDto",
+                  "typeSimple": "Verge.Trading.DTOs.UpdateExitInfoInputDto",
                   "isOptional": false,
                   "defaultValue": null,
                   "constraintTypes": null,
-                  "bindingSourceId": "ModelBinding",
-                  "descriptorName": ""
-                },
-                {
-                  "nameOnMethod": "btcPriceAtClose",
-                  "name": "btcPriceAtClose",
-                  "jsonName": null,
-                  "type": "System.Decimal?",
-                  "typeSimple": "number?",
-                  "isOptional": false,
-                  "defaultValue": null,
-                  "constraintTypes": null,
-                  "bindingSourceId": "ModelBinding",
+                  "bindingSourceId": "Body",
                   "descriptorName": ""
                 }
               ],
@@ -3839,7 +4031,7 @@
                 "typeSimple": "System.Void"
               },
               "allowAnonymous": null,
-              "implementFrom": "Verge.Trading.SimulatedTradeAppService"
+              "implementFrom": "Verge.Trading.ISimulatedTradeAppService"
             },
             "CloseTradeAsyncByTradeId": {
               "uniqueName": "CloseTradeAsyncByTradeId",
@@ -11870,6 +12062,18 @@
           "minimum": null,
           "maximum": null,
           "regex": null
+        },
+        {
+          "name": "ExitAuditJson",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
         }
       ]
     },
@@ -12581,6 +12785,51 @@
         }
       ]
     },
+    "Verge.Trading.DTOs.UpdateExitInfoInputDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "ExitReason",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "BtcPriceAtClose",
+          "jsonName": null,
+          "type": "System.Decimal?",
+          "typeSimple": "number?",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "ExitAuditJson",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
     "Verge.Trading.DTOs.UpdateMaxAdversePriceInputDto": {
       "baseType": null,
       "isEnum": false,
@@ -12590,6 +12839,27 @@
       "properties": [
         {
           "name": "MaxAdversePrice",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.DTOs.UpdateMaxFavorablePriceInputDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "MaxFavorablePrice",
           "jsonName": null,
           "type": "System.Decimal",
           "typeSimple": "number",
@@ -14416,6 +14686,168 @@
         }
       ]
     },
+    "Verge.Trading.Nexus15.Strike15mItemDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Symbol",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "ForceScore",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Ma99DistancePct",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Volume15m",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "CurrentPrice",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Ma99Value",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "CandleOpen",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Atr20_15m",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "IsPerfectShot",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.Nexus15.Strike15mResponseDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Top5",
+          "jsonName": null,
+          "type": "[Verge.Trading.Nexus15.Strike15mItemDto]",
+          "typeSimple": "[Verge.Trading.Nexus15.Strike15mItemDto]",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "ScannedCount",
+          "jsonName": null,
+          "type": "System.Int32",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "AnalyzedAt",
+          "jsonName": null,
+          "type": "System.DateTime",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
     "Verge.Trading.Nexus5.Nexus5FeaturesDto": {
       "baseType": null,
       "isEnum": false,
@@ -14632,6 +15064,162 @@
           "jsonName": null,
           "type": "System.Double",
           "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "SlopeMa50",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "SlopeMa99",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "GravityMa99Safe",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "VolRatio",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "CompressionViper",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Ma50Horizontal",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Ma50Ma99Distance",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "PriceToMa99Pct",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "SweepDetected",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "SweepDepthPct",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "HalfUForming",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Lateralization1m",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "MasAligned1m",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
           "isRequired": false,
           "minLength": null,
           "maxLength": null,

@@ -20,4 +20,10 @@ public interface INexus5AppService : IApplicationService
     /// (Compression con phase_score > 60 o Ignition), ordenados por urgencia.
     /// </summary>
     Task<List<Nexus5ResultDto>> AnalyzeAllCandidatesAsync();
+
+    /// <summary>Sweep on-demand: retorna resultado solo si sweep_detected=true.</summary>
+    Task<Nexus5ResultDto?> AnalyzeSweepOnDemandAsync(string symbol);
+
+    /// <summary>Top Sweep scan: escanea mercado y retorna pares con sweep detectado.</summary>
+    Task<List<Nexus5ResultDto>> AnalyzeSweepTopAsync(int topN = 5);
 }

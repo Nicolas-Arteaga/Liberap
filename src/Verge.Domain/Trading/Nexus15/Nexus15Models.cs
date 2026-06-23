@@ -99,7 +99,42 @@ public class Nexus15FeaturesModel
     public double AtrPercent { get; set; }
 }
 
+// ── STRIKE 15m Models ────────────────────────────────────────────────────────────
+
+public class Strike15mItemModel
+{
+    [JsonPropertyName("symbol")]
+    public string Symbol { get; set; }
+    [JsonPropertyName("force_score")]
+    public double ForceScore { get; set; }
+    [JsonPropertyName("ma99_distance_pct")]
+    public double Ma99DistancePct { get; set; }
+    [JsonPropertyName("volume_15m")]
+    public double Volume15m { get; set; }
+    [JsonPropertyName("current_price")]
+    public double CurrentPrice { get; set; }
+    [JsonPropertyName("ma99_value")]
+    public double Ma99Value { get; set; }
+    [JsonPropertyName("candle_open")]
+    public double CandleOpen { get; set; }
+    [JsonPropertyName("atr_20_15m")]
+    public double Atr20_15m { get; set; }
+    [JsonPropertyName("is_perfect_shot")]
+    public bool IsPerfectShot { get; set; }
+}
+
+public class Strike15mResponseModel
+{
+    [JsonPropertyName("top_5")]
+    public List<Strike15mItemModel> Top5 { get; set; }
+    [JsonPropertyName("scanned_count")]
+    public int ScannedCount { get; set; }
+    [JsonPropertyName("analyzed_at")]
+    public DateTime AnalyzedAt { get; set; }
+}
+
 public interface IPythonNexus15Service
 {
     Task<Nexus15ResponseModel?> AnalyzeNexus15Async(string symbol, List<MarketCandleModel> candles);
+    Task<Strike15mResponseModel?> AnalyzeStrike15mAsync(List<string> symbols);
 }

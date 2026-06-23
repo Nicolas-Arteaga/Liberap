@@ -137,9 +137,21 @@ public class Nexus5FeaturesModel
     public double SuperCrashPct { get; set; }
     [JsonPropertyName("crash_detected")]
     public bool CrashDetected { get; set; }
+
+    // ── SWEEP DETECTOR — Dual timeframe 15m+1m (v13.0) ──────────────
+    [JsonPropertyName("sweep_detected")]
+    public bool SweepDetected { get; set; }
+    [JsonPropertyName("sweep_depth_pct")]
+    public double SweepDepthPct { get; set; }
+    [JsonPropertyName("half_u_forming")]
+    public bool HalfUForming { get; set; }
+    [JsonPropertyName("lateralization_1m")]
+    public bool Lateralization1m { get; set; }
+    [JsonPropertyName("mas_aligned_1m")]
+    public bool MasAligned1m { get; set; }
 }
 
 public interface IPythonNexus5Service
 {
-    Task<Nexus5ResponseModel?> AnalyzeNexus5Async(string symbol, List<MarketCandleModel> candles, List<MarketCandleModel>? candles15m = null);
+    Task<Nexus5ResponseModel?> AnalyzeNexus5Async(string symbol, List<MarketCandleModel> candles, List<MarketCandleModel>? candles15m = null, List<MarketCandleModel>? candles1m = null);
 }

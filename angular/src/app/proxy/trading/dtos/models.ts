@@ -167,6 +167,7 @@ export interface SimulatedTradeDto extends EntityDto<string> {
   exitReason?: string;
   ma7DistancePctAtEntry?: number;
   btcPriceAtClose?: number;
+  exitAuditJson?: string;
 }
 
 export interface SimulationPerformanceDto {
@@ -237,8 +238,18 @@ export interface TradingSignalDto extends EntityDto<string> {
   score?: number;
 }
 
+export interface UpdateExitInfoInputDto {
+  exitReason?: string;
+  btcPriceAtClose?: number;
+  exitAuditJson?: string;
+}
+
 export interface UpdateMaxAdversePriceInputDto {
   maxAdversePrice: number;
+}
+
+export interface UpdateMaxFavorablePriceInputDto {
+  maxFavorablePrice: number;
 }
 
 export interface UpdateTpSlInputDto {

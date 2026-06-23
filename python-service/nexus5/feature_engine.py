@@ -702,3 +702,193 @@ class Nexus5FeatureEngine:
                 "super_crash_pct": 0.0,
                 "crash_detected": False,
             }
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # SWEEP DETECTOR — Dual timeframe: 15m (macro) + 1m (micro)
+    # Detecta la "mitad de la U" — el barrido antes de la confirmación verde.
+    # ══════════════════════════════════════════════════════════════════════════
+    def _detect_sweep(self, df_15m: pd.DataFrame, df_1m: pd.DataFrame) -> dict:
+        """
+        Detecta el patrón SWEEP en dos temporalidades:
+
+        15m (macro):
+          - Precio lateralizando: range < 4% en últimas 20 velas
+          - MA99 cayendo en diagonal: slope < -1%
+          - Compresión: MA99 acercándose al precio
+
+        1m (micro):
+          - Precio lateralizando: range < 2% en últimas 30 velas
+          - Todas las MAs (7,25,50,99) lateralizando junto al precio (slopes < 0.05%)
+          - Barrido formando: el low reciente perforó el piso de lateralización = "half U"
+
+        Retorna dict con sweep_detected y métricas.
+        NO espera la vela verde de confirmación — entrega hasta la mitad de la U.
+        """
+        _sentinel = {
+            "sweep_detected": False,
+            "sweep_depth_pct": 0.0,
+            "half_u_forming": False,
+            "lateralization_1m": False,
+            "mas_aligned_1m": False,
+            "sweep_15m_compression": False,
+            "sweep_ma99_descending": False,
+        }
+
+        try:
+            if df_15m is None or len(df_15m) < 99:
+                return _sentinel
+            if df_1m is None or len(df_1m) < 110:
+                return _sentinel
+
+            # ── 15m CHECKS (Macro Context) ──────────────────────────────────────
+            n_15m = len(df_15m)
+
+            # MA99 on 15m
+            ma99_15m = df_15m['close'].rolling(99).mean()
+            ma99_now = ma99_15m.iloc[-1]
+            ma99_ago = ma99_15m.iloc[-40] if n_15m >= 40 else ma99_15m.iloc[0]
+            ma99_slope_15m = (ma99_now - ma99_ago) / (ma99_ago + EPSILON)
+            ma99_descending = ma99_slope_15m < -0.005  # < -0.5% (relajado desde -1%)
+
+            # Price lateralization on 15m (last 20 candles)
+            lat_15m = df_15m.iloc[-20:]
+            range_15m = (lat_15m['high'].max() - lat_15m['low'].min()) / (lat_15m['close'].iloc[-1] + EPSILON)
+            lateral_15m = range_15m < 0.06  # < 6% (relajado desde 4%)
+
+            # Compression: MA99 approaching price
+            price_now = df_15m['close'].iloc[-1]
+            dist_now = abs(price_now - ma99_now) / (price_now + EPSILON)
+            dist_ago = abs(df_15m['close'].iloc[-20] - ma99_15m.iloc[-20]) / (df_15m['close'].iloc[-20] + EPSILON) if n_15m >= 20 else dist_now
+            compression_15m = dist_now < dist_ago  # Distance shrinking
+
+            # Price must be BELOW MA99 (MA99 pressing down from above = the WHOLE pattern)
+            price_below_ma99 = price_now < ma99_now
+
+            # macro_ok requires ALL structural conditions from the plan:
+            # 1. MA99 descending diagonally toward price
+            # 2. Price lateralizing (< 6% range)
+            # 3. Price BELOW MA99 (compression from above)
+            # Compression is bonus (nice-to-have, not always present)
+            macro_ok = bool(ma99_descending and lateral_15m and price_below_ma99)
+
+            print(f"[SWEEP-15m] MA99 slope={ma99_slope_15m:.4f}(<-0.005)={ma99_descending} | "
+                  f"range={range_15m:.4f}(<0.06)={lateral_15m} | "
+                  f"price={price_now:.4f} < MA99={ma99_now:.4f} → below={price_below_ma99} | "
+                  f"compression={compression_15m} | macro_ok={macro_ok}")
+
+            # ── 1m CHECKS (Micro Trigger) ───────────────────────────────────────
+            n_1m = len(df_1m)
+
+            # Calculate MAs on 1m
+            ma7_1m = df_1m['close'].rolling(7).mean()
+            ma25_1m = df_1m['close'].rolling(25).mean()
+            ma50_1m = df_1m['close'].rolling(50).mean()
+            ma99_1m = df_1m['close'].rolling(99).mean()
+
+            # Lateralization on 1m: range < 2% in last 30 candles
+            lat_1m = df_1m.iloc[-30:]
+            range_1m = (lat_1m['high'].max() - lat_1m['low'].min()) / (lat_1m['close'].iloc[-1] + EPSILON)
+            lateral_1m = range_1m < 0.02  # < 2%
+
+            # MA slopes on 1m (all near zero = lateralizing together)
+            def _slope_1m(ma_series, lookback=10):
+                if len(ma_series.dropna()) < lookback:
+                    return 999.0
+                vals = ma_series.dropna().iloc[-lookback:]
+                return (vals.iloc[-1] - vals.iloc[0]) / (vals.iloc[0] + EPSILON)
+
+            slope_ma7 = abs(_slope_1m(ma7_1m))
+            slope_ma25 = abs(_slope_1m(ma25_1m))
+            slope_ma50 = abs(_slope_1m(ma50_1m))
+            slope_ma99 = abs(_slope_1m(ma99_1m))
+
+            # MA7 is more volatile — use higher threshold
+            # MA25/MA50 are the core flatness check
+            # MA99 uses sentinel 999.0 when insufficient data — treat as "unknown, don't veto"
+            ma7_threshold = 0.003    # 0.3% — MA7 puede oscilar más
+            ma_core_threshold = 0.003  # 0.3% — MA25 y MA50 planas con tolerancia al ruido de 1m
+
+            ma7_flat = slope_ma7 < ma7_threshold
+            ma25_flat = slope_ma25 < ma_core_threshold
+            ma50_flat = slope_ma50 < ma_core_threshold
+            # MA99: if sentinel (999), skip the check (don't veto)
+            ma99_flat = slope_ma99 < ma_core_threshold if slope_ma99 < 100 else True
+
+            mas_aligned = bool(ma7_flat and ma25_flat and ma50_flat and ma99_flat)
+
+            # ── HALF-U DETECTION: dip-recovery pattern on 1m ──────────
+            # Detect a V/U shape: local minimum with price higher on BOTH sides.
+            # This is stable across candle updates — the minimum just needs to exist.
+            
+            lookback_n = 25  # analyze last 25 candles for dip-recovery shape
+            lookback_window = df_1m.iloc[-lookback_n:]
+            
+            # Find the minimum low and its position
+            min_low = lookback_window['low'].min()
+            min_idx = lookback_window['low'].idxmin()
+            min_pos = lookback_window.index.get_loc(min_idx)
+            min_pct = min_pos / max(1, lookback_n - 1)  # 0=start, 1=end
+            
+            # Left rise: how much higher is the price BEFORE the minimum
+            left_window = lookback_window.iloc[:max(1, min_pos)]
+            left_high = left_window['high'].max() if len(left_window) > 0 else lookback_window['high'].iloc[0]
+            left_rise = (left_high - min_low) / (min_low + EPSILON) if min_low > 0 else 0
+            
+            # Right rise: how much higher is the price AFTER the minimum  
+            right_window = lookback_window.iloc[min_pos + 1:] if min_pos < lookback_n - 1 else lookback_window.iloc[-1:]
+            right_high = right_window['high'].max() if len(right_window) > 0 else lookback_window['high'].iloc[-1]
+            right_rise = (right_high - min_low) / (min_low + EPSILON) if min_low > 0 else 0
+            
+            # Current close vs minimum (recovery confirmation)
+            current_close_1m = df_1m['close'].iloc[-1]
+            recovery = (current_close_1m - min_low) / (min_low + EPSILON) if min_low > 0 else 0
+            
+            # HALF-U criteria (must be VISIBLE on chart, not micro-noise):
+            # 1. Left rise > 0.2% (clear dip visible on chart)
+            # 2. Right rise > 0.1% (clear recovery visible)
+            # 3. Minimum is not at the very end
+            # 4. Current close is in upper portion of range
+            has_left_rise = left_rise > 0.002    # 0.2% — dip visible a ojo
+            has_right_rise = right_rise > 0.001   # 0.1% — recovery visible
+            dip_not_at_end = min_pct < 0.80       # dip ocurrió antes del último 20%
+            # Current close in upper 60% of the window range
+            window_range = lookback_window['high'].max() - lookback_window['low'].min()
+            close_position = (current_close_1m - lookback_window['low'].min()) / (window_range + EPSILON) if window_range > 0 else 0.5
+            close_upper = close_position > 0.40  # close en la parte superior
+            
+            half_u = bool(has_left_rise and has_right_rise and dip_not_at_end and close_upper)
+            
+            # Also check floor sweep (classic sweep) as additional signal
+            floor_window = df_1m.iloc[-50:-10] if n_1m >= 50 else df_1m.iloc[:-10]
+            floor_price = floor_window['low'].min() if len(floor_window) > 0 else df_1m['low'].min()
+            recent_low_10 = df_1m.iloc[-10:]['low'].min()
+            sweep_below = recent_low_10 < floor_price
+            sweep_depth = (floor_price - recent_low_10) / (floor_price + EPSILON) if sweep_below else 0.0
+            if sweep_below:
+                half_u = True  # classic sweep overrides
+
+            # ── FINAL VERDICT ────────────────────────────────────────────────
+            sweep_detected = bool(macro_ok and lateral_1m and mas_aligned and half_u)
+
+            print(f"[SWEEP-1m] range={range_1m:.4f}(<0.02)={lateral_1m} | "
+                  f"MAs flat={mas_aligned} (7={slope_ma7:.5f}<{ma7_threshold}={ma7_flat} "
+                  f"25={slope_ma25:.5f}<{ma_core_threshold}={ma25_flat} "
+                  f"50={slope_ma50:.5f}<{ma_core_threshold}={ma50_flat} "
+                  f"99={slope_ma99:.5f}[{'skip' if slope_ma99 > 100 else 'check'}]={ma99_flat})")
+            print(f"[SWEEP-U] min@{min_pct:.2f} left_rise={left_rise:.4%} right_rise={right_rise:.4%} "
+                  f"rec={recovery:.4%} close_pos={close_position:.2f} "
+                  f"half_u={half_u} | floor_sweep={sweep_below} | DETECTED={sweep_detected}")
+
+            return {
+                "sweep_detected": sweep_detected,
+                "sweep_depth_pct": round(float(sweep_depth * 100), 4),
+                "half_u_forming": bool(half_u),
+                "lateralization_1m": bool(lateral_1m),
+                "mas_aligned_1m": bool(mas_aligned),
+                "sweep_15m_compression": bool(compression_15m),
+                "sweep_ma99_descending": bool(ma99_descending),
+            }
+
+        except Exception as e:
+            print(f"[SWEEP] ERROR: {e}")
+            return _sentinel

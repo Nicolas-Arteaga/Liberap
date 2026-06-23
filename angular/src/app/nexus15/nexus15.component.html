@@ -171,6 +171,36 @@
         <div class="tb-clear" (click)="topResults.set([])">⨯</div>
       </div>
 
+      <!-- STRIKE RADAR Panel -->
+      <div class="nx15-strike-radar" *ngIf="strikeResults().length > 0">
+        <div class="strike-header">
+          <span class="strike-title">⚡ STRIKE RADAR (15m)</span>
+          <span class="strike-count">{{ strikeResults().length }} OPPORTUNITIES</span>
+          <div class="strike-clear" (click)="strikeResults.set([])">⨯</div>
+        </div>
+        <div class="strike-table">
+          <div class="strike-row strike-header-row">
+            <span class="st-col st-col-moneda">MONEDA</span>
+            <span class="st-col st-col-fuerza">FUERZA (X/10)</span>
+            <span class="st-col st-col-dist">DIST. MA99 (%)</span>
+            <span class="st-col st-col-vol">VOLUMEN 15m</span>
+          </div>
+          <div class="strike-row" 
+               *ngFor="let item of strikeResults()" 
+               (click)="onSymbolChange(item.symbol)"
+               [class.perfect-shot]="item.isPerfectShot">
+            <span class="st-col st-col-moneda">{{ item.symbol?.replace('USDT','') }}</span>
+            <span class="st-col st-col-fuerza" [style.color]="item.forceScore >= 9 ? '#00ff88' : item.forceScore >= 7 ? '#ffdd00' : '#ff8888'">
+              {{ item.forceScore | number:'1.1-1' }}/10
+            </span>
+            <span class="st-col st-col-dist" [style.color]="item.ma99DistancePct < 0.3 ? '#00ff88' : item.ma99DistancePct < 0.7 ? '#ffdd00' : '#ff8888'">
+              {{ item.ma99DistancePct | number:'1.2-2' }}%
+            </span>
+            <span class="st-col st-col-vol">{{ item.volume15m | number:'1.0-0' }}</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Chart -->
       <div class="nx15-chart-box">
         <!-- Syncing Overlay -->
@@ -296,6 +326,12 @@
           <span class="act-icon">🏆</span>
           <span class="act-text">TOP DE NEXUS-15</span>
           <span class="act-spin" *ngIf="isTopLoading()"> ⟳</span>
+        </button>
+
+        <button class="nx15-activate btn-strike" (click)="runStrike15m()" [disabled]="isLoading() || isTopLoading() || isStrikeLoading()">
+          <span class="act-icon">⚡</span>
+          <span class="act-text">STRIKE 15m</span>
+          <span class="act-spin" *ngIf="isStrikeLoading()"> ⟳</span>
         </button>
       </div>
 

@@ -1103,12 +1103,151 @@ $border:  rgba(0, 240, 255, 0.15);
   }
 }
 
+.btn-strike {
+  border-color: rgba($green, 0.7);
+  background: linear-gradient(135deg, rgba($green,0.20), rgba($green,0.05));
+  animation: pulse-glow 2.5s ease infinite;
+  
+  .act-icon { filter: drop-shadow(0 0 6px $green); }
+  
+  &:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgba($green,0.40), rgba($green,0.15));
+    border-color: $green;
+    box-shadow: 0 0 24px rgba($green,0.5), 0 0 48px rgba($green,0.2);
+  }
+}
+
 .explosion-msg {
   font-size: 11px;
   color: $magenta;
   text-align: center;
   margin-top: 4px;
   animation: flicker 2s infinite;
+}
+
+// ── STRIKE RADAR PANEL ──
+.nx15-strike-radar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba($green, 0.4);
+  background: rgba(0, 0, 0, 0.5);
+  animation: fade-in 0.3s ease;
+  margin-top: 6px;
+  flex-shrink: 0;
+
+  .strike-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba($green, 0.2);
+
+    .strike-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 13px;
+      font-weight: 900;
+      color: $green;
+      text-shadow: 0 0 10px $green;
+      letter-spacing: 1px;
+    }
+
+    .strike-count {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba($green, 0.7);
+      margin-left: auto;
+    }
+
+    .strike-clear {
+      font-size: 18px;
+      color: rgba(255, 255, 255, 0.4);
+      cursor: pointer;
+      line-height: 1;
+      transition: color 0.2s;
+      &:hover { color: #ff4466; text-shadow: 0 0 10px #ff4466; }
+    }
+  }
+
+  .strike-table {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .strike-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    cursor: pointer;
+    transition: all 0.2s;
+    align-items: center;
+
+    &:hover {
+      background: rgba($green, 0.1);
+      border-color: rgba($green, 0.3);
+      box-shadow: 0 0 12px rgba($green, 0.15);
+    }
+
+    &.strike-header-row {
+      background: rgba(0, 0, 0, 0.3);
+      border: none;
+      cursor: default;
+      pointer-events: none;
+
+      .st-col {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        color: rgba($green, 0.6);
+        letter-spacing: 0.5px;
+      }
+    }
+
+    &.perfect-shot {
+      border: 2px solid $green;
+      box-shadow: 0 0 20px rgba($green, 0.6), 0 0 40px rgba($green, 0.3);
+      animation: pulse-glow 1.5s ease infinite;
+      background: rgba($green, 0.08);
+    }
+
+    .st-col {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.8);
+
+      &.st-col-moneda {
+        font-family: 'Orbitron', sans-serif;
+        font-weight: 700;
+        color: #fff;
+      }
+
+      &.st-col-fuerza {
+        font-family: 'Rajdhani', sans-serif;
+        font-weight: 700;
+        font-size: 13px;
+      }
+
+      &.st-col-dist {
+        font-family: 'Rajdhani', sans-serif;
+        font-weight: 600;
+      }
+
+      &.st-col-vol {
+        font-family: 'Rajdhani', sans-serif;
+        font-weight: 600;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.6);
+      }
+    }
+  }
 }
 
 // ── RESPONSIVE ──

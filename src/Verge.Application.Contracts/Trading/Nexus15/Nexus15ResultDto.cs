@@ -59,3 +59,25 @@ public class Nexus15FeaturesDto
     public bool ExplosionBullish { get; set; }
     public bool ExplosionBearish { get; set; }
 }
+
+// ── STRIKE 15m DTOs ────────────────────────────────────────────────────────────
+
+public class Strike15mItemDto
+{
+    public string Symbol { get; set; }
+    public double ForceScore { get; set; }
+    public double Ma99DistancePct { get; set; }
+    public double Volume15m { get; set; }
+    public double CurrentPrice { get; set; }
+    public double Ma99Value { get; set; }
+    public double CandleOpen { get; set; }
+    public double Atr20_15m { get; set; }
+    public bool IsPerfectShot { get; set; }
+}
+
+public class Strike15mResponseDto
+{
+    public List<Strike15mItemDto> Top5 { get; set; }
+    public int ScannedCount { get; set; }
+    public DateTime AnalyzedAt { get; set; }
+}
