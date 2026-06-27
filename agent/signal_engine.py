@@ -166,7 +166,7 @@ class SignalEngine:
         return {**base, "nexus5_timing_note": f"below_min({conf:.0f}%)"}
 
 
-    def calculate_confluence(self, symbol: str, scar_data: dict, nexus_data: dict, nexus5_data: dict = None) -> dict:
+    def calculate_confluence(self, symbol: str, scar_data: dict, nexus_data: dict, nexus5_data: dict = None, profile_id: str = None) -> dict:
         """
         Full confluence score using ALL available signals:
           - Nexus-15 AI confidence          (max 40 pts)
@@ -217,6 +217,26 @@ class SignalEngine:
                 group_scores.get("g6_ml",           0),   # ML Features
             ]
             active = [g for g in g_vals if g > 0]
+            
+            # MA Clone PA veto: reject if g1_price_action is between 40-60
+            # Analysis shows PA 40-60 has 13% winrate (death zone)
+            ma_clone_id = "3a21db74-5d45-fcbf-f186-a284d59e97fb"
+            if profile_id == ma_clone_id:
+                pa_score = group_scores.get("g1_price_action", 0)
+                if 40 <= pa_score < 60:
+                    return {
+                        "symbol": symbol,
+                        "confluence_score": 0,
+                        "nexus_confidence": nexus_confidence,
+                        "regime": regime,
+                        "volume_explosion": volume_explosion,
+                        "estimated_range_pct": est_range,
+                        "reasons": [f"PA veto: {pa_score:.0f}% in death zone (40-60) for MA Clone"],
+                        "group_scores": group_scores,
+                        "features": features,
+                        "scored_at": scored_at_ts,
+                        "price_at_signal": last_close_kline,
+                    }
             if active:
                 avg_group  = sum(active) / len(active)
                 group_pts  = avg_group * 0.20   # 100% avg → 20 pts
@@ -249,10 +269,16 @@ class SignalEngine:
                 score -= 5
                 reasons.append("BullTrend vs BEARISH→-5")
 
-        # 5. Volume Explosion bonus → +5 pts
+        # 5. Volume Explosion bonus → +5 pts (default), -3 pts for MA Clone
+        # MA Clone analysis shows VolumeExplosion indicates late entry, not valid momentum
+        ma_clone_id = "3a21db74-5d45-fcbf-f186-a284d59e97fb"
         if volume_explosion:
-            score += 5
-            reasons.append("VolumeExplosion→+5")
+            if profile_id == ma_clone_id:
+                score -= 3
+                reasons.append("VolumeExplosion→-3(MA-Clone)")
+            else:
+                score += 5
+                reasons.append("VolumeExplosion→+5")
 
         # 6. RSI filter → -5 pts if entering against extremes
         rsi = features.get("rsi_14", 50)

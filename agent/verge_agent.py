@@ -1035,7 +1035,7 @@ class VergeAgent:
                 
                 scar_data  = scar_alerts.get(symbol, {})
                 n5_data    = nexus5_cache.get(symbol)
-                confluence = self.signals.calculate_confluence(symbol, scar_data, nexus_data, nexus5_data=n5_data)
+                confluence = self.signals.calculate_confluence(symbol, scar_data, nexus_data, nexus5_data=n5_data, profile_id=None)
 
                 # 🟢 BROADCAST: Batch scores to UI scanner (avoid request spam)
                 with broadcast_lock:
@@ -1498,6 +1498,31 @@ class VergeAgent:
             p_name = profile.get("name", "Unknown")
             p_id = profile.get("id")
             logger.info(f"--- Strategy Execution: {p_name} ---")
+
+            # MA Clone: Recalculate confluence score with profile-specific logic
+            ma_clone_id = "3a21db74-5d45-fcbf-f186-a284d59e97fb"
+            if p_id == ma_clone_id:
+                scar_alerts = self.signals.get_scar_alerts()
+                nexus5_cache = self._fetch_nexus5_cache()
+                recalculated_candidates = []
+                for c in candidates:
+                    # Recalculate confluence with MA Clone profile_id
+                    nexus_data = c.get("agent_audit_context", {}).get("nexus15", {})
+                    scar_data = scar_alerts.get(c.get("symbol"), {})
+                    n5_data = nexus5_cache.get(c.get("symbol"))
+                    new_confluence = self.signals.calculate_confluence(
+                        c.get("symbol"),
+                        scar_data,
+                        nexus_data,
+                        nexus5_data=n5_data,
+                        profile_id=ma_clone_id
+                    )
+                    # Preserve other fields
+                    for k, v in c.items():
+                        if k not in new_confluence:
+                            new_confluence[k] = v
+                    recalculated_candidates.append(new_confluence)
+                candidates = recalculated_candidates
 
             # Filter candidates for THIS profile
             p_candidates = []
@@ -2218,7 +2243,7 @@ class VergeAgent:
                 continue
 
             scar_data = scar_alerts.get(symbol, {})
-            confluence = self.signals.calculate_confluence(symbol, scar_data, nexus_data)
+            confluence = self.signals.calculate_confluence(symbol, scar_data, nexus_data, profile_id=None)
 
             if confluence["confluence_score"] >= config.MIN_CONFLUENCE_SCORE:
                 candidates.append(confluence)
@@ -2262,7 +2287,7 @@ class VergeAgent:
             if nexus_data:
                 nexus_calls += 1
                 scar_data = scar_alerts.get(symbol, {})
-                confluence = self.signals.calculate_confluence(symbol, scar_data, nexus_data)
+                confluence = self.signals.calculate_confluence(symbol, scar_data, nexus_data, profile_id=None)
 
                 if confluence["confluence_score"] >= config.MIN_CONFLUENCE_SCORE:
                     candidates.append(confluence)
