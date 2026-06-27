@@ -2549,6 +2549,23 @@
                     "type": "Verge.Trading.Nexus15.Strike15mResponseDto",
                     "typeSimple": "Verge.Trading.Nexus15.Strike15mResponseDto"
                   }
+                },
+                {
+                  "name": "AnalyzeStaircaseAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "symbols",
+                      "typeAsString": "System.Collections.Generic.List`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                      "type": "System.Collections.Generic.List<System.String>",
+                      "typeSimple": "[string]",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "Verge.Trading.Nexus15.StaircaseResponseDto",
+                    "typeSimple": "Verge.Trading.Nexus15.StaircaseResponseDto"
+                  }
                 }
               ]
             }
@@ -2698,6 +2715,43 @@
               "returnValue": {
                 "type": "Verge.Trading.Nexus15.Strike15mResponseDto",
                 "typeSimple": "Verge.Trading.Nexus15.Strike15mResponseDto"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.Nexus15.INexus15AppService"
+            },
+            "AnalyzeStaircaseAsyncBySymbols": {
+              "uniqueName": "AnalyzeStaircaseAsyncBySymbols",
+              "name": "AnalyzeStaircaseAsync",
+              "httpMethod": "POST",
+              "url": "api/app/nexus15/analyze-staircase",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "symbols",
+                  "typeAsString": "System.Collections.Generic.List`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                  "type": "System.Collections.Generic.List<System.String>",
+                  "typeSimple": "[string]",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "symbols",
+                  "name": "symbols",
+                  "jsonName": null,
+                  "type": "System.Collections.Generic.List<System.String>",
+                  "typeSimple": "[string]",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "Body",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "Verge.Trading.Nexus15.StaircaseResponseDto",
+                "typeSimple": "Verge.Trading.Nexus15.StaircaseResponseDto"
               },
               "allowAnonymous": null,
               "implementFrom": "Verge.Trading.Nexus15.INexus15AppService"
@@ -14677,6 +14731,156 @@
           "jsonName": null,
           "type": "{System.String:System.String}",
           "typeSimple": "{string:string}",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.Nexus15.StaircaseItemDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Symbol",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "OrderScore",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Trend1d",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Phase",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "CurrentPrice",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Ema7Value",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "Ema25Value",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "ImpulseDetected",
+          "jsonName": null,
+          "type": "System.Boolean",
+          "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.Nexus15.StaircaseResponseDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Top5",
+          "jsonName": null,
+          "type": "[Verge.Trading.Nexus15.StaircaseItemDto]",
+          "typeSimple": "[Verge.Trading.Nexus15.StaircaseItemDto]",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "ScannedCount",
+          "jsonName": null,
+          "type": "System.Int32",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "AnalyzedAt",
+          "jsonName": null,
+          "type": "System.DateTime",
+          "typeSimple": "string",
           "isRequired": false,
           "minLength": null,
           "maxLength": null,

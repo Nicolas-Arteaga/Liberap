@@ -133,8 +133,41 @@ public class Strike15mResponseModel
     public DateTime AnalyzedAt { get; set; }
 }
 
+// ── STAIRCASE Models ─────────────────────────────────────────────────────────────
+
+public class StaircaseItemModel
+{
+    [JsonPropertyName("symbol")]
+    public string Symbol { get; set; }
+    [JsonPropertyName("order_score")]
+    public double OrderScore { get; set; }
+    [JsonPropertyName("trend_1d")]
+    public string Trend1d { get; set; }
+    [JsonPropertyName("phase")]
+    public string Phase { get; set; }
+    [JsonPropertyName("current_price")]
+    public double CurrentPrice { get; set; }
+    [JsonPropertyName("ema7_value")]
+    public double Ema7Value { get; set; }
+    [JsonPropertyName("ema25_value")]
+    public double Ema25Value { get; set; }
+    [JsonPropertyName("impulse_detected")]
+    public bool ImpulseDetected { get; set; }
+}
+
+public class StaircaseResponseModel
+{
+    [JsonPropertyName("top_5")]
+    public List<StaircaseItemModel> Top5 { get; set; }
+    [JsonPropertyName("scanned_count")]
+    public int ScannedCount { get; set; }
+    [JsonPropertyName("analyzed_at")]
+    public DateTime AnalyzedAt { get; set; }
+}
+
 public interface IPythonNexus15Service
 {
     Task<Nexus15ResponseModel?> AnalyzeNexus15Async(string symbol, List<MarketCandleModel> candles);
     Task<Strike15mResponseModel?> AnalyzeStrike15mAsync(List<string> symbols);
+    Task<StaircaseResponseModel?> AnalyzeStaircaseAsync(List<string> symbols);
 }

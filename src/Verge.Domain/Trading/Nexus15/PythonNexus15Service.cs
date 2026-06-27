@@ -89,4 +89,32 @@ public class PythonNexus15Service : IPythonNexus15Service
             return null;
         }
     }
+
+    public async Task<StaircaseResponseModel?> AnalyzeStaircaseAsync(List<string> symbols)
+    {
+        try
+        {
+            var payload = new
+            {
+                symbols = symbols
+            };
+
+            var response = await _http.PostAsJsonAsync("/nexus15/staircase", payload);
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync();
+            _logger.LogInformation("DEBUG STAIRCASE: Raw JSON from Python: {Json}", json);
+            
+            return JsonSerializer.Deserialize<StaircaseResponseModel>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ [STAIRCASE] Python Service call failed");
+            return null;
+        }
+    }
 }

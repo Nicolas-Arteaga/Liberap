@@ -6,7 +6,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { Nexus15Service } from '../proxy/trading/nexus15/nexus15.service';
-import { Nexus15ResultDto, Nexus15FeaturesDto, Strike15mItemDto } from '../proxy/trading/nexus15/models';
+import { Nexus15ResultDto, Nexus15FeaturesDto, Strike15mItemDto, StaircaseItemDto } from '../proxy/trading/nexus15/models';
 
 import { BotService } from '../proxy/trading/bot.service';
 import { ScarService } from '../proxy/trading/scar/scar.service';
@@ -80,6 +80,8 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
   isTopLoading   = signal(false);
   strikeResults  = signal<Strike15mItemDto[]>([]);
   isStrikeLoading = signal(false);
+  staircaseResults = signal<StaircaseItemDto[]>([]);
+  isStaircaseLoading = signal(false);
 
 
 
@@ -384,6 +386,30 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
+  runStaircase() {
+    this.isStaircaseLoading.set(true);
+    this.staircaseResults.set([]);
+    this.pushTerminal('> 🪜 ROLLERCOASTER SCAN INIT: HIGH-BETA SWINGS DETECTION (ADR-10 ≥ 8%)...');
+    
+    // Use top 80 volume pairs for STAIRCASE scan
+    const symbolsToScan = BINANCE_FUTURES_PAIRS.slice(0, 80);
+    
+    this.nexus15Svc.analyzeStaircase(symbolsToScan).subscribe({
+      next: res => {
+        const arr = (res as any)?.top5 || res || [];
+        this.staircaseResults.set(arr);
+        this.isStaircaseLoading.set(false);
+        this.pushTerminal(`✓ ROLLERCOASTER SCAN COMPLETE: ${arr.length} HIGH-BETA OPPORTUNITIES FOUND`);
+      },
+      error: err => {
+        this.isStaircaseLoading.set(false);
+        const msg = err?.error?.error?.message || err?.message || 'unknown error';
+        this.pushTerminal(`⚠ STAIRCASE SCAN ERROR: ${msg}`);
+        console.error('STAIRCASE SCAN ERROR:', err);
+      }
+    });
+  }
+
 
 
   // ── Pairs loading ──────────────────────────────────────────────────────────
@@ -412,26 +438,43 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
 
     this.chart = createChart(el, {
       layout: {
-        background: { type: ColorType.Solid, color: 'transparent' },
-        textColor: 'rgba(0,240,255,0.7)',
-        fontFamily: "'Share Tech Mono', monospace",
-        fontSize: 13,
+        background: { type: ColorType.Solid, color: 'rgba(5, 9, 16, 0.4)' },
+        textColor: '#00f3ff',
+        fontFamily: "'Share Tech Mono', 'Orbitron', monospace",
+        fontSize: 11,
       },
       grid: {
-        vertLines: { color: 'rgba(0,240,255,0.03)' },
-        horzLines: { color: 'rgba(0,240,255,0.03)' },
+        vertLines: { color: 'rgba(0, 243, 255, 0.04)', style: LineStyle.Dotted },
+        horzLines: { color: 'rgba(0, 243, 255, 0.04)', style: LineStyle.Dotted },
       },
-      crosshair: { mode: CrosshairMode.Normal },
       rightPriceScale: {
-        borderColor: 'rgba(0,240,255,0.15)',
-        scaleMargins: { top: 0.08, bottom: 0.28 }
+        borderColor: 'rgba(0, 243, 255, 0.15)',
+      },
+      leftPriceScale: {
+        visible: false,
       },
       timeScale: {
-        borderColor: 'rgba(0,240,255,0.15)',
+        borderColor: 'rgba(0, 243, 255, 0.15)',
         timeVisible: true,
+        secondsVisible: false,
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal,
+        vertLine: {
+          color: 'rgba(0, 243, 255, 0.35)',
+          width: 1,
+          style: LineStyle.Dashed,
+          labelBackgroundColor: 'rgba(5, 9, 16, 0.95)',
+        },
+        horzLine: {
+          color: 'rgba(0, 243, 255, 0.35)',
+          width: 1,
+          style: LineStyle.Dashed,
+          labelBackgroundColor: 'rgba(5, 9, 16, 0.95)',
+        },
       },
       width: el.clientWidth,
-      height: el.clientHeight || 400,
+      height: el.clientHeight || 480,
     });
 
     // Handle responsive resize dynamically
@@ -456,17 +499,17 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
 
     // ── Volume histogram ─────────────────────────────────────────────────────
     this.volumeSeries = this.chart.addSeries(HistogramSeries, {
-      color: '#00f0ff',
+      color: '#00e5ff',
       priceFormat: { type: 'volume' },
       priceScaleId: 'volume',
     });
     this.chart.priceScale('volume').applyOptions({
-      scaleMargins: { top: 0.82, bottom: 0 },
+      scaleMargins: { top: 0.8, bottom: 0 },
     });
 
     // ── HMA 50 (Hull Moving Average) ─────────────────────────────────────────
     this.hmaSeries = this.chart.addSeries(LineSeries, {
-      color: 'rgba(255, 0, 170, 0.8)',
+      color: '#00e5ff',
       lineWidth: 2,
       crosshairMarkerVisible: false,
       lastValueVisible: false,
@@ -672,8 +715,6 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
         this.currentMa99Value.set(null);
       }
 
-      this.chart?.timeScale().fitContent();
-
       // IMMEDIATE REDRAW: If we have the AI data (from Top 5 click), 
       // render the projection the exact millisecond the candles are in memory.
       const currentData = this.data();
@@ -807,7 +848,6 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
     this.realCandles = candles;
     this.candleSeries?.setData(candles);
     this.volumeSeries?.setData(volumes);
-    this.chart?.timeScale().fitContent();
   }
 
   /** @deprecated — use loadBinanceCandles */
@@ -909,7 +949,6 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
     }));
     this.volumeSeries?.setData([...histVols, ...futureVols]);
 
-    this.chart?.timeScale().fitContent();
   }
 
   // ── Private helpers ────────────────────────────────────────────────────────

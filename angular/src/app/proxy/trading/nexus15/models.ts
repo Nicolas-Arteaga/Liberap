@@ -53,6 +53,23 @@ export interface Nexus15ResultDto {
   detectivity: Record<string, string>;
 }
 
+export interface StaircaseItemDto {
+  symbol?: string;
+  orderScore: number;
+  trend1d?: string;
+  phase?: string;
+  currentPrice: number;
+  ema7Value: number;
+  ema25Value: number;
+  impulseDetected: boolean;
+}
+
+export interface StaircaseResponseDto {
+  top5: StaircaseItemDto[];
+  scannedCount: number;
+  analyzedAt?: string;
+}
+
 export interface Strike15mItemDto {
   symbol?: string;
   forceScore: number;

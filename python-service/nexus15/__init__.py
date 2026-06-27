@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException
-from .schemas import Nexus15Request, Nexus15Response, Strike15mRequest, Strike15mResponse
+from .schemas import Nexus15Request, Nexus15Response, Strike15mRequest, Strike15mResponse, StaircaseRequest, StaircaseResponse
 from .analyzer import Nexus15Analyzer
 from .strike_analyzer import Strike15mAnalyzer
+from .staircase_analyzer import StaircaseAnalyzer
 import logging
 import json
 import time
@@ -10,6 +11,7 @@ router = APIRouter(prefix="/nexus15", tags=["nexus15"])
 logger = logging.getLogger("NEXUS15")
 _analyzer = Nexus15Analyzer()
 _strike_analyzer = Strike15mAnalyzer()
+_staircase_analyzer = StaircaseAnalyzer()
 
 # Redis publisher (optional — if Redis is unavailable, analysis still works)
 _redis_client = None
@@ -104,5 +106,23 @@ async def analyze_strike15m(request: Strike15mRequest):
         return result
     except Exception as e:
         logger.exception(f"STRIKE-15m error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/staircase", response_model=StaircaseResponse)
+async def analyze_staircase(request: StaircaseRequest):
+    """
+    Endpoint STAIRCASE: Detecta patrones de escalera institucional (movimientos ordenados escalonados).
+    Filtra por alineación perfecta de EMAs en 1D y busca patrones de escalón en 15m.
+    Devuelve el TOP 5 con mayor Score de Orden.
+    """
+    if not request.symbols or len(request.symbols) == 0:
+        raise HTTPException(status_code=400, detail="Se requiere al menos un símbolo para escanear")
+    try:
+        result = _staircase_analyzer.analyze(request)
+        logger.info(f"STAIRCASE: Scanned {result.scanned_count} symbols, found {len(result.top_5)} opportunities")
+        return result
+    except Exception as e:
+        logger.exception(f"STAIRCASE error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 

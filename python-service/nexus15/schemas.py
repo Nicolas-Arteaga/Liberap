@@ -93,3 +93,23 @@ class Strike15mResponse(BaseModel):
     top_5: List[Strike15mItem]
     scanned_count: int
     analyzed_at: str
+
+# ── STAIRCASE Schemas ────────────────────────────────────────────────────────────
+
+class StaircaseRequest(BaseModel):
+    symbols: List[str]  # List of symbols to scan
+
+class StaircaseItem(BaseModel):
+    symbol: str
+    order_score: float  # 0-100, measures EMA parallelism and order
+    trend_1d: str  # "Bullish" or "Bearish"
+    phase: str  # "Rest", "Consolidation", or "Impulse"
+    current_price: float
+    ema7_value: float
+    ema25_value: float
+    impulse_detected: bool  # True if 4-5% impulse detected recently
+
+class StaircaseResponse(BaseModel):
+    top_5: List[StaircaseItem]
+    scanned_count: int
+    analyzed_at: str

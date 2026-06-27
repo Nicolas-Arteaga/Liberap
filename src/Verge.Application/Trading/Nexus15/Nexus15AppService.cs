@@ -250,4 +250,55 @@ public class Nexus15AppService : ApplicationService, INexus15AppService
             };
         }
     }
+
+    /// <summary>Analiza STAIRCASE: detecta patrones de escalera institucional (1D+15m).</summary>
+    public async Task<StaircaseResponseDto> AnalyzeStaircaseAsync(List<string> symbols)
+    {
+        try
+        {
+            _logger.LogInformation("🪜 [STAIRCASE] Initiating scan for {Count} symbols...", symbols.Count);
+
+            var result = await _pythonService.AnalyzeStaircaseAsync(symbols);
+            if (result == null)
+            {
+                _logger.LogWarning("⚠️ [STAIRCASE] No results from Python service");
+                return new StaircaseResponseDto
+                {
+                    Top5 = new List<StaircaseItemDto>(),
+                    ScannedCount = symbols.Count,
+                    AnalyzedAt = DateTime.UtcNow
+                };
+            }
+
+            var dto = new StaircaseResponseDto
+            {
+                Top5 = result.Top5?.Select(item => new StaircaseItemDto
+                {
+                    Symbol = item.Symbol,
+                    OrderScore = item.OrderScore,
+                    Trend1d = item.Trend1d,
+                    Phase = item.Phase,
+                    CurrentPrice = item.CurrentPrice,
+                    Ema7Value = item.Ema7Value,
+                    Ema25Value = item.Ema25Value,
+                    ImpulseDetected = item.ImpulseDetected
+                }).ToList() ?? new List<StaircaseItemDto>(),
+                ScannedCount = result.ScannedCount,
+                AnalyzedAt = result.AnalyzedAt
+            };
+
+            _logger.LogInformation("✅ [STAIRCASE] Scan complete: {Count} opportunities found", dto.Top5.Count);
+            return dto;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ [STAIRCASE] Analysis failed");
+            return new StaircaseResponseDto
+            {
+                Top5 = new List<StaircaseItemDto>(),
+                ScannedCount = symbols.Count,
+                AnalyzedAt = DateTime.UtcNow
+            };
+        }
+    }
 }

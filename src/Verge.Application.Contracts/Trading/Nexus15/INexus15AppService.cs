@@ -17,4 +17,7 @@ public interface INexus15AppService : IApplicationService
 
     /// <summary>Analiza STRIKE 15m: detecta velas de ignición en MA99.</summary>
     Task<Strike15mResponseDto> AnalyzeStrike15mAsync(List<string> symbols);
+
+    /// <summary>Analiza STAIRCASE: detecta patrones de escalera institucional (1D+15m).</summary>
+    Task<StaircaseResponseDto> AnalyzeStaircaseAsync(List<string> symbols);
 }

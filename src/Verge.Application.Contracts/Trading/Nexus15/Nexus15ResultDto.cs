@@ -81,3 +81,24 @@ public class Strike15mResponseDto
     public int ScannedCount { get; set; }
     public DateTime AnalyzedAt { get; set; }
 }
+
+// ── STAIRCASE DTOs ───────────────────────────────────────────────────────────────
+
+public class StaircaseItemDto
+{
+    public string Symbol { get; set; }
+    public double OrderScore { get; set; }
+    public string Trend1d { get; set; }
+    public string Phase { get; set; }
+    public double CurrentPrice { get; set; }
+    public double Ema7Value { get; set; }
+    public double Ema25Value { get; set; }
+    public bool ImpulseDetected { get; set; }
+}
+
+public class StaircaseResponseDto
+{
+    public List<StaircaseItemDto> Top5 { get; set; }
+    public int ScannedCount { get; set; }
+    public DateTime AnalyzedAt { get; set; }
+}
