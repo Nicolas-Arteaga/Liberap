@@ -20,4 +20,7 @@ public interface INexus15AppService : IApplicationService
 
     /// <summary>Analiza STAIRCASE: detecta patrones de escalera institucional (1D+15m).</summary>
     Task<StaircaseResponseDto> AnalyzeStaircaseAsync(List<string> symbols);
+
+    /// <summary>Analiza ARROW PEAK: detecta vértices de agotamiento (exhaustion reversals).</summary>
+    Task<ArrowPeakResponseDto> AnalyzeArrowPeakAsync(List<string> symbols);
 }

@@ -2566,6 +2566,23 @@
                     "type": "Verge.Trading.Nexus15.StaircaseResponseDto",
                     "typeSimple": "Verge.Trading.Nexus15.StaircaseResponseDto"
                   }
+                },
+                {
+                  "name": "AnalyzeArrowPeakAsync",
+                  "parametersOnMethod": [
+                    {
+                      "name": "symbols",
+                      "typeAsString": "System.Collections.Generic.List`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                      "type": "System.Collections.Generic.List<System.String>",
+                      "typeSimple": "[string]",
+                      "isOptional": false,
+                      "defaultValue": null
+                    }
+                  ],
+                  "returnValue": {
+                    "type": "Verge.Trading.Nexus15.ArrowPeakResponseDto",
+                    "typeSimple": "Verge.Trading.Nexus15.ArrowPeakResponseDto"
+                  }
                 }
               ]
             }
@@ -2752,6 +2769,43 @@
               "returnValue": {
                 "type": "Verge.Trading.Nexus15.StaircaseResponseDto",
                 "typeSimple": "Verge.Trading.Nexus15.StaircaseResponseDto"
+              },
+              "allowAnonymous": null,
+              "implementFrom": "Verge.Trading.Nexus15.INexus15AppService"
+            },
+            "AnalyzeArrowPeakAsyncBySymbols": {
+              "uniqueName": "AnalyzeArrowPeakAsyncBySymbols",
+              "name": "AnalyzeArrowPeakAsync",
+              "httpMethod": "POST",
+              "url": "api/app/nexus15/analyze-arrow-peak",
+              "supportedVersions": [],
+              "parametersOnMethod": [
+                {
+                  "name": "symbols",
+                  "typeAsString": "System.Collections.Generic.List`1[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                  "type": "System.Collections.Generic.List<System.String>",
+                  "typeSimple": "[string]",
+                  "isOptional": false,
+                  "defaultValue": null
+                }
+              ],
+              "parameters": [
+                {
+                  "nameOnMethod": "symbols",
+                  "name": "symbols",
+                  "jsonName": null,
+                  "type": "System.Collections.Generic.List<System.String>",
+                  "typeSimple": "[string]",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "Body",
+                  "descriptorName": ""
+                }
+              ],
+              "returnValue": {
+                "type": "Verge.Trading.Nexus15.ArrowPeakResponseDto",
+                "typeSimple": "Verge.Trading.Nexus15.ArrowPeakResponseDto"
               },
               "allowAnonymous": null,
               "implementFrom": "Verge.Trading.Nexus15.INexus15AppService"
@@ -14164,6 +14218,132 @@
           "jsonName": null,
           "type": "System.Boolean",
           "typeSimple": "boolean",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.Nexus15.ArrowPeakItemDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Symbol",
+          "jsonName": null,
+          "type": "System.String",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "PrevRisePct",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "DaysBleeding",
+          "jsonName": null,
+          "type": "System.Int32",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "CurrentPrice",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "PeakPrice",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "DistMa99Pct",
+          "jsonName": null,
+          "type": "System.Double",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        }
+      ]
+    },
+    "Verge.Trading.Nexus15.ArrowPeakResponseDto": {
+      "baseType": null,
+      "isEnum": false,
+      "enumNames": null,
+      "enumValues": null,
+      "genericArguments": null,
+      "properties": [
+        {
+          "name": "Top5",
+          "jsonName": null,
+          "type": "[Verge.Trading.Nexus15.ArrowPeakItemDto]",
+          "typeSimple": "[Verge.Trading.Nexus15.ArrowPeakItemDto]",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "ScannedCount",
+          "jsonName": null,
+          "type": "System.Int32",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "AnalyzedAt",
+          "jsonName": null,
+          "type": "System.DateTime",
+          "typeSimple": "string",
           "isRequired": false,
           "minLength": null,
           "maxLength": null,

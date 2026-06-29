@@ -1,4 +1,4 @@
-import type { Nexus15ResultDto, StaircaseResponseDto, Strike15mResponseDto } from './models';
+import type { ArrowPeakResponseDto, Nexus15ResultDto, StaircaseResponseDto, Strike15mResponseDto } from './models';
 import { RestService, Rest } from '@abp/ng.core';
 import { Injectable, inject } from '@angular/core';
 
@@ -8,6 +8,15 @@ import { Injectable, inject } from '@angular/core';
 export class Nexus15Service {
   private restService = inject(RestService);
   apiName = 'Default';
+  
+
+  analyzeArrowPeak = (symbols: string[], config?: Partial<Rest.Config>) =>
+    this.restService.request<any, ArrowPeakResponseDto>({
+      method: 'POST',
+      url: '/api/app/nexus15/analyze-arrow-peak',
+      body: symbols,
+    },
+    { apiName: this.apiName,...config });
   
 
   analyzeOnDemand = (symbol: string, config?: Partial<Rest.Config>) =>

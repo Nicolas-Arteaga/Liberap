@@ -117,4 +117,32 @@ public class PythonNexus15Service : IPythonNexus15Service
             return null;
         }
     }
+
+    public async Task<ArrowPeakResponseModel?> AnalyzeArrowPeakAsync(List<string> symbols)
+    {
+        try
+        {
+            var payload = new
+            {
+                symbols = symbols
+            };
+
+            var response = await _http.PostAsJsonAsync("/nexus15/arrow-peak", payload);
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync();
+            _logger.LogInformation("DEBUG ARROW PEAK: Raw JSON from Python: {Json}", json);
+            
+            return JsonSerializer.Deserialize<ArrowPeakResponseModel>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ [ARROW PEAK] Python Service call failed");
+            return null;
+        }
+    }
 }

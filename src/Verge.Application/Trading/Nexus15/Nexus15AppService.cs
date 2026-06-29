@@ -301,4 +301,53 @@ public class Nexus15AppService : ApplicationService, INexus15AppService
             };
         }
     }
+
+    /// <summary>Analiza ARROW PEAK: detecta vértices de agotamiento (exhaustion reversals).</summary>
+    public async Task<ArrowPeakResponseDto> AnalyzeArrowPeakAsync(List<string> symbols)
+    {
+        try
+        {
+            _logger.LogInformation("🏹 [ARROW PEAK] Initiating scan for {Count} symbols...", symbols.Count);
+
+            var result = await _pythonService.AnalyzeArrowPeakAsync(symbols);
+            if (result == null)
+            {
+                _logger.LogWarning("⚠️ [ARROW PEAK] No results from Python service");
+                return new ArrowPeakResponseDto
+                {
+                    Top5 = new List<ArrowPeakItemDto>(),
+                    ScannedCount = symbols.Count,
+                    AnalyzedAt = DateTime.UtcNow
+                };
+            }
+
+            var dto = new ArrowPeakResponseDto
+            {
+                Top5 = result.Top5?.Select(item => new ArrowPeakItemDto
+                {
+                    Symbol = item.Symbol,
+                    PrevRisePct = item.PrevRisePct,
+                    DaysBleeding = item.DaysBleeding,
+                    CurrentPrice = item.CurrentPrice,
+                    PeakPrice = item.PeakPrice,
+                    DistMa99Pct = item.DistMa99Pct
+                }).ToList() ?? new List<ArrowPeakItemDto>(),
+                ScannedCount = result.ScannedCount,
+                AnalyzedAt = result.AnalyzedAt
+            };
+
+            _logger.LogInformation("✅ [ARROW PEAK] Scan complete: {Count} opportunities found", dto.Top5.Count);
+            return dto;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ [ARROW PEAK] Analysis failed");
+            return new ArrowPeakResponseDto
+            {
+                Top5 = new List<ArrowPeakItemDto>(),
+                ScannedCount = symbols.Count,
+                AnalyzedAt = DateTime.UtcNow
+            };
+        }
+    }
 }

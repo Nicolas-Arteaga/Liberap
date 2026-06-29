@@ -1582,6 +1582,146 @@ $border:  rgba(0, 240, 255, 0.15);
   .act-icon { filter: drop-shadow(0 0 6px $purple) !important; }
 }
 
+// ── ARROW PEAK SCANNER PANEL ──
+.nx15-arrow-peak-radar {
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(135deg, rgba(255, 68, 102, 0.1) 0%, rgba(255, 100, 100, 0.05) 100%);
+  border: 1px solid rgba(255, 68, 102, 0.3);
+  border-radius: 8px;
+  overflow: hidden;
+
+  .arrow-peak-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: linear-gradient(90deg, rgba(255, 68, 102, 0.2) 0%, rgba(255, 100, 100, 0.1) 100%);
+    border-bottom: 1px solid rgba(255, 68, 102, 0.3);
+
+    .arrow-peak-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #ff4466;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .arrow-peak-count {
+      font-size: 11px;
+      font-weight: 600;
+      color: #ff8888;
+      background: rgba(255, 68, 102, 0.2);
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .arrow-peak-clear {
+      cursor: pointer;
+      font-size: 16px;
+      color: #ff8888;
+      opacity: 0.7;
+      transition: opacity 0.2s;
+
+      &:hover { opacity: 1; }
+    }
+  }
+
+  .arrow-peak-table {
+    display: flex;
+    flex-direction: column;
+    padding: 8px;
+  }
+
+  .arrow-peak-row {
+    display: flex;
+    align-items: center;
+    padding: 8px 10px;
+    border-radius: 6px;
+    margin-bottom: 4px;
+    background: rgba(255, 68, 102, 0.05);
+    border: 1px solid rgba(255, 68, 102, 0.1);
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      background: rgba(255, 68, 102, 0.15);
+      border-color: rgba(255, 68, 102, 0.4);
+      transform: translateX(2px);
+    }
+
+    &.arrow-peak-header-row {
+      background: rgba(255, 68, 102, 0.1);
+      border: none;
+      cursor: default;
+      font-weight: 700;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+
+      &:hover {
+        background: rgba(255, 68, 102, 0.1);
+        transform: none;
+      }
+    }
+
+    &.high-bleeding {
+      background: rgba(255, 68, 102, 0.2);
+      border: 1px solid rgba(255, 68, 102, 0.5);
+      box-shadow: 0 0 10px rgba(255, 68, 102, 0.3);
+    }
+  }
+
+  .ap-col {
+    flex: 1;
+    font-size: 12px;
+    font-weight: 500;
+    text-align: center;
+
+    &.ap-col-moneda {
+      flex: 1.2;
+      font-weight: 700;
+      color: #fff;
+      text-align: left;
+    }
+
+    &.ap-col-prev-rise {
+      flex: 1;
+      font-weight: 600;
+    }
+
+    &.ap-col-bleeding {
+      flex: 0.8;
+      font-weight: 700;
+    }
+
+    &.ap-col-ma99 {
+      flex: 1;
+      font-weight: 500;
+    }
+  }
+}
+
+.btn-arrow-peak {
+  background: linear-gradient(135deg, #ff4466 0%, #ff6666 100%) !important;
+  border: 1px solid #ff4466 !important;
+  color: #fff !important;
+  box-shadow: 0 0 15px rgba(255, 68, 102, 0.4) !important;
+
+  &:hover:not(:disabled) {
+    background: linear-gradient(135deg, #ff6666 0%, #ff8888 100%) !important;
+    box-shadow: 0 0 25px rgba(255, 68, 102, 0.6) !important;
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .act-icon { filter: drop-shadow(0 0 6px #ff4466) !important; }
+}
+
 // ── RESPONSIVE ──
 @media (max-width: 900px) {
   .nx15-header {

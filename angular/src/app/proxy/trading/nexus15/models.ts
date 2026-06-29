@@ -1,4 +1,19 @@
 
+export interface ArrowPeakItemDto {
+  symbol?: string;
+  prevRisePct: number;
+  daysBleeding: number;
+  currentPrice: number;
+  peakPrice: number;
+  distMa99Pct: number;
+}
+
+export interface ArrowPeakResponseDto {
+  top5: ArrowPeakItemDto[];
+  scannedCount: number;
+  analyzedAt?: string;
+}
+
 export interface Nexus15FeaturesDto {
   candleBodyRatio: number;
   upperWickRatio: number;

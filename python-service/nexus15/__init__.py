@@ -1,8 +1,9 @@
 from fastapi import APIRouter, HTTPException
-from .schemas import Nexus15Request, Nexus15Response, Strike15mRequest, Strike15mResponse, StaircaseRequest, StaircaseResponse
+from .schemas import Nexus15Request, Nexus15Response, Strike15mRequest, Strike15mResponse, StaircaseRequest, StaircaseResponse, ArrowPeakRequest, ArrowPeakResponse
 from .analyzer import Nexus15Analyzer
 from .strike_analyzer import Strike15mAnalyzer
 from .staircase_analyzer import StaircaseAnalyzer
+from .arrow_peak_analyzer import ArrowPeakAnalyzer
 import logging
 import json
 import time
@@ -12,6 +13,7 @@ logger = logging.getLogger("NEXUS15")
 _analyzer = Nexus15Analyzer()
 _strike_analyzer = Strike15mAnalyzer()
 _staircase_analyzer = StaircaseAnalyzer()
+_arrow_peak_analyzer = ArrowPeakAnalyzer()
 
 # Redis publisher (optional — if Redis is unavailable, analysis still works)
 _redis_client = None
@@ -124,5 +126,23 @@ async def analyze_staircase(request: StaircaseRequest):
         return result
     except Exception as e:
         logger.exception(f"STAIRCASE error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/arrow-peak", response_model=ArrowPeakResponse)
+async def analyze_arrow_peak(request: ArrowPeakRequest):
+    """
+    Endpoint ARROW PEAK: Detecta vértices de agotamiento (subidas parabólicas que empiezan a revertir).
+    Busca pumps de +15% en los últimos 10 días que tienen 1-5 velas rojas consecutivas.
+    Devuelve el TOP 5 organizado por días de sangrado (1-5).
+    """
+    if not request.symbols or len(request.symbols) == 0:
+        raise HTTPException(status_code=400, detail="Se requiere al menos un símbolo para escanear")
+    try:
+        result = _arrow_peak_analyzer.analyze(request)
+        logger.info(f"ARROW PEAK: Scanned {result.scanned_count} symbols, found {len(result.top_5)} opportunities")
+        return result
+    except Exception as e:
+        logger.exception(f"ARROW PEAK error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 

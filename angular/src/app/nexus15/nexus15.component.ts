@@ -6,7 +6,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { Nexus15Service } from '../proxy/trading/nexus15/nexus15.service';
-import { Nexus15ResultDto, Nexus15FeaturesDto, Strike15mItemDto, StaircaseItemDto } from '../proxy/trading/nexus15/models';
+import { Nexus15ResultDto, Nexus15FeaturesDto, Strike15mItemDto, StaircaseItemDto, ArrowPeakItemDto } from '../proxy/trading/nexus15/models';
 
 import { BotService } from '../proxy/trading/bot.service';
 import { ScarService } from '../proxy/trading/scar/scar.service';
@@ -82,6 +82,8 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
   isStrikeLoading = signal(false);
   staircaseResults = signal<StaircaseItemDto[]>([]);
   isStaircaseLoading = signal(false);
+  arrowPeakResults = signal<ArrowPeakItemDto[]>([]);
+  isArrowPeakLoading = signal(false);
 
 
 
@@ -406,6 +408,30 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
         const msg = err?.error?.error?.message || err?.message || 'unknown error';
         this.pushTerminal(`⚠ STAIRCASE SCAN ERROR: ${msg}`);
         console.error('STAIRCASE SCAN ERROR:', err);
+      }
+    });
+  }
+
+  runArrowPeak() {
+    this.isArrowPeakLoading.set(true);
+    this.arrowPeakResults.set([]);
+    this.pushTerminal('> 🏹 ARROW PEAK SCAN INIT: EXHAUSTION REVERSAL DETECTION (Pumps +15% bleeding 1-5 days)...');
+    
+    // Use top 80 volume pairs for ARROW PEAK scan
+    const symbolsToScan = BINANCE_FUTURES_PAIRS.slice(0, 80);
+    
+    this.nexus15Svc.analyzeArrowPeak(symbolsToScan).subscribe({
+      next: res => {
+        const arr = (res as any)?.top5 || res || [];
+        this.arrowPeakResults.set(arr);
+        this.isArrowPeakLoading.set(false);
+        this.pushTerminal(`✓ ARROW PEAK SCAN COMPLETE: ${arr.length} EXHAUSTION REVERSALS FOUND`);
+      },
+      error: err => {
+        this.isArrowPeakLoading.set(false);
+        const msg = err?.error?.error?.message || err?.message || 'unknown error';
+        this.pushTerminal(`⚠ ARROW PEAK SCAN ERROR: ${msg}`);
+        console.error('ARROW PEAK SCAN ERROR:', err);
       }
     });
   }

@@ -165,9 +165,38 @@ public class StaircaseResponseModel
     public DateTime AnalyzedAt { get; set; }
 }
 
+// ── ARROW PEAK Models ─────────────────────────────────────────────────────────────
+
+public class ArrowPeakItemModel
+{
+    [JsonPropertyName("symbol")]
+    public string Symbol { get; set; }
+    [JsonPropertyName("prev_rise_pct")]
+    public double PrevRisePct { get; set; }
+    [JsonPropertyName("days_bleeding")]
+    public int DaysBleeding { get; set; }
+    [JsonPropertyName("current_price")]
+    public double CurrentPrice { get; set; }
+    [JsonPropertyName("peak_price")]
+    public double PeakPrice { get; set; }
+    [JsonPropertyName("dist_ma99_pct")]
+    public double DistMa99Pct { get; set; }
+}
+
+public class ArrowPeakResponseModel
+{
+    [JsonPropertyName("top_5")]
+    public List<ArrowPeakItemModel> Top5 { get; set; }
+    [JsonPropertyName("scanned_count")]
+    public int ScannedCount { get; set; }
+    [JsonPropertyName("analyzed_at")]
+    public DateTime AnalyzedAt { get; set; }
+}
+
 public interface IPythonNexus15Service
 {
     Task<Nexus15ResponseModel?> AnalyzeNexus15Async(string symbol, List<MarketCandleModel> candles);
     Task<Strike15mResponseModel?> AnalyzeStrike15mAsync(List<string> symbols);
     Task<StaircaseResponseModel?> AnalyzeStaircaseAsync(List<string> symbols);
+    Task<ArrowPeakResponseModel?> AnalyzeArrowPeakAsync(List<string> symbols);
 }

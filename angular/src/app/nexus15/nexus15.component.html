@@ -279,6 +279,40 @@
           </div>
         </div>
 
+        <!-- ARROW PEAK SCANNER Panel -->
+        <div class="nx15-signal-panel mb-2" *ngIf="arrowPeakResults().length > 0">
+          <div class="nx15-arrow-peak-radar">
+            <div class="arrow-peak-header">
+              <span class="arrow-peak-title">🏹 ARROW PEAK SCANNER (Exhaustion Reversals)</span>
+              <span class="arrow-peak-count">{{ arrowPeakResults().length }} OPPORTUNITIES</span>
+              <div class="arrow-peak-clear" (click)="arrowPeakResults.set([])">⨯</div>
+            </div>
+            <div class="arrow-peak-table">
+              <div class="arrow-peak-row arrow-peak-header-row">
+                <span class="ap-col ap-col-moneda">MONEDA</span>
+                <span class="ap-col ap-col-prev-rise">SUBIDA PREVIA (%)</span>
+                <span class="ap-col ap-col-bleeding">DÍAS EN ROJO</span>
+                <span class="ap-col ap-col-ma99">DIST. MA99 (15m)</span>
+              </div>
+              <div class="arrow-peak-row"
+                   *ngFor="let item of arrowPeakResults()"
+                   (click)="onSymbolChange(item.symbol)"
+                   [class.high-bleeding]="item.daysBleeding === 1">
+                <span class="ap-col ap-col-moneda">{{ item.symbol?.replace('USDT','') }}</span>
+                <span class="ap-col ap-col-prev-rise" [style.color]="item.prevRisePct >= 30 ? '#ff4466' : item.prevRisePct >= 20 ? '#ffdd00' : '#00ff88'">
+                  {{ item.prevRisePct | number:'1.1-1' }}%
+                </span>
+                <span class="ap-col ap-col-bleeding" [style.color]="item.daysBleeding === 1 ? '#ff4466' : item.daysBleeding === 2 ? '#ffdd00' : '#00ff88'">
+                  {{ item.daysBleeding }}d
+                </span>
+                <span class="ap-col ap-col-ma99" [style.color]="Math.abs(item.distMa99Pct) < 1.0 ? '#00ff88' : '#ff8888'">
+                  {{ item.distMa99Pct | number:'1.1-1' }}%
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div><!-- /col-xl-8 -->
 
       <!-- RIGHT: Grupos de señales + Botones -->
@@ -406,6 +440,12 @@
                 <span class="act-icon">🪜</span>
                 <span class="act-text">ROLLERCOASTER SCAN</span>
                 <span class="act-spin" *ngIf="isStaircaseLoading()"> ⟳</span>
+              </button>
+
+              <button class="nx15-activate btn-arrow-peak" (click)="runArrowPeak()" [disabled]="isLoading() || isTopLoading() || isArrowPeakLoading()">
+                <span class="act-icon">🏹</span>
+                <span class="act-text">ARROW PEAK SCAN</span>
+                <span class="act-spin" *ngIf="isArrowPeakLoading()"> ⟳</span>
               </button>
             </div>
 

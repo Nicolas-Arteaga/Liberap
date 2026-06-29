@@ -102,3 +102,22 @@ public class StaircaseResponseDto
     public int ScannedCount { get; set; }
     public DateTime AnalyzedAt { get; set; }
 }
+
+// ── ARROW PEAK DTOs ───────────────────────────────────────────────────────────────
+
+public class ArrowPeakItemDto
+{
+    public string Symbol { get; set; }
+    public double PrevRisePct { get; set; }
+    public int DaysBleeding { get; set; }
+    public double CurrentPrice { get; set; }
+    public double PeakPrice { get; set; }
+    public double DistMa99Pct { get; set; }
+}
+
+public class ArrowPeakResponseDto
+{
+    public List<ArrowPeakItemDto> Top5 { get; set; }
+    public int ScannedCount { get; set; }
+    public DateTime AnalyzedAt { get; set; }
+}

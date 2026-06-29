@@ -113,3 +113,21 @@ class StaircaseResponse(BaseModel):
     top_5: List[StaircaseItem]
     scanned_count: int
     analyzed_at: str
+
+# ── ARROW PEAK Schemas ────────────────────────────────────────────────────────────
+
+class ArrowPeakRequest(BaseModel):
+    symbols: List[str]  # List of symbols to scan
+
+class ArrowPeakItem(BaseModel):
+    symbol: str
+    prev_rise_pct: float  # Previous rise magnitude before peak (%)
+    days_bleeding: int  # Number of red candles after peak (1-5)
+    current_price: float
+    peak_price: float  # The highest point of the arrow
+    dist_ma99_pct: float  # Distance to MA99 in 15m (%)
+
+class ArrowPeakResponse(BaseModel):
+    top_5: List[ArrowPeakItem]
+    scanned_count: int
+    analyzed_at: str

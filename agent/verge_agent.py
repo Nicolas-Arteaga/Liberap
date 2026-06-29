@@ -1503,7 +1503,7 @@ class VergeAgent:
             ma_clone_id = "3a21db74-5d45-fcbf-f186-a284d59e97fb"
             if p_id == ma_clone_id:
                 scar_alerts = self.signals.get_scar_alerts()
-                nexus5_cache = self._fetch_nexus5_cache()
+                nexus5_cache = {}  # v12.1: Golden U-Turn deshabilitado, nexus5 no se usa
                 recalculated_candidates = []
                 for c in candidates:
                     # Recalculate confluence with MA Clone profile_id

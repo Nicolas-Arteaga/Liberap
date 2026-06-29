@@ -222,9 +222,9 @@ def get_breakers() -> Dict[str, ExchangeCircuitBreaker]:
         with _breakers_lock:
             if not _breakers:
                 for name in EXCHANGES:
-                    # Binance gets longer recovery (4h ban is real)
-                    # Others get faster recovery (5 min)
-                    recovery = 14_400 if name == "binance" else 300
+                    # All exchanges get 5 minutes recovery timeout.
+                    # Hard IP ban (418) is handled separately in record_failure() by setting _ban_until for 4 hours.
+                    recovery = 300
                     _breakers[name] = ExchangeCircuitBreaker(
                         name=name,
                         failure_threshold=3,
