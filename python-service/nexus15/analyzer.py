@@ -23,7 +23,7 @@ class Nexus15Analyzer:
         self.engine = Nexus15FeatureEngine()
         self.model_loader = Nexus15ModelLoader()
 
-    def analyze(self, req: Nexus15Request) -> Nexus15Response:
+    def analyze(self, req: Nexus15Request, direction_bias: str = None) -> Nexus15Response:
         df = pd.DataFrame([c.model_dump() for c in req.candles])
         df['timestamp'] = pd.to_datetime(df['timestamp'])
         df = df.sort_values('timestamp').reset_index(drop=True)
@@ -32,11 +32,11 @@ class Nexus15Analyzer:
         feats = self.engine.compute(df)
 
         # 2. Scores por grupo (0.0 a 1.0)
-        g1 = self._score_g1(feats)
+        g1 = self._score_g1(feats, direction_bias)
         g2 = self._score_g2(feats)
-        g3 = self._score_g3(feats)
+        g3 = self._score_g3(feats, direction_bias)
         g4 = self._score_g4(feats)
-        g5 = self._score_g5(feats)
+        g5 = self._score_g5(feats, direction_bias)
 
         # 3. XGBoost prediction
         feature_vector = [
@@ -138,11 +138,14 @@ class Nexus15Analyzer:
         )
 
     # ── Score helpers ──────────────────────────────────────────────────────
-    def _score_g1(self, f) -> float:
+    def _score_g1(self, f, direction_bias: str = None) -> float:
         score = f["candle_body_ratio"] * 0.5
         score += (1 - f["upper_wick_ratio"]) * 0.2
         score += f["lower_wick_ratio"] * 0.2
-        score += (f["consecutive_bull_bars"] / 5) * 0.1
+        if direction_bias == "SHORT":
+            score += (f["consecutive_bear_bars"] / 5) * 0.1
+        else:
+            score += (f["consecutive_bull_bars"] / 5) * 0.1
         return round(min(1.0, max(0.0, score)), 4)
 
     def _score_g2(self, f) -> float:
@@ -153,9 +156,13 @@ class Nexus15Analyzer:
             int(f.get("liquidity_sweep", False)) * 0.2, 4
         )
 
-    def _score_g3(self, f) -> float:
-        phase_map = {"Markup": 0.9, "Accumulation": 0.7, "Ranging": 0.5,
-                     "Distribution": 0.2, "Markdown": 0.1}
+    def _score_g3(self, f, direction_bias: str = None) -> float:
+        if direction_bias == "SHORT":
+            phase_map = {"Markdown": 0.9, "Distribution": 0.7, "Ranging": 0.5,
+                         "Accumulation": 0.2, "Markup": 0.1}
+        else:
+            phase_map = {"Markup": 0.9, "Accumulation": 0.7, "Ranging": 0.5,
+                         "Distribution": 0.2, "Markdown": 0.1}
         score = phase_map.get(f["wyckoff_phase"], 0.5)
         score += int(f["spring_detected"]) * 0.1
         score -= int(f["upthrust_detected"]) * 0.1
@@ -168,12 +175,15 @@ class Nexus15Analyzer:
         score -= int(f["fractal_low_5"]) * 0.05
         return round(min(1.0, max(0.0, score)), 4)
 
-    def _score_g5(self, f) -> float:
+    def _score_g5(self, f, direction_bias: str = None) -> float:
         vol_score = min(f["volume_ratio_20"] / 3.0, 1.0) * 0.3
         cvd_norm = min(abs(f["cvd_delta"]) / 1e7, 1.0)
         cvd_dir = 1 if f["cvd_delta"] > 0 else -1
         score = 0.5 + cvd_dir * cvd_norm * 0.3
-        score += int(f["volume_surge_bullish"]) * 0.2
+        if direction_bias == "SHORT":
+            score += int(f["volume_surge_bearish"]) * 0.2
+        else:
+            score += int(f["volume_surge_bullish"]) * 0.2
         score += vol_score
         score -= f["poc_proximity"] * 0.1
         return round(min(1.0, max(0.0, score)), 4)

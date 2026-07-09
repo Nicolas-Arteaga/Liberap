@@ -291,6 +291,20 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
                 {
                     var repo = scope.ServiceProvider.GetRequiredService<IRepository<SimulatedTrade, Guid>>();
                     var trade = await repo.GetAsync(tradeId);
+
+                    // Monotonic guard: the mark-price worker already ratchets this every second.
+                    // Only accept this push if it's actually more extreme, so a stale/reset value
+                    // from the Python agent (e.g. after a restart) can't regress it.
+                    bool isMoreFavorable = trade.Side == SignalDirection.Long
+                        ? input.MaxFavorablePrice > (trade.MaxFavorablePrice ?? trade.EntryPrice)
+                        : input.MaxFavorablePrice < (trade.MaxFavorablePrice ?? trade.EntryPrice);
+
+                    if (!isMoreFavorable)
+                    {
+                        Logger.LogDebug("[AUDIT] MFE push for trade {TradeId} ignored (not more extreme than tracked {Current})", tradeId, trade.MaxFavorablePrice);
+                        break;
+                    }
+
                     trade.MaxFavorablePrice = input.MaxFavorablePrice;
                     await repo.UpdateAsync(trade, autoSave: true);
                     Logger.LogDebug("[AUDIT] MFE updated for trade {TradeId}: {Price}", tradeId, input.MaxFavorablePrice);
@@ -611,16 +625,49 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
     public async Task UpdateMaxAdversePriceAsync(Guid tradeId, UpdateMaxAdversePriceInputDto input)
     {
         var userId = CurrentUser.Id!.Value;
-        var trade = await _tradeRepo.GetAsync(tradeId);
 
-        if (trade.UserId != userId)
-            throw new UserFriendlyException("You don't have permission to update this trade.");
+        int maxRetries = 5;
+        for (int i = 0; i < maxRetries; i++)
+        {
+            await TradingSimulationService.ProfileLock.WaitAsync();
+            try
+            {
+                var trade = await _tradeRepo.GetAsync(tradeId);
 
-        trade.MaxAdversePrice = input.MaxAdversePrice;
-        await _tradeRepo.UpdateAsync(trade, autoSave: true);
+                if (trade.UserId != userId)
+                    throw new UserFriendlyException("You don't have permission to update this trade.");
 
-        Logger.LogInformation("📉 [Simulation] MaxAdversePrice recorded for {Symbol}: {Price}",
-            trade.Symbol, input.MaxAdversePrice);
+                // Monotonic guard: the mark-price worker already ratchets this every second.
+                // Only accept this push if it's actually more extreme, so a stale/reset value
+                // from the Python agent (e.g. after a restart) can't regress it.
+                bool isMoreAdverse = trade.Side == SignalDirection.Long
+                    ? input.MaxAdversePrice < (trade.MaxAdversePrice ?? trade.EntryPrice)
+                    : input.MaxAdversePrice > (trade.MaxAdversePrice ?? trade.EntryPrice);
+
+                if (!isMoreAdverse)
+                {
+                    Logger.LogDebug("[AUDIT] MAE push for trade {TradeId} ignored (not more extreme than tracked {Current})", tradeId, trade.MaxAdversePrice);
+                    return;
+                }
+
+                trade.MaxAdversePrice = input.MaxAdversePrice;
+                await _tradeRepo.UpdateAsync(trade, autoSave: true);
+
+                Logger.LogInformation("📉 [Simulation] MaxAdversePrice recorded for {Symbol}: {Price}",
+                    trade.Symbol, input.MaxAdversePrice);
+                return;
+            }
+            catch (AbpDbConcurrencyException)
+            {
+                if (i == maxRetries - 1) throw;
+                Logger.LogWarning("[Simulation] Concurrency retry {0}/5 for updating MAE on trade {1}", i + 1, tradeId);
+                await Task.Delay(200);
+            }
+            finally
+            {
+                TradingSimulationService.ProfileLock.Release();
+            }
+        }
     }
 
     private static SimulatedTradeDto MapToDto(SimulatedTrade t) => new SimulatedTradeDto
@@ -657,7 +704,11 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         MaxFavorablePrice = t.MaxFavorablePrice,
         ExitReason = t.ExitReason,
         Ma7DistancePctAtEntry = t.Ma7DistancePctAtEntry,
-        BtcPriceAtClose = t.BtcPriceAtClose
+        BtcPriceAtClose = t.BtcPriceAtClose,
+        ExitAuditJson = t.ExitAuditJson,
+        TpProgressPct = t.TpProgressPct,
+        MaxTpProgressPct = t.MaxTpProgressPct,
+        MaxSlProgressPct = t.MaxSlProgressPct
     };
 
     /// <summary>

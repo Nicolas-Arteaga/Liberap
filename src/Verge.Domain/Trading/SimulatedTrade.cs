@@ -95,6 +95,28 @@ public class SimulatedTrade : FullAuditedAggregateRoot<Guid>
     /// </summary>
     public Guid? StrategyProfileId { get; set; }
 
+    /// <summary>
+    /// Live progress toward TP as of the last mark price update, as a percentage of the
+    /// entry-to-TP distance. 0 = at entry, 100 = at TP. Can go negative (moving toward SL)
+    /// or exceed 100 (price ran past TP before the closing tick landed).
+    /// Null when TpPrice isn't set. Computed server-side by SimulationMarkPriceWorker.
+    /// </summary>
+    public decimal? TpProgressPct { get; set; }
+
+    /// <summary>
+    /// The highest TpProgressPct ever reached during the trade's life (derived from
+    /// MaxFavorablePrice). Answers "how close did this get to TP before reversing".
+    /// Persists after close. Null when TpPrice isn't set.
+    /// </summary>
+    public decimal? MaxTpProgressPct { get; set; }
+
+    /// <summary>
+    /// The highest percentage of the entry-to-SL distance ever covered during the trade's
+    /// life (derived from MaxAdversePrice). Answers "how close did this get to blowing the stop".
+    /// Persists after close. Null when SlPrice isn't set.
+    /// </summary>
+    public decimal? MaxSlProgressPct { get; set; }
+
     protected SimulatedTrade() { }
 
     public SimulatedTrade(

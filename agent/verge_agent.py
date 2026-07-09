@@ -710,8 +710,8 @@ class VergeAgent:
         # 1. Sync profiles and monitor open positions
         logger.info("[Step 1/6] Syncing strategy profiles and checking positions...")
         db_profiles = self.positions.get_strategy_profiles() or []
-        db_profiles = [p for p in db_profiles if p.get("name") not in ("Standard Scalping", "Scalping Clone")]
         _profile_nexus_cap = float(getattr(config, "PROFILE_MIN_NEXUS_CONFIDENCE", 76.0))
+        ma_clone_id = "3a21db74-5d45-fcbf-f186-a284d59e97fb"
         for p in db_profiles:
             raw_nexus = float(p.get("minNexusConfidence") or _profile_nexus_cap)
             if raw_nexus > _profile_nexus_cap:
@@ -719,48 +719,20 @@ class VergeAgent:
                 logger.info(
                     f"[v10.8] Perfil '{p.get('name')}' minNexus capped {raw_nexus}% → {_profile_nexus_cap}%"
                 )
+            # FIX: MA Clone minConfluenceScore 60.0 to accept floor scores
+            if p.get("id") == ma_clone_id:
+                raw_confluence = float(p.get("minConfluenceScore") or 65.0)
+                if raw_confluence > 60.0:
+                    p["minConfluenceScore"] = 60.0
+                    logger.info(
+                        f"[FIX] MA Clone minConfluenceScore capped {raw_confluence} → 60.0"
+                    )
         
-        # Define the virtual legacy profile for "Standard Scalping" (Sniper Mode)
-        legacy_profile = {
-            "id": STANDARD_PROFILE_ID,
-            "name": "Standard Scalping",
-            "minConfluenceScore": config.MIN_CONFLUENCE_SCORE,
-            "minNexusConfidence": _profile_nexus_cap,
-            "tpMultiplier": getattr(config, "TP_MULTIPLIER", 2.0),
-            "slMultiplier": getattr(config, "SL_MULTIPLIER", 1.0),
-            "marginPerTrade": getattr(config, "MAX_MARGIN_PER_TRADE_USD", 150),
-            "maxOpenPositions": config.MAX_OPEN_POSITIONS,
-            "maxMa7DistancePct": 1.2,          # EL SECRETO: Filtro de proximidad a la media (evita FOMO)
-            "maxNexusSignalAgeSeconds": 60,    # Solo señales frescas (60s)
-            "nexusMaxPriceDriftPct": 0.002,    # Máximo movimiento de 0.2% desde la señal
-            "allowLong": True,
-            "allowShort": True,
-            "allowedSources": ["nexus", "scar", "redis_bridge", "golden_uturn", "total_sweep"],
-            "isActive": True
-        }
-
-        # Define the virtual clone profile for "Scalping Clone" (Sniper Mode + Tank SL)
-        self.clone_profile = {
-            "id": CLONE_PROFILE_ID,
-            "name": "Scalping Clone",
-            "minConfluenceScore": config.MIN_CONFLUENCE_SCORE,
-            "minNexusConfidence": _profile_nexus_cap,
-            "tpMultiplier": getattr(config, "TP_MULTIPLIER", 2.0),
-            "slMultiplier": getattr(config, "SL_MULTIPLIER", 1.0) * 2,  # 2x Standard Scalping SL (Tanque)
-            "marginPerTrade": getattr(config, "MAX_MARGIN_PER_TRADE_USD", 150),
-            "maxOpenPositions": config.MAX_OPEN_POSITIONS,
-            "maxMa7DistancePct": 1.2,          # COPIADO: El Clone ahora también espera el pullback
-            "maxNexusSignalAgeSeconds": 60,    # COPIADO: Evita entrar en datos viejos
-            "nexusMaxPriceDriftPct": 0.002,    # COPIADO: Máximo 0.2% drift
-            "allowLong": True,
-            "allowShort": True,
-            "allowedSources": ["nexus", "scar", "redis_bridge", "golden_uturn", "total_sweep"],
-            "isActive": True
-        }
-
-        # The active profiles list includes Standard Scalping + Scalping Clone + any DB profile
-        # Each profile evaluates candidates independently with its own slot limit
-        self.active_profiles = [legacy_profile, self.clone_profile] + db_profiles
+        # Standard Scalping y Scalping Clone ahora viven en StrategyProfile (DB) con sus
+        # GUIDs originales (00000000-...-0000/0001) — se calibran desde /strategies como
+        # cualquier otro perfil. Cada perfil evalúa candidatos independientemente con su
+        # propio slot limit.
+        self.active_profiles = db_profiles
         
         logger.info(f"Active strategies this cycle: {[p['name'] for p in self.active_profiles]}")
 
@@ -1499,13 +1471,20 @@ class VergeAgent:
             p_id = profile.get("id")
             logger.info(f"--- Strategy Execution: {p_name} ---")
 
+            profile_candidates = list(candidates)
+
             # MA Clone: Recalculate confluence score with profile-specific logic
             ma_clone_id = "3a21db74-5d45-fcbf-f186-a284d59e97fb"
             if p_id == ma_clone_id:
                 scar_alerts = self.signals.get_scar_alerts()
                 nexus5_cache = {}  # v12.1: Golden U-Turn deshabilitado, nexus5 no se usa
                 recalculated_candidates = []
-                for c in candidates:
+                for c in profile_candidates:
+                    # nexus_top candidates already have a high-quality score from the backend.
+                    # They don't carry groupScores, so recalculating would destroy their score. Skip recalc.
+                    if c.get("source") == "nexus_top":
+                        recalculated_candidates.append(c)
+                        continue
                     # Recalculate confluence with MA Clone profile_id
                     nexus_data = c.get("agent_audit_context", {}).get("nexus15", {})
                     scar_data = scar_alerts.get(c.get("symbol"), {})
@@ -1522,7 +1501,7 @@ class VergeAgent:
                         if k not in new_confluence:
                             new_confluence[k] = v
                     recalculated_candidates.append(new_confluence)
-                candidates = recalculated_candidates
+                profile_candidates = recalculated_candidates
 
             # Filter candidates for THIS profile
             p_candidates = []
@@ -1540,7 +1519,7 @@ class VergeAgent:
                 full_scan_ok = (not LSE_REQUIRE_ALL_QUEUED_PROCESSED) or (queued > 0 and sp >= queued)
                 batch_ok = bool(called and ok and min_symbols_ok and full_scan_ok)
 
-            for c in candidates:
+            for c in profile_candidates:
                 is_golden = self._is_golden_uturn_candidate(c)
                 
                 # v12.1: Golden U-Turn DESHABILITADO — nunca inyectar Score=99 ni golden_uturn_mode
@@ -1663,6 +1642,23 @@ class VergeAgent:
                     logger.info(f"[{p_name}] SKIP {c.get('symbol')}: Short not allowed")
                     p_rejected.append({"symbol": c.get("symbol"), "score": c.get("confluence_score", 0), "nexus": c.get("nexus_confidence", 0), "reason": "short_not_allowed"})
                     continue
+                
+                # SHORT MIRROR: Recalcular Nexus-15 con direction_bias SHORT cuando el perfil busca shorts
+                if allow_short and cand_side == 1 and c.get("source") in ["nexus", "nexus_top"]:
+                    symbol = c.get("symbol")
+                    logger.debug(f"[{p_name}] SHORT MIRROR: Recalculating Nexus-15 for {symbol} with direction_bias=SHORT")
+                    nexus_short = self.signals.get_nexus15_prediction(symbol, direction_bias="SHORT")
+                    if nexus_short:
+                        # Actualizar el candidato con el nuevo score SHORT
+                        c["nexus_confidence"] = nexus_short.get("ai_confidence", c.get("nexus_confidence", 0))
+                        c["group_scores"] = nexus_short.get("group_scores", c.get("group_scores", {}))
+                        c["trade_direction"] = nexus_short.get("direction", c.get("trade_direction", "BEARISH"))
+                        # Recalcular confluence con el nuevo score
+                        scar_data = scar_alerts.get(symbol, {})
+                        n5_data = nexus5_cache.get(symbol)
+                        confluence_short = self.signals.calculate_confluence(symbol, scar_data, nexus_short, nexus5_data=n5_data, profile_id=None)
+                        c["confluence_score"] = confluence_short.get("confluence_score", c.get("confluence_score", 0))
+                        logger.info(f"[{p_name}] SHORT MIRROR: {symbol} Nexus score {c['nexus_confidence']}% G3={c.get('group_scores', {}).get('g3_wyckoff', 0)}%")
 
                 # Fix 2: Filtros RSI y MA7 por perfil (PascalCase del DTO -> camelCase del JSON)
                 # BYPASS: Golden U-Turn v9.0 — si el candidato tiene golden_uturn_mode, ignorar estos filtros.
@@ -3434,89 +3430,9 @@ class VergeAgent:
                 }
             )
 
-            # ── Auto-cloning for Standard Scalping ──
-            is_standard = False
-            if profile is None:
-                is_standard = True
-            elif profile.get("id") in (None, STANDARD_PROFILE_ID) or profile.get("name") == "Standard Scalping":
-                is_standard = True
-
-            if is_standard:
-                try:
-                    self._open_clone_trade(str(trade_id) if trade_id else "", candidate, pos_details, entry_reason, nexus_group)
-                except Exception as ex:
-                    logger.error(f"[CLONE] Failed to auto-clone trade for {symbol}: {ex}")
-
             return True
 
         return False
-
-    def _open_clone_trade(self, orig_trade_id: str, candidate: dict, orig_pos_details: dict, entry_reason: str, nexus_group: str) -> bool:
-        """
-        Opens a clone trade for Scalping Clone with the exact same parameters as the
-        Standard Scalping trade, EXCEPT the SL/TP are recalculated using the Scalping Clone profile
-        (which uses double SL and proportional TP).
-        Skips all validation filters — the trade was already validated by Standard Scalping.
-        """
-        symbol = candidate["symbol"]
-
-        # ── Check clone profile slot limit ──
-        clone_max = int(self.clone_profile.get("maxOpenPositions", config.MAX_OPEN_POSITIONS))
-        clone_active = [
-            t for t in (self.positions.get_active_trades() or [])
-            if t.get("strategyProfileId", t.get("strategy_profile_id")) == CLONE_PROFILE_ID
-        ]
-        if len(clone_active) >= clone_max:
-            logger.info(f"[CLONE] Profile Scalping Clone is full ({len(clone_active)}/{clone_max}). Skipping clone for {symbol}.")
-            return False
-
-        # v12.0-BERSERKER: Balance NO se consulta para clone. Bala fija $150.
-        balance = 999_999.0
-        clone_pos = self.risk.calculate_position(symbol, candidate, available_balance=balance, profile=self.clone_profile)
-        if not clone_pos:
-            logger.warning(f"[CLONE] Failed to calculate clone position for {symbol}. Skipping clone.")
-            return False
-
-        clone_pos.pop("agent_decision_json", None)
-        clone_pos["strategy_profile_id"] = CLONE_PROFILE_ID
-
-        # ── CLONE PROTECTION: SL ceiling check ──
-        entry_price = float(clone_pos.get("entry_price", 0))
-        sl_price = float(clone_pos.get("sl_price", 0))
-        if entry_price > 0 and sl_price > 0:
-            sl_pct = abs(entry_price - sl_price) / entry_price * 100.0
-            clone_max_sl_pct = getattr(config, "CLONE_MAX_STOP_LOSS_PCT", 5.0)
-            if sl_pct > clone_max_sl_pct:
-                logger.warning(f"[CLONE] VETO {symbol}: SL {sl_pct:.2f}% exceeds Clone ceiling {clone_max_sl_pct}%. Skipping clone.")
-                return False
-
-        logger.info(f"[CLONE] Opening clone trade for {symbol} | entry={entry_price} | margin={clone_pos.get('margin')}x{clone_pos.get('leverage')} | SL={clone_pos.get('sl_price')} | TP={clone_pos.get('tp_price')} (Independent Scalping Clone calculation)")
-        clone_result = self.positions.open_trade(clone_pos)
-
-        if clone_result:
-            clone_id = clone_result.get("id")
-            clone_local = {
-                "trade_id": clone_id,
-                "symbol": symbol,
-                "opened_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-                "entry_reason": f"[CLONE] {entry_reason}",
-                "nexus_group": nexus_group,
-                "tier": self._get_tier_for_symbol(symbol),
-                **candidate,
-                **clone_pos,
-                "cloned_from": orig_trade_id,
-                "strategy_profile_id": CLONE_PROFILE_ID,
-            }
-            self.state.add_position(clone_local)
-            self.state.record_trade_action(symbol)
-            if candidate.get("source") == "LSE":
-                self.state.register_lse_symbol_cooldown(symbol, candidate.get("lse_timeframe") or "1h")
-            self.report.log_trade_opened(clone_local)
-            logger.info(f"[CLONE] ✅ Clone trade {clone_id} opened for {symbol}")
-            return True
-        else:
-            logger.warning(f"[CLONE] ❌ Failed to open clone trade for {symbol}")
-            return False
 
     # ─────────────────────────────────────────────────────────
     # Position management

@@ -155,6 +155,12 @@ public class SimulationMarkPriceWorker : BackgroundService
                     
                     trade.MarkPrice = markPrice;
 
+                    // ── MAE/MFE ratchet + TP/SL progress (server-side, monotonic) ──
+                    // Runs every tick (1s) independent of the Python agent's process lifetime,
+                    // so it survives agent restarts and doesn't depend on a fire-and-forget
+                    // sync that only fired once at close time.
+                    UpdateExcursionTracking(trade, markPrice);
+
                     // ── Liquidation check ──────────────────────────────────────────
                     if (simulationService.IsLiquidationTriggered(markPrice, trade.LiquidationPrice, trade.Side))
                     {
@@ -162,6 +168,7 @@ public class SimulationMarkPriceWorker : BackgroundService
                         trade.Status = TradeStatus.Liquidated;
                         trade.ClosePrice = markPrice;
                         trade.ClosedAt = DateTime.UtcNow;
+                        trade.ExitReason = "liquidated";
                         trade.RealizedPnl = -trade.Margin;
                         trade.UnrealizedPnl = 0;
                         trade.ROIPercentage = simulationService.CalculateROI(-trade.Margin, trade.Margin); // -100%
@@ -210,6 +217,7 @@ public class SimulationMarkPriceWorker : BackgroundService
                         trade.Status = closeReason == "Take Profit" ? TradeStatus.Win : TradeStatus.Loss;
                         trade.ClosePrice = markPrice;
                         trade.ClosedAt = DateTime.UtcNow;
+                        trade.ExitReason = closeReason == "Take Profit" ? "tp_hit" : "sl_hit";
                         trade.RealizedPnl = realizedPnl;
                         trade.ExitFee = exitFee;
                         trade.UnrealizedPnl = 0;
@@ -294,6 +302,61 @@ public class SimulationMarkPriceWorker : BackgroundService
         }
     }
 
+    /// <summary>
+    /// Updates MaxFavorablePrice/MaxAdversePrice monotonically from the current mark price,
+    /// then derives TP/SL progress percentages from them. Entry price is the starting point
+    /// for both ratchets so a trade with no ticks yet still reports 0%, not null.
+    /// </summary>
+    private static void UpdateExcursionTracking(SimulatedTrade trade, decimal markPrice)
+    {
+        bool isLong = trade.Side == SignalDirection.Long;
+
+        var favorableBaseline = trade.MaxFavorablePrice ?? trade.EntryPrice;
+        var adverseBaseline = trade.MaxAdversePrice ?? trade.EntryPrice;
+
+        trade.MaxFavorablePrice = isLong
+            ? Math.Max(favorableBaseline, markPrice)
+            : Math.Min(favorableBaseline, markPrice);
+
+        trade.MaxAdversePrice = isLong
+            ? Math.Min(adverseBaseline, markPrice)
+            : Math.Max(adverseBaseline, markPrice);
+
+        if (trade.TpPrice.HasValue)
+        {
+            var tpRange = isLong
+                ? trade.TpPrice.Value - trade.EntryPrice
+                : trade.EntryPrice - trade.TpPrice.Value;
+
+            if (tpRange != 0)
+            {
+                var liveDist = isLong ? markPrice - trade.EntryPrice : trade.EntryPrice - markPrice;
+                var peakDist = isLong
+                    ? trade.MaxFavorablePrice.Value - trade.EntryPrice
+                    : trade.EntryPrice - trade.MaxFavorablePrice.Value;
+
+                trade.TpProgressPct = Math.Round(liveDist / tpRange * 100m, 2);
+                trade.MaxTpProgressPct = Math.Round(peakDist / tpRange * 100m, 2);
+            }
+        }
+
+        if (trade.SlPrice.HasValue)
+        {
+            var slRange = isLong
+                ? trade.EntryPrice - trade.SlPrice.Value
+                : trade.SlPrice.Value - trade.EntryPrice;
+
+            if (slRange != 0)
+            {
+                var peakAdverseDist = isLong
+                    ? trade.EntryPrice - trade.MaxAdversePrice.Value
+                    : trade.MaxAdversePrice.Value - trade.EntryPrice;
+
+                trade.MaxSlProgressPct = Math.Round(peakAdverseDist / slRange * 100m, 2);
+            }
+        }
+    }
+
     private static SimulatedTradeDto MapToDto(SimulatedTrade t) => new SimulatedTradeDto
     {
         Id = t.Id,
@@ -323,6 +386,15 @@ public class SimulationMarkPriceWorker : BackgroundService
         TradingSignalId = t.TradingSignalId,
         Exchange = t.Exchange,
         AgentDecisionJson = t.AgentDecisionJson,
-        StrategyProfileId = t.StrategyProfileId
+        StrategyProfileId = t.StrategyProfileId,
+        MaxAdversePrice = t.MaxAdversePrice,
+        MaxFavorablePrice = t.MaxFavorablePrice,
+        ExitReason = t.ExitReason,
+        Ma7DistancePctAtEntry = t.Ma7DistancePctAtEntry,
+        BtcPriceAtClose = t.BtcPriceAtClose,
+        ExitAuditJson = t.ExitAuditJson,
+        TpProgressPct = t.TpProgressPct,
+        MaxTpProgressPct = t.MaxTpProgressPct,
+        MaxSlProgressPct = t.MaxSlProgressPct
     };
 }

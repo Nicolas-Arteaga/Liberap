@@ -775,7 +775,7 @@ export class AgentTradeAuditComponent implements OnInit {
   downloadCsv(): void {
     // Semicolon is better for Excel in Spanish locales, and we add BOM for UTF-8 characters
     let out = '\uFEFF'; 
-    out += 'Symbol;Apertura;Cierre;Source;Strategy;NexusConf;Confluence;LSE_Score;SCAR;Estado;RealizedPnL;Margin;Leverage;EntryReason\n';
+    out += 'Symbol;Apertura;Cierre;Source;Strategy;NexusConf;Confluence;LSE_Score;SCAR;Estado;RealizedPnL;Margin;Leverage;EntryReason;MaxTpProgressPct;MaxSlProgressPct\n';
     
     for (const tr of this.allRows()) {
       const pnlStr = (tr.realizedPnl != null && tr.status !== TradeStatus.Open) ? tr.realizedPnl.toFixed(2).replace('.', ',') : '';
@@ -804,8 +804,11 @@ export class AgentTradeAuditComponent implements OnInit {
          }
       }
       
+      const maxTpProgress = tr.maxTpProgressPct != null ? String(tr.maxTpProgressPct).replace('.', ',') : '';
+      const maxSlProgress = tr.maxSlProgressPct != null ? String(tr.maxSlProgressPct).replace('.', ',') : '';
+
       // We use ; as separator for Spanish Excel
-      out += `${tr.symbol};${openedStr};${closedStr};${src};${strat};${nxConf};${conf};${lseScore};${scar};${this.statusLabel(tr.status)};${pnlStr};${tr.margin};${tr.leverage};${reason}\n`;
+      out += `${tr.symbol};${openedStr};${closedStr};${src};${strat};${nxConf};${conf};${lseScore};${scar};${this.statusLabel(tr.status)};${pnlStr};${tr.margin};${tr.leverage};${reason};${maxTpProgress};${maxSlProgress}\n`;
     }
     
     const blob = new Blob([out], { type: 'text/csv;charset=utf-8' });

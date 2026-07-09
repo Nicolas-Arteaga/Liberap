@@ -190,6 +190,26 @@
                 <dt>SL</dt><dd class="price-value">{{ tr.slPrice | number:'1.4-6' }}</dd>
                 <dt>Mejor precio (MFE)</dt><dd class="price-value">{{ tr.maxFavorablePrice ? (tr.maxFavorablePrice | number:'1.4-6') : '—' }}</dd>
                 <dt>Peor precio (MAE)</dt><dd class="price-value">{{ tr.maxAdversePrice ? (tr.maxAdversePrice | number:'1.4-6') : '—' }}</dd>
+                <dt>Máx. acercamiento a TP</dt>
+                <dd>
+                  @if (tr.maxTpProgressPct != null) {
+                    <span class="tp-check" [class.better]="tr.maxTpProgressPct >= 100" [class.worse]="tr.maxTpProgressPct < 70" [class.exact]="tr.maxTpProgressPct >= 70 && tr.maxTpProgressPct < 100">
+                      {{ tr.maxTpProgressPct | number:'1.0-1' }}%
+                    </span>
+                  } @else {
+                    —
+                  }
+                </dd>
+                <dt>Máx. acercamiento a SL</dt>
+                <dd>
+                  @if (tr.maxSlProgressPct != null) {
+                    <span class="sl-check" [class.worse]="tr.maxSlProgressPct >= 100" [class.before]="tr.maxSlProgressPct >= 70 && tr.maxSlProgressPct < 100">
+                      {{ tr.maxSlProgressPct | number:'1.0-1' }}%
+                    </span>
+                  } @else {
+                    —
+                  }
+                </dd>
                 <dt>Distancia MA7 &#64; entrada</dt><dd>{{ tr.ma7DistancePctAtEntry != null ? (tr.ma7DistancePctAtEntry | number:'1.2-2') + '%' : '—' }}</dd>
                 <dt>BTC &#64; cierre</dt><dd>{{ tr.btcPriceAtClose ? (tr.btcPriceAtClose | number:'1.2-2') : '—' }}</dd>
                 <dt>Margen / Lev</dt><dd>{{ tr.margin | number:'1.2-2' }} USDT × {{ tr.leverage }}</dd>

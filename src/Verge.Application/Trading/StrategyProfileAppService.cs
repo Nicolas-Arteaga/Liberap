@@ -19,156 +19,17 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
         _repo = repo;
     }
 
-    private static readonly Guid CloneProfileId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-
     [HttpGet]
     public async Task<List<StrategyProfileDto>> GetListAsync()
     {
         var userId = CurrentUser.Id!.Value;
         var items = await _repo.GetListAsync(p => p.UserId == userId);
-        var dtos = items.OrderBy(p => p.Name).Select(MapToDto).ToList();
-
-        // Add virtual Standard Scalping profile at index 0
-        dtos.Insert(0, new StrategyProfileDto
-        {
-            Id = Guid.Empty,
-            UserId = userId,
-            Name = "Standard Scalping",
-            Description = "Estrategia predeterminada de la app (Scalping)",
-            Color = "#3B82F6",
-            IsActive = true,
-            MinConfluenceScore = 60f,
-            MinNexusConfidence = 76f,
-            MaxRsiLong = 75f,
-            MinRsiShort = 20f,
-            MaxMa7DistancePct = 3.5f,
-            AllowedSources = "LSE,Nexus,Bridge",
-            AllowLong = true,
-            AllowShort = true,
-            MarginPerTrade = 150m,
-            TpMultiplier = 3.5f,
-            SlMultiplier = 0.6f,
-            MinRR = 2.5f,
-            MaxOpenPositions = 3,
-            MaxTradeDurationCandles = 8,
-            ExtremeRsiVeto = true,
-            MaxEntrySlippagePct = 0.002f,
-            LseMaxEntrySlippagePct = 0.20f,
-            MinTpDistancePct = 0.003f,
-            MinSlDistancePct = 0.002f,
-            MinEstimatedRangePct = 0.8f,
-            MaxNexusSignalAgeSeconds = 120f,
-            NexusMaxPriceDriftPct = 0.025f
-        });
-
-        // Add virtual Scalping Clone profile (auto-clones Standard Scalping trades with 2x SL)
-        dtos.Insert(1, new StrategyProfileDto
-        {
-            Id = CloneProfileId,
-            UserId = userId,
-            Name = "Scalping Clone",
-            Description = "Copia automática de Standard Scalping con SL doble (1.2x)",
-            Color = "rgb(67, 182, 0)",
-            IsActive = true,
-            MinConfluenceScore = 60f,
-            MinNexusConfidence = 76f,
-            MaxRsiLong = 75f,
-            MinRsiShort = 20f,
-            MaxMa7DistancePct = 3.5f,
-            AllowedSources = "LSE,Nexus,Bridge",
-            AllowLong = true,
-            AllowShort = true,
-            MarginPerTrade = 150m,
-            TpMultiplier = 3.5f,
-            SlMultiplier = 1.2f, // 2x Standard Scalping SL
-            MinRR = 2.5f,
-            MaxOpenPositions = 3,
-            MaxTradeDurationCandles = 8,
-            ExtremeRsiVeto = true,
-            MaxEntrySlippagePct = 0.002f,
-            LseMaxEntrySlippagePct = 0.20f,
-            MinTpDistancePct = 0.003f,
-            MinSlDistancePct = 0.002f,
-            MinEstimatedRangePct = 0.8f,
-            MaxNexusSignalAgeSeconds = 120f,
-            NexusMaxPriceDriftPct = 0.025f
-        });
-
-        return dtos;
+        return items.OrderBy(p => p.Name).Select(MapToDto).ToList();
     }
 
     [HttpGet]
     public async Task<StrategyProfileDto> GetAsync(Guid id)
     {
-        if (id == Guid.Empty)
-        {
-            return new StrategyProfileDto
-            {
-                Id = Guid.Empty,
-                UserId = CurrentUser.Id!.Value,
-                Name = "Standard Scalping",
-                Description = "Estrategia predeterminada de la app (Scalping)",
-                Color = "#3B82F6",
-                IsActive = true,
-                MinConfluenceScore = 60f,
-                MinNexusConfidence = 76f,
-                MaxRsiLong = 75f,
-                MinRsiShort = 20f,
-                MaxMa7DistancePct = 3.5f,
-                AllowedSources = "LSE,Nexus,Bridge",
-                AllowLong = true,
-                AllowShort = true,
-                MarginPerTrade = 150m,
-                TpMultiplier = 3.5f,
-                SlMultiplier = 0.6f,
-                MinRR = 2.5f,
-                MaxOpenPositions = 3,
-                MaxTradeDurationCandles = 8,
-                ExtremeRsiVeto = true,
-                MaxEntrySlippagePct = 0.002f,
-                LseMaxEntrySlippagePct = 0.20f,
-                MinTpDistancePct = 0.003f,
-                MinSlDistancePct = 0.002f,
-                MinEstimatedRangePct = 0.8f,
-                MaxNexusSignalAgeSeconds = 120f,
-                NexusMaxPriceDriftPct = 0.025f
-            };
-        }
-
-        if (id == CloneProfileId)
-        {
-            return new StrategyProfileDto
-            {
-                Id = CloneProfileId,
-                UserId = CurrentUser.Id!.Value,
-                Name = "Scalping Clone",
-                Description = "Copia automática de Standard Scalping con SL doble (1.2x)",
-                Color = "rgb(67, 182, 0)",
-                IsActive = true,
-                MinConfluenceScore = 60f,
-                MinNexusConfidence = 76f,
-                MaxRsiLong = 75f,
-                MinRsiShort = 20f,
-                MaxMa7DistancePct = 3.5f,
-                AllowedSources = "LSE,Nexus,Bridge",
-                AllowLong = true,
-                AllowShort = true,
-                MarginPerTrade = 150m,
-                TpMultiplier = 3.5f,
-                SlMultiplier = 1.2f, // 2x Standard Scalping SL
-                MinRR = 2.5f,
-                MaxOpenPositions = 3,
-                MaxTradeDurationCandles = 8,
-                ExtremeRsiVeto = true,
-                MaxEntrySlippagePct = 0.002f,
-                LseMaxEntrySlippagePct = 0.20f,
-                MinTpDistancePct = 0.003f,
-                MinSlDistancePct = 0.002f,
-                MinEstimatedRangePct = 0.8f,
-                MaxNexusSignalAgeSeconds = 120f,
-                NexusMaxPriceDriftPct = 0.025f
-            };
-        }
         var profile = await _repo.GetAsync(id);
         EnsureOwnership(profile);
         return MapToDto(profile);
@@ -187,8 +48,6 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
     [HttpPut]
     public async Task<StrategyProfileDto> UpdateAsync(Guid id, CreateUpdateStrategyProfileDto input)
     {
-        if (id == Guid.Empty || id == CloneProfileId)
-            throw new UserFriendlyException("No se puede editar una estrategia virtual del sistema.");
         var profile = await _repo.GetAsync(id);
         EnsureOwnership(profile);
         ApplyInput(profile, input);
@@ -199,8 +58,6 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
     [HttpDelete]
     public async Task DeleteAsync(Guid id)
     {
-        if (id == Guid.Empty || id == CloneProfileId)
-            throw new UserFriendlyException("No se puede eliminar una estrategia virtual del sistema.");
         var profile = await _repo.GetAsync(id);
         EnsureOwnership(profile);
         await _repo.DeleteAsync(profile, autoSave: true);
@@ -209,7 +66,6 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
     [HttpPost]
     public async Task<StrategyProfileDto> ToggleActiveAsync(Guid id)
     {
-        if (id == Guid.Empty) throw new UserFriendlyException("No se puede desactivar la estrategia predeterminada directamente.");
         var profile = await _repo.GetAsync(id);
         EnsureOwnership(profile);
         profile.IsActive = !profile.IsActive;

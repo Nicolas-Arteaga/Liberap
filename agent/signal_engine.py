@@ -31,7 +31,7 @@ class SignalEngine:
             logger.error(f"Error fetching SCAR alerts: {e}")
         return {}
 
-    def get_nexus15_prediction(self, symbol: str, limit: int = 300) -> Optional[Dict[str, Any]]:
+    def get_nexus15_prediction(self, symbol: str, limit: int = 300, direction_bias: str = None) -> Optional[Dict[str, Any]]:
         """
         Fetches the Nexus-15 prediction for a symbol.
         Sends 15m candles (from SQLite cache, already in correct format) to the AI service.
@@ -48,6 +48,8 @@ class SignalEngine:
             "timeframe": "15m",
             "candles": klines  # Already has 'timestamp' field from KlineCache.get_klines()
         }
+        if direction_bias:
+            payload["direction_bias"] = direction_bias
 
         try:
             response = requests.post(url, json=payload, timeout=10)
@@ -166,6 +168,70 @@ class SignalEngine:
         return {**base, "nexus5_timing_note": f"below_min({conf:.0f}%)"}
 
 
+    def _normalize_keys_to_snake_case(self, d: dict) -> dict:
+        if not isinstance(d, dict):
+            return d
+        
+        mapping = {
+            "G1PriceAction": "g1_price_action",
+            "G2SmcIct": "g2_smc_ict",
+            "G3Wyckoff": "g3_wyckoff",
+            "G4Fractals": "g4_fractals",
+            "G5Volume": "g5_volume",
+            "G6Ml": "g6_ml",
+            "g1PriceAction": "g1_price_action",
+            "g2SmcIct": "g2_smc_ict",
+            "g3Wyckoff": "g3_wyckoff",
+            "g4Fractals": "g4_fractals",
+            "g5Volume": "g5_volume",
+            "g6Ml": "g6_ml",
+            
+            "CandleBodyRatio": "candle_body_ratio",
+            "UpperWickRatio": "upper_wick_ratio",
+            "LowerWickRatio": "lower_wick_ratio",
+            "ConsecutiveBullBars": "consecutive_bull_bars",
+            "ConsecutiveBearBars": "consecutive_bear_bars",
+            "OrderBlockDetected": "order_block_detected",
+            "FairValueGap": "fair_value_gap",
+            "BosDetected": "bos_detected",
+            "LiquiditySweep": "liquidity_sweep",
+            "WyckoffPhase": "wyckoff_phase",
+            "SpringDetected": "spring_detected",
+            "UpthrustDetected": "upthrust_detected",
+            "FractalHigh5": "fractal_high_5",
+            "FractalLow5": "fractal_low_5",
+            "TrendStructure": "trend_structure",
+            "VolumeRatio20": "volume_ratio_20",
+            "CvdDelta": "cvd_delta",
+            "VolumeSurgeBullish": "volume_surge_bullish",
+            "VolumeSurgeBearish": "volume_surge_bearish",
+            "PocProximity": "poc_proximity",
+            "Rsi14": "rsi_14",
+            "MacdHistogram": "macd_histogram",
+            "AtrPercent": "atr_percent",
+            
+            "AiConfidence": "ai_confidence",
+            "aiConfidence": "ai_confidence",
+            "Direction": "direction",
+            "Regime": "regime",
+            "VolumeExplosion": "volume_explosion",
+            "volumeExplosion": "volume_explosion",
+            "GroupScores": "group_scores",
+            "groupScores": "group_scores",
+            "Features": "features",
+            "EstimatedRangePercent": "estimated_range_percent",
+            "estimatedRangePercent": "estimated_range_percent",
+        }
+        
+        normalized = {}
+        for k, v in d.items():
+            new_k = mapping.get(k, k)
+            if isinstance(v, dict):
+                normalized[new_k] = self._normalize_keys_to_snake_case(v)
+            else:
+                normalized[new_k] = v
+        return normalized
+
     def calculate_confluence(self, symbol: str, scar_data: dict, nexus_data: dict, nexus5_data: dict = None, profile_id: str = None) -> dict:
         """
         Full confluence score using ALL available signals:
@@ -178,6 +244,9 @@ class SignalEngine:
           - SCAR + Nexus alignment bonus    (+10 pts)
         Total max: 100 pts | Entry threshold: MIN_CONFLUENCE_SCORE (35)
         """
+        if nexus_data:
+            nexus_data = self._normalize_keys_to_snake_case(nexus_data)
+
         score   = 0.0
         reasons = []
 

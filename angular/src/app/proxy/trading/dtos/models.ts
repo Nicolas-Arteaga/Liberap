@@ -168,6 +168,9 @@ export interface SimulatedTradeDto extends EntityDto<string> {
   ma7DistancePctAtEntry?: number;
   btcPriceAtClose?: number;
   exitAuditJson?: string;
+  tpProgressPct?: number;
+  maxTpProgressPct?: number;
+  maxSlProgressPct?: number;
 }
 
 export interface SimulationPerformanceDto {

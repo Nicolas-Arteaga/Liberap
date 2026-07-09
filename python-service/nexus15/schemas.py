@@ -14,6 +14,7 @@ class Nexus15Request(BaseModel):
     symbol: str
     timeframe: str = "15m"
     candles: List[CandleInput]  # últimas 25-50 velas
+    direction_bias: Optional[str] = None  # "LONG" | "SHORT" | None (auto)
 
 class GroupScores(BaseModel):
     g1_price_action: float
@@ -29,6 +30,7 @@ class Nexus15Features(BaseModel):
     upper_wick_ratio: float
     lower_wick_ratio: float
     consecutive_bull_bars: int
+    consecutive_bear_bars: int
     # G2
     order_block_detected: bool
     fair_value_gap: bool
@@ -46,6 +48,7 @@ class Nexus15Features(BaseModel):
     volume_ratio_20: float
     cvd_delta: float
     volume_surge_bullish: bool
+    volume_surge_bearish: bool
     poc_proximity: float
     volume_explosion: bool
     explosion_bullish: bool

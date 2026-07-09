@@ -134,6 +134,16 @@
                     {{ getMaxAdversePriceDisplay(trade) }}
                   </span>
                 </div>
+                <div *ngIf="getTpProgressDisplay(trade) !== null" class="mt-2" style="max-width: 180px;">
+                  <div class="d-flex align-items-center justify-content-between mb-1">
+                    <span class="text-white-50 text-xs">{{ trade.status === 0 ? 'Progreso a TP' : 'Máx. acercamiento a TP' }}</span>
+                    <span class="text-white-50 text-xs fw-medium">{{ getTpProgressDisplay(trade) | number:'1.0-1' }}%</span>
+                  </div>
+                  <div class="progress" style="height: 4px;">
+                    <div class="progress-bar" [class]="getTpProgressBarClass(trade)"
+                         [style.width.%]="getTpProgressBarWidth(trade)"></div>
+                  </div>
+                </div>
               </div>
               
               <div class="text-end">

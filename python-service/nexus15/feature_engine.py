@@ -37,11 +37,19 @@ class Nexus15FeatureEngine:
             else:
                 break
 
+        consecutive_bear = 0
+        for i in range(len(df) - 1, -1, -1):
+            if df.iloc[i]['close'] < df.iloc[i]['open']:
+                consecutive_bear += 1
+            else:
+                break
+
         return {
             "candle_body_ratio": round(body / hl, 4),
             "upper_wick_ratio":  round(upper / hl, 4),
             "lower_wick_ratio":  round(lower / hl, 4),
             "consecutive_bull_bars": min(consecutive, 5),
+            "consecutive_bear_bars": min(consecutive_bear, 5),
         }
 
     # ── Grupo 2: SMC/ICT ──────────────────────────────────────────────────
@@ -198,6 +206,7 @@ class Nexus15FeatureEngine:
                 cvd_delta -= row['volume']
 
         volume_surge_bullish = (vol_ratio > 1.5 and df['close'].iloc[-1] > df['open'].iloc[-1])
+        volume_surge_bearish = (vol_ratio > 1.5 and df['close'].iloc[-1] < df['open'].iloc[-1])
 
         # POC: precio de mayor volumen en ventana 50 velas
         poc_price = df.loc[df['volume'].idxmax(), 'close']
@@ -223,6 +232,7 @@ class Nexus15FeatureEngine:
             "volume_ratio_20": round(vol_ratio, 4),
             "cvd_delta": round(cvd_delta, 2),
             "volume_surge_bullish": volume_surge_bullish,
+            "volume_surge_bearish": volume_surge_bearish,
             "poc_proximity": round(poc_proximity, 4),
             "volume_explosion": volume_explosion,
             "explosion_bullish": explosion_bullish,

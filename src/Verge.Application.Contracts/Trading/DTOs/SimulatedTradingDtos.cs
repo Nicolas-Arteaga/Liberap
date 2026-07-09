@@ -71,6 +71,23 @@ public class SimulatedTradeDto : EntityDto<Guid>
     /// Full exit audit JSON block (v12.1): MAE%, MFE%, candles_held, BTC context at exit, etc.
     /// </summary>
     public string? ExitAuditJson { get; set; }
+
+    /// <summary>
+    /// Live progress toward TP as of the last mark price update (% of entry-to-TP distance).
+    /// 0 = at entry, 100 = at TP. Can be negative or exceed 100. Null if TpPrice isn't set.
+    /// </summary>
+    public decimal? TpProgressPct { get; set; }
+
+    /// <summary>
+    /// Highest TpProgressPct ever reached during the trade's life. Persists after close.
+    /// </summary>
+    public decimal? MaxTpProgressPct { get; set; }
+
+    /// <summary>
+    /// Highest percentage of the entry-to-SL distance ever covered during the trade's life.
+    /// Persists after close.
+    /// </summary>
+    public decimal? MaxSlProgressPct { get; set; }
 }
 
 public class OpenTradeInputDto

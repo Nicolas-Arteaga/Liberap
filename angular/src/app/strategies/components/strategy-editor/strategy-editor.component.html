@@ -212,6 +212,15 @@
             <button class="source-pill" [class.active]="isSourceAllowed('Bridge')" (click)="toggleSource('Bridge')">
               <ion-icon name="git-merge-outline"></ion-icon> Bridge Redis
             </button>
+            <button class="source-pill" [class.active]="isSourceAllowed('SCAR')" (click)="toggleSource('SCAR')">
+              <ion-icon name="skull-outline"></ion-icon> SCAR
+            </button>
+            <button class="source-pill" [class.active]="isSourceAllowed('golden_uturn')" (click)="toggleSource('golden_uturn')">
+              <ion-icon name="return-up-back-outline"></ion-icon> Golden U-Turn
+            </button>
+            <button class="source-pill" [class.active]="isSourceAllowed('total_sweep')" (click)="toggleSource('total_sweep')">
+              <ion-icon name="water-outline"></ion-icon> Total Sweep
+            </button>
           </div>
         </div>
       </div>

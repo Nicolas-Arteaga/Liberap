@@ -82,7 +82,7 @@ async def analyze_nexus15(request: Nexus15Request):
     if len(request.candles) < 25:
         raise HTTPException(status_code=400, detail="Se requieren al menos 25 velas de 15m")
     try:
-        result = _analyzer.analyze(request)
+        result = _analyzer.analyze(request, direction_bias=request.direction_bias)
         logger.info(f"NEXUS-15 {request.symbol}: confidence={result.ai_confidence}% dir={result.direction}")
 
         # Forward hot signals to the agent via Redis Bridge

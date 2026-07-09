@@ -169,13 +169,19 @@ export class HistoryComponent {
     }
   }
 
+  // Techo de puntos en el gráfico: con 800+ trades históricos, graficar todo
+  // laguea el render sin aportar nada (no es un backtest, es un vistazo rápido
+  // de la evolución reciente). Se aplica tanto por estrategia como en "Todas".
+  private static readonly CHART_TRADE_LIMIT = 50;
+
   private buildChartData(trades: SimulatedTradeDto[]) {
     const closed = [...trades]
       .filter(t => t.status === 1 || t.status === 2 || t.status === 6)
       .sort((a, b) =>
         new Date(a.closedAt || a.openedAt || '').getTime() -
         new Date(b.closedAt || b.openedAt || '').getTime()
-      );
+      )
+      .slice(-HistoryComponent.CHART_TRADE_LIMIT);
 
     const newData = closed.map(t => ({
       month: this.formatDateLabel(t.closedAt || t.openedAt || ''),
@@ -301,20 +307,24 @@ export class HistoryComponent {
     return Number(trade.realizedPnl ?? trade.unrealizedPnl ?? 0);
   }
 
-  // O(1) strategy lookup via Map
+  // O(1) strategy lookup via Map. Trades con strategyProfileId null son legacy
+  // (previos al multi-estrategia) y pertenecen a Standard Scalping por convención.
+  private static readonly STANDARD_SCALPING_ID = '00000000-0000-0000-0000-000000000000';
+
+  private effectiveStrategyId(id?: string): string {
+    return id || HistoryComponent.STANDARD_SCALPING_ID;
+  }
+
   getStrategyLabel(id?: string): string {
-    if (!id || id === '00000000-0000-0000-0000-000000000000') return 'Standard Scalping';
-    return this.strategyMap.get(id)?.name || 'Unknown';
+    return this.strategyMap.get(this.effectiveStrategyId(id))?.name || 'Unknown';
   }
 
   getStrategyColor(id?: string): string {
-    if (!id || id === '00000000-0000-0000-0000-000000000000') return '#3B82F6';
-    return this.strategyMap.get(id)?.color || '#00C47D';
+    return this.strategyMap.get(this.effectiveStrategyId(id))?.color || '#00C47D';
   }
 
   isStrategyActive(id?: string): boolean {
-    if (!id || id === '00000000-0000-0000-0000-000000000000') return true;
-    const strategy = this.strategyMap.get(id);
+    const strategy = this.strategyMap.get(this.effectiveStrategyId(id));
     // Si la estrategia no existe en el map, mostrar los trades (fallback seguro)
     if (!strategy) return true;
     return strategy.isActive;
@@ -339,9 +349,23 @@ export class HistoryComponent {
     return new Date(date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
   }
 
+  /**
+   * Decimales necesarios para que una diferencia de precio sea visible.
+   * toFixed(2) fijo rompe con altcoins de centavos: un movimiento del 30%
+   * en una moneda de $0.02 son $0.006, que redondeado a 2 decimales da "$0.00".
+   */
+  private adaptivePriceDecimals(referencePrice: number): number {
+    const p = Math.abs(referencePrice);
+    if (p === 0) return 2;
+    if (p < 0.01) return 6;
+    if (p < 1) return 5;
+    if (p < 100) return 3;
+    return 2;
+  }
+
   getMaxAdversePriceDisplay(trade: SimulatedTradeDto): string {
     if (!trade.maxAdversePrice) return '';
-    
+
     // Calcular la distancia adversa en USDT desde el entry price
     let adverseDistance: number;
     if (trade.side === 0) {
@@ -351,9 +375,10 @@ export class HistoryComponent {
       // SHORT: adverse es mayor que entry (subió)
       adverseDistance = trade.entryPrice - trade.maxAdversePrice;
     }
-    
+
+    const decimals = this.adaptivePriceDecimals(trade.entryPrice);
     const sign = adverseDistance < 0 ? '-' : '';
-    return `${sign}$${Math.abs(adverseDistance).toFixed(2)}`;
+    return `${sign}$${Math.abs(adverseDistance).toFixed(decimals)}`;
   }
 
   getMaxAdversePriceColor(trade: SimulatedTradeDto): string {
@@ -369,6 +394,30 @@ export class HistoryComponent {
     
     // Si la distancia es negativa (adversa), mostrar en warning
     return adverseDistance < 0 ? 'text-warning' : 'text-white-50';
+  }
+
+  /**
+   * % hacia el TP a mostrar: en vivo (tpProgressPct) si el trade sigue abierto,
+   * o el pico histórico (maxTpProgressPct) una vez cerrado — "qué tan cerca estuvo".
+   */
+  getTpProgressDisplay(trade: SimulatedTradeDto): number | null {
+    const pct = trade.status === 0 ? trade.tpProgressPct : trade.maxTpProgressPct;
+    return pct == null ? null : pct;
+  }
+
+  getTpProgressBarWidth(trade: SimulatedTradeDto): number {
+    const pct = this.getTpProgressDisplay(trade);
+    if (pct == null) return 0;
+    return Math.max(0, Math.min(100, pct));
+  }
+
+  getTpProgressBarClass(trade: SimulatedTradeDto): string {
+    const pct = this.getTpProgressDisplay(trade);
+    if (pct == null) return 'bg-secondary';
+    if (trade.status === 1) return 'bg-success'; // ganador
+    if (pct >= 70) return 'bg-warning'; // llegó cerca y no cerró en TP: la señal más útil para calibrar
+    if (pct >= 40) return 'bg-info';
+    return 'bg-secondary';
   }
 
   viewInChart(symbol: string): void {

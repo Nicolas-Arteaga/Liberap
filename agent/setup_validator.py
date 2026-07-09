@@ -972,7 +972,7 @@ def validate_nexus_confluence_setup(
     # Un rango <3% en 15m no tiene recorrido suficiente para cubrir el riesgo.
     estimated_range_pct = float(candidate.get("estimated_range_pct", 0) or 0)
     MIN_RANGE_PCT = float(profile.get("minEstimatedRangePct", getattr(config, "MIN_ESTIMATED_RANGE_PCT", 3.0))) if profile else float(getattr(config, "MIN_ESTIMATED_RANGE_PCT", 3.0))
-    if not is_golden and estimated_range_pct < MIN_RANGE_PCT:
+    if not is_golden and candidate.get("source") != "nexus_top" and estimated_range_pct < MIN_RANGE_PCT:
         logger.info(
             "[VETO] range_too_small — %s | range=%.2f%% < min=%.1f%%",
             candidate.get("symbol"), estimated_range_pct, MIN_RANGE_PCT
@@ -1129,7 +1129,7 @@ def validate_pre_trade(
     # Posible inflado artificial de bonus (SMC, grupos, SCAR) que no refleja condición real.
     # Aplica a TODAS las estrategias (Golden U-Turn ya está deshabilitado).
     confluence_score_for_ceiling = float(candidate.get("confluence_score", 0) or 0)
-    if confluence_score_for_ceiling > 90:
+    if candidate.get("source") != "nexus_top" and confluence_score_for_ceiling > 90:
         logger.warning(
             f"[CONFLUENCE-CEILING v12.1] {symbol}: Score={confluence_score_for_ceiling:.1f} > 90 — VETO. "
             f"Nexus={candidate.get('nexus_confidence', 0):.1f}% | "
