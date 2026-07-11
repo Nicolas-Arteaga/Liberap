@@ -152,6 +152,7 @@ public class VergeHttpApiHostModule : AbpModule
         context.Services.AddHostedService<Verge.Trading.Nexus5.Nexus5ScannerJob>();
         context.Services.AddScoped<Verge.Trading.Nexus5.IPythonNexus5Service, Verge.Trading.Nexus5.PythonNexus5Service>();
         context.Services.AddScoped<Verge.Trading.Scar.IPythonScarService, Verge.Trading.Scar.PythonScarService>();
+        context.Services.AddScoped<Verge.Trading.Fvg.IPythonFvgService, Verge.Trading.Fvg.PythonFvgService>();
 
 
         // Redis Configuration (Graceful startup)
@@ -196,6 +197,16 @@ public class VergeHttpApiHostModule : AbpModule
             var url = configuration["PythonService:Url"] ?? "http://localhost:8000";
             client.BaseAddress = new Uri(url);
             client.Timeout = TimeSpan.FromSeconds(30);
+        });
+
+        // Python FVG HTTP Client — timeout mas alto que el resto: /fvg/cascade-scan
+        // hace hasta 3 fetches de Binance por símbolo (15m/5m/1m) para toda la
+        // watchlist, tarda bastante más que un análisis de un solo timeframe.
+        context.Services.AddHttpClient("PythonFvg", client =>
+        {
+            var url = configuration["PythonService:Url"] ?? "http://localhost:8000";
+            client.BaseAddress = new Uri(url);
+            client.Timeout = TimeSpan.FromSeconds(60);
         });
 
 

@@ -129,6 +129,7 @@ class ArrowPeakItem(BaseModel):
     current_price: float
     peak_price: float  # The highest point of the arrow
     dist_ma99_pct: float  # Distance to MA99 in 15m (%)
+    trigger_signal: bool = False  # True if the 15m execution trigger fired (price at MA99 + red > prev green)
 
 class ArrowPeakResponse(BaseModel):
     top_5: List[ArrowPeakItem]

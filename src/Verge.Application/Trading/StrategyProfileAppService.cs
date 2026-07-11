@@ -109,6 +109,8 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
         p.MinEstimatedRangePct = i.MinEstimatedRangePct;
         p.MaxNexusSignalAgeSeconds = i.MaxNexusSignalAgeSeconds;
         p.NexusMaxPriceDriftPct = i.NexusMaxPriceDriftPct;
+        p.StrategyType = string.IsNullOrWhiteSpace(i.StrategyType) ? "Generic" : i.StrategyType;
+        p.PatternParamsJson = i.PatternParamsJson;
     }
 
     private static StrategyProfileDto MapToDto(StrategyProfile p) => new()
@@ -141,6 +143,8 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
         MinSlDistancePct = p.MinSlDistancePct,
         MinEstimatedRangePct = p.MinEstimatedRangePct,
         MaxNexusSignalAgeSeconds = p.MaxNexusSignalAgeSeconds,
-        NexusMaxPriceDriftPct = p.NexusMaxPriceDriftPct
+        NexusMaxPriceDriftPct = p.NexusMaxPriceDriftPct,
+        StrategyType = p.StrategyType,
+        PatternParamsJson = p.PatternParamsJson
     };
 }

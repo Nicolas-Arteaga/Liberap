@@ -48,6 +48,10 @@ public class StrategyProfileDto : EntityDto<Guid>
     public float MaxNexusSignalAgeSeconds { get; set; }
     public float NexusMaxPriceDriftPct { get; set; }
 
+    // Motor de patrones (genérico)
+    public string StrategyType { get; set; } = "Generic";
+    public string? PatternParamsJson { get; set; }
+
     // Metrics (Calculated)
     public double WinRate { get; set; }
     public int TotalTrades { get; set; }
@@ -95,4 +99,8 @@ public class CreateUpdateStrategyProfileDto
     public float MinEstimatedRangePct { get; set; } = 3.0f;
     public float MaxNexusSignalAgeSeconds { get; set; } = 120.0f;
     public float NexusMaxPriceDriftPct { get; set; } = 0.025f;
+
+    // Motor de patrones (genérico)
+    public string StrategyType { get; set; } = "Generic";
+    public string? PatternParamsJson { get; set; }
 }

@@ -20,6 +20,22 @@ _VALIDATE_CALL_COUNT = 0  # Contador global de validaciones
 _VALIDATE_VETO_COUNT = 0  # Contador de vetos aplicados
 _VALIDATE_PASS_COUNT = 0  # Contador de validaciones que pasaron
 
+def _is_direct_injection_candidate(candidate: dict) -> bool:
+    """
+    True para candidatos de inyección directa (MA Slope, Arrow Peak, Total
+    Sweep, Golden U-Turn): ya traen su propio score/SL/TP calculados por su
+    propio detector geométrico, no son señales "Nexus con nivel de confianza"
+    — los chequeos de Tier/rango estimado de esta funcion están pensados para
+    ese otro paradigma (Nexus/Bridge) y no aplican acá.
+    """
+    return bool(
+        candidate.get("ma_slope_mode")
+        or candidate.get("arrow_peak_mode")
+        or candidate.get("total_sweep_mode")
+        or candidate.get("golden_uturn_mode")
+    )
+
+
 # --- 24h Ticker Cache (Thread-Safe Symmetrical Veto Provider) ---
 _TICKER_CACHE: Dict[str, Dict[str, float]] = {}
 _LAST_TICKER_FETCH = 0.0
@@ -972,7 +988,8 @@ def validate_nexus_confluence_setup(
     # Un rango <3% en 15m no tiene recorrido suficiente para cubrir el riesgo.
     estimated_range_pct = float(candidate.get("estimated_range_pct", 0) or 0)
     MIN_RANGE_PCT = float(profile.get("minEstimatedRangePct", getattr(config, "MIN_ESTIMATED_RANGE_PCT", 3.0))) if profile else float(getattr(config, "MIN_ESTIMATED_RANGE_PCT", 3.0))
-    if not is_golden and candidate.get("source") != "nexus_top" and estimated_range_pct < MIN_RANGE_PCT:
+    if (not is_golden and not _is_direct_injection_candidate(candidate)
+            and candidate.get("source") != "nexus_top" and estimated_range_pct < MIN_RANGE_PCT):
         logger.info(
             "[VETO] range_too_small — %s | range=%.2f%% < min=%.1f%%",
             candidate.get("symbol"), estimated_range_pct, MIN_RANGE_PCT
@@ -1204,9 +1221,12 @@ def validate_pre_trade(
             tier = "T3"
 
         # Regla A: Desactivar Trend Following en Tier 3
+        # No aplica a inyección directa: su "nexus_confidence" es una copia
+        # del score propio del detector geométrico, no una confianza real de
+        # tendencia estilo Nexus — este veto mide otra cosa.
         nexus_conf = float(candidate.get("nexus_confidence", 0) or 0)
         is_trend_following = 60 < nexus_conf <= 80
-        if tier == "T3" and is_trend_following:
+        if tier == "T3" and is_trend_following and not _is_direct_injection_candidate(candidate):
             logger.info(
                 "[VETO] disabled_signal_for_tier — %s | Trend Following desactivado en Tier 3",
                 symbol

@@ -1,0 +1,125 @@
+<div class="fvg-shell">
+
+  <header class="fvg-header">
+    <div class="fvg-title">
+      <span class="fvg-title-main">FVG</span>
+      <span class="fvg-title-sub">CASCADA 15m → 5m → 1m + IFVG</span>
+    </div>
+
+    <div class="fvg-controls">
+      <input
+        class="fvg-symbol-input"
+        type="text"
+        [ngModel]="selectedSymbol()"
+        (ngModelChange)="onSymbolChange($event.toUpperCase())"
+        placeholder="BTCUSDT" />
+
+      <select class="fvg-interval-select" [ngModel]="selectedInterval()" (ngModelChange)="onIntervalChange($event)">
+        <option *ngFor="let itv of intervals" [value]="itv">{{ itv }}</option>
+      </select>
+
+      <button class="fvg-btn fvg-btn-primary" (click)="runAnalyze()" [disabled]="isLoading()">
+        {{ isLoading() ? 'Analizando...' : 'Analizar' }}
+      </button>
+
+      <button class="fvg-btn fvg-btn-scan" (click)="runTopScan()" [disabled]="isTopLoading()">
+        {{ isTopLoading() ? 'Escaneando...' : 'Top-5 FVG del exchange' }}
+      </button>
+    </div>
+  </header>
+
+  <div class="fvg-error" *ngIf="errorMsg()">{{ errorMsg() }}</div>
+
+  <!-- TOP 5 resultados del scan — solo setups CONFIRMADOS (5m como mínimo) y en punto de entrada -->
+  <div class="fvg-top-panel" *ngIf="topResults().length > 0">
+    <div class="tb-title">
+      🏆 TOP 5 FVG — LISTOS PARA ENTRAR
+      <span class="tb-age" *ngIf="topScanAgeSec() !== null" [class.stale]="topScanAgeSec()! > 90">
+        (hace {{ topScanAgeSec() }}s{{ topScanAgeSec()! > 90 ? ' — puede estar desactualizado, re-escaneá' : '' }})
+      </span>
+    </div>
+    <div class="tb-items">
+      <div class="tb-item" *ngFor="let tr of topResults()" (click)="onSymbolChange(tr.symbol!)">
+        <span class="tb-sym">{{ tr.symbol?.replace('USDT', '') }}</span>
+        <span class="tb-entry" [class.in-zone]="tr.entryPriceZone?.entryStatus === 'IN_ZONE'" [class.approaching]="tr.entryPriceZone?.entryStatus === 'APPROACHING'">
+          {{ entryStatusLabel(tr.entryPriceZone) }}
+        </span>
+        <span class="tb-dir" [class.bullish]="tr.entryPriceZone?.direction === 'bullish'" [class.bearish]="tr.entryPriceZone?.direction === 'bearish'">
+          {{ zoneDirectionArrow(tr.entryPriceZone) }}
+        </span>
+        <span class="tb-ifvg" *ngIf="tr.entryPriceZone?.isIfvg">IFVG</span>
+        <span class="tb-stage" [class.ready]="tr.cascadeStatus === 'READY'">{{ tr.cascadeStatus === 'READY' ? '1m' : '5m' }}</span>
+        <span class="tb-tp">TP {{ tr.entryPriceZone?.tpPrice | number:'1.2-6' }}</span>
+        <span class="tb-score" [style.color]="tr.confluenceScore >= 75 ? '#00ff88' : tr.confluenceScore >= 45 ? '#ffdd00' : '#ff8888'">
+          {{ tr.confluenceScore | number:'1.1-1' }}
+        </span>
+      </div>
+    </div>
+    <div class="tb-clear" (click)="clearTopResults()">⨯</div>
+  </div>
+
+  <!-- Panel de CASCADA — muestra por qué (o por qué no) el setup está listo -->
+  <div class="fvg-cascade-panel" *ngIf="cascade()">
+    <div class="cascade-header">
+      <span class="tb-title">CASCADA — {{ selectedSymbol() }}</span>
+      <span class="cascade-status" [ngClass]="cascade()!.cascadeStatus?.toLowerCase()">
+        {{ cascadeStageLabel(cascade()!.cascadeStatus) }}
+      </span>
+    </div>
+    <div class="cascade-stages">
+      <div class="cascade-stage" [class.ok]="!!cascade()!.biasZone">
+        <span class="stage-label">15m · SESGO</span>
+        <span class="stage-check">{{ cascade()!.biasZone ? '✓' : '—' }}</span>
+        <span class="stage-dir" *ngIf="cascade()!.biasZone" [class.bullish]="cascade()!.biasZone?.direction === 'bullish'" [class.bearish]="cascade()!.biasZone?.direction === 'bearish'">
+          {{ zoneDirectionArrow(cascade()!.biasZone) }}
+        </span>
+        <span class="stage-ifvg" *ngIf="cascade()!.biasZone?.isIfvg">IFVG</span>
+      </div>
+      <div class="cascade-arrow">→</div>
+      <div class="cascade-stage" [class.ok]="!!cascade()!.confirmationZone">
+        <span class="stage-label">5m · CONFIRMACIÓN</span>
+        <span class="stage-check">{{ cascade()!.confirmationZone ? '✓' : '—' }}</span>
+        <span class="stage-dir" *ngIf="cascade()!.confirmationZone" [class.bullish]="cascade()!.confirmationZone?.direction === 'bullish'" [class.bearish]="cascade()!.confirmationZone?.direction === 'bearish'">
+          {{ zoneDirectionArrow(cascade()!.confirmationZone) }}
+        </span>
+        <span class="stage-ifvg" *ngIf="cascade()!.confirmationZone?.isIfvg">IFVG</span>
+      </div>
+      <div class="cascade-arrow">→</div>
+      <div class="cascade-stage" [class.ok]="!!cascade()!.executionZone">
+        <span class="stage-label">1m · EJECUCIÓN</span>
+        <span class="stage-check">{{ cascade()!.executionZone ? '✓' : '—' }}</span>
+        <span class="stage-dir" *ngIf="cascade()!.executionZone" [class.bullish]="cascade()!.executionZone?.direction === 'bullish'" [class.bearish]="cascade()!.executionZone?.direction === 'bearish'">
+          {{ zoneDirectionArrow(cascade()!.executionZone) }}
+        </span>
+        <span class="stage-ifvg" *ngIf="cascade()!.executionZone?.isIfvg">IFVG</span>
+      </div>
+    </div>
+    <div class="cascade-entry" *ngIf="cascade()!.entryPriceZone as ez">
+      <span class="tb-entry"
+        [class.in-zone]="ez.entryStatus === 'IN_ZONE'"
+        [class.approaching]="ez.entryStatus === 'APPROACHING'"
+        [class.exhausted]="ez.entryStatus === 'EXHAUSTED'"
+        [class.far]="ez.entryStatus === 'FAR'">
+        {{ entryStatusLabel(ez) }}
+      </span>
+      <span class="tb-gap">gap {{ ez.gapPct | number:'1.2-2' }}%</span>
+      <span class="tb-tp">TP {{ ez.tpPrice | number:'1.2-6' }}</span>
+      <span class="tb-tp">SL {{ ez.slPrice | number:'1.2-6' }}</span>
+      <span class="tb-score" [style.color]="ez.confluenceScore >= 75 ? '#00ff88' : ez.confluenceScore >= 45 ? '#ffdd00' : '#ff8888'">
+        {{ ez.confluenceScore | number:'1.1-1' }}
+      </span>
+    </div>
+  </div>
+
+  <!-- Súper gráfico: volume profile a la izquierda + chart a la derecha -->
+  <div class="fvg-chart-row">
+    <div class="fvg-vp-sidebar">
+      <app-volume-profile-sidebar
+        [bins]="volumeBins()"
+        [priceToCoordinate]="priceToCoordinate">
+      </app-volume-profile-sidebar>
+    </div>
+    <div class="fvg-chart-container" #chartContainer></div>
+  </div>
+
+</div>

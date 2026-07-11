@@ -241,6 +241,36 @@ NICO_L_SHAPE_MIN_CEMENT_FOR_TOP5 = int(os.getenv("NICO_L_SHAPE_MIN_CEMENT_FOR_TO
 # v10.1 The Surgical Hook — Veto Zombi
 MIN_VOLUME_RATIO_20 = float(os.getenv("MIN_VOLUME_RATIO_20", "0.15"))  # v10.1: 0.15x mata a CRDOUSDT, permite a UBUSDT
 
+# ==========================================
+# ARROW PEAK — Exhaustion Reversal Scanner (SHORT only)
+# ==========================================
+# Detecta pump limpio de 3-5 velas verdes (>=20%) seguido de 1-3 velas rojas de
+# "sangrado" y dispara al tocar la MA99 en 15m. Antes solo visible en la UI de
+# Nexus-15 (scan manual) — nunca alimentaba al loop de decisión del agente.
+ARROW_PEAK_ENABLED = os.getenv("ARROW_PEAK_ENABLED", "true").lower() in ("1", "true", "yes")
+# Score de inyección directa (bypass de los umbrales normales de confluencia/nexus
+# del perfil, igual que Golden U-Turn/Total Sweep) — la validación real ya la hizo
+# el propio analyzer (pump limpio + sangrado + toque de MA99).
+ARROW_PEAK_SCORE = float(os.getenv("ARROW_PEAK_SCORE", "85.0"))
+# SL = peak_price + buffer (el pico es la resistencia estructural del setup).
+ARROW_PEAK_SL_BUFFER_PCT = float(os.getenv("ARROW_PEAK_SL_BUFFER_PCT", "1.0"))
+# TP mínimo (igual mecanismo que GOLDEN_UTURN_TP_MIN_DISTANCE_PCT).
+ARROW_PEAK_TP_MIN_DISTANCE_PCT = float(os.getenv("ARROW_PEAK_TP_MIN_DISTANCE_PCT", "10.0"))
+# Timeout del scan completo (recorre todo el watchlist con 2 timeframes por símbolo).
+ARROW_PEAK_HTTP_TIMEOUT_SEC = int(os.getenv("ARROW_PEAK_HTTP_TIMEOUT_SEC", "90"))
+
+# ==========================================
+# MA SLOPE — "Cruce de Medias" anticipado (Casos 1/2/3, 1H)
+# ==========================================
+# Motor genérico de patrones de medias móviles (StrategyType=MaGeometry).
+# La geometría (orden, pendiente, toque, distancia entre medias, proximidad
+# a pico/valle, salida) vive por perfil en PatternParamsJson — ya no hay
+# casos hardcodeados acá. Solo quedan los flags globales de encendido/apagado
+# y el piso de velas mínimas para leer geometría.
+MA_SLOPE_ENABLED = os.getenv("MA_SLOPE_ENABLED", "true").lower() in ("1", "true", "yes")
+MA_SLOPE_INTERVAL = os.getenv("MA_SLOPE_INTERVAL", "1h")  # fallback si un perfil no especifica timeframe
+MA_SLOPE_MIN_CANDLES = int(os.getenv("MA_SLOPE_MIN_CANDLES", "150"))
+
 # Paths
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 POSITIONS_FILE    = os.path.join(DATA_DIR, "positions.json")

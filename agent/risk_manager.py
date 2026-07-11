@@ -154,18 +154,28 @@ class RiskManager:
                 atr_f = cp * float(gu_atr_pct) / 100.0
                 atr_signal = atr_f
 
-        # ── HYBRID SNIPER / GOLDEN U-TURN: Custom SL Calibration ─────────────────
-        # Golden U-Turn: SL = low de las últimas 20 velas (piso estructural)
+        # ── HYBRID SNIPER / GOLDEN U-TURN / ARROW PEAK / MA SLOPE: Custom SL ─────
+        # Golden U-Turn: SL = low de las últimas 20 velas (piso estructural, LONG).
+        # Arrow Peak: SL = techo del pico + buffer (resistencia estructural, SHORT).
+        # MA Slope (Casos 1/2/3): SL = mínimo/máximo reciente + buffer, según lado.
         structural_sniper_mode = signal_data.get("structural_sniper_mode", False)
         golden_uturn_mode = signal_data.get("golden_uturn_mode", False)
+        arrow_peak_mode = signal_data.get("arrow_peak_mode", False)
+        ma_slope_mode = signal_data.get("ma_slope_mode", False)
         custom_sl_price = signal_data.get("custom_sl_price")
-        
-        if (structural_sniper_mode or golden_uturn_mode) and custom_sl_price:
+        side_for_custom_sl = int(signal_data.get("side", 0))
+
+        if (structural_sniper_mode or golden_uturn_mode or arrow_peak_mode or ma_slope_mode) and custom_sl_price:
             try:
                 custom_sl_f = float(custom_sl_price)
-                if custom_sl_f > 0 and custom_sl_f < cp:  # Solo LONGs
-                    sl_price = custom_sl_f
-                    sl_distance_price = cp - sl_price
+                # LONG: el SL custom debe quedar debajo del precio actual.
+                # SHORT (Arrow Peak): el SL custom debe quedar arriba (techo del pico).
+                is_valid_custom_sl = (
+                    (side_for_custom_sl == 0 and custom_sl_f > 0 and custom_sl_f < cp) or
+                    (side_for_custom_sl == 1 and custom_sl_f > cp)
+                )
+                if is_valid_custom_sl:
+                    sl_distance_price = abs(cp - custom_sl_f)
                     sl_distance_pct = sl_distance_price / cp
 
                     # v9.6 Big Fish: Golden U-Turn exige SL mínimo 3% bajo entrada
@@ -188,7 +198,12 @@ class RiskManager:
                                 f"(low-20 o 3% mín)"
                             )
 
-                    tag = "GOLDEN-U-TURN" if golden_uturn_mode else "STRUCTURAL-SNIPER"
+                    tag = (
+                        "GOLDEN-U-TURN" if golden_uturn_mode
+                        else "ARROW-PEAK" if arrow_peak_mode
+                        else "MA-SLOPE" if ma_slope_mode
+                        else "STRUCTURAL-SNIPER"
+                    )
                     if not golden_uturn_mode:
                         logger.info(
                             f"[{tag}-RISK] {symbol}: Usando custom SL={custom_sl_f:.6f} "
@@ -209,7 +224,7 @@ class RiskManager:
 
         # 1. Distancia SL basada en volatilidad (atr o estimated_range)
         # Solo calcular si no hay custom SL de Sniper Mode
-        if not ((structural_sniper_mode or golden_uturn_mode) and custom_sl_price):
+        if not ((structural_sniper_mode or golden_uturn_mode or arrow_peak_mode or ma_slope_mode) and custom_sl_price):
             if profile:
                 sl_mult = float(profile.get("slMultiplier", 0.8))
             else:
@@ -229,8 +244,8 @@ class RiskManager:
             sl_distance_price = cp * sl_distance_pct
 
         # Calcular base SL sin el multiplicador de Clone para el Take Profit
-        # Para Sniper/Golden con custom SL, usar el mismo sl_distance_price calculado
-        if (structural_sniper_mode or golden_uturn_mode) and custom_sl_price:
+        # Para Sniper/Golden/Arrow Peak/MA Slope con custom SL, usar el mismo sl_distance_price calculado
+        if (structural_sniper_mode or golden_uturn_mode or arrow_peak_mode or ma_slope_mode) and custom_sl_price:
             base_sl_distance_price = sl_distance_price
         else:
             if profile and profile.get("name") == "Scalping Clone":
@@ -288,6 +303,29 @@ class RiskManager:
             )
         else:
             tp_distance_price = sl_distance_price * rr_target
+
+        # [MA SLOPE] TP mínimo genérico — el propio candidato trae su piso
+        # (min_tp_pct), distinto por caso, en vez de un bloque fijo por cada uno.
+        if ma_slope_mode and signal_data.get("min_tp_pct"):
+            ms_min_tp_pct = float(signal_data.get("min_tp_pct")) / 100.0
+            ms_min_tp_distance = cp * ms_min_tp_pct
+            if tp_distance_price < ms_min_tp_distance:
+                logger.info(
+                    f"[MA-SLOPE-RISK] {symbol}: TP estirado al mínimo {ms_min_tp_pct*100:.1f}% "
+                    f"(RR daba {tp_distance_price/cp*100:.2f}%)"
+                )
+                tp_distance_price = ms_min_tp_distance
+
+        # [ARROW PEAK] TP mínimo — reversión por agotamiento, dejar correr 1-2 días.
+        if arrow_peak_mode:
+            ap_min_tp_pct = float(getattr(config, "ARROW_PEAK_TP_MIN_DISTANCE_PCT", 10.0)) / 100.0
+            ap_min_tp_distance = cp * ap_min_tp_pct
+            if tp_distance_price < ap_min_tp_distance:
+                logger.info(
+                    f"[ARROW-PEAK-RISK] {symbol}: TP estirado al mínimo {ap_min_tp_pct*100:.1f}% "
+                    f"(RR daba {tp_distance_price/cp*100:.2f}%)"
+                )
+                tp_distance_price = ap_min_tp_distance
 
         # v9.6 Big Fish: TP mínimo 10% para Golden U-Turn
         if golden_uturn_mode:

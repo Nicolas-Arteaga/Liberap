@@ -55,6 +55,11 @@
           <span>Avanzado</span>
           <div class="tab-indicator"></div>
         </button>
+        <button class="tab-btn" *ngIf="isMaGeometry" [class.active]="activeTab === 'pattern'" (click)="activeTab = 'pattern'">
+          <ion-icon name="git-network-outline"></ion-icon>
+          <span>Patrón</span>
+          <div class="tab-indicator"></div>
+        </button>
         <button class="tab-btn disabled" disabled>
           <ion-icon name="bar-chart-outline"></ion-icon>
           <span>Backsim</span>
@@ -104,6 +109,22 @@
               <div class="toggle-dot"></div>
               <span>{{ model.isActive ? 'Activa' : 'Pausada' }}</span>
             </div>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Tipo de Estrategia</label>
+          <div class="direction-selector">
+            <button class="dir-btn" [class.active-auto]="!isMaGeometry" (click)="onStrategyTypeChange('Generic')">
+              <ion-icon name="analytics-outline"></ion-icon>
+              <span>Genérica</span>
+              <span class="dir-hint">Nexus / LSE / SCAR / etc.</span>
+            </button>
+            <button class="dir-btn" [class.active-long]="isMaGeometry" (click)="onStrategyTypeChange('MaGeometry')">
+              <ion-icon name="trending-up-outline"></ion-icon>
+              <span>Patrón de Medias Móviles</span>
+              <span class="dir-hint">Geometría configurable (pendiente, toque, etc.)</span>
+            </button>
           </div>
         </div>
 
@@ -160,7 +181,7 @@
           <p class="field-hint">Puntaje total combinado (Nexus + SCAR + LSE) requerido para abrir una entrada.</p>
         </div>
 
-        <div class="field-group">
+        <div class="field-group" *ngIf="!isMaGeometry">
           <div class="slider-label-row">
             <label class="field-label">Confianza Nexus Mínima</label>
             <span class="slider-value">{{ model.minNexusConfidence }}%</span>
@@ -170,6 +191,9 @@
             <div class="slider-fill" [style.width.%]="model.minNexusConfidence" style="background:#3b82f6"></div>
           </div>
         </div>
+        <p class="field-hint" *ngIf="isMaGeometry">
+          "Confluencia Mínima" (arriba) es el score fijo que se le asigna a las señales de este patrón — no aplica "Confianza Nexus" porque este perfil no usa el motor de Nexus.
+        </p>
 
         <div class="field-row">
           <div class="field-group">
@@ -197,7 +221,7 @@
           <p class="field-hint">Rechaza la entrada si el precio está más del <strong>{{ model.maxMa7DistancePct }}%</strong> por encima/debajo de la MA7. Evita entradas tardías en extensiones.</p>
         </div>
 
-        <div class="field-group">
+        <div class="field-group" *ngIf="!isMaGeometry">
           <label class="field-label">Fuentes de Señal</label>
           <div class="source-pills">
             <button class="source-pill" [class.active]="isSourceAllowed('Nexus')" (click)="toggleSource('Nexus')">
@@ -392,6 +416,263 @@
             <div class="mini-toggle" [class.on]="model.extremeRsiVeto"
                  (click)="model.extremeRsiVeto = !model.extremeRsiVeto">
               <div class="mini-dot"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── TAB: Patrón (solo si strategyType = MaGeometry) ── -->
+      <div class="tab-pane slide-in" *ngIf="activeTab === 'pattern' && isMaGeometry">
+        <div class="section-header">
+          <ion-icon name="git-network-outline"></ion-icon>
+          <div>
+            <h2>Patrón de Medias Móviles</h2>
+            <p>Geometría configurable: orden, pendiente, toque, distancia entre medias, proximidad a pico/valle y salida — sin escribir código.</p>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Temporalidad</label>
+          <select class="field-input" [(ngModel)]="patternParams.timeframe">
+            <option value="1m">1 minuto</option>
+            <option value="5m">5 minutos</option>
+            <option value="15m">15 minutos</option>
+            <option value="1h">1 hora</option>
+          </select>
+        </div>
+
+        <!-- Grupo 1: Orden de las medias -->
+        <div class="field-group">
+          <label class="field-label">Orden de las medias (posición relativa ahora)</label>
+          <div class="field-row">
+            <div class="field-group">
+              <label class="field-label">MA7 vs MA25</label>
+              <select class="field-input" [(ngModel)]="patternParams.order.ma7VsMa25">
+                <option [ngValue]="null">Ninguno</option>
+                <option value="less">MA7 menor</option>
+                <option value="greater">MA7 mayor</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">MA7 vs MA50</label>
+              <select class="field-input" [(ngModel)]="patternParams.order.ma7VsMa50">
+                <option [ngValue]="null">Ninguno</option>
+                <option value="less">MA7 menor</option>
+                <option value="greater">MA7 mayor</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">MA7 vs MA99</label>
+              <select class="field-input" [(ngModel)]="patternParams.order.ma7VsMa99">
+                <option [ngValue]="null">Ninguno</option>
+                <option value="less">MA7 menor</option>
+                <option value="greater">MA7 mayor</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Grupo 2: Pendiente de MA7 (el giro) -->
+        <div class="field-group">
+          <label class="field-label">Pendiente (el giro)</label>
+          <div class="field-row">
+            <div class="field-group">
+              <label class="field-label">Media a medir</label>
+              <select class="field-input" [(ngModel)]="patternParams.slope.targetMa">
+                <option *ngFor="let ma of maOptions" [value]="ma.value">{{ ma.label }}</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Ventana (velas)</label>
+              <input class="field-input" type="number" [(ngModel)]="patternParams.slope.windowCandles" min="2" max="30">
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field-group">
+              <label class="field-label">Pendiente actual</label>
+              <select class="field-input" [(ngModel)]="patternParams.slope.currentOp">
+                <option [ngValue]="null">No usar</option>
+                <option value="gte">≥</option>
+                <option value="lte">≤</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Grados</label>
+              <input class="field-input" type="number" step="0.01" [(ngModel)]="patternParams.slope.currentDeg" [disabled]="!patternParams.slope.currentOp">
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field-group">
+              <label class="field-label">Pendiente anterior</label>
+              <select class="field-input" [(ngModel)]="patternParams.slope.priorOp">
+                <option [ngValue]="null">No usar</option>
+                <option value="gte">≥</option>
+                <option value="lte">≤</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Grados</label>
+              <input class="field-input" type="number" step="0.01" [(ngModel)]="patternParams.slope.priorDeg" [disabled]="!patternParams.slope.priorOp">
+            </div>
+          </div>
+          <p class="field-hint">"Actual" y "anterior" se miden en la misma ventana, desplazada — así se detecta un giro reciente (ej. anterior ≤0,15° y actual ≥0,15° = recién empezó a girar hacia arriba).</p>
+        </div>
+
+        <!-- Grupo 3: Toque + confirmación -->
+        <div class="field-group">
+          <div class="slider-label-row">
+            <label class="field-label">Toque + confirmación (mecha vs. cierre)</label>
+            <div class="toggle-card" [class.on]="patternParams.touch.enabled" (click)="patternParams.touch.enabled = !patternParams.touch.enabled">
+              <div class="toggle-dot"></div>
+              <span>{{ patternParams.touch.enabled ? 'Activo' : 'Inactivo' }}</span>
+            </div>
+          </div>
+          <ng-container *ngIf="patternParams.touch.enabled">
+            <div class="field-row">
+              <div class="field-group">
+                <label class="field-label">Media objetivo</label>
+                <select class="field-input" [(ngModel)]="patternParams.touch.targetMa">
+                  <option *ngFor="let ma of maOptions" [value]="ma.value">{{ ma.label }}</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Tolerancia (%)</label>
+                <input class="field-input" type="number" step="0.01" [(ngModel)]="patternParams.touch.tolerancePct">
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field-group">
+                <label class="field-label">Lado del toque</label>
+                <select class="field-input" [(ngModel)]="patternParams.touch.side">
+                  <option value="fromBelow">Mecha desde abajo</option>
+                  <option value="fromAbove">Mecha desde arriba</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <label class="field-label">¿Cierre debe quedar del lado original?</label>
+                <div class="toggle-card" [class.on]="patternParams.touch.requireCloseStaysOriginalSide" (click)="patternParams.touch.requireCloseStaysOriginalSide = !patternParams.touch.requireCloseStaysOriginalSide">
+                  <div class="toggle-dot"></div>
+                  <span>{{ patternParams.touch.requireCloseStaysOriginalSide ? 'Sí' : 'No' }}</span>
+                </div>
+              </div>
+            </div>
+          </ng-container>
+        </div>
+
+        <!-- Grupo 4: Distancia entre dos medias -->
+        <div class="field-group">
+          <div class="slider-label-row">
+            <label class="field-label">Distancia entre dos medias (encajonamiento/rebote)</label>
+            <div class="toggle-card" [class.on]="patternParams.distanceBetweenMas.enabled" (click)="patternParams.distanceBetweenMas.enabled = !patternParams.distanceBetweenMas.enabled">
+              <div class="toggle-dot"></div>
+              <span>{{ patternParams.distanceBetweenMas.enabled ? 'Activo' : 'Inactivo' }}</span>
+            </div>
+          </div>
+          <div class="field-row" *ngIf="patternParams.distanceBetweenMas.enabled">
+            <div class="field-group">
+              <label class="field-label">Media A</label>
+              <select class="field-input" [(ngModel)]="patternParams.distanceBetweenMas.maA">
+                <option *ngFor="let ma of maOptions" [value]="ma.value">{{ ma.label }}</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Media B</label>
+              <select class="field-input" [(ngModel)]="patternParams.distanceBetweenMas.maB">
+                <option *ngFor="let ma of maOptions" [value]="ma.value">{{ ma.label }}</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Distancia máxima (%)</label>
+              <input class="field-input" type="number" step="0.01" [(ngModel)]="patternParams.distanceBetweenMas.maxPct">
+            </div>
+          </div>
+        </div>
+
+        <!-- Grupo 5: Pendiente de una media de contexto -->
+        <div class="field-group">
+          <div class="slider-label-row">
+            <label class="field-label">Pendiente de una media de contexto</label>
+            <div class="toggle-card" [class.on]="patternParams.contextSlope.enabled" (click)="patternParams.contextSlope.enabled = !patternParams.contextSlope.enabled">
+              <div class="toggle-dot"></div>
+              <span>{{ patternParams.contextSlope.enabled ? 'Activo' : 'Inactivo' }}</span>
+            </div>
+          </div>
+          <div class="field-row" *ngIf="patternParams.contextSlope.enabled">
+            <div class="field-group">
+              <label class="field-label">Media</label>
+              <select class="field-input" [(ngModel)]="patternParams.contextSlope.targetMa">
+                <option *ngFor="let ma of maOptions" [value]="ma.value">{{ ma.label }}</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Ventana (velas)</label>
+              <input class="field-input" type="number" [(ngModel)]="patternParams.contextSlope.windowCandles" min="2" max="60">
+            </div>
+            <div class="field-group">
+              <label class="field-label">Operador</label>
+              <select class="field-input" [(ngModel)]="patternParams.contextSlope.op">
+                <option value="gte">≥</option>
+                <option value="lte">≤</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Grados</label>
+              <input class="field-input" type="number" step="0.01" [(ngModel)]="patternParams.contextSlope.deg">
+            </div>
+          </div>
+        </div>
+
+        <!-- Grupo 6: Proximidad a pico/valle reciente -->
+        <div class="field-group">
+          <div class="slider-label-row">
+            <label class="field-label">Proximidad a pico/valle reciente</label>
+            <div class="toggle-card" [class.on]="patternParams.peakProximity.enabled" (click)="patternParams.peakProximity.enabled = !patternParams.peakProximity.enabled">
+              <div class="toggle-dot"></div>
+              <span>{{ patternParams.peakProximity.enabled ? 'Activo' : 'Inactivo' }}</span>
+            </div>
+          </div>
+          <div class="field-row" *ngIf="patternParams.peakProximity.enabled">
+            <div class="field-group">
+              <label class="field-label">Tipo</label>
+              <select class="field-input" [(ngModel)]="patternParams.peakProximity.type">
+                <option value="recentHigh">Máximo reciente</option>
+                <option value="recentLow">Mínimo reciente</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Velas de lookback</label>
+              <input class="field-input" type="number" [(ngModel)]="patternParams.peakProximity.lookbackCandles" min="2" max="100">
+            </div>
+            <div class="field-group">
+              <label class="field-label">Tolerancia (%)</label>
+              <input class="field-input" type="number" step="0.01" [(ngModel)]="patternParams.peakProximity.tolerancePct">
+            </div>
+          </div>
+        </div>
+
+        <!-- Grupo 7: Salida estructural -->
+        <div class="field-group">
+          <label class="field-label">Salida estructural (SL/TP)</label>
+          <div class="field-row">
+            <div class="field-group">
+              <label class="field-label">Referencia de SL</label>
+              <select class="field-input" [(ngModel)]="patternParams.exit.slReference">
+                <option value="recentLow">Mínimo reciente</option>
+                <option value="recentHigh">Máximo reciente</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Velas de lookback</label>
+              <input class="field-input" type="number" [(ngModel)]="patternParams.exit.slLookbackCandles" min="2" max="100">
+            </div>
+            <div class="field-group">
+              <label class="field-label">Buffer (%)</label>
+              <input class="field-input" type="number" step="0.01" [(ngModel)]="patternParams.exit.slBufferPct">
+            </div>
+            <div class="field-group">
+              <label class="field-label">TP mínimo (%)</label>
+              <input class="field-input" type="number" step="0.1" [(ngModel)]="patternParams.exit.tpMinPct">
+              <p class="field-hint">Piso — el objetivo real es el próximo nivel de liquidez.</p>
             </div>
           </div>
         </div>

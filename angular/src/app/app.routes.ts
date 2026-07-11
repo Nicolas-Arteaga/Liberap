@@ -88,6 +88,10 @@ export const APP_ROUTES: Routes = [
         loadComponent: () => import('./nexus5/nexus5.component').then(c => c.Nexus5Component),
       },
       {
+        path: 'fvg',
+        loadComponent: () => import('./fvg/fvg.component').then(c => c.FvgComponent),
+      },
+      {
         path: 'scar/analytics',
         loadComponent: () => import('./scar-analytics/scar-analytics.component').then(c => c.ScarAnalyticsComponent),
       },

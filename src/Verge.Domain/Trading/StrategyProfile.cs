@@ -41,8 +41,16 @@ public class StrategyProfile : FullAuditedAggregateRoot<Guid>
     public float MinTpDistancePct { get; set; } = 0.003f; // Minimum TP distance vs price
     public float MinSlDistancePct { get; set; } = 0.002f; // Minimum SL distance vs price
     public float MinEstimatedRangePct { get; set; } = 3.0f; // Minimum allowed estimated range
-    public float MaxNexusSignalAgeSeconds { get; set; } = 120.0f; 
+    public float MaxNexusSignalAgeSeconds { get; set; } = 120.0f;
     public float NexusMaxPriceDriftPct { get; set; } = 0.025f; // Max allowed drift if signal is old
+
+    // ── Motor de patrones (genérico, sin límites de tipo) ───────────────────
+    // "Generic" = filtros de arriba (Nexus/LSE/etc., como siempre).
+    // "MaGeometry" = geometría de medias móviles configurable vía PatternParamsJson
+    // (orden, pendiente, toque, distancia entre medias, proximidad a pico/valle, salida)
+    // en vez de código Python hardcodeado por caso.
+    public string StrategyType { get; set; } = "Generic";
+    public string? PatternParamsJson { get; set; }
 
     protected StrategyProfile() { }
 

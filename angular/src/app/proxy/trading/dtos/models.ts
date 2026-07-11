@@ -70,6 +70,8 @@ export interface CreateUpdateStrategyProfileDto {
   minEstimatedRangePct: number;
   maxNexusSignalAgeSeconds: number;
   nexusMaxPriceDriftPct: number;
+  strategyType?: string;
+  patternParamsJson?: string;
 }
 
 export interface EnhancedAnalysisDto {
@@ -213,6 +215,8 @@ export interface StrategyProfileDto extends EntityDto<string> {
   minEstimatedRangePct: number;
   maxNexusSignalAgeSeconds: number;
   nexusMaxPriceDriftPct: number;
+  strategyType?: string;
+  patternParamsJson?: string;
   winRate: number;
   totalTrades: number;
   netPnL: number;

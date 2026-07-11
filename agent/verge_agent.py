@@ -1,10 +1,12 @@
 import time
+import math
 import logging
 from typing import Optional
 import sys
 import json
 import copy
 import config
+import bucket_calibrator
 import requests
 import asyncio
 from datetime import datetime, timezone
@@ -663,7 +665,17 @@ class VergeAgent:
     # ─────────────────────────────────────────────────────────
     def loop_cycle(self):
         logger.debug("[TRACE] Entering loop_cycle")
-        
+
+        # ── BUCKET CALIBRATOR: recálculo dinámico de prioridad por score ──
+        # Se recalcula solo cada BUCKET_CALIBRATOR_INTERVAL_HOURS (default 24h)
+        # contra Postgres — no requiere reinicio ni intervención manual.
+        try:
+            if bucket_calibrator.should_recalculate():
+                bucket_calibrator.recalculate_and_save()
+                bucket_calibrator.load_multipliers(force_reload=True)
+        except Exception as e:
+            logger.warning(f"[BUCKET-CALIBRATOR] Error en recálculo periódico: {e}")
+
         # ── BTC FLASH CRASH PAUSE (Capa B) ──
         # Pausar el agente si BTC cayó más de 3% en 1h (flash crash)
         if self.btc_filter.is_flash_crash():
@@ -1148,6 +1160,93 @@ class VergeAgent:
                     f"(total candidates={len(candidates)})"
                 )
 
+        # ── ARROW PEAK: Inyección directa (reversión por agotamiento, SHORT only) ──
+        # Antes solo existía como scan manual en la UI de Nexus-15 — el analyzer nunca
+        # alimentaba al agente. Ya valida pump limpio (3-5 velas verdes >=20%) + sangrado
+        # (1-3 velas rojas) + toque de MA99 en 15m, así que entra con score de inyección
+        # directa (bypass de los umbrales normales de confluencia/nexus del perfil).
+        if getattr(config, "ARROW_PEAK_ENABLED", True):
+            # Mismo fix que MA Slope: no descartar por tener ya un candidato
+            # de otra fuente este ciclo — Arrow Reversal filtra exclusivo por
+            # AllowedSources=arrow_peak, no compite por el mismo slot.
+            arrow_peak_injected = 0
+            for item in self._run_arrow_peak_scan():
+                symbol = item.get("symbol")
+                if not symbol:
+                    continue
+                if self._should_skip(symbol):
+                    continue
+
+                ac = self._build_arrow_peak_candidate(item)
+                ac_px = ac.get("price_at_signal") or self.fetcher.get_current_price(symbol)
+                if not ac_px or ac_px <= 0:
+                    continue
+                try:
+                    v_ok, v_code, _ = validate_pre_trade(
+                        ac, ac_px, btc_filter=self.btc_filter, btc_corr=self.btc_corr
+                    )
+                    if not v_ok:
+                        logger.info(f"[ARROW-PEAK-INJECT] VETO {symbol}: {v_code}")
+                        continue
+                except Exception as e:
+                    logger.warning(f"[ARROW-PEAK-INJECT] Error validando {symbol}: {e}")
+                    continue
+
+                candidates.append(ac)
+                arrow_peak_injected += 1
+                logger.warning(
+                    f"[ARROW-PEAK-INJECT] {symbol} | Score={ac['confluence_score']} | "
+                    f"{item.get('days_bleeding')}d sangrado tras +{item.get('prev_rise_pct', 0):.1f}% "
+                    f"— reversión por agotamiento (SHORT)"
+                )
+
+            if arrow_peak_injected:
+                logger.info(f"[ARROW-PEAK-INJECT] {arrow_peak_injected} nuevos (total candidates={len(candidates)})")
+
+        # ── MA PATTERN: Inyección directa (motor genérico MaGeometry, por perfil) ──
+        # Cada perfil StrategyType=MaGeometry es su propia fuente/estrategia.
+        # IMPORTANTE: a diferencia de otras inyecciones, acá NO se descarta un
+        # símbolo solo porque YA tenga un candidato de otra fuente este ciclo
+        # (Nexus, LSE, etc.). Cada perfil filtra por su propio AllowedSources
+        # exclusivo (ma_pattern:{profile_id}) y nunca compite por el mismo
+        # slot que otro perfil — descartar por esa razón solo tiraba a la
+        # basura candidatos válidos porque Nexus ya había mirado ese símbolo
+        # el mismo ciclo (con un watchlist de 400+ símbolos, esto pasaba la
+        # mayoría de las veces — era, en la práctica, un veto silencioso que
+        # dejaba estas estrategias sin trades).
+        if getattr(config, "MA_SLOPE_ENABLED", True):
+            ma_slope_injected = 0
+            for mc in self._run_ma_geometry_scan():
+                symbol = mc.get("symbol")
+                if not symbol:
+                    continue
+                if self._should_skip(symbol):
+                    continue
+
+                mc_px = mc.get("price_at_signal") or self.fetcher.get_current_price(symbol)
+                if not mc_px or mc_px <= 0:
+                    continue
+                try:
+                    v_ok, v_code, _ = validate_pre_trade(
+                        mc, mc_px, btc_filter=self.btc_filter, btc_corr=self.btc_corr
+                    )
+                    if not v_ok:
+                        logger.info(f"[MA-PATTERN-INJECT] VETO {symbol} ({mc.get('source')}): {v_code}")
+                        continue
+                except Exception as e:
+                    logger.warning(f"[MA-PATTERN-INJECT] Error validando {symbol}: {e}")
+                    continue
+
+                candidates.append(mc)
+                ma_slope_injected += 1
+                logger.warning(
+                    f"[MA-PATTERN-INJECT] {symbol} | {mc.get('source')} | "
+                    f"Score={mc['confluence_score']} | {mc['reasons'][0]}"
+                )
+
+            if ma_slope_injected:
+                logger.info(f"[MA-PATTERN-INJECT] {ma_slope_injected} nuevos (total candidates={len(candidates)})")
+
         # ── TOTAL-SWEEP v13.0: The Sinfonía Final ───────────────────────────────────────
         # NEXUS-5 Bottom Sniper > 90% → HUNTING_READY → Volume Radar → Ley de Nico G>R
         if getattr(config, "TOTAL_SWEEP_ENABLED", True):
@@ -1606,6 +1705,22 @@ class VergeAgent:
                         f"(nexus={c.get('nexus_confidence', 0)}%, score={c.get('confluence_score', 0)})"
                     )
                 
+                # MA PATTERN (MaGeometry): cada perfil es dueño exclusivo de sus
+                # propios candidatos (source=f"ma_pattern:{profile_id}") — no pasa
+                # por el matching de AllowedSources normal (ese campo ni se
+                # muestra en el editor para este tipo de perfil).
+                raw_src = c.get("source", "") or ""
+                if raw_src.startswith("ma_pattern:"):
+                    if raw_src != f"ma_pattern:{profile.get('id')}":
+                        continue
+                    allow_long = profile.get("allowLong", True)
+                    allow_short = profile.get("allowShort", True)
+                    cand_side = int(c.get("side", 0))
+                    if (cand_side == 0 and not allow_long) or (cand_side == 1 and not allow_short):
+                        continue
+                    p_candidates.append(c)
+                    continue
+
                 allowed = profile.get("allowedSources")
                 if allowed and not is_golden:
                     src = (c.get("source", "") or "").lower()
@@ -1698,7 +1813,15 @@ class VergeAgent:
             p_vip = [c for c in p_candidates if self._is_golden_uturn_candidate(c) or self._is_total_sweep_candidate(c)]
             p_standard = [c for c in p_candidates if not self._is_golden_uturn_candidate(c) and not self._is_total_sweep_candidate(c)]
             p_vip.sort(key=lambda x: x["confluence_score"], reverse=True)
-            p_standard.sort(key=lambda x: x["confluence_score"], reverse=True)
+            # BUCKET CALIBRATOR: prioridad relativa al historial real de la propia
+            # estrategia, no al score crudo. Neutro (x1.0) si esa estrategia/bucket
+            # todavía no tiene muestra suficiente — no cambia el orden actual.
+            p_standard.sort(
+                key=lambda x: x["confluence_score"] * bucket_calibrator.get_multiplier(
+                    profile.get("id"), x["confluence_score"]
+                ),
+                reverse=True,
+            )
             p_candidates = p_vip + p_standard
             if p_vip:
                 logger.info(
@@ -2565,8 +2688,155 @@ class VergeAgent:
         # Convertir pendiente a ángulo en grados
         # Ángulo = atan(m) * (180 / π)
         angle_deg = math.degrees(math.atan(m))
-        
+
         return angle_deg
+
+    # ─────────────────────────────────────────────────────────
+    # MA SLOPE — "el ojo": lector de geometría de medias móviles
+    # ─────────────────────────────────────────────────────────
+    def _sma_series(self, closes: list, period: int) -> list:
+        """
+        Serie SMA completa (no solo el último valor) para poder medir su
+        propia pendiente en el tiempo. A propósito es SMA y no EMA: el
+        dashboard (Angular) y el "MA" nativo de Binance Futures son SMA
+        sobre las mismas velas — las 3 estrategias de "cruce de medias"
+        (MA Slope) se definieron mirando ESE gráfico, así que el "ojo" tiene
+        que leer exactamente la misma curva que el usuario vio, no una EMA
+        (que gira antes/distinto por reaccionar más rápido a velas recientes).
+        """
+        if len(closes) < period:
+            return []
+        window_sum = sum(closes[:period])
+        series = [window_sum / period]
+        for i in range(period, len(closes)):
+            window_sum += closes[i] - closes[i - period]
+            series.append(window_sum / period)
+        return series
+
+    def _pct_distance(self, a: float, b: float) -> float:
+        """Distancia porcentual entre dos precios/valores, siempre positiva."""
+        ref = b if b else a
+        if not ref:
+            return 0.0
+        return abs(a - b) / abs(ref) * 100.0
+
+    def _normalized_slope_angle(self, ma_values: list, window: int) -> float:
+        """
+        Pendiente en grados, pero calculada sobre la serie normalizada a
+        "% del último valor" en vez de precio crudo. _calculate_ma99_slope_angle
+        hace atan(m) sobre el valor en dólares de la MA, lo que hace que el
+        ángulo dependa de la escala de precio del activo (a BTC ~$60k un
+        movimiento normal da decenas de grados, a DOGE ~$0.07 el mismo
+        movimiento relativo da milésimas de grado). Se normaliza contra el
+        último valor (el más cercano a "ahora"), no el primero de la serie,
+        para que un drift de precio grande a lo largo de las 150 velas de
+        historia no distorsione la escala de la ventana reciente que en
+        realidad se está midiendo.
+        """
+        if not ma_values:
+            return 0.0
+        base = ma_values[-1] if ma_values[-1] else 1.0
+        normalized = [v / base * 100.0 for v in ma_values]
+        return self._calculate_ma99_slope_angle(normalized, window=window)
+
+    def _fetch_binance_futures_klines_direct(self, symbol: str, interval: str, limit: int) -> list:
+        """
+        Klines directo a Binance Futures (fapi.binance.com), sin pasar por
+        el cache/rotación multi-exchange de self.fetcher. self.fetcher reparte
+        el watchlist en 4 bloques (Binance/Bybit/OKX/Bitget) para no saturar
+        rate-limit — pero eso significa que ~75% de los symbols traen velas
+        de OTRO exchange. El dashboard (Angular) pega directo a este mismo
+        endpoint de Binance Futures para graficar, por eso sus MAs calzan con
+        el gráfico nativo de Binance. El "ojo" de MA Slope necesita la misma
+        garantía: si el día de mañana esto opera en serio, la ejecución real
+        es contra Binance Futures (BinanceDirectClient), así que la lectura
+        de geometría debe mirar exactamente esa misma fuente.
+        """
+        try:
+            resp = requests.get(
+                "https://fapi.binance.com/fapi/v1/klines",
+                params={"symbol": symbol, "interval": interval, "limit": limit},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            raw = resp.json()
+            return [
+                {"open": k[1], "high": k[2], "low": k[3], "close": k[4], "open_time": k[0]}
+                for k in raw
+            ]
+        except Exception as e:
+            logger.warning(f"[MA-SLOPE] Binance directo falló para {symbol}, uso fallback multi-exchange: {e}")
+            return self.fetcher.get_klines_for_nexus(symbol, interval=interval, limit=limit)
+
+    def _read_ma_geometry(self, symbol: str, interval: str = None) -> Optional[dict]:
+        """
+        "El ojo" — lee MA7/MA25/MA50/MA99 en la temporalidad dada, calcula su
+        pendiente en grados (regresión lineal, mismo método que Golden U-Turn)
+        y queda todo disponible para que cada caso compare contra sus propios
+        umbrales. Nada de esto es cualitativo — son números concretos.
+
+        ma7_slope_now: pendiente de MA7 en las últimas 3 velas.
+        ma7_slope_prev: pendiente de MA7 en las 3 velas anteriores a esas
+                        (para detectar si el giro es reciente, no una
+                        tendencia que ya venía de antes).
+
+        Las velas se piden SIEMPRE directo a Binance Futures (ver
+        _fetch_binance_futures_klines_direct), no a través del cache
+        multi-exchange, para que esto lea lo mismo que el gráfico del
+        dashboard y lo mismo contra lo que eventualmente se ejecuta.
+        """
+        interval = interval or getattr(config, "MA_SLOPE_INTERVAL", "1h")
+        min_candles = int(getattr(config, "MA_SLOPE_MIN_CANDLES", 150))
+        try:
+            klines = self._fetch_binance_futures_klines_direct(symbol, interval, min_candles)
+            if not klines or len(klines) < 100:
+                return None
+
+            closes = [float(k["close"]) for k in klines]
+            opens = [float(k["open"]) for k in klines]
+            highs = [float(k["high"]) for k in klines]
+            lows = [float(k["low"]) for k in klines]
+
+            ma7 = self._sma_series(closes, 7)
+            ma25 = self._sma_series(closes, 25)
+            ma50 = self._sma_series(closes, 50)
+            ma99 = self._sma_series(closes, 99)
+            if not ma7 or not ma25 or not ma50 or not ma99:
+                return None
+
+            ma7_slope_now = self._normalized_slope_angle(ma7, window=3)
+            ma7_slope_prev = self._normalized_slope_angle(ma7[:-3], window=3) if len(ma7) > 6 else 0.0
+            ma99_slope = self._normalized_slope_angle(ma99, window=12)
+
+            return {
+                "symbol": symbol,
+                "interval": interval,
+                "closes": closes,
+                "opens": opens,
+                "highs": highs,
+                "lows": lows,
+                "current_price": closes[-1],
+                "current_open": opens[-1],
+                "current_high": highs[-1],
+                "current_low": lows[-1],
+                "ma7_now": ma7[-1],
+                "ma25_now": ma25[-1],
+                "ma50_now": ma50[-1],
+                "ma99_now": ma99[-1],
+                # Series completas — el evaluador genérico de patrones (motor
+                # MaGeometry) las necesita para medir pendiente de CUALQUIER
+                # media con CUALQUIER ventana, no solo MA7/MA99 fijas.
+                "ma7_series": ma7,
+                "ma25_series": ma25,
+                "ma50_series": ma50,
+                "ma99_series": ma99,
+                "ma7_slope_now": ma7_slope_now,
+                "ma7_slope_prev": ma7_slope_prev,
+                "ma99_slope": ma99_slope,
+            }
+        except Exception as e:
+            logger.warning(f"[MA-SLOPE] Error leyendo geometría de {symbol}: {e}")
+            return None
 
     def _build_golden_uturn_candidate(self, symbol: str, n5_data: dict, nexus_data: dict = None) -> dict:
         """
@@ -2713,6 +2983,278 @@ class VergeAgent:
     def _is_total_sweep_candidate(self, candidate: dict) -> bool:
         """True si el candidato entró por TOTAL-SWEEP v13.0."""
         return candidate.get("total_sweep_mode", False) or candidate.get("source") == "total_sweep"
+
+    def _run_arrow_peak_scan(self) -> list:
+        """
+        [ARROW PEAK] Escanea el watchlist buscando patrones de agotamiento
+        (pump limpio + sangrado + toque de MA99 en 15m). Devuelve solo los
+        items donde el trigger de ejecución ya disparó este ciclo — no la
+        lista completa de "en observación".
+        """
+        if not getattr(config, "ARROW_PEAK_ENABLED", True):
+            return []
+        base_py = config.PYTHON_SERVICE_URL.rstrip("/")
+        url = f"{base_py}/nexus15/arrow-peak"
+        timeout = int(getattr(config, "ARROW_PEAK_HTTP_TIMEOUT_SEC", 90))
+        try:
+            resp = requests.post(url, json={"symbols": config.WATCHLIST}, timeout=timeout)
+            if resp.status_code != 200:
+                logger.warning(f"[ARROW-PEAK] Scan failed: HTTP {resp.status_code}")
+                return []
+            data = resp.json()
+            items = data.get("top_5", [])
+            triggered = [it for it in items if it.get("trigger_signal")]
+            logger.info(f"[ARROW-PEAK] Scan: {len(items)} qualified, {len(triggered)} triggered this cycle")
+            return triggered
+        except Exception as e:
+            logger.warning(f"[ARROW-PEAK] Scan error: {e}")
+            return []
+
+    def _build_arrow_peak_candidate(self, item: dict) -> dict:
+        """
+        [ARROW PEAK] Construye el candidato SHORT: SL = techo del pico + buffer
+        (resistencia estructural del setup), TP con piso mínimo configurable,
+        score de inyección directa (bypass de los umbrales normales del perfil,
+        igual mecanismo que Golden U-Turn / Total Sweep).
+        """
+        symbol = item.get("symbol")
+        price = float(item.get("current_price") or 0)
+        peak_price = float(item.get("peak_price") or 0)
+        ap_score = float(getattr(config, "ARROW_PEAK_SCORE", 85.0))
+        sl_buffer_pct = float(getattr(config, "ARROW_PEAK_SL_BUFFER_PCT", 1.0))
+        custom_sl = peak_price * (1 + sl_buffer_pct / 100.0) if peak_price > 0 else None
+
+        return {
+            "symbol": symbol,
+            "confluence_score": ap_score,
+            "nexus_confidence": ap_score,
+            "trade_direction": "SHORT",
+            "side": 1,
+            "source": "arrow_peak",
+            "arrow_peak_mode": True,
+            "price_at_signal": price,
+            "reasons": [
+                f"[ARROW-PEAK] {item.get('days_bleeding')}d de sangrado tras "
+                f"+{float(item.get('prev_rise_pct') or 0):.1f}% | "
+                f"MA99 dist={float(item.get('dist_ma99_pct') or 0):.2f}%"
+            ],
+            "custom_sl_price": custom_sl,
+            "agent_audit_context": {
+                "arrow_peak": {
+                    "detected": True,
+                    "days_bleeding": item.get("days_bleeding"),
+                    "prev_rise_pct": item.get("prev_rise_pct"),
+                    "peak_price": peak_price,
+                    "dist_ma99_pct": item.get("dist_ma99_pct"),
+                },
+                "scar": {},
+                "nexus15": {},
+            },
+        }
+
+    def _is_arrow_peak_candidate(self, candidate: dict) -> bool:
+        """True si el candidato entró por ARROW PEAK (reversión por agotamiento)."""
+        return candidate.get("arrow_peak_mode", False) or candidate.get("source") == "arrow_peak"
+
+    # ─────────────────────────────────────────────────────────
+    # MOTOR DE PATRONES DE MEDIAS MÓVILES (MaGeometry) — genérico, por perfil.
+    # Reemplaza los 3 detectores hardcodeados de "MA Slope Caso 1/2/3": ahora
+    # cualquier perfil StrategyType=MaGeometry define su propia geometría vía
+    # PatternParamsJson (orden, pendiente, toque, distancia entre medias,
+    # proximidad a pico/valle, salida), sin tocar código Python.
+    # ─────────────────────────────────────────────────────────
+    _MA_SERIES_KEYS = {
+        "ma7": "ma7_series", "ma25": "ma25_series",
+        "ma50": "ma50_series", "ma99": "ma99_series",
+    }
+    _MA_NOW_KEYS = {
+        "ma7": "ma7_now", "ma25": "ma25_now",
+        "ma50": "ma50_now", "ma99": "ma99_now",
+    }
+
+    def _evaluate_ma_geometry_profile(self, profile: dict, geo: dict) -> Optional[dict]:
+        """
+        Evalúa el PatternParamsJson de un perfil MaGeometry contra la
+        geometría leída por _read_ma_geometry. Cada grupo de parámetros que
+        esté presente/activo debe cumplirse (AND) — un grupo ausente o sin
+        operador seteado simplemente no se chequea. Devuelve el candidato
+        armado si todo pasa, o None.
+        """
+        try:
+            params = json.loads(profile.get("patternParamsJson") or "{}")
+        except Exception as e:
+            logger.warning(f"[MA-PATTERN] PatternParamsJson inválido en perfil {profile.get('name')}: {e}")
+            return None
+        if not params:
+            return None
+
+        ma_now = {k: geo[v] for k, v in self._MA_NOW_KEYS.items()}
+
+        # ── Grupo 1: orden de las medias ──
+        order = params.get("order") or {}
+        for key, ma_b in (("ma7VsMa25", "ma25"), ("ma7VsMa50", "ma50"), ("ma7VsMa99", "ma99")):
+            rule = order.get(key)
+            if rule == "less" and not (ma_now["ma7"] < ma_now[ma_b]):
+                return None
+            if rule == "greater" and not (ma_now["ma7"] > ma_now[ma_b]):
+                return None
+
+        # ── Grupo 2: pendiente (el giro) ──
+        slope_cfg = params.get("slope") or {}
+        target = slope_cfg.get("targetMa", "ma7")
+        series = geo.get(self._MA_SERIES_KEYS.get(target, "ma7_series"), [])
+        window = int(slope_cfg.get("windowCandles", 3))
+        current_slope = self._normalized_slope_angle(series, window=window) if series else 0.0
+        prior_slope = (
+            self._normalized_slope_angle(series[:-window], window=window)
+            if series and len(series) > window * 2 else 0.0
+        )
+        cur_op, cur_deg = slope_cfg.get("currentOp"), slope_cfg.get("currentDeg")
+        if cur_op == "gte" and not (current_slope >= float(cur_deg or 0)):
+            return None
+        if cur_op == "lte" and not (current_slope <= float(cur_deg or 0)):
+            return None
+        pri_op, pri_deg = slope_cfg.get("priorOp"), slope_cfg.get("priorDeg")
+        if pri_op == "gte" and not (prior_slope >= float(pri_deg or 0)):
+            return None
+        if pri_op == "lte" and not (prior_slope <= float(pri_deg or 0)):
+            return None
+
+        # ── Grupo 3: toque + confirmación (mecha vs. cierre) ──
+        touch = params.get("touch") or {}
+        if touch.get("enabled"):
+            t_target = ma_now.get(touch.get("targetMa", "ma25"))
+            tol = float(touch.get("tolerancePct", 0.3)) / 100.0
+            side = touch.get("side", "fromBelow")
+            require_confirm = touch.get("requireCloseStaysOriginalSide", True)
+            if side == "fromBelow":
+                touched = geo["current_high"] >= t_target * (1 - tol)
+                confirmed = (geo["current_price"] < t_target) if require_confirm else True
+            else:
+                touched = geo["current_low"] <= t_target * (1 + tol)
+                confirmed = (geo["current_price"] > t_target) if require_confirm else True
+            if not (touched and confirmed):
+                return None
+
+        # ── Grupo 4: distancia entre dos medias ──
+        dist_cfg = params.get("distanceBetweenMas") or {}
+        if dist_cfg.get("enabled"):
+            a, b = dist_cfg.get("maA", "ma7"), dist_cfg.get("maB", "ma99")
+            max_pct = float(dist_cfg.get("maxPct", 0.5))
+            if self._pct_distance(ma_now.get(a), ma_now.get(b)) > max_pct:
+                return None
+
+        # ── Grupo 5: pendiente de una media de contexto ──
+        ctx = params.get("contextSlope") or {}
+        if ctx.get("enabled"):
+            ctx_target = ctx.get("targetMa", "ma99")
+            ctx_series = geo.get(self._MA_SERIES_KEYS.get(ctx_target, "ma99_series"), [])
+            ctx_window = int(ctx.get("windowCandles", 12))
+            ctx_slope = self._normalized_slope_angle(ctx_series, window=ctx_window) if ctx_series else 0.0
+            ctx_op, ctx_deg = ctx.get("op"), float(ctx.get("deg", 0))
+            if ctx_op == "gte" and not (ctx_slope >= ctx_deg):
+                return None
+            if ctx_op == "lte" and not (ctx_slope <= ctx_deg):
+                return None
+
+        # ── Grupo 6: proximidad a pico/valle reciente ──
+        peak = params.get("peakProximity") or {}
+        if peak.get("enabled"):
+            lookback = int(peak.get("lookbackCandles", 10))
+            tol_pct = float(peak.get("tolerancePct", 1.0))
+            if peak.get("type", "recentHigh") == "recentHigh":
+                extreme = max(geo["highs"][-lookback:])
+            else:
+                extreme = min(geo["lows"][-lookback:])
+            if self._pct_distance(geo["current_price"], extreme) > tol_pct:
+                return None
+
+        # ── Grupo 7: salida estructural (SL/TP) ──
+        exit_cfg = params.get("exit") or {}
+        sl_ref = exit_cfg.get("slReference", "recentLow")
+        sl_lookback = int(exit_cfg.get("slLookbackCandles", 10))
+        sl_buffer_pct = float(exit_cfg.get("slBufferPct", 1.0))
+        min_tp_pct = float(exit_cfg.get("tpMinPct", 8.0))
+        if sl_ref == "recentLow":
+            sl_price = min(geo["lows"][-sl_lookback:]) * (1 - sl_buffer_pct / 100.0)
+        else:
+            sl_price = max(geo["highs"][-sl_lookback:]) * (1 + sl_buffer_pct / 100.0)
+
+        # Dirección: la define el propio perfil (Solo Long / Solo Short — el
+        # editor exige elegir una, no "Automático", para este tipo de perfil).
+        side_int = 0 if profile.get("allowLong") else 1
+        score = float(profile.get("minConfluenceScore", 80.0))
+        profile_name = profile.get("name", "MA Pattern")
+
+        return {
+            "symbol": geo["symbol"],
+            "confluence_score": score,
+            "nexus_confidence": score,
+            "trade_direction": "SHORT" if side_int == 1 else "LONG",
+            "side": side_int,
+            "source": f"ma_pattern:{profile.get('id')}",
+            "ma_slope_mode": True,
+            "min_tp_pct": min_tp_pct,
+            "price_at_signal": geo["current_price"],
+            "reasons": [f"[{profile_name}] patrón de medias cumplido (score={score})"],
+            "custom_sl_price": sl_price,
+            "agent_audit_context": {
+                "ma_slope": {
+                    "profile_name": profile_name,
+                    "ma7": geo["ma7_now"], "ma25": geo["ma25_now"],
+                    "ma50": geo["ma50_now"], "ma99": geo["ma99_now"],
+                    "ma7_slope_now": round(current_slope, 4),
+                    "ma7_slope_prev": round(prior_slope, 4),
+                },
+                "scar": {},
+                "nexus15": {},
+            },
+        }
+
+    def _run_ma_geometry_scan(self) -> list:
+        """
+        Para cada perfil activo StrategyType=MaGeometry, escanea el watchlist
+        completo (en la temporalidad propia de ESE perfil) y evalúa su
+        PatternParamsJson. Cada perfil es dueño exclusivo de sus candidatos
+        (source=f"ma_pattern:{profile_id}"), no compite por cupo con otros.
+        """
+        if not getattr(config, "MA_SLOPE_ENABLED", True):
+            return []
+
+        ma_profiles = [p for p in self.active_profiles if p.get("strategyType") == "MaGeometry"]
+        if not ma_profiles:
+            return []
+
+        found = []
+        geo_cache: dict = {}
+        for profile in ma_profiles:
+            try:
+                params = json.loads(profile.get("patternParamsJson") or "{}")
+            except Exception:
+                continue
+            interval = params.get("timeframe") or getattr(config, "MA_SLOPE_INTERVAL", "1h")
+
+            for symbol in config.WATCHLIST:
+                if self._should_skip(symbol):
+                    continue
+                cache_key = (symbol, interval)
+                if cache_key not in geo_cache:
+                    geo_cache[cache_key] = self._read_ma_geometry(symbol, interval=interval)
+                geo = geo_cache[cache_key]
+                if not geo:
+                    continue
+                try:
+                    c = self._evaluate_ma_geometry_profile(profile, geo)
+                    if c:
+                        found.append(c)
+                except Exception as e:
+                    logger.warning(f"[MA-PATTERN] Error evaluando {symbol} para perfil {profile.get('name')}: {e}")
+        return found
+
+    def _is_ma_slope_candidate(self, candidate: dict) -> bool:
+        """True si el candidato viene del motor de patrones de medias (MaGeometry)."""
+        src = str(candidate.get("source", ""))
+        return candidate.get("ma_slope_mode", False) or src.startswith("ma_pattern:") or src.startswith("ma_slope_case")
 
     def _get_ma99_15m(self, symbol: str) -> Optional[float]:
         try:
@@ -3192,6 +3734,38 @@ class VergeAgent:
                 f"[TOTAL-SWEEP-v13.0] {symbol} — STRATEGY TAG APPLIED | "
                 f"N5={ts_n5_conf:.1f}% | Radar={ts_radar} | SL={ts_red_low} | TP>={tp_min_pct}%"
             )
+
+        # ── ARROW PEAK: Tag strategy ────────────────────────────────────────────
+        if candidate.get("arrow_peak_mode"):
+            ap_ctx = candidate.get("agent_audit_context", {}).get("arrow_peak", {})
+            ap_days = ap_ctx.get("days_bleeding", "?")
+            ap_rise = ap_ctx.get("prev_rise_pct", "?")
+            ap_ma99 = ap_ctx.get("dist_ma99_pct", "?")
+
+            # Override entry_reason with ARROW-PEAK tag
+            entry_reason = (
+                f"[STRAT: ARROW-PEAK] Reversión por agotamiento: subida previa de {ap_rise}% "
+                f"seguida de {ap_days} día(s) de sangrado, toque de MA99 (dist={ap_ma99}%). "
+                f"Score={candidate.get('confluence_score')} bypass activo."
+            )
+
+            logger.warning(
+                f"[ARROW-PEAK] {symbol} — STRATEGY TAG APPLIED | "
+                f"Rise={ap_rise}% | Bleeding={ap_days}d | MA99Dist={ap_ma99}%"
+            )
+
+        # ── MA PATTERN (MaGeometry): Tag strategy ────────────────────────────────
+        if candidate.get("ma_slope_mode"):
+            ms_ctx = candidate.get("agent_audit_context", {}).get("ma_slope", {})
+            ms_name = ms_ctx.get("profile_name", "MA Pattern")
+            ms_detail = candidate.get("reasons", [""])[0]
+
+            entry_reason = (
+                f"[STRAT: {ms_name}] {ms_detail} "
+                f"Score={candidate.get('confluence_score')} bypass activo."
+            )
+
+            logger.warning(f"[MA-PATTERN] {symbol} — STRATEGY TAG APPLIED | {ms_name}")
 
         audit_json = self._build_agent_decision_snapshot(
             candidate,

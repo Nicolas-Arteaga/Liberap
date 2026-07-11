@@ -218,7 +218,8 @@ class ArrowPeakAnalyzer:
             days_bleeding=bleeding_days,
             current_price=current_price,
             peak_price=peak_price,
-            dist_ma99_pct=dist_ma99_pct
+            dist_ma99_pct=dist_ma99_pct,
+            trigger_signal=trigger_signal
         )
     
     def _log_rejection(self, symbol: str, reason: str):

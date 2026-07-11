@@ -20,6 +20,7 @@ from scar import data_store as scar_db
 from scar import scheduler as scar_scheduler
 from lse.router import router as lse_router
 from scar import proxies
+from fvg import router as fvg_router
 
 
 # Initialize logging
@@ -60,6 +61,7 @@ app.include_router(nexus15_router)
 app.include_router(nexus5_router)
 app.include_router(scar_router)
 app.include_router(lse_router)
+app.include_router(fvg_router)
 
 @app.on_event("startup")
 async def _startup():
