@@ -21,6 +21,7 @@ from scar import scheduler as scar_scheduler
 from lse.router import router as lse_router
 from scar import proxies
 from fvg import router as fvg_router
+from adn_compression import router as adn_compression_router
 
 
 # Initialize logging
@@ -62,6 +63,7 @@ app.include_router(nexus5_router)
 app.include_router(scar_router)
 app.include_router(lse_router)
 app.include_router(fvg_router)
+app.include_router(adn_compression_router)
 
 @app.on_event("startup")
 async def _startup():
@@ -278,7 +280,28 @@ async def analyze_technicals(request: TechRequest):
 
 @app.get("/market/tickers")
 async def get_tickers():
-    """Proxy for 24h Tickers (Binance/Bybit) used by ABP Backend."""
+    """
+    Proxy for 24h Tickers used by ABP Backend y por todos los scanners
+    manuales del frontend (FVG, ADN Compression, Strike15m, Staircase,
+    Arrow Peak, SCAR, Explosion Scanner).
+
+    Prioridad: market-ws (caché en memoria alimentada por WebSocket
+    persistente, cero costo de REST) -> Binance -> Bybit. market-ws ya
+    existe para esto exacto (ver agent/kline_cache.py, formato ya
+    compatible) — pegarle a Binance en cada scan cuando esta caché ya
+    tiene los mismos datos en vivo fue lo que generó el bloqueo 418 de
+    Binance del 2026-07-11. Solo cae a REST directo si market-ws no
+    responde o no tiene nada — nunca se pierde disponibilidad de datos.
+    """
+    try:
+        r = requests.get("http://market-ws:8001/market/tickers", timeout=3)
+        if r.status_code == 200:
+            cached = r.json()
+            if isinstance(cached, list) and len(cached) > 0:
+                return cached
+    except Exception as e:
+        logger.warning(f"market-ws no disponible para tickers ({e}), cae a REST directo")
+
     try:
         # Try Binance first
         r = requests.get("https://fapi.binance.com/fapi/v1/ticker/24hr", timeout=5)

@@ -23,33 +23,31 @@
       </button>
 
       <button class="fvg-btn fvg-btn-scan" (click)="runTopScan()" [disabled]="isTopLoading()">
-        {{ isTopLoading() ? 'Escaneando...' : 'Top-5 FVG del exchange' }}
+        {{ isTopLoading() ? 'Escaneando...' : 'Top-5 FVG del exchange (' + selectedInterval() + ')' }}
       </button>
     </div>
   </header>
 
   <div class="fvg-error" *ngIf="errorMsg()">{{ errorMsg() }}</div>
 
-  <!-- TOP 5 resultados del scan — solo setups CONFIRMADOS (5m como mínimo) y en punto de entrada -->
+  <!-- TOP 10 resultados del scan — 1m/5m/15m escaneados por separado, sin exigir cascada alineada -->
   <div class="fvg-top-panel" *ngIf="topResults().length > 0">
     <div class="tb-title">
-      🏆 TOP 5 FVG — LISTOS PARA ENTRAR
+      🏆 TOP 5 FVG — {{ selectedInterval() }}
       <span class="tb-age" *ngIf="topScanAgeSec() !== null" [class.stale]="topScanAgeSec()! > 90">
         (hace {{ topScanAgeSec() }}s{{ topScanAgeSec()! > 90 ? ' — puede estar desactualizado, re-escaneá' : '' }})
       </span>
     </div>
     <div class="tb-items">
-      <div class="tb-item" *ngFor="let tr of topResults()" (click)="onSymbolChange(tr.symbol!)">
+      <div class="tb-item" *ngFor="let tr of topResults()" (click)="selectTopResult(tr)">
         <span class="tb-sym">{{ tr.symbol?.replace('USDT', '') }}</span>
-        <span class="tb-entry" [class.in-zone]="tr.entryPriceZone?.entryStatus === 'IN_ZONE'" [class.approaching]="tr.entryPriceZone?.entryStatus === 'APPROACHING'">
-          {{ entryStatusLabel(tr.entryPriceZone) }}
+        <span class="tb-entry" [class.in-zone]="tr.entryStatus === 'IN_ZONE'" [class.approaching]="tr.entryStatus === 'APPROACHING'">
+          {{ entryStatusLabel(tr) }}
         </span>
-        <span class="tb-dir" [class.bullish]="tr.entryPriceZone?.direction === 'bullish'" [class.bearish]="tr.entryPriceZone?.direction === 'bearish'">
-          {{ zoneDirectionArrow(tr.entryPriceZone) }}
+        <span class="tb-dir" [class.bullish]="tr.direction === 'bullish'" [class.bearish]="tr.direction === 'bearish'">
+          {{ zoneDirectionArrow(tr) }}
         </span>
-        <span class="tb-ifvg" *ngIf="tr.entryPriceZone?.isIfvg">IFVG</span>
-        <span class="tb-stage" [class.ready]="tr.cascadeStatus === 'READY'">{{ tr.cascadeStatus === 'READY' ? '1m' : '5m' }}</span>
-        <span class="tb-tp">TP {{ tr.entryPriceZone?.tpPrice | number:'1.2-6' }}</span>
+        <span class="tb-tp">TP {{ tr.tpPrice | number:'1.2-6' }}</span>
         <span class="tb-score" [style.color]="tr.confluenceScore >= 75 ? '#00ff88' : tr.confluenceScore >= 45 ? '#ffdd00' : '#ff8888'">
           {{ tr.confluenceScore | number:'1.1-1' }}
         </span>

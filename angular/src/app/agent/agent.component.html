@@ -103,7 +103,7 @@
       </div>
       
       <div class="terminal font-mono" #terminalContainer>
-        <div class="log-line" *ngFor="let log of terminalLogs" [class.highlight]="log.highlight">
+        <div class="log-line" *ngFor="let log of terminalLogs; trackBy: trackByLogId" [class.highlight]="log.highlight">
           <span class="prompt">></span>
           <span class="log-time">[{{ log.time }}]</span>
           <span class="log-text" [style.color]="log.color || '#00f3ff'">{{ log.text }}</span>

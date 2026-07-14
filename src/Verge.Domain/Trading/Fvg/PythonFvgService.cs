@@ -65,11 +65,11 @@ public class PythonFvgService : IPythonFvgService
         }
     }
 
-    public async Task<FvgCascadeResultModel?> CascadeAsync(string symbol)
+    public async Task<FvgCascadeResultModel?> CascadeAsync(string symbol, string anchorInterval = "15m")
     {
         try
         {
-            var payload = new { symbol = symbol, limit = 200 };
+            var payload = new { symbol = symbol, limit = 200, anchor_interval = anchorInterval };
             var response = await _http.PostAsJsonAsync("/fvg/cascade", payload);
             response.EnsureSuccessStatusCode();
 

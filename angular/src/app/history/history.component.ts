@@ -335,18 +335,26 @@ export class HistoryComponent {
     return `${sign}$${Math.abs(amount).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 
+  // Hora fija Argentina (UTC-3) — antes dependía del timezone del navegador/SO,
+  // que no siempre coincide con el que muestra el resto del dashboard (reloj
+  // superior, gráfico), generando horarios distintos para el mismo trade
+  // según qué componente lo mostraba.
+  private static readonly AR_TZ = 'America/Argentina/Buenos_Aires';
+
   formatDate(dateStr?: string): string {
     if (!dateStr) return '--:--';
     const date = new Date(dateStr);
     const now  = new Date();
-    if (date.toDateString() === now.toDateString()) {
-      return `Hoy ${date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`;
+    const sameDay = date.toLocaleDateString('en-CA', { timeZone: HistoryComponent.AR_TZ })
+      === now.toLocaleDateString('en-CA', { timeZone: HistoryComponent.AR_TZ });
+    if (sameDay) {
+      return `Hoy ${date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: HistoryComponent.AR_TZ })}`;
     }
-    return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: HistoryComponent.AR_TZ });
   }
 
   private formatDateLabel(date: string): string {
-    return new Date(date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+    return new Date(date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', timeZone: HistoryComponent.AR_TZ });
   }
 
   /**

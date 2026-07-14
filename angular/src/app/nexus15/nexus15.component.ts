@@ -13,6 +13,7 @@ import { ScarService } from '../proxy/trading/scar/scar.service';
 import { TradingSignalrService } from '../services/trading-signalr.service';
 import { ActivatedRoute } from '@angular/router';
 import { BINANCE_FUTURES_PAIRS, ExplosionCycleResult } from '../shared/models/models-shared';
+import { VolatileSymbolsService } from '../shared/services/volatile-symbols.service';
 import {
   createChart, IChartApi, ISeriesApi,
   CandlestickData, CandlestickSeries,
@@ -66,6 +67,7 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
   private scarSvc    = inject(ScarService);
   private signalR    = inject(TradingSignalrService);
   private route      = inject(ActivatedRoute);
+  private volatileSvc = inject(VolatileSymbolsService);
 
   // ── State ──────────────────────────────────────────────────────────────────
   selectedSymbol = signal('BTCUSDT');
@@ -368,23 +370,22 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
     this.isStrikeLoading.set(true);
     this.strikeResults.set([]);
     this.pushTerminal('> ⚡ STRIKE 15m SCAN INIT: MA99 IGNITION DETECTION...');
-    
-    // Use top 80 volume pairs for STRIKE scan
-    const symbolsToScan = BINANCE_FUTURES_PAIRS.slice(0, 80);
-    
-    this.nexus15Svc.analyzeStrike15m(symbolsToScan).subscribe({
-      next: res => {
-        const arr = (res as any)?.top5 || res || [];
-        this.strikeResults.set(arr);
-        this.isStrikeLoading.set(false);
-        this.pushTerminal(`✓ STRIKE SCAN COMPLETE: ${arr.length} OPPORTUNITIES FOUND`);
-      },
-      error: err => {
-        this.isStrikeLoading.set(false);
-        const msg = err?.error?.error?.message || err?.message || 'unknown error';
-        this.pushTerminal(`⚠ STRIKE SCAN ERROR: ${msg}`);
-        console.error('STRIKE SCAN ERROR:', err);
-      }
+
+    this.volatileSvc.getMostVolatile(80).then(symbolsToScan => {
+      this.nexus15Svc.analyzeStrike15m(symbolsToScan).subscribe({
+        next: res => {
+          const arr = (res as any)?.top5 || res || [];
+          this.strikeResults.set(arr);
+          this.isStrikeLoading.set(false);
+          this.pushTerminal(`✓ STRIKE SCAN COMPLETE: ${arr.length} OPPORTUNITIES FOUND`);
+        },
+        error: err => {
+          this.isStrikeLoading.set(false);
+          const msg = err?.error?.error?.message || err?.message || 'unknown error';
+          this.pushTerminal(`⚠ STRIKE SCAN ERROR: ${msg}`);
+          console.error('STRIKE SCAN ERROR:', err);
+        }
+      });
     });
   }
 
@@ -392,23 +393,22 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
     this.isStaircaseLoading.set(true);
     this.staircaseResults.set([]);
     this.pushTerminal('> 🪜 ROLLERCOASTER SCAN INIT: HIGH-BETA SWINGS DETECTION (ADR-10 ≥ 8%)...');
-    
-    // Use top 80 volume pairs for STAIRCASE scan
-    const symbolsToScan = BINANCE_FUTURES_PAIRS.slice(0, 80);
-    
-    this.nexus15Svc.analyzeStaircase(symbolsToScan).subscribe({
-      next: res => {
-        const arr = (res as any)?.top5 || res || [];
-        this.staircaseResults.set(arr);
-        this.isStaircaseLoading.set(false);
-        this.pushTerminal(`✓ ROLLERCOASTER SCAN COMPLETE: ${arr.length} HIGH-BETA OPPORTUNITIES FOUND`);
-      },
-      error: err => {
-        this.isStaircaseLoading.set(false);
-        const msg = err?.error?.error?.message || err?.message || 'unknown error';
-        this.pushTerminal(`⚠ STAIRCASE SCAN ERROR: ${msg}`);
-        console.error('STAIRCASE SCAN ERROR:', err);
-      }
+
+    this.volatileSvc.getMostVolatile(80).then(symbolsToScan => {
+      this.nexus15Svc.analyzeStaircase(symbolsToScan).subscribe({
+        next: res => {
+          const arr = (res as any)?.top5 || res || [];
+          this.staircaseResults.set(arr);
+          this.isStaircaseLoading.set(false);
+          this.pushTerminal(`✓ ROLLERCOASTER SCAN COMPLETE: ${arr.length} HIGH-BETA OPPORTUNITIES FOUND`);
+        },
+        error: err => {
+          this.isStaircaseLoading.set(false);
+          const msg = err?.error?.error?.message || err?.message || 'unknown error';
+          this.pushTerminal(`⚠ STAIRCASE SCAN ERROR: ${msg}`);
+          console.error('STAIRCASE SCAN ERROR:', err);
+        }
+      });
     });
   }
 
@@ -416,23 +416,22 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
     this.isArrowPeakLoading.set(true);
     this.arrowPeakResults.set([]);
     this.pushTerminal('> 🏹 ARROW PEAK SCAN INIT: EXHAUSTION REVERSAL DETECTION (Pumps +15% bleeding 1-5 days)...');
-    
-    // Use top 80 volume pairs for ARROW PEAK scan
-    const symbolsToScan = BINANCE_FUTURES_PAIRS.slice(0, 80);
-    
-    this.nexus15Svc.analyzeArrowPeak(symbolsToScan).subscribe({
-      next: res => {
-        const arr = (res as any)?.top5 || res || [];
-        this.arrowPeakResults.set(arr);
-        this.isArrowPeakLoading.set(false);
-        this.pushTerminal(`✓ ARROW PEAK SCAN COMPLETE: ${arr.length} EXHAUSTION REVERSALS FOUND`);
-      },
-      error: err => {
-        this.isArrowPeakLoading.set(false);
-        const msg = err?.error?.error?.message || err?.message || 'unknown error';
-        this.pushTerminal(`⚠ ARROW PEAK SCAN ERROR: ${msg}`);
-        console.error('ARROW PEAK SCAN ERROR:', err);
-      }
+
+    this.volatileSvc.getMostVolatile(80).then(symbolsToScan => {
+      this.nexus15Svc.analyzeArrowPeak(symbolsToScan).subscribe({
+        next: res => {
+          const arr = (res as any)?.top5 || res || [];
+          this.arrowPeakResults.set(arr);
+          this.isArrowPeakLoading.set(false);
+          this.pushTerminal(`✓ ARROW PEAK SCAN COMPLETE: ${arr.length} EXHAUSTION REVERSALS FOUND`);
+        },
+        error: err => {
+          this.isArrowPeakLoading.set(false);
+          const msg = err?.error?.error?.message || err?.message || 'unknown error';
+          this.pushTerminal(`⚠ ARROW PEAK SCAN ERROR: ${msg}`);
+          console.error('ARROW PEAK SCAN ERROR:', err);
+        }
+      });
     });
   }
 

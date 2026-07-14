@@ -12,12 +12,23 @@ import {
 } from 'lightweight-charts';
 
 import { FvgService } from '../proxy/trading/fvg/fvg.service';
-import { FvgCascadeResultDto, FvgZoneDto, VolumeProfileBinDto } from '../proxy/trading/fvg/models';
-import { BINANCE_FUTURES_PAIRS } from '../shared/models/models-shared';
+import { FvgCascadeResultDto, FvgScanItemDto, FvgZoneDto, VolumeProfileBinDto } from '../proxy/trading/fvg/models';
 import { FvgZonePrimitive, FvgRenderZone } from '../shared/charts/fvg-zone-primitive';
 import { VolumeProfileSidebarComponent } from '../shared/charts/volume-profile-sidebar.component';
+import { VolatileSymbolsService } from '../shared/services/volatile-symbols.service';
 
 const INTERVALS = ['1m', '5m', '15m'];
+const VOLATILE_SCAN_SIZE = 80;
+
+/**
+ * Exigir que 15m Y 5m estén confirmados AL MISMO TIEMPO (la cascada
+ * completa) para aparecer en el Top-5 es pedirle al mercado una
+ * coincidencia rarísima — por eso el Top-5 escanea cada temporalidad por
+ * su cuenta (1m, 5m, 15m independientes) en vez de exigir la cascada. La
+ * cascada completa se sigue usando al analizar UN símbolo puntual
+ * (runAnalyze), donde sí tiene sentido buscar la mejor confluencia.
+ */
+type TopFvgResult = FvgScanItemDto & { interval: string };
 
 @Component({
   selector: 'app-fvg',
@@ -31,6 +42,7 @@ export class FvgComponent implements AfterViewInit, OnDestroy {
   @ViewChild(VolumeProfileSidebarComponent) volumeProfileSidebar!: VolumeProfileSidebarComponent;
 
   private fvgSvc = inject(FvgService);
+  private volatileSvc = inject(VolatileSymbolsService);
 
   readonly intervals = INTERVALS;
 
@@ -40,7 +52,7 @@ export class FvgComponent implements AfterViewInit, OnDestroy {
   isTopLoading = signal(false);
   errorMsg = signal<string | null>(null);
   cascade = signal<FvgCascadeResultDto | null>(null);
-  topResults = signal<FvgCascadeResultDto[]>([]);
+  topResults = signal<TopFvgResult[]>([]);
   topScanAgeSec = signal<number | null>(null);
   volumeBins = signal<VolumeProfileBinDto[]>([]);
 
@@ -258,11 +270,30 @@ export class FvgComponent implements AfterViewInit, OnDestroy {
     this.selectedInterval.set(interval);
     this.loadChartData();
     this.loadVolumeProfile();
+    this.clearTopResults(); // la lista anterior quedó escaneada en otra temporalidad, ya no es comparable
   }
 
   onSymbolChange(symbol: string): void {
     this.selectedSymbol.set(symbol);
     this.loadChartData();
+    this.runAnalyze();
+  }
+
+  /**
+   * El Top-10 mezcla resultados de 1m/5m/15m — cada chip trae SU PROPIA
+   * temporalidad (tr.interval), que no necesariamente es la que está
+   * elegida en el dropdown. Si solo cambiáramos el símbolo (onSymbolChange)
+   * y dejáramos el dropdown como estaba, "Analizar" preguntaría por la
+   * temporalidad equivocada — el resultado real (el que armó este chip)
+   * puede no existir ahí, y no se dibuja nada aunque el chip diga que SÍ
+   * hay un FVG. Por eso acá también se sincroniza el dropdown al hacer clic.
+   */
+  selectTopResult(tr: TopFvgResult): void {
+    if (!tr.symbol) return;
+    this.selectedSymbol.set(tr.symbol);
+    this.selectedInterval.set(tr.interval);
+    this.loadChartData();
+    this.loadVolumeProfile();
     this.runAnalyze();
   }
 
@@ -289,7 +320,7 @@ export class FvgComponent implements AfterViewInit, OnDestroy {
     this.loadVolumeProfile();
     const symbolAtRequest = this.selectedSymbol();
     const token = ++this.analyzeToken;
-    this.fvgSvc.cascade(symbolAtRequest).subscribe({
+    this.fvgSvc.cascade(symbolAtRequest, this.selectedInterval()).subscribe({
       next: (res) => {
         if (token !== this.analyzeToken) return; // ya se pidió otro símbolo mientras tanto
         this.cascade.set(res);
@@ -328,28 +359,21 @@ export class FvgComponent implements AfterViewInit, OnDestroy {
   }
 
   /**
-   * El Top-5 es un snapshot de un momento dado — con setups de 1m, el
-   * precio se mueve tan rápido que en 1-2 minutos un símbolo puede dejar
-   * de ser accionable (ya tocó el TP, o el precio se alejó). Cada vez que
-   * se vuelve a analizar un símbolo (por ej. al hacer clic en un chip del
-   * Top-5), si ya no es accionable se saca de la lista en vez de dejarlo
-   * mostrando un score viejo que ya no refleja la realidad.
+   * El Top-5 es un snapshot de un momento dado — el precio se mueve rápido
+   * y en 1-2 minutos un símbolo puede dejar de ser accionable (ya tocó el
+   * TP, o el precio se alejó). Al volver a analizar un símbolo (ej. click
+   * en un chip del Top-5) usando la cascada completa, si esa cascada dice
+   * que ya no hay nada accionable se sacan TODAS sus entradas (de
+   * cualquier temporalidad) de la lista, en vez de dejarlas con un score
+   * viejo que ya no refleja la realidad.
    */
   private reconcileTopResult(symbol: string, fresh: FvgCascadeResultDto): void {
     const stillActionable =
-      (fresh.cascadeStatus === 'READY' || fresh.cascadeStatus === 'AWAITING_EXECUTION') &&
+      fresh.cascadeStatus !== 'NONE' &&
       (fresh.entryPriceZone?.entryStatus === 'IN_ZONE' || fresh.entryPriceZone?.entryStatus === 'APPROACHING');
 
-    this.topResults.update(list => {
-      const idx = list.findIndex(r => r.symbol === symbol);
-      if (idx === -1) return list;
-      if (!stillActionable) {
-        return list.filter(r => r.symbol !== symbol);
-      }
-      const updated = [...list];
-      updated[idx] = fresh;
-      return updated;
-    });
+    if (stillActionable) return; // nada que corregir, se deja el resultado del scan tal cual
+    this.topResults.update(list => list.filter(r => r.symbol !== symbol));
   }
 
   private renderEntryZone(res: FvgCascadeResultDto | null): void {
@@ -367,28 +391,39 @@ export class FvgComponent implements AfterViewInit, OnDestroy {
     this.volumeProfileSidebar?.render();
   }
 
+  /**
+   * El scan respeta la temporalidad elegida en el dropdown — antes escaneaba
+   * 1m/5m/15m mezclados sin importar qué había elegido el usuario, lo que
+   * generaba una lista con velas de distinta escala imposibles de comparar
+   * a simple vista, y encima el click sobre un resultado le cambiaba el
+   * dropdown por sorpresa. Un solo criterio de temporalidad en toda la
+   * página: el que elegís arriba es el que se escanea Y el que se analiza.
+   */
   runTopScan(): void {
     this.isTopLoading.set(true);
-    const symbolsToScan = BINANCE_FUTURES_PAIRS.slice(0, 80);
-    this.fvgSvc.cascadeScan(symbolsToScan).subscribe({
-      next: (res) => {
-        this.topResults.set(res.top5 ?? []);
-        this.isTopLoading.set(false);
-        this.startTopScanAgeTracker();
-      },
-      error: (err) => {
-        console.error('[FVG] cascade scan error:', err);
-        this.errorMsg.set('No se pudo escanear el exchange.');
-        this.isTopLoading.set(false);
-      },
+    const interval = this.selectedInterval();
+    this.volatileSvc.getMostVolatile(VOLATILE_SCAN_SIZE).then(symbolsToScan => {
+      this.fvgSvc.scan(symbolsToScan, interval).subscribe({
+        next: (res) => {
+          const items: TopFvgResult[] = (res.top5 ?? []).map(item => ({ ...item, interval }));
+          this.topResults.set(items);
+          this.isTopLoading.set(false);
+          this.startTopScanAgeTracker();
+        },
+        error: (err) => {
+          console.error('[FVG] scan error:', err);
+          this.errorMsg.set('No se pudo escanear el exchange.');
+          this.isTopLoading.set(false);
+        },
+      });
     });
   }
 
-  zoneDirectionArrow(z: FvgZoneDto | undefined): string {
+  zoneDirectionArrow(z: { direction?: string } | undefined): string {
     return z?.direction === 'bullish' ? '▲' : '▼';
   }
 
-  entryStatusLabel(z: FvgZoneDto | undefined): string {
+  entryStatusLabel(z: { entryStatus?: string; distToEntryPct?: number } | undefined): string {
     switch (z?.entryStatus) {
       case 'IN_ZONE': return 'EN ZONA';
       case 'APPROACHING': return `A ${(z.distToEntryPct ?? 0).toFixed(2)}%`;
@@ -398,11 +433,14 @@ export class FvgComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  // Texto genérico (no nombra una temporalidad fija) porque la cascada
+  // ahora puede arrancar en 15m, 5m o 1m según lo elegido en el dropdown —
+  // "entra con 5m" quedaría mal si la cadena en curso es 5m→1m o solo 1m.
   cascadeStageLabel(status: string | undefined): string {
     switch (status) {
-      case 'READY': return 'LISTO — 1m ejecuta';
-      case 'AWAITING_EXECUTION': return 'CONFIRMADO — entra con 5m';
-      case 'AWAITING_CONFIRMATION': return 'ESPERANDO CONFIRMACIÓN 5m';
+      case 'READY': return 'LISTO PARA ENTRAR';
+      case 'AWAITING_EXECUTION': return 'CONFIRMADO — esperando entrada más fina';
+      case 'AWAITING_CONFIRMATION': return 'ESPERANDO CONFIRMACIÓN';
       case 'NONE': return 'SIN SESGO CLARO';
       default: return '—';
     }

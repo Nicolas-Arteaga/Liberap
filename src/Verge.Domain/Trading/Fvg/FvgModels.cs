@@ -157,6 +157,6 @@ public interface IPythonFvgService
 {
     Task<FvgAnalyzeResponseModel?> AnalyzeAsync(string symbol, string interval);
     Task<FvgScanResponseModel?> ScanAsync(List<string> symbols, string interval);
-    Task<FvgCascadeResultModel?> CascadeAsync(string symbol);
+    Task<FvgCascadeResultModel?> CascadeAsync(string symbol, string anchorInterval = "15m");
     Task<FvgCascadeScanResponseModel?> CascadeScanAsync(List<string> symbols);
 }

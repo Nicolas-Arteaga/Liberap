@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from .schemas import ArrowPeakRequest, ArrowPeakResponse, ArrowPeakItem
+from shared_kline_cache import get_or_fetch
 import logging
 
 logger = logging.getLogger("ARROW_PEAK")
@@ -125,7 +126,8 @@ class ArrowPeakAnalyzer:
         
         is_clean_arrow = False
         prev_rise_pct = 0.0
-        
+        arrow_start_price = 0.0
+
         # Check sequences ending at peak (index -1) or the day before (index -2)
         for end_pos in [n_before, n_before - 1]:
             if is_clean_arrow:
@@ -143,6 +145,7 @@ class ArrowPeakAnalyzer:
                     if rise_pct >= 20.0:
                         is_clean_arrow = True
                         prev_rise_pct = rise_pct
+                        arrow_start_price = float(first_open)
                         break
         
         if not is_clean_arrow:
@@ -218,6 +221,7 @@ class ArrowPeakAnalyzer:
             days_bleeding=bleeding_days,
             current_price=current_price,
             peak_price=peak_price,
+            arrow_start_price=arrow_start_price,
             dist_ma99_pct=dist_ma99_pct,
             trigger_signal=trigger_signal
         )
@@ -232,26 +236,11 @@ class ArrowPeakAnalyzer:
         Fetch klines from Binance Futures API.
         Returns list of [timestamp, open, high, low, close, volume] or None on error.
         """
-        # Clean symbol format
         clean_symbol = symbol.replace('/', '').replace('-', '').upper()
-        
-        # Try Binance Futures first
-        try:
-            url = f"https://fapi.binance.com/fapi/v1/klines"
-            params = {
-                'symbol': clean_symbol,
-                'interval': interval,
-                'limit': limit
-            }
-            response = requests.get(url, params=params, timeout=self.timeout)
-            response.raise_for_status()
-            return response.json()
-        except Exception as e:
-            logger.warning(f"[ARROW PEAK] Failed to fetch {symbol} from Binance Futures: {e}")
-            
-            # Try spot as fallback
+
+        def _do_fetch():
             try:
-                url = f"https://api.binance.com/api/v3/klines"
+                url = f"https://fapi.binance.com/fapi/v1/klines"
                 params = {
                     'symbol': clean_symbol,
                     'interval': interval,
@@ -260,6 +249,21 @@ class ArrowPeakAnalyzer:
                 response = requests.get(url, params=params, timeout=self.timeout)
                 response.raise_for_status()
                 return response.json()
-            except Exception as e2:
-                logger.error(f"[ARROW PEAK] Failed to fetch {symbol} from Binance Spot: {e2}")
-                return None
+            except Exception as e:
+                logger.warning(f"[ARROW PEAK] Failed to fetch {symbol} from Binance Futures: {e}")
+
+                try:
+                    url = f"https://api.binance.com/api/v3/klines"
+                    params = {
+                        'symbol': clean_symbol,
+                        'interval': interval,
+                        'limit': limit
+                    }
+                    response = requests.get(url, params=params, timeout=self.timeout)
+                    response.raise_for_status()
+                    return response.json()
+                except Exception as e2:
+                    logger.error(f"[ARROW PEAK] Failed to fetch {symbol} from Binance Spot: {e2}")
+                    return None
+
+        return get_or_fetch(clean_symbol, interval, limit, _do_fetch)

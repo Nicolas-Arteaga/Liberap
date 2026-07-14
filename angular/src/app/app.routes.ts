@@ -92,6 +92,10 @@ export const APP_ROUTES: Routes = [
         loadComponent: () => import('./fvg/fvg.component').then(c => c.FvgComponent),
       },
       {
+        path: 'adn-compression',
+        loadComponent: () => import('./adn-compression/adn-compression.component').then(c => c.AdnCompressionComponent),
+      },
+      {
         path: 'scar/analytics',
         loadComponent: () => import('./scar-analytics/scar-analytics.component').then(c => c.ScarAnalyticsComponent),
       },

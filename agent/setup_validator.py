@@ -23,7 +23,7 @@ _VALIDATE_PASS_COUNT = 0  # Contador de validaciones que pasaron
 def _is_direct_injection_candidate(candidate: dict) -> bool:
     """
     True para candidatos de inyección directa (MA Slope, Arrow Peak, Total
-    Sweep, Golden U-Turn): ya traen su propio score/SL/TP calculados por su
+    Sweep, Golden U-Turn, FVG): ya traen su propio score/SL/TP calculados por su
     propio detector geométrico, no son señales "Nexus con nivel de confianza"
     — los chequeos de Tier/rango estimado de esta funcion están pensados para
     ese otro paradigma (Nexus/Bridge) y no aplican acá.
@@ -33,6 +33,7 @@ def _is_direct_injection_candidate(candidate: dict) -> bool:
         or candidate.get("arrow_peak_mode")
         or candidate.get("total_sweep_mode")
         or candidate.get("golden_uturn_mode")
+        or candidate.get("fvg_mode")
     )
 
 

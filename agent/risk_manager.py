@@ -4,6 +4,25 @@ from typing import Any, Dict, Optional
 
 logger = logging.getLogger("RiskManager")
 
+# 2026-07-12: tope de seguridad UNIVERSAL sobre el TP final de CUALQUIER
+# estrategia (no solo FVG/Arrow Peak, que ya tienen su propio TP estructural
+# — ver más abajo, esas se saltean este tope porque ya pasaron por uno
+# equivalente). El usuario verificó el mismo síntoma (TP inalcanzable,
+# apunta a la punta de un impulso viejo y ya agotado) en varias estrategias
+# más, no solo FVG. Mismo razonamiento que
+# python-service/fvg/analyzer.py::_liquidity_target: compara el alcance de
+# una ventana reciente (pata actual) contra el de una ventana de 3-4 días —
+# si el TP ya calculado (por RR×SL o lo que sea) implica ir más lejos de lo
+# proporcional, se recorta a la mitad del camino restante. Siempre se aplica
+# además un haircut del 10% (nunca el 100% del nivel calculado). Solo puede
+# achicar el TP, nunca agrandarlo — y si faltan datos, no toca nada.
+STRUCTURAL_CAP_INTERVAL = "15m"
+STRUCTURAL_CAP_LOOKBACK_BARS = 400   # ~4 días en 15m
+RECENT_IMPULSE_LOOKBACK_BARS = 40
+DISPROPORTION_RATIO = 1.5
+FADING_IMPULSE_TARGET_RATIO = 0.5
+TP_HAIRCUT_RATIO = 0.9
+
 
 class RiskManager:
     """
@@ -14,6 +33,63 @@ class RiskManager:
 
     def __init__(self, fetcher):
         self.fetcher = fetcher
+
+    def _apply_structural_tp_cap(self, symbol: str, side: int, cp: float, tp_price: float) -> float:
+        """
+        Ver constantes arriba. Fail-open: si no hay datos suficientes o algo
+        falla, devuelve tp_price sin tocar — nunca bloquea un trade por esto.
+        """
+        try:
+            klines = self.fetcher.get_klines_for_nexus(
+                symbol, interval=STRUCTURAL_CAP_INTERVAL, limit=STRUCTURAL_CAP_LOOKBACK_BARS
+            )
+        except Exception as e:
+            logger.debug(f"[TP-CAP] {symbol}: no se pudo obtener klines ({e}), sin tope estructural")
+            return tp_price
+
+        if not klines or len(klines) < 60:
+            return tp_price
+
+        try:
+            recent = klines[-RECENT_IMPULSE_LOOKBACK_BARS:]
+            if side == 0:
+                full_high = max(float(k["high"]) for k in klines)
+                local_high = max(float(k["high"]) for k in recent)
+                if full_high <= cp or local_high <= cp:
+                    candidate = tp_price
+                else:
+                    local_reach = local_high - cp
+                    full_reach = full_high - cp
+                    if full_reach > local_reach * DISPROPORTION_RATIO:
+                        candidate = cp + full_reach * FADING_IMPULSE_TARGET_RATIO
+                    else:
+                        candidate = tp_price
+                candidate = cp + (candidate - cp) * TP_HAIRCUT_RATIO
+                capped = min(tp_price, candidate) if candidate > cp else tp_price
+            else:
+                full_low = min(float(k["low"]) for k in klines)
+                local_low = min(float(k["low"]) for k in recent)
+                if full_low >= cp or local_low >= cp:
+                    candidate = tp_price
+                else:
+                    local_reach = cp - local_low
+                    full_reach = cp - full_low
+                    if full_reach > local_reach * DISPROPORTION_RATIO:
+                        candidate = cp - full_reach * FADING_IMPULSE_TARGET_RATIO
+                    else:
+                        candidate = tp_price
+                candidate = cp - (cp - candidate) * TP_HAIRCUT_RATIO
+                capped = max(tp_price, candidate) if candidate < cp else tp_price
+
+            if capped != tp_price:
+                logger.info(
+                    f"[TP-CAP] {symbol}: TP recortado por tope estructural "
+                    f"{tp_price:.6f} -> {capped:.6f} (lado={side})"
+                )
+            return capped
+        except Exception as e:
+            logger.warning(f"[TP-CAP] {symbol}: error aplicando tope estructural: {e}")
+            return tp_price
 
     def calculate_position(
         self,
@@ -72,6 +148,8 @@ class RiskManager:
                 symbol,
             )
             return None
+
+        tp2_b = self._apply_structural_tp_cap(symbol, side, cp, tp2_b)
 
         # ── v10.3 Fixed Bullet: Margen fijo de 150 USDT para TODOS los trades LSE ──
         # Eliminamos el cálculo de qty basado en risk_usd / stop_distance
@@ -162,10 +240,11 @@ class RiskManager:
         golden_uturn_mode = signal_data.get("golden_uturn_mode", False)
         arrow_peak_mode = signal_data.get("arrow_peak_mode", False)
         ma_slope_mode = signal_data.get("ma_slope_mode", False)
+        fvg_mode = signal_data.get("fvg_mode", False)
         custom_sl_price = signal_data.get("custom_sl_price")
         side_for_custom_sl = int(signal_data.get("side", 0))
 
-        if (structural_sniper_mode or golden_uturn_mode or arrow_peak_mode or ma_slope_mode) and custom_sl_price:
+        if (structural_sniper_mode or golden_uturn_mode or arrow_peak_mode or ma_slope_mode or fvg_mode) and custom_sl_price:
             try:
                 custom_sl_f = float(custom_sl_price)
                 # LONG: el SL custom debe quedar debajo del precio actual.
@@ -202,6 +281,7 @@ class RiskManager:
                         "GOLDEN-U-TURN" if golden_uturn_mode
                         else "ARROW-PEAK" if arrow_peak_mode
                         else "MA-SLOPE" if ma_slope_mode
+                        else "FVG" if fvg_mode
                         else "STRUCTURAL-SNIPER"
                     )
                     if not golden_uturn_mode:
@@ -224,7 +304,7 @@ class RiskManager:
 
         # 1. Distancia SL basada en volatilidad (atr o estimated_range)
         # Solo calcular si no hay custom SL de Sniper Mode
-        if not ((structural_sniper_mode or golden_uturn_mode or arrow_peak_mode or ma_slope_mode) and custom_sl_price):
+        if not ((structural_sniper_mode or golden_uturn_mode or arrow_peak_mode or ma_slope_mode or fvg_mode) and custom_sl_price):
             if profile:
                 sl_mult = float(profile.get("slMultiplier", 0.8))
             else:
@@ -244,8 +324,8 @@ class RiskManager:
             sl_distance_price = cp * sl_distance_pct
 
         # Calcular base SL sin el multiplicador de Clone para el Take Profit
-        # Para Sniper/Golden/Arrow Peak/MA Slope con custom SL, usar el mismo sl_distance_price calculado
-        if (structural_sniper_mode or golden_uturn_mode or arrow_peak_mode or ma_slope_mode) and custom_sl_price:
+        # Para Sniper/Golden/Arrow Peak/MA Slope/FVG con custom SL, usar el mismo sl_distance_price calculado
+        if (structural_sniper_mode or golden_uturn_mode or arrow_peak_mode or ma_slope_mode or fvg_mode) and custom_sl_price:
             base_sl_distance_price = sl_distance_price
         else:
             if profile and profile.get("name") == "Scalping Clone":
@@ -316,16 +396,35 @@ class RiskManager:
                 )
                 tp_distance_price = ms_min_tp_distance
 
-        # [ARROW PEAK] TP mínimo — reversión por agotamiento, dejar correr 1-2 días.
+        # [ARROW PEAK] TP estructural: apunta al origen real de la flecha (open de
+        # la primera vela del pump, con buffer para cerrar un poco ANTES de
+        # completarla), no a un múltiplo RR de la distancia al SL — ese RR podía
+        # dar objetivos irreales (60%+) cuando el pump previo fue grande, ya que
+        # el SL de Arrow Peak es estructural (distancia al pico) y variable.
         if arrow_peak_mode:
-            ap_min_tp_pct = float(getattr(config, "ARROW_PEAK_TP_MIN_DISTANCE_PCT", 10.0)) / 100.0
-            ap_min_tp_distance = cp * ap_min_tp_pct
-            if tp_distance_price < ap_min_tp_distance:
+            ap_custom_tp = signal_data.get("custom_tp_price")
+            ap_custom_tp_f = None
+            if ap_custom_tp:
+                try:
+                    ap_custom_tp_f = float(ap_custom_tp)
+                except (TypeError, ValueError):
+                    ap_custom_tp_f = None
+
+            if ap_custom_tp_f and 0 < ap_custom_tp_f < cp:
+                tp_distance_price = cp - ap_custom_tp_f
                 logger.info(
-                    f"[ARROW-PEAK-RISK] {symbol}: TP estirado al mínimo {ap_min_tp_pct*100:.1f}% "
-                    f"(RR daba {tp_distance_price/cp*100:.2f}%)"
+                    f"[ARROW-PEAK-RISK] {symbol}: TP=origen de flecha "
+                    f"({ap_custom_tp_f:.6f}, distancia={tp_distance_price/cp*100:.2f}%)"
                 )
-                tp_distance_price = ap_min_tp_distance
+            else:
+                ap_min_tp_pct = float(getattr(config, "ARROW_PEAK_TP_MIN_DISTANCE_PCT", 10.0)) / 100.0
+                ap_min_tp_distance = cp * ap_min_tp_pct
+                if tp_distance_price < ap_min_tp_distance:
+                    logger.info(
+                        f"[ARROW-PEAK-RISK] {symbol}: TP estirado al mínimo {ap_min_tp_pct*100:.1f}% "
+                        f"(RR daba {tp_distance_price/cp*100:.2f}%, sin origen de flecha válido)"
+                    )
+                    tp_distance_price = ap_min_tp_distance
 
         # v9.6 Big Fish: TP mínimo 10% para Golden U-Turn
         if golden_uturn_mode:
@@ -344,6 +443,41 @@ class RiskManager:
                     f"(RR {rr_target:.1f}x sobre SL {sl_distance_pct*100:.2f}%)"
                 )
 
+        # [FVG] TP estructural: usa el liquidity target ya calculado en
+        # python-service (swing real de la ventana reciente, con recorte a la
+        # mitad cuando el máximo/mínimo de la ventana completa pertenece a un
+        # impulso anterior desproporcionadamente más grande, más un haircut
+        # final) como objetivo directo — no un múltiplo RR de un SL que en
+        # FVG suele ser chico (el piso `min_tp_pct` solo podía ESTIRAR el TP,
+        # nunca acotarlo, así que un RR grande igual mandaba a un objetivo
+        # irreal aunque python-service ya calculara uno razonable). Ver casos
+        # reales BEATUSDT/VELVETUSDT 2026-07-12.
+        if fvg_mode:
+            fvg_side = int(signal_data.get("side", 0))
+            fvg_custom_tp = signal_data.get("custom_tp_price")
+            fvg_custom_tp_f = None
+            if fvg_custom_tp:
+                try:
+                    fvg_custom_tp_f = float(fvg_custom_tp)
+                except (TypeError, ValueError):
+                    fvg_custom_tp_f = None
+
+            is_valid_fvg_tp = fvg_custom_tp_f is not None and (
+                (fvg_side == 0 and fvg_custom_tp_f > cp) or
+                (fvg_side == 1 and 0 < fvg_custom_tp_f < cp)
+            )
+            if is_valid_fvg_tp:
+                tp_distance_price = abs(fvg_custom_tp_f - cp)
+                logger.info(
+                    f"[FVG-RISK] {symbol}: TP=liquidity target estructural "
+                    f"({fvg_custom_tp_f:.6f}, distancia={tp_distance_price/cp*100:.2f}%)"
+                )
+            else:
+                logger.warning(
+                    f"[FVG-RISK] {symbol}: TP estructural inválido/ausente, "
+                    f"usando fallback RR×SL ({tp_distance_price/cp*100:.2f}%)"
+                )
+
         side = int(signal_data.get("side", 0))
 
         if side == 0:
@@ -358,6 +492,13 @@ class RiskManager:
         if stop_distance <= 0:
             logger.error("Nexus stop_distance invalid side=%s cp=%s sl=%s", side, cp, sl_price)
             return None
+
+        # Tope estructural universal — FVG y Arrow Peak ya calculan su propio
+        # TP estructural (con su propio haircut), aplicarlo de nuevo encima
+        # solo los recortaría el doble sin necesidad.
+        if not (fvg_mode or arrow_peak_mode):
+            tp_price = self._apply_structural_tp_cap(symbol, side, cp, tp_price)
+            tp_distance_price = abs(tp_price - cp)
 
         # ── v10.3 Fixed Bullet: Margen fijo de 150 USDT para TODOS los trades ──
         # Eliminamos el cálculo de qty basado en risk_usd / stop_distance

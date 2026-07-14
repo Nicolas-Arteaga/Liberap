@@ -237,9 +237,85 @@
       color: #848e9c;
       font-weight: 600;
       border-bottom: 2px solid transparent;
-      &.active { color: #00f3ff; border-bottom-color: #00f3ff; }
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      &.active { color: #00f3ff; border-bottom-color: var(--tab-accent, #00f3ff); }
       &:hover { color: white; background: rgba(0, 243, 255, 0.05); }
     }
+
+    // Standard Scalping / Historial — siempre visibles, nunca se recortan.
+    .tab-pinned {
+      background: rgba(0, 0, 0, 0.18);
+    }
+
+    // Ícono de familia (Genérica/MaGeometry/ADN/FVG), teñido con el color
+    // propio del perfil — permite reconocer la familia de un vistazo sin
+    // leer el nombre completo.
+    .tab-icon {
+      font-size: 12px;
+      margin-right: 5px;
+      opacity: 0.75;
+      color: var(--tab-accent, #00f3ff);
+      filter: drop-shadow(0 0 3px var(--tab-accent, transparent));
+    }
+
+    // Badge de cantidad de posiciones abiertas — apagado en 0, brilla en
+    // verde cuando la estrategia tiene algo operando ahora mismo, así se
+    // detecta de un vistazo cuál está "caliente" sin leer cada número.
+    .tab-count {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 16px;
+      margin-left: 6px;
+      padding: 1px 5px;
+      border-radius: 8px;
+      font-size: 9px;
+      font-weight: 700;
+      background: rgba(255, 255, 255, 0.06);
+      color: #848e9c;
+      &.tab-count-hot {
+        background: rgba(0, 255, 136, 0.12);
+        color: #00ff88;
+        text-shadow: 0 0 6px rgba(0, 255, 136, 0.5);
+      }
+    }
+
+    // Estrategias dinámicas: nunca se recortan por overflow-hidden del
+    // contenedor padre — quedan en un carril con scroll horizontal propio,
+    // con un degradé en el borde derecho que insinúa que hay más para ver.
+    .tab-scroll-wrap {
+      position: relative;
+      min-width: 0; // clave en flex: permite que el hijo se angoste y scrollee en vez de empujar a los hermanos
+      overflow: hidden;
+
+      &::after {
+        content: '';
+        position: absolute;
+        top: 0; right: 0; bottom: 0;
+        width: 28px;
+        background: linear-gradient(to right, transparent, rgba(8, 12, 17, 0.92));
+        pointer-events: none;
+        z-index: 2;
+      }
+    }
+
+    .tab-scroll {
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0, 243, 255, 0.3) transparent;
+
+      &::-webkit-scrollbar { height: 4px; }
+      &::-webkit-scrollbar-track { background: transparent; }
+      &::-webkit-scrollbar-thumb {
+        background: rgba(0, 243, 255, 0.3);
+        border-radius: 2px;
+        &:hover { background: rgba(0, 243, 255, 0.55); }
+      }
+    }
+
     .position-table {
       th { font-weight: 400; color: #00f3ff; padding: 10px 8px; border-bottom: 1px solid rgba(0, 243, 255, 0.15); text-shadow: 0 0 8px rgba(0, 243, 255, 0.4); }
       td { padding: 12px 8px; vertical-align: middle; border-bottom: 1px solid rgba(0, 243, 255, 0.05); }

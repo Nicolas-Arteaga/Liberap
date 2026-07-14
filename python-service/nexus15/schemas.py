@@ -128,6 +128,7 @@ class ArrowPeakItem(BaseModel):
     days_bleeding: int  # Number of red candles after peak (1-5)
     current_price: float
     peak_price: float  # The highest point of the arrow
+    arrow_start_price: float  # Open of the first candle of the pump (base of the arrow)
     dist_ma99_pct: float  # Distance to MA99 in 15m (%)
     trigger_signal: bool = False  # True if the 15m execution trigger fired (price at MA99 + red > prev green)
 

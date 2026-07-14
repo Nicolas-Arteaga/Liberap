@@ -7,7 +7,8 @@ import { BotService } from '../proxy/trading/bot.service';
 import { IonIcon } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { apertureOutline, waterOutline, rocketOutline, searchOutline, chevronForward, flashOutline, radioOutline } from 'ionicons/icons';
-import { BINANCE_FUTURES_PAIRS, ExplosionCycleResult } from '../shared/models/models-shared';
+import { ExplosionCycleResult } from '../shared/models/models-shared';
+import { VolatileSymbolsService } from '../shared/services/volatile-symbols.service';
 
 @Component({
   selector: 'app-radar',
@@ -24,6 +25,7 @@ export class RadarComponent implements OnInit {
   private scarSvc = inject(ScarService);
   private botSvc  = inject(BotService);
   private router  = inject(Router);
+  private volatileSvc = inject(VolatileSymbolsService);
 
   // ── SCAR Whale Detector ────────────────────────────────────────────────────
   scarAlerts         = signal<any[]>([]);
@@ -66,7 +68,7 @@ export class RadarComponent implements OnInit {
 
   async runWhaleScanner() {
     this.isScarLoading.set(true);
-    const topSymbols = BINANCE_FUTURES_PAIRS.slice(0, 30);
+    const topSymbols = await this.volatileSvc.getMostVolatile(30);
     this.scarSvc.scan(topSymbols).subscribe({
       next: (res) => {
         this.scarAlerts.set(res.filter(r => r.scoreGrial >= 2));
@@ -84,8 +86,8 @@ export class RadarComponent implements OnInit {
     this.explosionProgress.set(0);
     this.explosionScanMessage.set('Iniciando rastreo de fases Wyckoff...');
     
-    // We scan 80 symbols for more variety
-    const symbols = BINANCE_FUTURES_PAIRS.slice(0, 80); 
+    // We scan the 80 most volatile symbols right now for more relevant results
+    const symbols = await this.volatileSvc.getMostVolatile(80);
     const results: ExplosionCycleResult[] = [];
     const now = Date.now();
     

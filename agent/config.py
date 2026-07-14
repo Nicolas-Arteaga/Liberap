@@ -256,6 +256,11 @@ ARROW_PEAK_SCORE = float(os.getenv("ARROW_PEAK_SCORE", "85.0"))
 ARROW_PEAK_SL_BUFFER_PCT = float(os.getenv("ARROW_PEAK_SL_BUFFER_PCT", "1.0"))
 # TP mínimo (igual mecanismo que GOLDEN_UTURN_TP_MIN_DISTANCE_PCT).
 ARROW_PEAK_TP_MIN_DISTANCE_PCT = float(os.getenv("ARROW_PEAK_TP_MIN_DISTANCE_PCT", "10.0"))
+# TP estructural: en vez de un múltiplo RR sobre la distancia al SL (que podía dar
+# objetivos irreales, ej. 60%+ si el pump previo fue grande), el TP apunta al
+# origen real de la flecha (open de la primera vela del pump) — con un pequeño
+# buffer para cerrar un poco ANTES de completar la flecha entera (más alcanzable).
+ARROW_PEAK_TP_BUFFER_PCT = float(os.getenv("ARROW_PEAK_TP_BUFFER_PCT", "2.0"))
 # Timeout del scan completo (recorre todo el watchlist con 2 timeframes por símbolo).
 ARROW_PEAK_HTTP_TIMEOUT_SEC = int(os.getenv("ARROW_PEAK_HTTP_TIMEOUT_SEC", "90"))
 
@@ -270,6 +275,39 @@ ARROW_PEAK_HTTP_TIMEOUT_SEC = int(os.getenv("ARROW_PEAK_HTTP_TIMEOUT_SEC", "90")
 MA_SLOPE_ENABLED = os.getenv("MA_SLOPE_ENABLED", "true").lower() in ("1", "true", "yes")
 MA_SLOPE_INTERVAL = os.getenv("MA_SLOPE_INTERVAL", "1h")  # fallback si un perfil no especifica timeframe
 MA_SLOPE_MIN_CANDLES = int(os.getenv("MA_SLOPE_MIN_CANDLES", "150"))
+
+# ==========================================
+# ADN COMPRESSION — "Resorte comprimido" (StrategyType=AdnCompression)
+# ==========================================
+# MA25/50/99 se agrupan mientras MA7 las cruza >=2 veces (compresión real,
+# filtra el "amague") -> ignición -> régimen de pullback a MA7. La detección
+# entera vive en el python-service (/adn-compression/scan, mismo endpoint que
+# usa el radar) — el agente solo pide el scan por temporalidad de perfil y
+# arma el candidato para los items en fase PULLBACK_TO_MA7 (LONG por ahora).
+ADN_COMPRESSION_ENABLED = os.getenv("ADN_COMPRESSION_ENABLED", "true").lower() in ("1", "true", "yes")
+# SL = MA25 actual + buffer (tocar MA25 invalida la tesis del patrón — el
+# propio nivel de invalidación ES el stop, no un cálculo de ATR/perfil).
+ADN_COMPRESSION_SL_BUFFER_PCT = float(os.getenv("ADN_COMPRESSION_SL_BUFFER_PCT", "0.3"))
+# TP mínimo — entramos y dejamos correr, sin salida dinámica (ver decisión con Nico).
+ADN_COMPRESSION_TP_MIN_DISTANCE_PCT = float(os.getenv("ADN_COMPRESSION_TP_MIN_DISTANCE_PCT", "10.0"))
+ADN_COMPRESSION_HTTP_TIMEOUT_SEC = int(os.getenv("ADN_COMPRESSION_HTTP_TIMEOUT_SEC", "90"))
+
+# ==========================================
+# FVG — Fair Value Gap (StrategyType=FVG)
+# ==========================================
+# Un perfil por temporalidad (1m/5m/15m, ver PatternParamsJson). No busca la
+# zona de mayor confluence_score sino la de mayor rango real hasta el TP
+# (sort_by=range en /fvg/scan) — "la mejor entrada armada", no la que mejor
+# puntúa en conjunto. SL/TP vienen del propio gap (estructural), no de un
+# cálculo de ATR/perfil genérico.
+FVG_STRATEGY_ENABLED = os.getenv("FVG_STRATEGY_ENABLED", "true").lower() in ("1", "true", "yes")
+FVG_STRATEGY_HTTP_TIMEOUT_SEC = int(os.getenv("FVG_STRATEGY_HTTP_TIMEOUT_SEC", "90"))
+# 2026-07-13: SL estructural (borde del gap + buffer) puede quedar
+# desproporcionado cuando la zona ya está agotada/vieja (ej. LRCUSDT, SL a
+# ~78% de distancia) — un scalp de gap de 3 velas nunca debería tener un SL
+# así de lejos. Por encima de este umbral se descarta el candidato entero en
+# vez de dejar que llegue al RiskManager y falle ahí cada ciclo.
+FVG_MAX_SL_DISTANCE_PCT = float(os.getenv("FVG_MAX_SL_DISTANCE_PCT", "15.0"))
 
 # Paths
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")

@@ -1,0 +1,57 @@
+<div class="adn-shell">
+
+  <header class="adn-header">
+    <div class="adn-title">
+      <span class="adn-title-main">🧬 COMPRESIÓN ADN</span>
+      <span class="adn-title-sub">MA25/50/99 comprimidas + MA7 tejiendo → ignición → pullback a MA7 → fin en el toque de MA25</span>
+    </div>
+
+    <div class="adn-controls">
+      <div class="adn-toggle">
+        <button class="adn-toggle-btn" [class.active]="mode() === '5m'" (click)="setMode('5m')">MICRO · 5m</button>
+        <button class="adn-toggle-btn" [class.active]="mode() === '1d'" (click)="setMode('1d')">MACRO · 1D</button>
+      </div>
+
+      <button class="adn-btn adn-btn-primary" (click)="runScan()" [disabled]="isLoading()">
+        {{ isLoading() ? 'Escaneando...' : 'Escanear ' + modeLabel() }}
+      </button>
+    </div>
+  </header>
+
+  <div class="adn-error" *ngIf="errorMsg()">{{ errorMsg() }}</div>
+
+  <div class="adn-meta" *ngIf="scannedCount() !== null">
+    Escaneados: {{ scannedCount() }} · Con ADN confirmado: {{ qualifiedCount() }} · Top {{ results().length }}
+    <span *ngIf="lastScanAt()"> · {{ lastScanAt()! | date:'HH:mm:ss' }}</span>
+  </div>
+
+  <div class="adn-empty" *ngIf="!isLoading() && results().length === 0 && scannedCount() !== null">
+    Ningún símbolo mostró compresión real (ADN confirmado) en este escaneo.
+  </div>
+
+  <div class="adn-table" *ngIf="results().length > 0">
+    <div class="adn-row adn-row-head">
+      <span>Símbolo</span>
+      <span>Fase</span>
+      <span>Dir.</span>
+      <span>Cruces ADN</span>
+      <span>Velas compresión</span>
+      <span>Ignición</span>
+      <span>Dist. MA7</span>
+      <span>Dist. MA25</span>
+    </div>
+    <div class="adn-row" *ngFor="let r of results()" [ngClass]="'phase-' + (r.phase ?? '').toLowerCase()">
+      <span class="adn-sym">{{ cleanSymbol(r.symbol) }}</span>
+      <span class="adn-phase">{{ phaseLabel(r.phase) }}</span>
+      <span class="adn-dir" [class.long]="r.direction === 'LONG'" [class.short]="r.direction === 'SHORT'">
+        {{ r.direction === 'LONG' ? '▲ LONG' : r.direction === 'SHORT' ? '▼ SHORT' : '—' }}
+      </span>
+      <span>{{ r.ma7Crossings }}</span>
+      <span>{{ r.compressionCandles }}</span>
+      <span>{{ r.ignitionMultiplier > 0 ? 'x' + (r.ignitionMultiplier | number:'1.1-1') : '—' }}</span>
+      <span>{{ r.distToMa7Pct | number:'1.2-2' }}%</span>
+      <span [class.touched]="r.touchedMa25SinceIgnition">{{ r.distToMa25Pct | number:'1.2-2' }}%</span>
+    </div>
+  </div>
+
+</div>

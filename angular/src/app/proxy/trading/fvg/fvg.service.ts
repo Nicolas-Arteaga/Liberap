@@ -29,11 +29,11 @@ export class FvgService {
     { apiName: this.apiName, ...config });
 
 
-  cascade = (symbol: string, config?: Partial<Rest.Config>) =>
+  cascade = (symbol: string, anchorInterval: string = '15m', config?: Partial<Rest.Config>) =>
     this.restService.request<any, FvgCascadeResultDto>({
       method: 'POST',
       url: '/api/app/fvg/cascade',
-      params: { symbol },
+      params: { symbol, anchorInterval },
     },
     { apiName: this.apiName, ...config });
 

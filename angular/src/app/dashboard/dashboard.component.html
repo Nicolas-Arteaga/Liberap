@@ -453,26 +453,35 @@
 
         <!-- 💰 Positions & Orders Table (New) -->
         <div class="positions-console bg-dark-deep mb-2 overflow-hidden">
-          <div class="console-tabs d-flex border-bottom border-white-05 bg-dark-soft">
-            <!-- Tab: Standart Scalping -->
-            <div class="tab-item py-2 px-3 pointer text-xs uppercase" [class.active]="consoleTab === 'legacy'"
+          <div class="console-tabs d-flex align-items-stretch border-bottom border-white-05 bg-dark-soft">
+            <!-- Tab: Standard Scalping (fijo, siempre visible) -->
+            <div class="tab-item tab-pinned py-2 px-3 pointer text-xs uppercase flex-shrink-0" [class.active]="consoleTab === 'legacy'"
               (click)="setConsoleTab('legacy')">
-              Standard Scalping ({{ getActiveTradesCount(null) }})
+              Standard Scalping
+              <span class="tab-count" [class.tab-count-hot]="getActiveTradesCount(null) > 0">{{ getActiveTradesCount(null) }}</span>
             </div>
 
-            <!-- Tabs: Dynamic Strategies -->
-            <div *ngFor="let profile of strategyProfiles" class="tab-item py-2 px-3 pointer text-xs uppercase"
-              [class.active]="consoleTab === profile.id" (click)="setConsoleTab(profile.id!)">
-              {{ profile.name }} ({{ getActiveTradesCount(profile.id!) }})
+            <!-- Tabs: Dynamic Strategies — scroll horizontal, nunca se recortan -->
+            <div class="tab-scroll-wrap flex-grow-1">
+              <div class="tab-scroll d-flex align-items-stretch">
+                <div *ngFor="let profile of strategyProfiles" class="tab-item py-2 px-3 pointer text-xs uppercase flex-shrink-0"
+                  [class.active]="consoleTab === profile.id"
+                  [style.--tab-accent]="profile.color || '#00f3ff'"
+                  (click)="setConsoleTab(profile.id!)">
+                  <ion-icon [name]="strategyTypeIcon(profile.strategyType)" class="tab-icon"></ion-icon>
+                  {{ profile.name }}
+                  <span class="tab-count" [class.tab-count-hot]="getActiveTradesCount(profile.id!) > 0">{{ getActiveTradesCount(profile.id!) }}</span>
+                </div>
+              </div>
             </div>
 
-            <!-- Tab: History -->
-            <div class="tab-item py-2 px-3 pointer text-xs uppercase" [class.active]="consoleTab === 'history'"
+            <!-- Tab: History (fijo) -->
+            <div class="tab-item tab-pinned py-2 px-3 pointer text-xs uppercase flex-shrink-0" [class.active]="consoleTab === 'history'"
               (click)="setConsoleTab('history')">
               Historial de trades
             </div>
 
-            <div class="ms-auto d-flex align-items-center px-3 gap-2">
+            <div class="d-flex align-items-center px-3 gap-2 flex-shrink-0">
               <input type="checkbox" class="form-check-input bg-dark border-white-10"
                 style="width: 12px; height: 12px;">
               <span class="text-white-50" style="font-size: 10px;">Ocultar otros símbolos</span>

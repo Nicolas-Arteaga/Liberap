@@ -33,6 +33,14 @@ public class SimulationMarkPriceWorker : BackgroundService
     // Tracks consecutive WS misses per symbol to avoid log spam
     private static readonly Dictionary<string, int> _wsMissCount = new();
 
+    // Un solo tick de precio no puede moverse más de esto en 1 segundo real
+    // (ya generoso). Sin este filtro, un print corrupto o un flash de un
+    // exchange de baja liquidez se tomaba tal cual: cerraba trades a un
+    // precio inflado y corrompía para siempre MaxFavorablePrice/MaxTpProgressPct
+    // (son ratchets monotónicos — un solo tick malo nunca se corregía solo).
+    private const decimal MaxSingleTickMovePct = 0.15m; // 15%
+    private static readonly Dictionary<Guid, decimal> _lastGoodPrice = new();
+
     public SimulationMarkPriceWorker(
         IServiceProvider serviceProvider,
         IHubContext<TradingHub> hubContext,
@@ -149,10 +157,36 @@ public class SimulationMarkPriceWorker : BackgroundService
                     }
 
                     var markPrice = price.Value;
+
+                    // ── Filtro de outlier: un solo tick no puede saltar más de
+                    // MaxSingleTickMovePct respecto del último precio válido de
+                    // ESTE trade. Si lo hace, es un print corrupto o un flash de
+                    // baja liquidez — se descarta y se reintenta el próximo ciclo,
+                    // en vez de cerrar el trade o corromper el ratchet con un dato malo.
+                    // Se semilla desde trade.MarkPrice (persistido) si el proceso
+                    // recién arrancó y no tiene baseline en memoria todavía —
+                    // si no, el primer tick tras un restart siempre pasaba gratis.
+                    if (!_lastGoodPrice.ContainsKey(trade.Id) && trade.MarkPrice > 0)
+                    {
+                        _lastGoodPrice[trade.Id] = trade.MarkPrice;
+                    }
+                    if (_lastGoodPrice.TryGetValue(trade.Id, out var lastGood) && lastGood > 0)
+                    {
+                        var moveFraction = Math.Abs(markPrice - lastGood) / lastGood;
+                        if (moveFraction > MaxSingleTickMovePct)
+                        {
+                            _logger.LogWarning(
+                                "🚫 [SimulationWorker] Tick descartado para {Symbol}: {Old} -> {New} ({Move:P1} en 1 tick, excede {Max:P0}). Probable outlier/flash.",
+                                trade.Symbol, lastGood, markPrice, moveFraction, MaxSingleTickMovePct);
+                            continue;
+                        }
+                    }
+                    _lastGoodPrice[trade.Id] = markPrice;
+
                     _logger.LogInformation(
                         "✅ [SimulationWorker] Price for {Symbol}: {Price} (Source: {Source})",
                         trade.Symbol, markPrice, priceSource);
-                    
+
                     trade.MarkPrice = markPrice;
 
                     // ── MAE/MFE ratchet + TP/SL progress (server-side, monotonic) ──
@@ -166,7 +200,10 @@ public class SimulationMarkPriceWorker : BackgroundService
                     {
                         _logger.LogWarning("💀 [SimulationWorker] LIQUIDATION for {Id} | {Symbol} at {Price}", trade.Id, trade.Symbol, markPrice);
                         trade.Status = TradeStatus.Liquidated;
-                        trade.ClosePrice = markPrice;
+                        // Clampeado al precio de liquidación exacto, no al tick crudo
+                        // que disparó la detección — un gap real no debe inflar/deflar
+                        // el registro más allá del nivel mecánico que corresponde.
+                        trade.ClosePrice = trade.LiquidationPrice;
                         trade.ClosedAt = DateTime.UtcNow;
                         trade.ExitReason = "liquidated";
                         trade.RealizedPnl = -trade.Margin;
@@ -201,21 +238,28 @@ public class SimulationMarkPriceWorker : BackgroundService
 
                     if (isClosed)
                     {
-                        _logger.LogInformation("🎯 [SimulationWorker] {Reason} reached for {Symbol} at {Price}.", closeReason, trade.Symbol, markPrice);
-                        
-                        var exitFee = simulationService.CalculateExitFee(trade.Size, markPrice);
-                        var pnl = simulationService.CalculateUnrealizedPnl(trade.EntryPrice, markPrice, trade.Size, trade.Side);
-                        
+                        // Clampeado al TpPrice/SlPrice exacto, no al tick crudo que
+                        // disparó la detección — un gap o un tick apenas por encima
+                        // del umbral no debe inflar/deflar el PnL registrado más allá
+                        // de lo que el propio perfil pedía (ver bug de MaxTpProgressPct
+                        // >100%, ej. RKLBUSDT/ONUSDT, corregido 2026-07-12).
+                        var settlementPrice = closeReason == "Take Profit" ? trade.TpPrice!.Value : trade.SlPrice!.Value;
+
+                        _logger.LogInformation("🎯 [SimulationWorker] {Reason} reached for {Symbol} — tick={Tick}, liquidado a {Price}.", closeReason, trade.Symbol, markPrice, settlementPrice);
+
+                        var exitFee = simulationService.CalculateExitFee(trade.Size, settlementPrice);
+                        var pnl = simulationService.CalculateUnrealizedPnl(trade.EntryPrice, settlementPrice, trade.Size, trade.Side);
+
                         // True NET PnL
                         var realizedPnl = pnl - trade.EntryFee - exitFee - trade.TotalFundingPaid;
 
                         // Log FEES
                         var totalFee = trade.EntryFee + exitFee;
-                        _logger.LogInformation("[FEE] Entry={EntryFee:N4} | Exit={ExitFee:N4} | Total={TotalFee:N4} | Notional={Notional:N4}", 
+                        _logger.LogInformation("[FEE] Entry={EntryFee:N4} | Exit={ExitFee:N4} | Total={TotalFee:N4} | Notional={Notional:N4}",
                             trade.EntryFee, exitFee, totalFee, trade.Amount);
 
                         trade.Status = closeReason == "Take Profit" ? TradeStatus.Win : TradeStatus.Loss;
-                        trade.ClosePrice = markPrice;
+                        trade.ClosePrice = settlementPrice;
                         trade.ClosedAt = DateTime.UtcNow;
                         trade.ExitReason = closeReason == "Take Profit" ? "tp_hit" : "sl_hit";
                         trade.RealizedPnl = realizedPnl;
@@ -335,8 +379,13 @@ public class SimulationMarkPriceWorker : BackgroundService
                     ? trade.MaxFavorablePrice.Value - trade.EntryPrice
                     : trade.EntryPrice - trade.MaxFavorablePrice.Value;
 
-                trade.TpProgressPct = Math.Round(liveDist / tpRange * 100m, 2);
-                trade.MaxTpProgressPct = Math.Round(peakDist / tpRange * 100m, 2);
+                // Clampeado a 100: pasado el TP el trade ya debería estar
+                // cerrado (ver settlementPrice más arriba) — más de 100% acá
+                // es siempre un artefacto de un tick que rompió el TP y el
+                // cierre todavía no se procesó ese mismo ciclo, nunca un
+                // "avance real" mayor al propio objetivo.
+                trade.TpProgressPct = Math.Round(Math.Min(liveDist / tpRange * 100m, 100m), 2);
+                trade.MaxTpProgressPct = Math.Round(Math.Min(peakDist / tpRange * 100m, 100m), 2);
             }
         }
 

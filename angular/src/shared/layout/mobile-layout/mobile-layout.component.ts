@@ -19,7 +19,9 @@ import {
   settingsOutline,
   personOutline,
   radioOutline,
-  flashOutline
+  flashOutline,
+  layersOutline,
+  gitNetworkOutline
 } from 'ionicons/icons';
 import { Subscription, Observable } from 'rxjs';
 import { map, filter } from 'rxjs/operators';
@@ -93,7 +95,7 @@ export class MobileLayoutComponent implements OnInit, OnDestroy {
       homeOutline, pulseOutline, hardwareChipOutline, gridOutline,
       briefcaseOutline, listOutline, analyticsOutline,
       notificationsOutline, settingsOutline, personOutline,
-      radioOutline, flashOutline
+      radioOutline, flashOutline, layersOutline, gitNetworkOutline
     });
   }
 

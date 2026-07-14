@@ -159,17 +159,17 @@ public class FvgAppService : ApplicationService, IFvgAppService
         };
     }
 
-    /// <summary>Cascada 15m (sesgo) -> 5m (confirmación) -> 1m (ejecución) para un símbolo.</summary>
-    public async Task<FvgCascadeResultDto?> CascadeAsync(string symbol)
+    /// <summary>Cascada anclada a anchorInterval (15m/5m/1m) para un símbolo.</summary>
+    public async Task<FvgCascadeResultDto?> CascadeAsync(string symbol, string anchorInterval = "15m")
     {
         try
         {
             var normalized = symbol.Contains(':') ? symbol.Split(':')[0] : symbol;
             var cleanSymbol = normalized.ToUpper().Replace("/", "").Replace("-", "").Trim();
 
-            _logger.LogInformation("🔀 [FVG-CASCADE] {Symbol}", cleanSymbol);
+            _logger.LogInformation("🔀 [FVG-CASCADE] {Symbol} @ {Anchor}", cleanSymbol, anchorInterval);
 
-            var result = await _pythonService.CascadeAsync(cleanSymbol);
+            var result = await _pythonService.CascadeAsync(cleanSymbol, anchorInterval);
             if (result == null)
             {
                 _logger.LogWarning("⚠️ [FVG-CASCADE] No result from Python service for {Symbol}", cleanSymbol);

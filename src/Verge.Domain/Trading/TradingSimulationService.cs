@@ -13,6 +13,14 @@ public class TradingSimulationService : DomainService
     private const decimal MaintenanceMarginRate = 0.005m;  // 0.5% (MMR)
     private const decimal FundingRate = 0.0001m;       // Simulated 0.01% every 8h
 
+    // Postgres "numeric" no tiene límite de precisión, pero System.Decimal
+    // de .NET sí (28-29 dígitos significativos) — Npgsql tira OverflowException
+    // al leer una fila que lo supere. Los cálculos de C# ya quedan acotados
+    // por su propio tipo decimal, pero cualquier script SQL directo contra la
+    // base (backfills, correcciones manuales) puede escribir de más si no
+    // redondea explícitamente. 12 decimales es de sobra para este dominio.
+    private const int SafeDecimalScale = 12;
+
     public static readonly System.Threading.SemaphoreSlim ProfileLock = new System.Threading.SemaphoreSlim(1, 1);
 
     /// <summary>
@@ -27,21 +35,21 @@ public class TradingSimulationService : DomainService
     /// (on the full notional value, not just margin)
     /// </summary>
     public decimal CalculateEntryFee(decimal amount)
-        => amount * TakerFeeRate;
+        => Math.Round(amount * TakerFeeRate, SafeDecimalScale);
 
     /// <summary>
     /// Calculates exit taker fee on the notional at closing price.
     /// ExitFee = Size * ClosePrice * TakerFeeRate
     /// </summary>
     public decimal CalculateExitFee(decimal size, decimal closePrice)
-        => size * closePrice * TakerFeeRate;
+        => Math.Round(size * closePrice * TakerFeeRate, SafeDecimalScale);
 
     /// <summary>
     /// Calculates position size (quantity) in base asset.
     /// Size = Amount / EntryPrice
     /// </summary>
     public decimal CalculatePositionSize(decimal amount, decimal entryPrice)
-        => amount / entryPrice;
+        => Math.Round(amount / entryPrice, SafeDecimalScale);
 
     /// <summary>
     /// Calculates isolated margin liquidation price.
@@ -70,10 +78,10 @@ public class TradingSimulationService : DomainService
     /// </summary>
     public decimal CalculateUnrealizedPnl(decimal entryPrice, decimal markPrice, decimal size, SignalDirection side)
     {
-        if (side == SignalDirection.Long)
-            return (markPrice - entryPrice) * size;
-        else
-            return (entryPrice - markPrice) * size;
+        decimal pnl = side == SignalDirection.Long
+            ? (markPrice - entryPrice) * size
+            : (entryPrice - markPrice) * size;
+        return Math.Round(pnl, SafeDecimalScale);
     }
 
     /// <summary>
@@ -81,7 +89,7 @@ public class TradingSimulationService : DomainService
     /// ROI = UnrealizedPnl / InitialMargin * 100
     /// </summary>
     public decimal CalculateROI(decimal unrealizedPnl, decimal initialMargin)
-        => initialMargin == 0 ? 0 : (unrealizedPnl / initialMargin) * 100m;
+        => initialMargin == 0 ? 0 : Math.Round((unrealizedPnl / initialMargin) * 100m, SafeDecimalScale);
 
     /// <summary>
     /// Calculates realized PnL after closing a position (minus fees).
@@ -102,7 +110,7 @@ public class TradingSimulationService : DomainService
         else
             grossPnl = (entryPrice - closePrice) * size;
 
-        return grossPnl - entryFee - exitFee - totalFundingPaid;
+        return Math.Round(grossPnl - entryFee - exitFee - totalFundingPaid, SafeDecimalScale);
     }
 
     /// <summary>

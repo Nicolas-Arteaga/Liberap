@@ -40,7 +40,8 @@ export class AgentComponent implements OnInit, OnDestroy, AfterViewChecked {
   private exchangeStats: any = null;
 
   // Terminal Logs
-  terminalLogs: { time: string, text: string, highlight?: boolean, color?: string }[] = [];
+  terminalLogs: { id: number, time: string, text: string, highlight?: boolean, color?: string }[] = [];
+  private nextLogId = 0;
   
   private uptimeInterval: any;
   private startTimestamp: number = 0;
@@ -585,16 +586,30 @@ export class AgentComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.terminalLogs = [];
   }
 
+  // 2026-07-13: el buffer vivo llegaba a 10k líneas y se recortaba de a una
+  // (shift() por cada línea nueva = O(n) copia del array entero cada vez),
+  // que era la causa real de que la pestaña se laguee tras ~1h de terminal
+  // abierta con ~15k líneas/hora de tráfico. Ahora: cap más chico (esto es
+  // para ver lo que pasa AHORA, no para revisar historial — para eso está
+  // el archivo rotativo `agent/logs/agent.log` que persiste 24-48h en disco)
+  // y el recorte se hace en lotes con un solo splice, no de a una.
+  private static readonly LOG_CAP = 2000;
+  private static readonly LOG_TRIM_TO = 1500;
+
   private addLog(text: string, color?: string) {
     this.terminalLogs.push({
+      id: this.nextLogId++,
       time: this.getCurrentTime(),
       text: text,
       color: color
     });
-    // Keep terminal history large enough (like a real terminal)
-    if (this.terminalLogs.length > 10000) {
-      this.terminalLogs.shift();
+    if (this.terminalLogs.length > AgentComponent.LOG_CAP) {
+      this.terminalLogs.splice(0, this.terminalLogs.length - AgentComponent.LOG_TRIM_TO);
     }
+  }
+
+  trackByLogId(index: number, log: { id: number }): number {
+    return log.id;
   }
 
   private getCurrentTime(): string {

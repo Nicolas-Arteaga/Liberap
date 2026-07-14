@@ -131,9 +131,12 @@ class BinanceFetcher:
         if interval == "5m":
             from exchange_registry import EXCHANGES
             binance_exc = EXCHANGES.get("binance")
-            if binance_exc:
-                fetched = self._do_fetch_binance_direct(binance_exc, symbol, interval, limit)
-            else:
+            fetched = self._do_fetch_binance_direct(binance_exc, symbol, interval, limit) if binance_exc else []
+            if not fetched:
+                # Banned/failed direct call — no dejar el símbolo sin datos
+                # frescos por eso, caer al mismo chain multi-exchange que
+                # usan el resto de los intervalos (puede traer 15m si el
+                # exchange no soporta 5m nativo, pero es mejor que nada).
                 fetched = self._multi_fetcher.fetch_klines(symbol, interval, limit)
         else:
             fetched = self._multi_fetcher.fetch_klines(symbol, interval, limit)
@@ -228,9 +231,21 @@ class BinanceFetcher:
         Used for 5m candles to bypass the load-balancer that may route to
         exchanges with no native 5m support.
 
-        Returns normalized kline list, or [] on any failure.
+        2026-07-13: wired into the shared circuit breaker (same one
+        multi_source_fetcher.py already uses for bitget/pyth/etc) — this
+        path used to hit fapi.binance.com unconditionally on every 5m cache
+        miss with no ban awareness at all, retrying every cycle even during
+        an active 418 quarantine. Now it skips the request outright while
+        banned and lets the caller fall back to the multi-exchange chain.
+
+        Returns normalized kline list, or [] on any failure/ban.
         """
         import requests
+        from circuit_breaker import get_breaker
+        cb = get_breaker("binance")
+        if not cb.is_available:
+            return []
+
         try:
             params = binance_exc.rest_kline_params(symbol, interval, limit)
             resp = requests.get(
@@ -241,6 +256,7 @@ class BinanceFetcher:
             if resp.status_code == 200:
                 klines = binance_exc.rest_kline_parser(resp.json())
                 if klines:
+                    cb.record_success()
                     logger.info(
                         f"[Fetcher] {symbol} {interval}: fetched {len(klines)} klines "
                         f"via Binance direct REST and saved to cache."
@@ -248,12 +264,18 @@ class BinanceFetcher:
                     return klines
                 logger.debug(f"[Fetcher/Direct] Binance returned empty klines for {symbol} {interval}")
             elif resp.status_code == 429:
+                retry_after = int(resp.headers.get("Retry-After", 0) or 0)
+                cb.record_failure(is_rate_limit=True, retry_after_s=retry_after)
                 logger.warning(f"[Fetcher/Direct] Binance rate-limited (429) for {symbol}")
             elif resp.status_code == 418:
+                retry_after = int(resp.headers.get("Retry-After", 0) or 0)
+                cb.record_failure(is_ban=True, retry_after_s=retry_after)
                 logger.critical(f"[Fetcher/Direct] Binance IP ban (418) for {symbol}")
             else:
+                cb.record_failure()
                 logger.warning(f"[Fetcher/Direct] Binance HTTP {resp.status_code} for {symbol}")
         except Exception as e:
+            cb.record_failure()
             logger.error(f"[Fetcher/Direct] Exception fetching {symbol} {interval} from Binance: {e}")
         return []
 

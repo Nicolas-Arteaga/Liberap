@@ -292,4 +292,7 @@ freqtrade/user_data/*.sqlite-wal
 __pycache__/
 *.pyc
 agent/data/
-scratch/create_agent_profile.*
+agent/logs/
+scratch/create_agent_profile.*
+# Marcador interno del hook de progress-log (bookkeeping, no aporta valor versionado)
+.claude/.progress_log_marker

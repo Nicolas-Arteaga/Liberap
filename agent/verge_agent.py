@@ -131,10 +131,34 @@ AGENT_MAX_CANDIDATES_PER_CYCLE = int(getattr(config, "AGENT_MAX_CANDIDATES_PER_C
 # ---------------------------------------------------------
 # Logging Configuration
 # ---------------------------------------------------------
+# 2026-07-13: además de stdout (que AgentProcessManager.cs reenvía en vivo
+# por SignalR al panel /agent del dashboard), se escribe a un archivo
+# rotativo propio. Antes de esto el ÚNICO registro persistente del agente
+# era lo que quedara pegado en el buffer del navegador (10k líneas, capado
+# y con lag después de ~1h de terminal abierta) — para revisar algo de
+# hace más de una hora había que copiar/pegar el DOM a mano (con mojibake
+# incluido por el encoding del navegador). Este archivo es la fuente que
+# tanto el usuario como Claude pueden leer directamente del disco en
+# cualquier momento, en UTF-8 real, sin depender de la terminal viva.
+# Rota a medianoche, backupCount=1 → como mucho archivo de hoy + el de
+# ayer completo (nunca crece sin límite, nunca se pisa antes de guardar
+# ~24-48h reales).
+from logging.handlers import TimedRotatingFileHandler
+import os as _os
+
+_LOG_DIR = _os.path.join(_os.path.dirname(__file__), "logs")
+_os.makedirs(_LOG_DIR, exist_ok=True)
+_file_handler = TimedRotatingFileHandler(
+    _os.path.join(_LOG_DIR, "agent.log"),
+    when="midnight",
+    backupCount=1,
+    encoding="utf-8",
+)
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(name)s] %(levelname)s: %(message)s',
-    handlers=[logging.StreamHandler(sys.stdout)]
+    handlers=[logging.StreamHandler(sys.stdout), _file_handler]
 )
 logger = logging.getLogger("VergeAgent")
 
@@ -1247,6 +1271,73 @@ class VergeAgent:
             if ma_slope_injected:
                 logger.info(f"[MA-PATTERN-INJECT] {ma_slope_injected} nuevos (total candidates={len(candidates)})")
 
+        # ── ADN COMPRESSION: Inyección directa (por perfil, mismo criterio que MA PATTERN) ──
+        # Solo entra en fase PULLBACK_TO_MA7 — nunca en COILED (sin ignición
+        # todavía), EXTENDED (perseguir la vela ya volada) ni EXHAUSTED (ya
+        # tocó MA25, el movimiento terminó). Ver _run_adn_compression_scan.
+        if getattr(config, "ADN_COMPRESSION_ENABLED", True):
+            adn_injected = 0
+            for ac in self._run_adn_compression_scan():
+                symbol = ac.get("symbol")
+                if not symbol or self._should_skip(symbol):
+                    continue
+
+                ac_px = ac.get("price_at_signal") or self.fetcher.get_current_price(symbol)
+                if not ac_px or ac_px <= 0:
+                    continue
+                try:
+                    v_ok, v_code, _ = validate_pre_trade(
+                        ac, ac_px, btc_filter=self.btc_filter, btc_corr=self.btc_corr
+                    )
+                    if not v_ok:
+                        logger.info(f"[ADN-COMPRESSION-INJECT] VETO {symbol} ({ac.get('source')}): {v_code}")
+                        continue
+                except Exception as e:
+                    logger.warning(f"[ADN-COMPRESSION-INJECT] Error validando {symbol}: {e}")
+                    continue
+
+                candidates.append(ac)
+                adn_injected += 1
+                logger.warning(
+                    f"[ADN-COMPRESSION-INJECT] {symbol} | Score={ac['confluence_score']} | {ac['reasons'][0]}"
+                )
+
+            if adn_injected:
+                logger.info(f"[ADN-COMPRESSION-INJECT] {adn_injected} nuevos (total candidates={len(candidates)})")
+
+        # ── FVG: Inyección directa (por perfil, mismo criterio que ADN COMPRESSION) ──
+        # Prioriza mayor rango real hasta el TP (sort_by=range en /fvg/scan),
+        # no el confluence_score compuesto. Ver _run_fvg_scan.
+        if getattr(config, "FVG_STRATEGY_ENABLED", True):
+            fvg_injected = 0
+            for fc in self._run_fvg_scan():
+                symbol = fc.get("symbol")
+                if not symbol or self._should_skip(symbol):
+                    continue
+
+                fc_px = fc.get("price_at_signal") or self.fetcher.get_current_price(symbol)
+                if not fc_px or fc_px <= 0:
+                    continue
+                try:
+                    v_ok, v_code, _ = validate_pre_trade(
+                        fc, fc_px, btc_filter=self.btc_filter, btc_corr=self.btc_corr
+                    )
+                    if not v_ok:
+                        logger.info(f"[FVG-INJECT] VETO {symbol} ({fc.get('source')}): {v_code}")
+                        continue
+                except Exception as e:
+                    logger.warning(f"[FVG-INJECT] Error validando {symbol}: {e}")
+                    continue
+
+                candidates.append(fc)
+                fvg_injected += 1
+                logger.warning(
+                    f"[FVG-INJECT] {symbol} | Score={fc['confluence_score']} | {fc['reasons'][0]}"
+                )
+
+            if fvg_injected:
+                logger.info(f"[FVG-INJECT] {fvg_injected} nuevos (total candidates={len(candidates)})")
+
         # ── TOTAL-SWEEP v13.0: The Sinfonía Final ───────────────────────────────────────
         # NEXUS-5 Bottom Sniper > 90% → HUNTING_READY → Volume Radar → Ley de Nico G>R
         if getattr(config, "TOTAL_SWEEP_ENABLED", True):
@@ -1712,6 +1803,37 @@ class VergeAgent:
                 raw_src = c.get("source", "") or ""
                 if raw_src.startswith("ma_pattern:"):
                     if raw_src != f"ma_pattern:{profile.get('id')}":
+                        continue
+                    allow_long = profile.get("allowLong", True)
+                    allow_short = profile.get("allowShort", True)
+                    cand_side = int(c.get("side", 0))
+                    if (cand_side == 0 and not allow_long) or (cand_side == 1 and not allow_short):
+                        continue
+                    p_candidates.append(c)
+                    continue
+
+                # ADN COMPRESSION y FVG: mismo criterio que MA PATTERN arriba —
+                # cada perfil es dueño exclusivo de sus propios candidatos
+                # (source=f"adn_compression:{profile_id}" / f"fvg:{profile_id}").
+                # BUG real encontrado 2026-07-12: sin este bypass, el match
+                # genérico de AllowedSources de más abajo compara el string
+                # completo ("adn_compression:<uuid>") contra el valor guardado
+                # en el perfil ("adn_compression"/"fvg", sin uuid) — nunca
+                # coincidían, así que ninguna de las dos estrategias abrió
+                # jamás un trade real desde que se crearon.
+                if raw_src.startswith("adn_compression:"):
+                    if raw_src != f"adn_compression:{profile.get('id')}":
+                        continue
+                    allow_long = profile.get("allowLong", True)
+                    allow_short = profile.get("allowShort", True)
+                    cand_side = int(c.get("side", 0))
+                    if (cand_side == 0 and not allow_long) or (cand_side == 1 and not allow_short):
+                        continue
+                    p_candidates.append(c)
+                    continue
+
+                if raw_src.startswith("fvg:"):
+                    if raw_src != f"fvg:{profile.get('id')}":
                         continue
                     allow_long = profile.get("allowLong", True)
                     allow_short = profile.get("allowShort", True)
@@ -2751,20 +2873,50 @@ class VergeAgent:
         garantía: si el día de mañana esto opera en serio, la ejecución real
         es contra Binance Futures (BinanceDirectClient), así que la lectura
         de geometría debe mirar exactamente esa misma fuente.
+
+        2026-07-13: este llamado nunca reportaba nada al circuit breaker
+        compartido ("binance") — un 418 se atrapaba acá mismo como excepción
+        genérica y se resolvía con el fallback, pero el ciclo siguiente
+        volvía a pegarle directo a Binance sin enterarse de que seguía
+        baneado (~400 symbols/ciclo, cada 5 min, sin backoff). Eso extendía
+        el ban en vez de dejarlo asentarse. Ahora respeta el mismo breaker
+        que ya usa multi_source_fetcher.py para bitget/pyth/etc: si está
+        baneado, ni siquiera intenta el request directo y va directo al
+        fallback (mismo camino de siempre, sin perder datos frescos).
         """
+        cb = get_breakers().get("binance")
+        if cb and not cb.is_available:
+            return self.fetcher.get_klines_for_nexus(symbol, interval=interval, limit=limit)
+
         try:
             resp = requests.get(
                 "https://fapi.binance.com/fapi/v1/klines",
                 params={"symbol": symbol, "interval": interval, "limit": limit},
                 timeout=10,
             )
+            if resp.status_code == 418:
+                retry_after = int(resp.headers.get("Retry-After", 0) or 0)
+                if cb:
+                    cb.record_failure(is_ban=True, retry_after_s=retry_after)
+                logger.critical(f"[MA-SLOPE] Binance IP ban (418) para {symbol}, uso fallback multi-exchange")
+                return self.fetcher.get_klines_for_nexus(symbol, interval=interval, limit=limit)
+            if resp.status_code == 429:
+                retry_after = int(resp.headers.get("Retry-After", 0) or 0)
+                if cb:
+                    cb.record_failure(is_rate_limit=True, retry_after_s=retry_after)
+                logger.warning(f"[MA-SLOPE] Binance rate-limited (429) para {symbol}, uso fallback multi-exchange")
+                return self.fetcher.get_klines_for_nexus(symbol, interval=interval, limit=limit)
             resp.raise_for_status()
             raw = resp.json()
+            if cb:
+                cb.record_success()
             return [
                 {"open": k[1], "high": k[2], "low": k[3], "close": k[4], "open_time": k[0]}
                 for k in raw
             ]
         except Exception as e:
+            if cb:
+                cb.record_failure()
             logger.warning(f"[MA-SLOPE] Binance directo falló para {symbol}, uso fallback multi-exchange: {e}")
             return self.fetcher.get_klines_for_nexus(symbol, interval=interval, limit=limit)
 
@@ -3020,9 +3172,19 @@ class VergeAgent:
         symbol = item.get("symbol")
         price = float(item.get("current_price") or 0)
         peak_price = float(item.get("peak_price") or 0)
+        arrow_start_price = float(item.get("arrow_start_price") or 0)
         ap_score = float(getattr(config, "ARROW_PEAK_SCORE", 85.0))
         sl_buffer_pct = float(getattr(config, "ARROW_PEAK_SL_BUFFER_PCT", 1.0))
         custom_sl = peak_price * (1 + sl_buffer_pct / 100.0) if peak_price > 0 else None
+
+        # TP estructural: el origen de la flecha (open de la primera vela del pump),
+        # con un pequeño buffer para cerrar un poco ANTES de completarla entera
+        # (más alcanzable que el 100% del retroceso). Reemplaza el viejo RR×SL,
+        # que podía dar objetivos irreales cuando el pump previo fue grande.
+        tp_buffer_pct = float(getattr(config, "ARROW_PEAK_TP_BUFFER_PCT", 2.0))
+        custom_tp = arrow_start_price * (1 + tp_buffer_pct / 100.0) if arrow_start_price > 0 else None
+        if custom_tp is not None and custom_tp >= price:
+            custom_tp = None  # el origen quedó por encima del precio actual, no sirve como TP de SHORT
 
         return {
             "symbol": symbol,
@@ -3039,12 +3201,14 @@ class VergeAgent:
                 f"MA99 dist={float(item.get('dist_ma99_pct') or 0):.2f}%"
             ],
             "custom_sl_price": custom_sl,
+            "custom_tp_price": custom_tp,
             "agent_audit_context": {
                 "arrow_peak": {
                     "detected": True,
                     "days_bleeding": item.get("days_bleeding"),
                     "prev_rise_pct": item.get("prev_rise_pct"),
                     "peak_price": peak_price,
+                    "arrow_start_price": arrow_start_price,
                     "dist_ma99_pct": item.get("dist_ma99_pct"),
                 },
                 "scar": {},
@@ -3255,6 +3419,230 @@ class VergeAgent:
         """True si el candidato viene del motor de patrones de medias (MaGeometry)."""
         src = str(candidate.get("source", ""))
         return candidate.get("ma_slope_mode", False) or src.startswith("ma_pattern:") or src.startswith("ma_slope_case")
+
+    def _run_adn_compression_scan(self) -> list:
+        """
+        [ADN COMPRESSION] Para cada perfil activo StrategyType=AdnCompression,
+        pide el mismo scan que usa el radar (/adn-compression/scan) en la
+        temporalidad propia de ESE perfil, y arma un candidato solo para los
+        items en fase PULLBACK_TO_MA7 (el punto de reentrada real del
+        patrón — nunca en COILED, EXTENDED ni EXHAUSTED) y dirección LONG
+        (short queda para más adelante). Un mismo scan por temporalidad se
+        reusa entre perfiles que compartan esa temporalidad.
+        """
+        if not getattr(config, "ADN_COMPRESSION_ENABLED", True):
+            return []
+
+        adn_profiles = [p for p in self.active_profiles if p.get("strategyType") == "AdnCompression"]
+        if not adn_profiles:
+            return []
+
+        base_py = config.PYTHON_SERVICE_URL.rstrip("/")
+        url = f"{base_py}/adn-compression/scan"
+        timeout = int(getattr(config, "ADN_COMPRESSION_HTTP_TIMEOUT_SEC", 90))
+
+        found = []
+        scan_cache: dict = {}
+        for profile in adn_profiles:
+            try:
+                params = json.loads(profile.get("patternParamsJson") or "{}")
+            except Exception:
+                continue
+            timeframe = params.get("timeframe") or "5m"
+
+            if timeframe not in scan_cache:
+                try:
+                    resp = requests.post(url, json={"symbols": config.WATCHLIST, "timeframe": timeframe}, timeout=timeout)
+                    if resp.status_code != 200:
+                        logger.warning(f"[ADN-COMPRESSION] Scan failed @ {timeframe}: HTTP {resp.status_code}")
+                        scan_cache[timeframe] = []
+                    else:
+                        scan_cache[timeframe] = resp.json().get("top_10", [])
+                except Exception as e:
+                    logger.warning(f"[ADN-COMPRESSION] Scan error @ {timeframe}: {e}")
+                    scan_cache[timeframe] = []
+
+            actionable = [
+                it for it in scan_cache[timeframe]
+                if it.get("phase") == "PULLBACK_TO_MA7" and it.get("direction") == "LONG"
+            ]
+            for item in actionable:
+                cand = self._build_adn_compression_candidate(item, profile)
+                if cand:
+                    found.append(cand)
+
+        return found
+
+    def _build_adn_compression_candidate(self, item: dict, profile: dict) -> Optional[dict]:
+        """
+        [ADN COMPRESSION] SL = MA25 actual + buffer — tocar MA25 invalida la
+        tesis del patrón, así que ese nivel de invalidación ES el stop
+        estructural (no un cálculo de ATR/perfil genérico). TP con piso
+        mínimo configurable; sin salida dinámica, se deja correr.
+        """
+        symbol = item.get("symbol")
+        price = float(item.get("current_price") or 0)
+        ma25_now = float(item.get("ma25_now") or 0)
+        if not symbol or price <= 0 or ma25_now <= 0 or ma25_now >= price:
+            return None
+
+        sl_buffer_pct = float(getattr(config, "ADN_COMPRESSION_SL_BUFFER_PCT", 0.3))
+        custom_sl = ma25_now * (1 - sl_buffer_pct / 100.0)
+        score = float(profile.get("minConfluenceScore", 80.0))
+        profile_name = profile.get("name", "Compresión ADN")
+
+        return {
+            "symbol": symbol,
+            "confluence_score": score,
+            "nexus_confidence": score,
+            "trade_direction": "LONG",
+            "side": 0,
+            "source": f"adn_compression:{profile.get('id')}",
+            "ma_slope_mode": True,  # reusa el mismo bypass de riesgo genérico (SL/TP custom) que MaGeometry
+            "min_tp_pct": float(getattr(config, "ADN_COMPRESSION_TP_MIN_DISTANCE_PCT", 10.0)),
+            "price_at_signal": price,
+            "custom_sl_price": custom_sl,
+            "reasons": [f"[{profile_name}] Pullback a MA7 tras ignición — {item.get('ma7_crossings')} cruces ADN"],
+            "agent_audit_context": {
+                "adn_compression": {
+                    "profile_name": profile_name,
+                    "timeframe": item.get("timeframe"),
+                    "ma7_crossings": item.get("ma7_crossings"),
+                    "compression_candles": item.get("compression_candles"),
+                    "ignition_multiplier": item.get("ignition_multiplier"),
+                    "dist_to_ma7_pct": item.get("dist_to_ma7_pct"),
+                    "ma25_now": ma25_now,
+                },
+                "scar": {},
+                "nexus15": {},
+            },
+        }
+
+    def _run_fvg_scan(self) -> list:
+        """
+        [FVG] Para cada perfil activo StrategyType=FVG, pide el mismo scan
+        que usa el botón "Top-5 FVG" del frontend (/fvg/scan) en la
+        temporalidad de ESE perfil, pero con sort_by="range": no busca la
+        zona de mayor confluence_score sino la de mayor recorrido real
+        hasta el TP — "la mejor entrada armada", no la que mejor puntúa en
+        conjunto. Un mismo scan por temporalidad se reusa entre perfiles
+        que compartan esa temporalidad (1m/5m/15m).
+        """
+        if not getattr(config, "FVG_STRATEGY_ENABLED", True):
+            return []
+
+        fvg_profiles = [p for p in self.active_profiles if p.get("strategyType") == "FVG"]
+        if not fvg_profiles:
+            return []
+
+        base_py = config.PYTHON_SERVICE_URL.rstrip("/")
+        url = f"{base_py}/fvg/scan"
+        timeout = int(getattr(config, "FVG_STRATEGY_HTTP_TIMEOUT_SEC", 90))
+
+        found = []
+        scan_cache: dict = {}
+        for profile in fvg_profiles:
+            try:
+                params = json.loads(profile.get("patternParamsJson") or "{}")
+            except Exception:
+                continue
+            timeframe = params.get("timeframe") or "5m"
+
+            if timeframe not in scan_cache:
+                try:
+                    resp = requests.post(
+                        url,
+                        json={"symbols": config.WATCHLIST, "interval": timeframe, "sort_by": "range"},
+                        timeout=timeout,
+                    )
+                    if resp.status_code != 200:
+                        logger.warning(f"[FVG-STRATEGY] Scan failed @ {timeframe}: HTTP {resp.status_code}")
+                        scan_cache[timeframe] = []
+                    else:
+                        resp_json = resp.json()
+                        scan_cache[timeframe] = resp_json.get("top_5", [])
+                        trend_blocked = resp_json.get("trend_blocked_count", 0)
+                        actionable = resp_json.get("actionable_count", 0)
+                        logger.info(
+                            f"[FVG-STRATEGY] {timeframe}: {actionable} candidatos a favor de tendencia | "
+                            f"{trend_blocked} bloqueados por contra-tendencia (de {len(config.WATCHLIST)} escaneados)"
+                        )
+                except Exception as e:
+                    logger.warning(f"[FVG-STRATEGY] Scan error @ {timeframe}: {e}")
+                    scan_cache[timeframe] = []
+
+            for item in scan_cache[timeframe]:
+                cand = self._build_fvg_candidate(item, profile)
+                if cand:
+                    found.append(cand)
+
+        return found
+
+    def _build_fvg_candidate(self, item: dict, profile: dict) -> Optional[dict]:
+        """
+        [FVG] SL/TP salen del propio gap (estructural, calculado en
+        python-service igual que la cascada) — no de un cálculo de
+        ATR/perfil genérico. La dirección la define la zona misma
+        (bullish->LONG, bearish->SHORT), ambas soportadas.
+        """
+        symbol = item.get("symbol")
+        price = float(item.get("current_price") or 0)
+        sl_price = float(item.get("sl_price") or 0)
+        tp_price_struct = float(item.get("tp_price") or 0)
+        tp_distance_pct = float(item.get("tp_distance_pct") or 0)
+        direction = item.get("direction")
+        if not symbol or price <= 0 or sl_price <= 0 or direction not in ("bullish", "bearish"):
+            return None
+
+        side_int = 0 if direction == "bullish" else 1
+        # Validación de sanidad del SL, igual criterio que usa risk_manager
+        # para cualquier custom_sl_price: LONG por debajo del precio, SHORT
+        # por arriba. Si no cierra, no forzamos un candidato mal armado.
+        if side_int == 0 and sl_price >= price:
+            return None
+        if side_int == 1 and sl_price <= price:
+            return None
+
+        # 2026-07-13: zona agotada/vieja (precio ya recorrió casi toda la
+        # distancia al borde del gap) da un SL desproporcionado — visto en
+        # vivo con LRCUSDT (~78%), que además siempre termina con TP
+        # estructural inválido y cae al fallback RR×SL, generando un
+        # tp_price <= 0 que el RiskManager bloquea EN CADA ciclo de scan.
+        # Cortarlo acá evita el ruido/reintento inútil sin tocar candidatos
+        # sanos (un gap de 3 velas nunca debería necesitar un SL así de lejos).
+        sl_distance_pct = abs(sl_price - price) / price * 100.0
+        if sl_distance_pct > config.FVG_MAX_SL_DISTANCE_PCT:
+            return None
+
+        score = float(profile.get("minConfluenceScore", 80.0))
+        profile_name = profile.get("name", "FVG")
+
+        return {
+            "symbol": symbol,
+            "confluence_score": score,
+            "nexus_confidence": score,
+            "trade_direction": "LONG" if side_int == 0 else "SHORT",
+            "side": side_int,
+            "source": f"fvg:{profile.get('id')}",
+            "fvg_mode": True,  # bypass de riesgo propio: SL/TP estructurales del gap, TP como objetivo directo (no RR×SL)
+            "price_at_signal": price,
+            "custom_sl_price": sl_price,
+            "custom_tp_price": tp_price_struct if tp_price_struct > 0 else None,
+            "reasons": [f"[{profile_name}] Gap FVG {direction} — mayor rango a TP ({tp_distance_pct:.2f}%)"],
+            "agent_audit_context": {
+                "fvg": {
+                    "profile_name": profile_name,
+                    "timeframe": item.get("timeframe"),
+                    "gap_pct": item.get("gap_pct"),
+                    "tp_distance_pct": tp_distance_pct,
+                    "entry_status": item.get("entry_status"),
+                    "sl_price": sl_price,
+                    "tp_price": item.get("tp_price"),
+                },
+                "scar": {},
+                "nexus15": {},
+            },
+        }
 
     def _get_ma99_15m(self, symbol: str) -> Optional[float]:
         try:
@@ -3753,6 +4141,19 @@ class VergeAgent:
                 f"[ARROW-PEAK] {symbol} — STRATEGY TAG APPLIED | "
                 f"Rise={ap_rise}% | Bleeding={ap_days}d | MA99Dist={ap_ma99}%"
             )
+
+        # ── FVG: Tag strategy ────────────────────────────────────────────────────
+        if candidate.get("fvg_mode"):
+            fvg_ctx = candidate.get("agent_audit_context", {}).get("fvg", {})
+            fvg_name = fvg_ctx.get("profile_name", "FVG")
+            fvg_detail = candidate.get("reasons", [""])[0]
+
+            entry_reason = (
+                f"[STRAT: {fvg_name}] {fvg_detail} "
+                f"Score={candidate.get('confluence_score')} bypass activo."
+            )
+
+            logger.warning(f"[FVG] {symbol} — STRATEGY TAG APPLIED | {fvg_name}")
 
         # ── MA PATTERN (MaGeometry): Tag strategy ────────────────────────────────
         if candidate.get("ma_slope_mode"):

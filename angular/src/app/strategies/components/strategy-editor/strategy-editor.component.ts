@@ -42,6 +42,36 @@ function defaultPatternParams(): MaPatternParams {
   };
 }
 
+/**
+ * Parámetros del patrón de Compresión ADN — deliberadamente mínimos: la
+ * detección (compresión + cruces de MA7 + ignición) vive entera en el
+ * python-service (mismo endpoint que usa el radar /adn-compression), acá
+ * solo se elige qué temporalidad escanea este perfil. LONG-only por ahora
+ * (ver decisión con Nico: validar en una sola dirección antes de sumar short).
+ */
+export interface AdnCompressionParams {
+  timeframe: '5m' | '1d';
+}
+
+function defaultAdnParams(): AdnCompressionParams {
+  return { timeframe: '5m' };
+}
+
+/**
+ * Parámetros del patrón FVG — igual de mínimos: la detección (3 velas del
+ * gap, SL/TP estructurales) vive entera en python-service (mismo
+ * /fvg/scan que usa el radar, con sort_by=range en vez de score). Acá solo
+ * se elige la temporalidad (1m/5m/15m). Soporta LONG y SHORT — la propia
+ * zona define la dirección (bullish/bearish), no hace falta forzar un lado.
+ */
+export interface FvgPatternParams {
+  timeframe: '1m' | '5m' | '15m';
+}
+
+function defaultFvgParams(): FvgPatternParams {
+  return { timeframe: '5m' };
+}
+
 @Component({
   selector: 'app-strategy-editor',
   standalone: true,
@@ -96,6 +126,8 @@ export class StrategyEditorComponent implements OnInit {
    * a/desde `model.patternParamsJson` al guardar/cargar.
    */
   patternParams: MaPatternParams = defaultPatternParams();
+  adnParams: AdnCompressionParams = defaultAdnParams();
+  fvgParams: FvgPatternParams = defaultFvgParams();
 
   readonly maOptions: { value: MaTarget; label: string }[] = [
     { value: 'ma7', label: 'MA7' },
@@ -106,6 +138,19 @@ export class StrategyEditorComponent implements OnInit {
 
   get isMaGeometry(): boolean {
     return this.model.strategyType === 'MaGeometry';
+  }
+
+  get isAdnCompression(): boolean {
+    return this.model.strategyType === 'AdnCompression';
+  }
+
+  get isFvgStrategy(): boolean {
+    return this.model.strategyType === 'FVG';
+  }
+
+  /** Cualquier estrategia de patrón (bypassea el motor de Nexus/confluencia genérico). */
+  get isPatternStrategy(): boolean {
+    return this.isMaGeometry || this.isAdnCompression || this.isFvgStrategy;
   }
 
   ngOnInit() {
@@ -124,11 +169,17 @@ export class StrategyEditorComponent implements OnInit {
         if (data.patternParamsJson) {
           try {
             this.patternParams = { ...defaultPatternParams(), ...JSON.parse(data.patternParamsJson) };
+            this.adnParams = { ...defaultAdnParams(), ...JSON.parse(data.patternParamsJson) };
+            this.fvgParams = { ...defaultFvgParams(), ...JSON.parse(data.patternParamsJson) };
           } catch {
             this.patternParams = defaultPatternParams();
+            this.adnParams = defaultAdnParams();
+            this.fvgParams = defaultFvgParams();
           }
         } else {
           this.patternParams = defaultPatternParams();
+          this.adnParams = defaultAdnParams();
+          this.fvgParams = defaultFvgParams();
         }
       });
   }
@@ -142,7 +193,13 @@ export class StrategyEditorComponent implements OnInit {
         this.model.allowShort = false;
       }
       this.activeTab = 'pattern';
+    } else if (type === 'AdnCompression') {
+      // LONG-only por ahora — ver AdnCompressionParams.
+      this.model.allowLong = true;
+      this.model.allowShort = false;
     }
+    // FVG: sin forzar dirección — la propia zona (bullish/bearish) define
+    // LONG o SHORT, "Automático" (el default) queda bien acá.
   }
 
   save() {
@@ -157,6 +214,10 @@ export class StrategyEditorComponent implements OnInit {
         return;
       }
       this.model.patternParamsJson = JSON.stringify(this.patternParams);
+    } else if (this.isAdnCompression) {
+      this.model.patternParamsJson = JSON.stringify(this.adnParams);
+    } else if (this.isFvgStrategy) {
+      this.model.patternParamsJson = JSON.stringify(this.fvgParams);
     } else {
       this.model.patternParamsJson = undefined;
     }

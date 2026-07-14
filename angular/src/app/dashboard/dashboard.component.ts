@@ -67,6 +67,25 @@ interface StageInfo {
   styleUrls: ['./dashboard.component.scss']
 })
 export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
+  // Hora fija Argentina (UTC-3) para el gráfico — antes lightweight-charts
+  // formateaba los ticks con el timezone del navegador/SO por default, que
+  // no siempre coincide con el resto del dashboard (reloj superior, historial
+  // de trades), haciendo que la misma vela pareciera estar en un horario
+  // distinto según qué parte de la UI se mirara.
+  private static readonly AR_TZ = 'America/Argentina/Buenos_Aires';
+
+  private static formatArTime(epochTime: any, withDate: boolean): string {
+    const date = new Date(Number(epochTime) * 1000);
+    const timeStr = date.toLocaleTimeString('es-AR', {
+      hour: '2-digit', minute: '2-digit', timeZone: DashboardComponent.AR_TZ,
+    });
+    if (!withDate) return timeStr;
+    const day = date.toLocaleDateString('es-AR', {
+      day: '2-digit', month: '2-digit', timeZone: DashboardComponent.AR_TZ,
+    });
+    return `${day} ${timeStr}`;
+  }
+
   @ViewChild('chartContainer') set chartContainer(content: ElementRef) {
     if (content && content.nativeElement !== this.chartContainerElement) {
       // Solo inicializamos si el elemento es nuevo o cambió
@@ -799,6 +818,10 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         borderColor: 'rgba(0, 243, 255, 0.15)',
         timeVisible: true,
         secondsVisible: false,
+        tickMarkFormatter: ((time: any) => DashboardComponent.formatArTime(time, false)) as any,
+      },
+      localization: {
+        timeFormatter: ((time: any) => DashboardComponent.formatArTime(time, true)) as any,
       },
       crosshair: {
         mode: CrosshairMode.Normal,
@@ -1325,6 +1348,20 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       }
       return t.strategyProfileId === profileId;
     }).length;
+  }
+
+  /**
+   * Ícono por familia de estrategia — mismo mapeo que el editor de
+   * estrategias, así el usuario asocia visualmente el tab del dashboard
+   * con el tipo que eligió al crearla, sin tener que leer el nombre.
+   */
+  strategyTypeIcon(strategyType: string | undefined): string {
+    switch (strategyType) {
+      case 'MaGeometry': return 'trending-up-outline';
+      case 'AdnCompression': return 'git-network-outline';
+      case 'FVG': return 'layers-outline';
+      default: return 'analytics-outline';
+    }
   }
 
   closePosition(tradeId: string) {

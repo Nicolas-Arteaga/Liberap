@@ -122,13 +122,28 @@ def ws_loop(exchange_name):
     symbols = config.get_symbols_for_exchange(exchange_name)
     cache = get_cache()
 
+    msg_count = {"total": 0, "written": 0, "parse_none": 0, "errors": 0}
+    last_report = [time.time()]
+
     while True:
         try:
             url = exc.ws_url_builder(symbols)
             def on_open(ws):
                 set_exchange_status(exchange_name, "CONNECTED")
-                agent_log(f"🔌 {exchange_name.upper()} Websocket conectado.")
+                agent_log(f"🔌 {exchange_name.upper()} Websocket conectado. URL={url[:120]}")
+                # BUG REAL: acá nunca se llamaba a exc.subscribe_fn — el socket
+                # abría bien (por eso /health decía "CONNECTED") pero para
+                # bybit/okx/bitget (que necesitan un mensaje explícito de
+                # suscripción, a diferencia de binance que va todo en la URL)
+                # nunca se pedían los streams, así que jamás llegaba un
+                # mensaje real y el caché quedaba congelado para siempre.
+                try:
+                    exc.subscribe_fn(ws, symbols)
+                    agent_log(f"📡 {exchange_name.upper()} suscripto a {len(symbols)} símbolos.")
+                except Exception as e:
+                    agent_log(f"❌ {exchange_name.upper()} subscribe_fn falló: {type(e).__name__}: {e}")
             def on_message(ws, msg):
+                msg_count["total"] += 1
                 try:
                     data = pyjson.loads(msg)
                     parsed = exc.message_parser(data)
@@ -137,19 +152,38 @@ def ws_loop(exchange_name):
                             parsed["symbol"], parsed["close"], parsed["open"],
                             parsed["high"], parsed["low"], parsed["volume"], exchange_name
                         )
-                except:
-                    pass
+                        msg_count["written"] += 1
+                    else:
+                        msg_count["parse_none"] += 1
+                except Exception as e:
+                    msg_count["errors"] += 1
+                    # Loguea la excepción real la primera vez que pasa en esta
+                    # ventana de reporte — antes esto era `except: pass` y por
+                    # eso nunca se supo por qué las escrituras se frenaron.
+                    if msg_count["errors"] <= 3:
+                        agent_log(f"⚠️ {exchange_name.upper()} on_message error: {type(e).__name__}: {e} | raw={msg[:200]}")
+                # Reporte periódico (cada ~60s) para confirmar en los logs que
+                # los mensajes siguen llegando y escribiéndose, sin inundar.
+                if time.time() - last_report[0] > 60:
+                    agent_log(f"📊 {exchange_name.upper()} msgs/60s: total={msg_count['total']} "
+                              f"written={msg_count['written']} parse_none={msg_count['parse_none']} "
+                              f"errors={msg_count['errors']}")
+                    msg_count.update(total=0, written=0, parse_none=0, errors=0)
+                    last_report[0] = time.time()
             def on_error(ws, err):
                 set_exchange_status(exchange_name, "ERROR")
+                agent_log(f"❌ {exchange_name.upper()} Websocket error: {type(err).__name__}: {err}")
             def on_close(ws, code, msg):
                 set_exchange_status(exchange_name, "DISCONNECTED")
+                agent_log(f"🔌 {exchange_name.upper()} Websocket cerrado. code={code} msg={msg}")
 
             ws = websocket.WebSocketApp(url, on_open=on_open, on_message=on_message,
                                         on_error=on_error, on_close=on_close)
             ws.run_forever()
             time.sleep(5)
-        except:
+        except Exception as e:
             set_exchange_status(exchange_name, "DISCONNECTED")
+            agent_log(f"❌ {exchange_name.upper()} ws_loop crash: {type(e).__name__}: {e}")
             time.sleep(5)
 
 def main_startup():

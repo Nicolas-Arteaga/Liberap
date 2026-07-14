@@ -115,7 +115,7 @@
         <div class="field-group">
           <label class="field-label">Tipo de Estrategia</label>
           <div class="direction-selector">
-            <button class="dir-btn" [class.active-auto]="!isMaGeometry" (click)="onStrategyTypeChange('Generic')">
+            <button class="dir-btn" [class.active-auto]="!isPatternStrategy" (click)="onStrategyTypeChange('Generic')">
               <ion-icon name="analytics-outline"></ion-icon>
               <span>Genérica</span>
               <span class="dir-hint">Nexus / LSE / SCAR / etc.</span>
@@ -125,7 +125,53 @@
               <span>Patrón de Medias Móviles</span>
               <span class="dir-hint">Geometría configurable (pendiente, toque, etc.)</span>
             </button>
+            <button class="dir-btn" [class.active-long]="isAdnCompression" (click)="onStrategyTypeChange('AdnCompression')">
+              <ion-icon name="git-network-outline"></ion-icon>
+              <span>Compresión ADN</span>
+              <span class="dir-hint">MA25/50/99 comprimidas + ignición + pullback a MA7</span>
+            </button>
+            <button class="dir-btn" [class.active-long]="isFvgStrategy" (click)="onStrategyTypeChange('FVG')">
+              <ion-icon name="layers-outline"></ion-icon>
+              <span>FVG</span>
+              <span class="dir-hint">La entrada de mayor rango a TP, no la de mejor score</span>
+            </button>
           </div>
+        </div>
+
+        <div class="field-group" *ngIf="isFvgStrategy">
+          <label class="field-label">Temporalidad</label>
+          <div class="direction-selector">
+            <button class="dir-btn" [class.active-long]="fvgParams.timeframe === '1m'" (click)="fvgParams.timeframe = '1m'">
+              <ion-icon name="flash-outline"></ion-icon>
+              <span>1m</span>
+            </button>
+            <button class="dir-btn" [class.active-long]="fvgParams.timeframe === '5m'" (click)="fvgParams.timeframe = '5m'">
+              <ion-icon name="flash-outline"></ion-icon>
+              <span>5m</span>
+            </button>
+            <button class="dir-btn" [class.active-long]="fvgParams.timeframe === '15m'" (click)="fvgParams.timeframe = '15m'">
+              <ion-icon name="flash-outline"></ion-icon>
+              <span>15m</span>
+            </button>
+          </div>
+          <p class="field-hint">Busca la zona con mayor rango real hasta el TP en esta temporalidad, no la de mejor score compuesto. Soporta LONG y SHORT según la dirección del gap.</p>
+        </div>
+
+        <div class="field-group" *ngIf="isAdnCompression">
+          <label class="field-label">Temporalidad</label>
+          <div class="direction-selector">
+            <button class="dir-btn" [class.active-long]="adnParams.timeframe === '5m'" (click)="adnParams.timeframe = '5m'">
+              <ion-icon name="flash-outline"></ion-icon>
+              <span>Micro · 5m</span>
+              <span class="dir-hint">Scalp — reentradas rápidas</span>
+            </button>
+            <button class="dir-btn" [class.active-long]="adnParams.timeframe === '1d'" (click)="adnParams.timeframe = '1d'">
+              <ion-icon name="calendar-outline"></ion-icon>
+              <span>Macro · 1D</span>
+              <span class="dir-hint">Swing — movimientos de semanas/meses</span>
+            </button>
+          </div>
+          <p class="field-hint">Solo LONG por ahora — se agrega SHORT más adelante si esta dirección da resultado.</p>
         </div>
 
         <div class="field-group">
@@ -181,7 +227,7 @@
           <p class="field-hint">Puntaje total combinado (Nexus + SCAR + LSE) requerido para abrir una entrada.</p>
         </div>
 
-        <div class="field-group" *ngIf="!isMaGeometry">
+        <div class="field-group" *ngIf="!isPatternStrategy">
           <div class="slider-label-row">
             <label class="field-label">Confianza Nexus Mínima</label>
             <span class="slider-value">{{ model.minNexusConfidence }}%</span>
@@ -191,7 +237,7 @@
             <div class="slider-fill" [style.width.%]="model.minNexusConfidence" style="background:#3b82f6"></div>
           </div>
         </div>
-        <p class="field-hint" *ngIf="isMaGeometry">
+        <p class="field-hint" *ngIf="isPatternStrategy">
           "Confluencia Mínima" (arriba) es el score fijo que se le asigna a las señales de este patrón — no aplica "Confianza Nexus" porque este perfil no usa el motor de Nexus.
         </p>
 
@@ -221,7 +267,7 @@
           <p class="field-hint">Rechaza la entrada si el precio está más del <strong>{{ model.maxMa7DistancePct }}%</strong> por encima/debajo de la MA7. Evita entradas tardías en extensiones.</p>
         </div>
 
-        <div class="field-group" *ngIf="!isMaGeometry">
+        <div class="field-group" *ngIf="!isPatternStrategy">
           <label class="field-label">Fuentes de Señal</label>
           <div class="source-pills">
             <button class="source-pill" [class.active]="isSourceAllowed('Nexus')" (click)="toggleSource('Nexus')">

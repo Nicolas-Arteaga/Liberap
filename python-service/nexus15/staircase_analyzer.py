@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from .schemas import StaircaseRequest, StaircaseResponse, StaircaseItem
+from shared_kline_cache import get_or_fetch
 import logging
 
 logger = logging.getLogger("ROLLERCOASTER")
@@ -167,28 +168,27 @@ class StaircaseAnalyzer:
         Fetch klines from Binance Futures API.
         Returns list of [timestamp, open, high, low, close, volume] or None on error.
         """
-        # Clean symbol format
         clean_symbol = symbol.replace('/', '').replace('-', '').upper()
-        
-        # Try Binance Futures first
-        url = f"https://fapi.binance.com/fapi/v1/klines?symbol={clean_symbol}&interval={interval}&limit={limit}"
-        
-        try:
-            response = requests.get(url, timeout=self.timeout)
-            if response.status_code == 200:
-                data = response.json()
-                return [[k[0], float(k[1]), float(k[2]), float(k[3]), float(k[4]), float(k[5])] for k in data]
-        except Exception as e:
-            logger.info(f"[STAIRCASE] Binance Futures failed for {symbol}: {e}")
-        
-        # Fallback to Binance Spot
-        url = f"https://api.binance.com/api/v3/klines?symbol={clean_symbol}&interval={interval}&limit={limit}"
-        try:
-            response = requests.get(url, timeout=self.timeout)
-            if response.status_code == 200:
-                data = response.json()
-                return [[k[0], float(k[1]), float(k[2]), float(k[3]), float(k[4]), float(k[5])] for k in data]
-        except Exception as e:
-            logger.info(f"[STAIRCASE] Binance Spot failed for {symbol}: {e}")
-        
-        return None
+
+        def _do_fetch():
+            url = f"https://fapi.binance.com/fapi/v1/klines?symbol={clean_symbol}&interval={interval}&limit={limit}"
+            try:
+                response = requests.get(url, timeout=self.timeout)
+                if response.status_code == 200:
+                    data = response.json()
+                    return [[k[0], float(k[1]), float(k[2]), float(k[3]), float(k[4]), float(k[5])] for k in data]
+            except Exception as e:
+                logger.info(f"[STAIRCASE] Binance Futures failed for {symbol}: {e}")
+
+            url = f"https://api.binance.com/api/v3/klines?symbol={clean_symbol}&interval={interval}&limit={limit}"
+            try:
+                response = requests.get(url, timeout=self.timeout)
+                if response.status_code == 200:
+                    data = response.json()
+                    return [[k[0], float(k[1]), float(k[2]), float(k[3]), float(k[4]), float(k[5])] for k in data]
+            except Exception as e:
+                logger.info(f"[STAIRCASE] Binance Spot failed for {symbol}: {e}")
+
+            return None
+
+        return get_or_fetch(clean_symbol, interval, limit, _do_fetch)
