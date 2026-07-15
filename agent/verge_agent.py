@@ -3595,12 +3595,30 @@ class VergeAgent:
             return None
 
         side_int = 0 if direction == "bullish" else 1
+
+        # 2026-07-14: el "current_price" que manda python-service es un
+        # snapshot tomado en el momento del scan (última vela cerrada ahí)
+        # — si ESE fetch vino de datos stale (ban de Binance, símbolo poco
+        # líquido, etc.), puede quedar desalineado de la cotización real
+        # por horas sin que el candidato lo note. Visto en vivo con
+        # LRCUSDT: el snapshot del scan mostraba el SL a distancia sana,
+        # pero el precio real usado horas después en risk_manager estaba
+        # ~78% más lejos del mismo sl_price fijo — cada ciclo generaba el
+        # mismo candidato roto (TP estructural inválido → fallback RR×SL →
+        # tp_price <=0 → trade bloqueado). Revalidamos acá con un precio
+        # fresco propio (mismo fetcher resiliente que usa todo el agente)
+        # antes de aceptar el candidato, en vez de confiar ciegamente en
+        # el snapshot del scan.
+        fresh_price = self.fetcher.get_current_price(symbol) or price
+        if fresh_price <= 0:
+            return None
+
         # Validación de sanidad del SL, igual criterio que usa risk_manager
         # para cualquier custom_sl_price: LONG por debajo del precio, SHORT
         # por arriba. Si no cierra, no forzamos un candidato mal armado.
-        if side_int == 0 and sl_price >= price:
+        if side_int == 0 and sl_price >= fresh_price:
             return None
-        if side_int == 1 and sl_price <= price:
+        if side_int == 1 and sl_price <= fresh_price:
             return None
 
         # 2026-07-13: zona agotada/vieja (precio ya recorrió casi toda la
@@ -3610,7 +3628,7 @@ class VergeAgent:
         # tp_price <= 0 que el RiskManager bloquea EN CADA ciclo de scan.
         # Cortarlo acá evita el ruido/reintento inútil sin tocar candidatos
         # sanos (un gap de 3 velas nunca debería necesitar un SL así de lejos).
-        sl_distance_pct = abs(sl_price - price) / price * 100.0
+        sl_distance_pct = abs(sl_price - fresh_price) / fresh_price * 100.0
         if sl_distance_pct > config.FVG_MAX_SL_DISTANCE_PCT:
             return None
 

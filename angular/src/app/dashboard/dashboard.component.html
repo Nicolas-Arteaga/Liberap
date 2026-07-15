@@ -315,7 +315,7 @@
     <!-- Main Content Row -->
     <div class="row g-2">
       <!-- Left Column: Chart, Positions, Console -->
-      <div class="col-xl-8">
+      <div class="col-xl-10">
         <!-- 📈 Super Chart Console (No borders) -->
         <div class="chart-container-vision mb-2 bg-dark-deep position-relative">
           <div
@@ -454,16 +454,14 @@
         <!-- 💰 Positions & Orders Table (New) -->
         <div class="positions-console bg-dark-deep mb-2 overflow-hidden">
           <div class="console-tabs d-flex align-items-stretch border-bottom border-white-05 bg-dark-soft">
-            <!-- Tab: Standard Scalping (fijo, siempre visible) -->
-            <div class="tab-item tab-pinned py-2 px-3 pointer text-xs uppercase flex-shrink-0" [class.active]="consoleTab === 'legacy'"
-              (click)="setConsoleTab('legacy')">
-              Standard Scalping
-              <span class="tab-count" [class.tab-count-hot]="getActiveTradesCount(null) > 0">{{ getActiveTradesCount(null) }}</span>
-            </div>
-
-            <!-- Tabs: Dynamic Strategies — scroll horizontal, nunca se recortan -->
+            <!-- Tabs: Standard Scalping + Dynamic Strategies — scroll horizontal, nunca se recortan -->
             <div class="tab-scroll-wrap flex-grow-1">
               <div class="tab-scroll d-flex align-items-stretch">
+                <div class="tab-item py-2 px-3 pointer text-xs uppercase flex-shrink-0" [class.active]="consoleTab === 'legacy'"
+                  (click)="setConsoleTab('legacy')">
+                  Standard Scalping
+                  <span class="tab-count" [class.tab-count-hot]="getActiveTradesCount(null) > 0">{{ getActiveTradesCount(null) }}</span>
+                </div>
                 <div *ngFor="let profile of strategyProfiles" class="tab-item py-2 px-3 pointer text-xs uppercase flex-shrink-0"
                   [class.active]="consoleTab === profile.id"
                   [style.--tab-accent]="profile.color || '#00f3ff'"
@@ -732,117 +730,14 @@
         </div>
       </div>
 
-      <!-- Right Column: Sidebar (2 sub-columns - No borders) -->
-      <div class="col-xl-4">
-        <div class="row g-2 sticky-top" style="top: 20px;">
-          <!-- Sub-col 1: Order Book, Trades & Ranking -->
-          <div class="col-6">
-            <!-- Order Book Section -->
-            <div class="side-panel bg-dark-deep mb-2">
-              <div
-                class="panel-header p-2 border-bottom border-white-05 text-white fw-bold text-xs uppercase d-flex justify-content-between align-items-center">
-                <div class="d-flex align-items-center gap-3">
-                  <span>Libro de Órdenes</span>
-                  <div class="view-filters">
-                    <div class="filter-btn filter-mixed" [class.active]="orderBookViewMode === 'mixed'"
-                      (click)="orderBookViewMode = 'mixed'">
-                      <div class="bar"></div>
-                      <div class="bar"></div>
-                    </div>
-                    <div class="filter-btn filter-bids" [class.active]="orderBookViewMode === 'bids'"
-                      (click)="orderBookViewMode = 'bids'">
-                      <div class="bar"></div>
-                      <div class="bar"></div>
-                    </div>
-                    <div class="filter-btn filter-asks" [class.active]="orderBookViewMode === 'asks'"
-                      (click)="orderBookViewMode = 'asks'">
-                      <div class="bar"></div>
-                      <div class="bar"></div>
-                    </div>
-                  </div>
-                </div>
-                <span class="text-white-50">0.1</span>
-              </div>
-              <div class="panel-content p-1" style="height: 320px; overflow: hidden;">
-                <table class="data-table-compact w-100">
-                  <thead>
-                    <tr class="text-white-50 uppercase" style="font-size: 9px;">
-                      <th>Precio (USDT)</th>
-                      <th class="text-center">Cantidad</th>
-                      <th class="text-end">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <!-- Asks (Venta) - Balanceado 6 y 6 -->
-                    <ng-container *ngIf="orderBookViewMode === 'mixed' || orderBookViewMode === 'asks'">
-                      <tr
-                        *ngFor="let ask of (orderBookViewMode === 'asks' ? orderBook.asks.slice(0, 18) : orderBook.asks.slice(0, 6).reverse())"
-                        class="text-danger text-xs">
-                        <td>{{ ask.price | number:'1.2-2' }}</td>
-                        <td class="text-center text-white">{{ ask.amount | number:'1.3-3' }}</td>
-                        <td class="text-end text-white-50">{{ ask.total | number:'1.2-2' }}</td>
-                      </tr>
-                    </ng-container>
-
-                    <!-- Current Price Row -->
-                    <tr class="text-success fw-bold text-sm">
-                      <td colspan="3" class="text-center py-2 border-top border-bottom border-white-05">
-                        <span class="fs-6">{{ chartPrices.current | number:'1.2-2' }}</span>
-                        <ion-icon [name]="'arrow-up-outline'" class="ms-1"></ion-icon>
-                      </td>
-                    </tr>
-
-                    <!-- Bids (Compra) - Balanceado 6 y 6 -->
-                    <ng-container *ngIf="orderBookViewMode === 'mixed' || orderBookViewMode === 'bids'">
-                      <tr
-                        *ngFor="let bid of (orderBookViewMode === 'bids' ? orderBook.bids.slice(0, 18) : orderBook.bids.slice(0, 6))"
-                        class="text-success text-xs">
-                        <td>{{ bid.price | number:'1.2-2' }}</td>
-                        <td class="text-center text-white">{{ bid.amount | number:'1.3-3' }}</td>
-                        <td class="text-end text-white-50">{{ bid.total | number:'1.2-2' }}</td>
-                      </tr>
-                    </ng-container>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <!-- Trades Section -->
-            <div class="side-panel bg-dark-deep mb-2">
-              <div class="panel-header p-2 border-bottom border-white-05 text-white fw-bold text-xs uppercase">Trades
-              </div>
-              <div class="panel-content p-1" style="height: 360px; overflow-y: auto;">
-                <table class="data-table-compact w-100">
-                  <thead>
-                    <tr class="text-white-50" style="font-size: 9px;">
-                      <th class="text-start">Precio</th>
-                      <th class="text-end">Monto</th>
-                      <th class="text-end">Tiempo</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr *ngFor="let trade of recentTrades" class="text-xs">
-                      <td [class.text-danger]="trade.isBuyerMaker" [class.text-success]="!trade.isBuyerMaker"
-                        class="text-start">
-                        {{ trade.price | number:'1.2-2' }}
-                      </td>
-                      <td class="text-end text-white-50">{{ trade.amount | number:'1.3-3' }}</td>
-                      <td class="text-end text-white-50" style="font-size: 8px;">{{ trade.time | date:'HH:mm:ss' }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <!-- Sub-col 2: Trading Panel -->
-          <div class="col-6">
-            <app-trading-panel [symbol]="selectedTicker?.symbol || selectedSymbol"
-              [price]="selectedTicker?.lastPrice || 0">
-            </app-trading-panel>
-          </div>
-        </div> <!-- End of sidebar row -->
-      </div> <!-- End of col-xl-4 -->
+      <!-- Right Column: Trading Panel -->
+      <div class="col-xl-2">
+        <div class="sticky-top" style="top: 20px;">
+          <app-trading-panel [symbol]="selectedTicker?.symbol || selectedSymbol"
+            [price]="selectedTicker?.lastPrice || 0">
+          </app-trading-panel>
+        </div>
+      </div> <!-- End of col-xl-2 -->
     </div> <!-- End of main row -->
   </main>
 

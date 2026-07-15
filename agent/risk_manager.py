@@ -285,9 +285,15 @@ class RiskManager:
                         else "STRUCTURAL-SNIPER"
                     )
                     if not golden_uturn_mode:
+                        # sl_distance_pct es una fracción (0.78 == 78%, no 0.78%) —
+                        # faltaba *100 acá, el log mostraba "0.7809%" para un SL
+                        # que en realidad estaba a 78.09% (confirmado contra el
+                        # log de [FIXED-MARGIN] unas líneas más abajo, que sí
+                        # multiplica bien). Engañó el diagnóstico del caso LRCUSDT
+                        # 2026-07-13/14 haciendo parecer sano un SL roto.
                         logger.info(
                             f"[{tag}-RISK] {symbol}: Usando custom SL={custom_sl_f:.6f} "
-                            f"(distancia={sl_distance_pct:.4f}%)"
+                            f"(distancia={sl_distance_pct*100:.4f}%)"
                         )
                 else:
                     logger.warning(
