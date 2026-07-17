@@ -4529,86 +4529,20 @@ class VergeAgent:
                     elif current_price <= sl:
                         should_close, close_reason = True, "Stop Loss reached"
 
-                # ── REGLA DE LA COSECHA INTELIGENTE (Trailing Stop Proporcional) ──
-                # v9.8 Diamond Hands: Desactivado para Golden U-Turn / TOTAL-SWEEP, reemplazado por Trailing Profit Inteligente
-                if not should_close and entry_price > 0 and tp > entry_price:
-                    if is_diamond:
-                        # ── v9.8 Trailing Profit Inteligente para Golden U-Turn ──
-                        # Se activa cuando el trade alcanza +10% de profit
-                        # Trailing stop solo se ejecuta si el precio cae 5% desde el máximo
-                        max_profit_price = pos.get("max_profit_price") or current_price
-                        max_profit_pct = (max_profit_price - entry_price) / entry_price
-                        
-                        if max_profit_pct >= 0.10:  # +10% de profit
-                            # Trailing stop: 5% desde el máximo
-                            trailing_sl_price = max_profit_price * 0.95  # 5% de caída desde el máximo
-                            if current_price <= trailing_sl_price:
-                                logger.info(
-                                    "[DIAMOND-HANDS] %s Trailing Profit activado | max_profit=%.2f%% | trailing_sl=%.8f (5%% desde máximo) | current=%.8f",
-                                    symbol, max_profit_pct * 100, trailing_sl_price, current_price
-                                )
-                                should_close, close_reason = True, f"Diamond Hands Trailing (max_profit={max_profit_pct*100:.1f}%)"
-                                close_tag = "[DIAMOND-HANDS]"
-                    else:
-                        # Cosecha Inteligente estándar para trades no-Golden U-Turn
-                        tp_dist = tp - entry_price
-                        activation_price = entry_price + (tp_dist * 0.50)  # 50% del camino al TP
-                        max_profit_price = pos.get("max_profit_price") or current_price
-                        max_profit_pct = (max_profit_price - entry_price) / entry_price
-                        if max_profit_pct > 0 and max_profit_price >= activation_price:
-                            # El buffer es el 25% del profit máximo alcanzado
-                            buffer_pct = max_profit_pct * 0.25
-                            # El trailing SL protege el 75% del profit máximo
-                            trailing_sl_price = entry_price * (1 + max_profit_pct - buffer_pct)
-                            if current_price <= trailing_sl_price:
-                                profit_protected_pct = (max_profit_pct - buffer_pct) * 100
-                                logger.info(
-                                    "[COSECHA] %s trailing stop activado | max_profit=%.2f%% | buffer=%.2f%% | trailing_sl=%.8f | current=%.8f | profit_protegido=%.2f%%",
-                                    symbol, max_profit_pct * 100, buffer_pct * 100, trailing_sl_price, current_price, profit_protected_pct
-                                )
-                                should_close, close_reason = True, f"Cosecha Inteligente (profit protegido={profit_protected_pct:.1f}%)"
-                                close_tag = "[COSECHA]"
+                # 2026-07-15: Cosecha Inteligente / Diamond Hands Trailing (LONG)
+                # eliminadas a pedido explícito del usuario — el SL/TP se define
+                # al abrir la posición y se ejecuta tal cual, sin que nada lo
+                # mueva después (igual que un bracket order real en un exchange).
+                # Si el TP/SL de entrada no está bien calibrado, ese es el
+                # problema a resolver ahí, no compensarlo con un trailing acá.
             else:  # SHORT
                 if current_price <= tp:
                     should_close, close_reason = True, "Take Profit reached"
                 elif current_price >= sl:
                     should_close, close_reason = True, "Stop Loss reached"
 
-                # ── REGLA DE LA COSECHA INTELIGENTE (SHORT) ──
-                # v9.8 Diamond Hands: Desactivado para Golden U-Turn / TOTAL-SWEEP
-                if not should_close and entry_price > 0 and tp < entry_price:
-                    if is_diamond:
-                        # ── v9.8 Trailing Profit Inteligente para Golden U-Turn SHORT ──
-                        max_profit_price = pos.get("max_profit_price") or current_price
-                        max_profit_pct = (entry_price - max_profit_price) / entry_price
-                        
-                        if max_profit_pct >= 0.10:  # +10% de profit
-                            # Trailing stop: 5% desde el máximo (para SHORT, el máximo es el precio más bajo)
-                            trailing_sl_price = max_profit_price * 1.05  # 5% de subida desde el mínimo
-                            if current_price >= trailing_sl_price:
-                                logger.info(
-                                    "[DIAMOND-HANDS] %s SHORT Trailing Profit activado | max_profit=%.2f%% | trailing_sl=%.8f (5%% desde mínimo) | current=%.8f",
-                                    symbol, max_profit_pct * 100, trailing_sl_price, current_price
-                                )
-                                should_close, close_reason = True, f"Diamond Hands Trailing SHORT (max_profit={max_profit_pct*100:.1f}%)"
-                                close_tag = "[DIAMOND-HANDS]"
-                    else:
-                        # Cosecha Inteligente estándar para trades no-Golden U-Turn
-                        tp_dist = entry_price - tp
-                        activation_price = entry_price - (tp_dist * 0.50)  # 50% del camino al TP
-                        max_profit_price = pos.get("max_profit_price") or current_price
-                        max_profit_pct = (entry_price - max_profit_price) / entry_price
-                        if max_profit_pct > 0 and max_profit_price <= activation_price:
-                            buffer_pct = max_profit_pct * 0.25
-                            trailing_sl_price = entry_price * (1 - max_profit_pct + buffer_pct)
-                            if current_price >= trailing_sl_price:
-                                profit_protected_pct = (max_profit_pct - buffer_pct) * 100
-                                logger.info(
-                                    "[COSECHA] %s SHORT trailing stop activado | max_profit=%.2f%% | buffer=%.2f%% | trailing_sl=%.8f | current=%.8f | profit_protegido=%.2f%%",
-                                    symbol, max_profit_pct * 100, buffer_pct * 100, trailing_sl_price, current_price, profit_protected_pct
-                                )
-                                should_close, close_reason = True, f"Cosecha Inteligente (profit protegido={profit_protected_pct:.1f}%)"
-                                close_tag = "[COSECHA]"
+                # 2026-07-15: Cosecha Inteligente / Diamond Hands Trailing (SHORT)
+                # eliminadas — ver nota equivalente en la rama LONG de arriba.
 
             opened_at_str = pos["opened_at"].replace("Z", "+00:00")
             opened_at = datetime.fromisoformat(opened_at_str)

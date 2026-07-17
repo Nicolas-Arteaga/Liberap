@@ -400,6 +400,32 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
                         return MapToDto(trade);
                     }
 
+                    // ── Sanity guard 2026-07-15: ResolveCurrentPriceAsync falls through
+                    // unrelated external sources as a last resort (Binance Spot, Bybit,
+                    // OKX) with no cross-validation between tiers. For thin-liquidity or
+                    // synthetic symbols (found in prod: ONUSDT/LITUSDT/UBUSDT), one of
+                    // those fallbacks can silently return a completely different
+                    // instrument's price, closing the trade at a value wildly off from
+                    // its own tracked history (one case landed 1000x off). trade.MarkPrice
+                    // is continuously ticked every 1s by SimulationMarkPriceWorker, which
+                    // already outlier-filters its own updates (2026-07-12 fix) — it's a
+                    // trustworthy recent anchor. If the freshly resolved close price
+                    // diverges too much from it, trust MarkPrice instead of the resolved
+                    // value rather than persisting a fabricated PnL.
+                    const decimal maxCloseDeviationRatio = 0.30m;
+                    var priceAnchor = trade.MarkPrice > 0 ? trade.MarkPrice : trade.EntryPrice;
+                    if (priceAnchor > 0)
+                    {
+                        var deviation = Math.Abs(closePrice - priceAnchor) / priceAnchor;
+                        if (deviation > maxCloseDeviationRatio)
+                        {
+                            Logger.LogWarning(
+                                "⚠️ [Simulation] Resolved close price for {Symbol} diverges {Deviation:P1} from last known price {Anchor} — using {Anchor} instead of resolved {Resolved} (likely bad/unrelated price source).",
+                                trade.Symbol, deviation, priceAnchor, priceAnchor, closePrice);
+                            closePrice = priceAnchor;
+                        }
+                    }
+
                     // 2. Calculate exit fee and realized PnL with the fetched trade data
                     var exitFee = _simulationService.CalculateExitFee(trade.Size, closePrice);
                     var realizedPnl = _simulationService.CalculateRealizedPnl(

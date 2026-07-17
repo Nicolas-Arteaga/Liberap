@@ -62,6 +62,17 @@ class ExchangeCircuitBreaker:
         self._rate_limited_until = 0.0   # 429 cooldown
         self._ban_until          = 0.0   # 418 hard ban
 
+        # 2026-07-15: HALF_OPEN se pensó como "una sola prueba de recuperación
+        # a la vez", pero is_available() no lo hacía cumplir — varios
+        # call-sites (ej. MA-Slope y el fetch de 5m de FVG) podían ver
+        # HALF_OPEN=disponible en el mismo instante y disparar en simultáneo.
+        # Si más de uno pegaba contra un exchange todavía baneado, cada 418
+        # volvía a abrir la cuarentena completa por separado — visto en vivo
+        # el 2026-07-14: 5 reaperturas de ~6h en <1 segundo. Este flag hace
+        # que solo el primer caller "reclame" la prueba; el resto ve
+        # is_available=False hasta que ese primero reporte éxito o fallo.
+        self._half_open_probe_in_flight = False
+
         self._mu = threading.Lock()
 
         # Stats
@@ -76,14 +87,30 @@ class ExchangeCircuitBreaker:
 
     @property
     def is_available(self) -> bool:
-        """True if the exchange can be called right now."""
+        """
+        True if the exchange can be called right now.
+
+        En HALF_OPEN esto reclama el único cupo de prueba disponible: el
+        primer caller que pase por acá en ese estado se lo lleva (y bloquea
+        a los demás hasta que llame record_success/record_failure); si ya
+        hay una prueba en curso, devuelve False en vez de dejar pasar más
+        de un request contra un exchange que puede seguir baneado.
+        """
         with self._mu:
             now = time.time()
             if now < self._ban_until:
                 return False
             if now < self._rate_limited_until:
                 return False
-            return self._get_state_locked() in (self.CLOSED, self.HALF_OPEN)
+            state = self._get_state_locked()
+            if state == self.CLOSED:
+                return True
+            if state == self.HALF_OPEN:
+                if self._half_open_probe_in_flight:
+                    return False
+                self._half_open_probe_in_flight = True
+                return True
+            return False
 
     @property
     def state(self) -> str:
@@ -93,6 +120,7 @@ class ExchangeCircuitBreaker:
     def record_success(self):
         """Call after every successful exchange response."""
         with self._mu:
+            self._half_open_probe_in_flight = False
             self._stat_successes += 1
             self._failure_count = 0
             if self._state == self.HALF_OPEN:
@@ -114,6 +142,7 @@ class ExchangeCircuitBreaker:
         - neither           → generic failure, count toward threshold
         """
         with self._mu:
+            self._half_open_probe_in_flight = False
             self._stat_failures += 1
 
             if is_ban:
@@ -197,6 +226,7 @@ class ExchangeCircuitBreaker:
             if elapsed >= self._recovery_timeout:
                 self._state         = self.HALF_OPEN
                 self._success_count = 0
+                self._half_open_probe_in_flight = False
                 logger.info(
                     f"[CB:{self.name}] OPEN → HALF_OPEN (recovery timeout elapsed, probing...)"
                 )
