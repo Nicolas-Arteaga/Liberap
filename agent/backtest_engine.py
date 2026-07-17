@@ -201,6 +201,7 @@ def run_backtest(
                     open_trade.pnl_pct = (open_trade.exit_price - open_trade.entry_price) / open_trade.entry_price * 100.0
                 else:
                     open_trade.pnl_pct = (open_trade.entry_price - open_trade.exit_price) / open_trade.entry_price * 100.0
+                open_trade.pnl_pct -= fee_pct  # fee de ida+vuelta, siempre se paga gane o pierda
                 result.trades.append(open_trade)
                 open_trade = None
             i += 1
@@ -212,12 +213,20 @@ def run_backtest(
             if candidate:
                 side = candidate["side"]
                 entry_price = geo["current_price"]
-                sl_price = candidate["custom_sl_price"]
+                if breakeven_sl:
+                    # 2026-07-16: experimento pedido por el usuario -- SL en el
+                    # precio de entrada (sin margen), para que una pérdida
+                    # cueste solo la fee en vez de la distancia estructural.
+                    sl_price = entry_price
+                else:
+                    sl_price = candidate["custom_sl_price"]
                 min_tp_pct = float(candidate.get("min_tp_pct", 10.0)) / 100.0
-                sl_dist = abs(entry_price - sl_price)
-                # Simplificado: RR 3x sobre el SL o el piso min_tp_pct, lo que
-                # sea mayor -- ver limitación documentada arriba (no reproduce
-                # _apply_structural_tp_cap de risk_manager.py).
+                sl_dist = abs(entry_price - candidate["custom_sl_price"])
+                # Simplificado: RR 3x sobre el SL estructural o el piso
+                # min_tp_pct, lo que sea mayor -- ver limitación documentada
+                # arriba (no reproduce _apply_structural_tp_cap de
+                # risk_manager.py). El TP no cambia con breakeven_sl: solo
+                # se prueba qué pasa si el SL se acorta, no si el TP también.
                 tp_dist = max(sl_dist * 3.0, entry_price * min_tp_pct)
                 tp_price = entry_price + tp_dist if side == 0 else entry_price - tp_dist
                 open_trade = BacktestTrade(symbol, side, i, entry_price, sl_price, tp_price)

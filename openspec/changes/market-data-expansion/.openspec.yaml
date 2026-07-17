@@ -1,0 +1,5 @@
+schema: spec-driven
+created: 2026-07-17
+goal: Que Verge deje de basarse 100% en OHLCV derivado (velas/medias) y empiece
+  a incorporar señales de microestructura de mercado y on-chain reales,
+  validadas con el motor de backtesting antes de tocar produccion.
