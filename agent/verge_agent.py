@@ -1189,43 +1189,90 @@ class VergeAgent:
         # alimentaba al agente. Ya valida pump limpio (3-5 velas verdes >=20%) + sangrado
         # (1-3 velas rojas) + toque de MA99 en 15m, así que entra con score de inyección
         # directa (bypass de los umbrales normales de confluencia/nexus del perfil).
-        if getattr(config, "ARROW_PEAK_ENABLED", True):
+        if getattr(config, "ARROW_PEAK_ENABLED", True) or getattr(config, "ARROW_PEAK_V2_ENABLED", False):
             # Mismo fix que MA Slope: no descartar por tener ya un candidato
             # de otra fuente este ciclo — Arrow Reversal filtra exclusivo por
             # AllowedSources=arrow_peak, no compite por el mismo slot.
+            # v1 y v2 comparten el mismo scan (mismo detector geométrico,
+            # arrow_peak_analyzer.py sin tocar) — una sola llamada HTTP a
+            # python-service alimenta a ambos, no se duplica el request.
             arrow_peak_injected = 0
-            for item in self._run_arrow_peak_scan():
-                symbol = item.get("symbol")
-                if not symbol:
-                    continue
-                if self._should_skip(symbol):
-                    continue
+            arrow_peak_v2_injected = 0
+            arrow_peak_triggered_items = self._run_arrow_peak_scan()
 
-                ac = self._build_arrow_peak_candidate(item)
-                ac_px = ac.get("price_at_signal") or self.fetcher.get_current_price(symbol)
-                if not ac_px or ac_px <= 0:
-                    continue
-                try:
-                    v_ok, v_code, _ = validate_pre_trade(
-                        ac, ac_px, btc_filter=self.btc_filter, btc_corr=self.btc_corr
-                    )
-                    if not v_ok:
-                        logger.info(f"[ARROW-PEAK-INJECT] VETO {symbol}: {v_code}")
+            if getattr(config, "ARROW_PEAK_ENABLED", True):
+                for item in arrow_peak_triggered_items:
+                    symbol = item.get("symbol")
+                    if not symbol:
                         continue
-                except Exception as e:
-                    logger.warning(f"[ARROW-PEAK-INJECT] Error validando {symbol}: {e}")
-                    continue
+                    if self._should_skip_arrow_peak_pair(symbol, "arrow_peak"):
+                        continue
 
-                candidates.append(ac)
-                arrow_peak_injected += 1
-                logger.warning(
-                    f"[ARROW-PEAK-INJECT] {symbol} | Score={ac['confluence_score']} | "
-                    f"{item.get('days_bleeding')}d sangrado tras +{item.get('prev_rise_pct', 0):.1f}% "
-                    f"— reversión por agotamiento (SHORT)"
-                )
+                    ac = self._build_arrow_peak_candidate(item)
+                    ac_px = ac.get("price_at_signal") or self.fetcher.get_current_price(symbol)
+                    if not ac_px or ac_px <= 0:
+                        continue
+                    try:
+                        v_ok, v_code, _ = validate_pre_trade(
+                            ac, ac_px, btc_filter=self.btc_filter, btc_corr=self.btc_corr
+                        )
+                        if not v_ok:
+                            logger.info(f"[ARROW-PEAK-INJECT] VETO {symbol}: {v_code}")
+                            continue
+                    except Exception as e:
+                        logger.warning(f"[ARROW-PEAK-INJECT] Error validando {symbol}: {e}")
+                        continue
 
-            if arrow_peak_injected:
-                logger.info(f"[ARROW-PEAK-INJECT] {arrow_peak_injected} nuevos (total candidates={len(candidates)})")
+                    candidates.append(ac)
+                    arrow_peak_injected += 1
+                    logger.warning(
+                        f"[ARROW-PEAK-INJECT] {symbol} | Score={ac['confluence_score']} | "
+                        f"{item.get('days_bleeding')}d sangrado tras +{item.get('prev_rise_pct', 0):.1f}% "
+                        f"— reversión por agotamiento (SHORT)"
+                    )
+
+                if arrow_peak_injected:
+                    logger.info(f"[ARROW-PEAK-INJECT] {arrow_peak_injected} nuevos (total candidates={len(candidates)})")
+
+            # ── ARROW PEAK V2 (clon): mismo detector, TP graduado por magnitud
+            # del pump (prev_rise_pct) — openspec market-data-expansion sección
+            # 7. Corre en paralelo al original SIN reemplazarlo (pedido
+            # explícito del usuario 2026-07-18, tras encontrar con el backtest
+            # real que la franja 25-50% de prev_rise_pct rinde peor y tarda
+            # más que las franjas 20-25% y 50%+ — ver arrow_peak_backtest.py).
+            if getattr(config, "ARROW_PEAK_V2_ENABLED", False):
+                for item in arrow_peak_triggered_items:
+                    symbol = item.get("symbol")
+                    if not symbol:
+                        continue
+                    if self._should_skip_arrow_peak_pair(symbol, "arrow_peak_v2"):
+                        continue
+
+                    ac = self._build_arrow_peak_v2_candidate(item)
+                    ac_px = ac.get("price_at_signal") or self.fetcher.get_current_price(symbol)
+                    if not ac_px or ac_px <= 0:
+                        continue
+                    try:
+                        v_ok, v_code, _ = validate_pre_trade(
+                            ac, ac_px, btc_filter=self.btc_filter, btc_corr=self.btc_corr
+                        )
+                        if not v_ok:
+                            logger.info(f"[ARROW-PEAK-V2-INJECT] VETO {symbol}: {v_code}")
+                            continue
+                    except Exception as e:
+                        logger.warning(f"[ARROW-PEAK-V2-INJECT] Error validando {symbol}: {e}")
+                        continue
+
+                    candidates.append(ac)
+                    arrow_peak_v2_injected += 1
+                    logger.warning(
+                        f"[ARROW-PEAK-V2-INJECT] {symbol} | Score={ac['confluence_score']} | "
+                        f"{item.get('days_bleeding')}d sangrado tras +{item.get('prev_rise_pct', 0):.1f}% "
+                        f"— reversión por agotamiento (SHORT, TP graduado)"
+                    )
+
+                if arrow_peak_v2_injected:
+                    logger.info(f"[ARROW-PEAK-V2-INJECT] {arrow_peak_v2_injected} nuevos (total candidates={len(candidates)})")
 
         # ── MA PATTERN: Inyección directa (motor genérico MaGeometry, por perfil) ──
         # Cada perfil StrategyType=MaGeometry es su propia fuente/estrategia.
@@ -2558,6 +2605,36 @@ class VergeAgent:
             return True
         return False
 
+    _ARROW_PEAK_PAIR = ("arrow_peak", "arrow_peak_v2")
+
+    def _should_skip_arrow_peak_pair(self, symbol: str, own_source: str) -> bool:
+        """
+        Mismo criterio que _should_skip, con una excepción puntual pedida
+        por el usuario (2026-07-18): arrow_peak y arrow_peak_v2 (el clon con
+        TP graduado por magnitud de pump, ver openspec market-data-expansion
+        sección 7) pueden convivir en el mismo símbolo el mismo día, con
+        posiciones simultáneas entre sí — para que la comparación entre
+        original y clon sea sobre el MISMO evento real, no una repartición
+        arbitraria de cuál dispara primero. Cualquier otra fuente (o una
+        segunda entrada del mismo own_source el mismo día) sigue bloqueando
+        exactamente como _should_skip.
+        """
+        other_source = next(s for s in self._ARROW_PEAK_PAIR if s != own_source)
+
+        for p in self.state.get_open_positions():
+            if p.get("symbol") != symbol:
+                continue
+            if p.get("source") == other_source:
+                continue  # el otro miembro del par ya abierto — permitido
+            return True
+
+        sources_today = self.state.get_symbol_sources_traded_today(symbol)
+        if not sources_today:
+            return False
+        if all(s == other_source for s in sources_today):
+            return False
+        return True
+
     # ─────────────────────────────────────────────────────────
     # Trade execution
     # ─────────────────────────────────────────────────────────
@@ -3143,7 +3220,7 @@ class VergeAgent:
         items donde el trigger de ejecución ya disparó este ciclo — no la
         lista completa de "en observación".
         """
-        if not getattr(config, "ARROW_PEAK_ENABLED", True):
+        if not getattr(config, "ARROW_PEAK_ENABLED", True) and not getattr(config, "ARROW_PEAK_V2_ENABLED", False):
             return []
         base_py = config.PYTHON_SERVICE_URL.rstrip("/")
         url = f"{base_py}/nexus15/arrow-peak"
@@ -3216,9 +3293,83 @@ class VergeAgent:
             },
         }
 
+    def _build_arrow_peak_v2_candidate(self, item: dict) -> dict:
+        """
+        [ARROW PEAK V2 — clon] Mismo detector que _build_arrow_peak_candidate
+        (arrow_peak_analyzer.py sin tocar), pero con TP graduado por
+        prev_rise_pct — openspec market-data-expansion sección 7. El
+        backtest real (185 trades, agent/arrow_peak_backtest.py) mostró
+        forma de "U": franjas 20-25% y 50%+ de prev_rise_pct rinden bien
+        (PF 1.52 y 2.02), la franja intermedia 25-50% rinde peor (PF ~1.0-1.1)
+        Y tarda más en cerrar. Para esa franja, el TP apunta al 50% del
+        camino de vuelta (peak → arrow_start) en vez del 100% (origen
+        completo) que usa el original — cierra más rápido sin perseguir un
+        objetivo que esa franja rara vez alcanza a tiempo. Fuera de esa
+        franja, usa EXACTAMENTE la misma lógica que el original.
+        Corre en paralelo al original sin reemplazarlo — source distinto
+        ("arrow_peak_v2") para que Historial los trackee por separado.
+        """
+        symbol = item.get("symbol")
+        price = float(item.get("current_price") or 0)
+        peak_price = float(item.get("peak_price") or 0)
+        arrow_start_price = float(item.get("arrow_start_price") or 0)
+        prev_rise_pct = float(item.get("prev_rise_pct") or 0)
+        ap_score = float(getattr(config, "ARROW_PEAK_SCORE", 85.0))
+        sl_buffer_pct = float(getattr(config, "ARROW_PEAK_SL_BUFFER_PCT", 1.0))
+        custom_sl = peak_price * (1 + sl_buffer_pct / 100.0) if peak_price > 0 else None
+
+        tp_buffer_pct = float(getattr(config, "ARROW_PEAK_TP_BUFFER_PCT", 2.0))
+        weak_lo = float(getattr(config, "ARROW_PEAK_V2_WEAK_ZONE_LOW_PCT", 25.0))
+        weak_hi = float(getattr(config, "ARROW_PEAK_V2_WEAK_ZONE_HIGH_PCT", 50.0))
+        in_weak_zone = weak_lo <= prev_rise_pct < weak_hi
+
+        if in_weak_zone and peak_price > 0 and arrow_start_price > 0:
+            half_retracement_price = peak_price - (peak_price - arrow_start_price) * 0.5
+            custom_tp = half_retracement_price * (1 + tp_buffer_pct / 100.0)
+        else:
+            custom_tp = arrow_start_price * (1 + tp_buffer_pct / 100.0) if arrow_start_price > 0 else None
+
+        if custom_tp is not None and custom_tp >= price:
+            custom_tp = None  # el objetivo quedó por encima del precio actual, no sirve como TP de SHORT
+
+        return {
+            "symbol": symbol,
+            "confluence_score": ap_score,
+            "nexus_confidence": ap_score,
+            "trade_direction": "SHORT",
+            "side": 1,
+            "source": "arrow_peak_v2",
+            "arrow_peak_v2_mode": True,
+            "price_at_signal": price,
+            "reasons": [
+                f"[ARROW-PEAK-V2] {item.get('days_bleeding')}d de sangrado tras "
+                f"+{prev_rise_pct:.1f}% | zona={'débil (TP 50% retroceso)' if in_weak_zone else 'normal (TP origen completo)'} | "
+                f"MA99 dist={float(item.get('dist_ma99_pct') or 0):.2f}%"
+            ],
+            "custom_sl_price": custom_sl,
+            "custom_tp_price": custom_tp,
+            "agent_audit_context": {
+                "arrow_peak_v2": {
+                    "detected": True,
+                    "days_bleeding": item.get("days_bleeding"),
+                    "prev_rise_pct": prev_rise_pct,
+                    "peak_price": peak_price,
+                    "arrow_start_price": arrow_start_price,
+                    "dist_ma99_pct": item.get("dist_ma99_pct"),
+                    "weak_zone_tp": in_weak_zone,
+                },
+                "scar": {},
+                "nexus15": {},
+            },
+        }
+
     def _is_arrow_peak_candidate(self, candidate: dict) -> bool:
-        """True si el candidato entró por ARROW PEAK (reversión por agotamiento)."""
-        return candidate.get("arrow_peak_mode", False) or candidate.get("source") == "arrow_peak"
+        """True si el candidato entró por ARROW PEAK (reversión por agotamiento), original o clon V2."""
+        return (
+            candidate.get("arrow_peak_mode", False)
+            or candidate.get("arrow_peak_v2_mode", False)
+            or candidate.get("source") in ("arrow_peak", "arrow_peak_v2")
+        )
 
     # ─────────────────────────────────────────────────────────
     # MOTOR DE PATRONES DE MEDIAS MÓVILES (MaGeometry) — genérico, por perfil.
@@ -4160,6 +4311,26 @@ class VergeAgent:
                 f"Rise={ap_rise}% | Bleeding={ap_days}d | MA99Dist={ap_ma99}%"
             )
 
+        # ── ARROW PEAK V2 (clon, TP graduado): Tag strategy ─────────────────────
+        if candidate.get("arrow_peak_v2_mode"):
+            ap2_ctx = candidate.get("agent_audit_context", {}).get("arrow_peak_v2", {})
+            ap2_days = ap2_ctx.get("days_bleeding", "?")
+            ap2_rise = ap2_ctx.get("prev_rise_pct", "?")
+            ap2_ma99 = ap2_ctx.get("dist_ma99_pct", "?")
+            ap2_weak = ap2_ctx.get("weak_zone_tp", False)
+
+            entry_reason = (
+                f"[STRAT: ARROW-PEAK-V2] Reversión por agotamiento: subida previa de {ap2_rise}% "
+                f"seguida de {ap2_days} día(s) de sangrado, toque de MA99 (dist={ap2_ma99}%). "
+                f"TP={'50% retroceso (zona débil)' if ap2_weak else 'origen completo'}. "
+                f"Score={candidate.get('confluence_score')} bypass activo."
+            )
+
+            logger.warning(
+                f"[ARROW-PEAK-V2] {symbol} — STRATEGY TAG APPLIED | "
+                f"Rise={ap2_rise}% | Bleeding={ap2_days}d | MA99Dist={ap2_ma99}% | WeakZoneTP={ap2_weak}"
+            )
+
         # ── FVG: Tag strategy ────────────────────────────────────────────────────
         if candidate.get("fvg_mode"):
             fvg_ctx = candidate.get("agent_audit_context", {}).get("fvg", {})
@@ -4405,7 +4576,7 @@ class VergeAgent:
                 **pos_details,
             }
             self.state.add_position(local_pos)
-            self.state.record_trade_action(symbol)
+            self.state.record_trade_action(symbol, source=candidate.get("source"))
             if candidate.get("source") == "LSE":
                 self.state.register_lse_symbol_cooldown(symbol, candidate.get("lse_timeframe") or "1h")
             self.report.log_trade_opened(local_pos)

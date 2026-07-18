@@ -264,6 +264,19 @@ ARROW_PEAK_TP_BUFFER_PCT = float(os.getenv("ARROW_PEAK_TP_BUFFER_PCT", "2.0"))
 # Timeout del scan completo (recorre todo el watchlist con 2 timeframes por símbolo).
 ARROW_PEAK_HTTP_TIMEOUT_SEC = int(os.getenv("ARROW_PEAK_HTTP_TIMEOUT_SEC", "90"))
 
+# ── ARROW PEAK V2 (clon, TP graduado por magnitud de pump) ──
+# openspec market-data-expansion sección 7 (2026-07-18). Corre en PARALELO al
+# original (ARROW_PEAK_ENABLED), no lo reemplaza — mismo detector, mismo SL,
+# distinto TP en la franja de prev_rise_pct que el backtest real
+# (agent/arrow_peak_backtest.py, 185 trades) mostró que rinde peor y tarda más.
+# Default False: opt-in explícito, no cambia el comportamiento actual hasta
+# que se active a propósito.
+ARROW_PEAK_V2_ENABLED = os.getenv("ARROW_PEAK_V2_ENABLED", "false").lower() in ("1", "true", "yes")
+# Franja [LOW, HIGH) de prev_rise_pct donde el TP se acorta al 50% del
+# retroceso (peak -> arrow_start) en vez del 100% del original.
+ARROW_PEAK_V2_WEAK_ZONE_LOW_PCT = float(os.getenv("ARROW_PEAK_V2_WEAK_ZONE_LOW_PCT", "25.0"))
+ARROW_PEAK_V2_WEAK_ZONE_HIGH_PCT = float(os.getenv("ARROW_PEAK_V2_WEAK_ZONE_HIGH_PCT", "50.0"))
+
 # ==========================================
 # MA SLOPE — "Cruce de Medias" anticipado (Casos 1/2/3, 1H)
 # ==========================================

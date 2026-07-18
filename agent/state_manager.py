@@ -63,13 +63,28 @@ class StateManager:
             return self._reset_daily_stats()
         return stats
 
-    def record_trade_action(self, symbol: str):
-        """Records that a trade was opened today to enforce limits."""
+    def record_trade_action(self, symbol: str, source: str = None):
+        """
+        Records that a trade was opened today to enforce limits. `source`
+        es opcional y aditivo (stats viejos sin esta clave siguen andando
+        igual) — permite que _should_skip_arrow_peak_pair() sepa QUÉ fuente
+        ya operó este símbolo hoy, para la excepción puntual entre
+        arrow_peak/arrow_peak_v2 (2026-07-18) sin tocar has_traded_symbol_today,
+        que sigue siendo la misma lista plana que usa el resto de estrategias.
+        """
         stats = self.get_daily_stats()
         stats["trades_count"] += 1
         if symbol not in stats["symbols_traded_today"]:
             stats["symbols_traded_today"].append(symbol)
+        if source:
+            sources = stats.setdefault("symbol_sources_traded_today", {})
+            sources.setdefault(symbol, []).append(source)
         self._save_json(self.daily_stats_file, stats)
+
+    def get_symbol_sources_traded_today(self, symbol: str) -> list:
+        """Fuentes (candidate['source']) que ya operaron este símbolo hoy. [] si ninguna o si es de antes de agregar este campo."""
+        stats = self.get_daily_stats()
+        return stats.get("symbol_sources_traded_today", {}).get(symbol, [])
 
     def can_trade_today(self) -> bool:
         """Check if we haven't hit the daily maximum trades limit."""

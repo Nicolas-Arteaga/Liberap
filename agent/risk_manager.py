@@ -238,7 +238,11 @@ class RiskManager:
         # MA Slope (Casos 1/2/3): SL = mínimo/máximo reciente + buffer, según lado.
         structural_sniper_mode = signal_data.get("structural_sniper_mode", False)
         golden_uturn_mode = signal_data.get("golden_uturn_mode", False)
-        arrow_peak_mode = signal_data.get("arrow_peak_mode", False)
+        # arrow_peak_v2_mode (clon con TP graduado, openspec market-data-expansion
+        # sección 7) reusa EXACTAMENTE la misma rama de riesgo que el original —
+        # ambos ya traen su propio custom_sl_price/custom_tp_price calculado
+        # correctamente en verge_agent.py, esta rama solo respeta lo que venga.
+        arrow_peak_mode = signal_data.get("arrow_peak_mode", False) or signal_data.get("arrow_peak_v2_mode", False)
         ma_slope_mode = signal_data.get("ma_slope_mode", False)
         fvg_mode = signal_data.get("fvg_mode", False)
         custom_sl_price = signal_data.get("custom_sl_price")

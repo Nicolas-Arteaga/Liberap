@@ -160,6 +160,7 @@ def run_arrow_peak_backtest(symbol: str, fee_pct: float = 0.0) -> BacktestResult
             if open_trade.exit_price is not None:
                 open_trade.pnl_pct = (open_trade.entry_price - open_trade.exit_price) / open_trade.entry_price * 100.0
                 open_trade.pnl_pct -= fee_pct
+                open_trade.candles_to_exit = open_trade.exit_idx - open_trade.entry_idx  # velas de 15m hasta cerrar (velocidad)
                 result.trades.append(open_trade)
                 open_trade = None
             i += 1
@@ -193,6 +194,9 @@ def run_arrow_peak_backtest(symbol: str, fee_pct: float = 0.0) -> BacktestResult
                 if sl_price > entry_price:  # sanity check, side=SHORT
                     open_trade = BacktestTrade(symbol, 1, i, entry_price, sl_price, tp_price)
                     open_trade.entry_time_ms = klines_15m[i]["open_time"]  # para alinear régimen de BTC por timestamp real, no por índice
+                    open_trade.prev_rise_pct = pattern["prev_rise_pct"]  # magnitud del pump — para correlacionar con calidad del trade
+                    open_trade.bleeding_days = pattern["bleeding_days"]
+                    open_trade.candles_to_exit = None  # se completa al cerrar
         i += 1
 
     return result
@@ -225,6 +229,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--symbols", default=None, help="Coma-separado; si se omite, corre contra todos los símbolos con historia suficiente")
     ap.add_argument("--fee-pct", type=float, default=0.08, help="Fee ida+vuelta, %% (default 0.08 ~ taker Binance futures)")
+    ap.add_argument("--export-csv", default=None, help="Vuelca cada trade cerrado (symbol, prev_rise_pct, bleeding_days, candles_to_exit, pnl_pct, exit_reason) a este CSV")
     args = ap.parse_args()
 
     cache = get_cache()
@@ -250,6 +255,16 @@ def main():
     if not all_trades:
         print("[ArrowPeakBacktest] Ningún trade generado en todo el universo probado.")
         return
+
+    if args.export_csv:
+        import csv
+        with open(args.export_csv, "w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow(["symbol", "entry_time_ms", "prev_rise_pct", "bleeding_days", "candles_to_exit", "pnl_pct", "exit_reason"])
+            for t in all_trades:
+                w.writerow([t.symbol, getattr(t, "entry_time_ms", ""), getattr(t, "prev_rise_pct", ""),
+                           getattr(t, "bleeding_days", ""), getattr(t, "candles_to_exit", ""), t.pnl_pct, t.exit_reason])
+        print(f"[ArrowPeakBacktest] Exportado a {args.export_csv} ({len(all_trades)} trades)")
 
     wins = [t for t in all_trades if t.pnl_pct and t.pnl_pct > 0]
     losses = [t for t in all_trades if t.pnl_pct and t.pnl_pct <= 0]

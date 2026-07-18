@@ -32,6 +32,7 @@ def _is_direct_injection_candidate(candidate: dict) -> bool:
     return bool(
         candidate.get("ma_slope_mode")
         or candidate.get("arrow_peak_mode")
+        or candidate.get("arrow_peak_v2_mode")
         or candidate.get("total_sweep_mode")
         or candidate.get("golden_uturn_mode")
         or candidate.get("fvg_mode")

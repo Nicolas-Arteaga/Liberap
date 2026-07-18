@@ -2,6 +2,13 @@
 
 Changelog corto y fechado de fixes/features/decisiones por sesión. Ver `~/.claude/CLAUDE.md` para cómo se usa esto.
 
+## 2026-07-18
+- **Backtest real de Arrow Reversal (Arrow Peak)** — `agent/arrow_peak_backtest.py`, portando la lógica de `arrow_peak_analyzer.py` contra klines cacheados (1D reconstruido agregando 1h por día calendario, ya que casi no hay velas 1D cacheadas). 185 trades reales / 681 símbolos: 62.2% precisión, PF 1.39, robusto en los 3 regímenes de BTC (no depende de que esté bajista, contra la sospecha inicial del usuario).
+- **Verificada con datos reales la hipótesis del usuario** sobre reversión post-pico: 0% de recuperación del precio del pico en 1 día (0/348 casos históricos), solo 25.6% la recupera dentro de 10 días — confirma el mecanismo de fondo detrás de Arrow Reversal.
+- **Hallazgo real para calibrar el TP**: la relación entre magnitud del pump previo y calidad del trade NO es lineal — forma de "U" (franjas 20-25% y 50%+ rinden bien, la franja intermedia 25-50% rinde mal y encima tarda más). Candidato a clonar Arrow Reversal con TP graduado por esta franja, sin tocar el original (mismo patrón que MA Slope Caso 3 15m).
+- Chequeada la hipótesis de confluencia multi-timeframe de medias móviles (`agent/arrow_ma_confluence_check.py`): señal real pero moderada (PF 1.71 vs 1.14 comprimido/no comprimido), correlación lineal débil — sugestivo, no confirmado con fuerza.
+- Commit + push del epic #156 completo (secciones 1-4 en producción, sección 5 con resultado honesto de "no sirve todavía", TODO documentado en `openspec/changes/market-data-expansion/tasks.md`).
+
 ## 2026-07-17
 - **Epic #156 (market-data-expansion) — secciones 1 y 2 completas y en producción**: order book imbalance (OFI, `agent/orderbook_ws.py`) y funding rate (`agent/funding_rates.py`) capturando en vivo, con veto opt-in de funding en `setup_validator.py`. Bug real encontrado y arreglado en el camino: el payload real de Binance Futures para partial depth usa `b`/`a` y trae `s` (símbolo), no `bids`/`asks` como muestra la doc pública (esa es la de spot) — detectado porque los mensajes llegaban pero nunca se escribían.
 - **Hallazgo de arquitectura importante**: el contenedor Docker `market-ws` y el proceso real `verge_agent.py` (host) usan bases SQLite completamente separadas — el backtest engine solo lee la del host. La captura de OFI/funding se movió a correr TAMBIÉN dentro de `verge_agent.py` (no solo en Docker) para que `backtest_engine.py` tenga acceso real. Requirió reiniciar el agente en vivo 3 veces esta sesión (con 26 posiciones abiertas, todas resincronizadas sin problema).
