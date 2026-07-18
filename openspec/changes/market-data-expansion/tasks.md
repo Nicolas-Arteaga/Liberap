@@ -57,5 +57,20 @@ reales) — mismo tipo de dato, gratis, sin cuenta.
 
 ## 6. Cierre del change
 
-- [ ] 6.1 Documentar en `.claude/PROGRESS_LOG.md` qué señales quedaron activas y cuáles se descartaron por no mostrar mejora en backtest (mismo criterio ya aplicado a Caso 1/Caso 2/FVG)
-- [ ] 6.2 `openspec archive market-data-expansion` una vez completadas las tareas anteriores, para que las specs pasen a `openspec/specs/` como estado vigente del sistema
+- [x] 6.1 Documentado en `.claude/PROGRESS_LOG.md` (entradas 2026-07-17) qué señales quedaron activas (OFI, funding, liquidaciones, ballenas) y cuál se descartó por no mostrar mejora (Nexus-15)
+- [ ] 6.2 `openspec archive market-data-expansion` — **todavía no**, quedan pendientes reales (ver TODO abajo), no cerrar hasta que estén resueltos o descartados explícitamente
+
+## 7. Mejoras a Arrow Reversal (fuera del alcance original — hallazgo de sesión 2026-07-17)
+
+No estaba en el plan original de este epic, pero surgió de un análisis en vivo con el usuario sobre por qué Arrow Reversal (Arrow Peak) tarda más en tocar TP que MA Slope Caso 3, a partir de un caso real (XANUSDT) con un pump "flojo" (4 días verdes, no un +20% raspando el mínimo). Verificado con datos reales (348 picos históricos, 681 símbolos, cero llamadas a Binance): el precio NUNCA recupera el nivel del pico en el primer día después de la primera vela roja (0/348), y solo el 25.6% lo recupera dentro de 10 días — confirma que el mecanismo de fondo es real, no solo el backtest de trading (185 trades, WR 62%, PF 1.39, robusto en los 3 regímenes de BTC — no depende de que BTC esté bajista, contra la sospecha inicial).
+
+- [ ] 7.1 TP graduado según magnitud del pump (`prev_rise_pct`): correlacionar en los 185 trades del backtest si un pump más grande predice una reversión más rápida/profunda — mantener el umbral actual (20%) para señales frecuentes CON un TP más cercano/rápido acorde a su magnitud, y agregar un tier de umbral más alto (ej. 30-35%) con TP más ambicioso — no reemplazar uno por el otro, hacer los dos
+- [ ] 7.2 Investigar si el trigger actual (toque de MA99 ±0.5% + vela roja > vela verde previa, sin memoria entre ciclos) puede disparar más de una entrada por la misma "flecha" en rebotes sucesivos — el usuario notó en vivo (XANUSDT) que hubo al menos 2 recuperaciones de precio antes de la reversión real y no está claro cuál dispara la entrada
+- [ ] 7.3 Hipótesis del usuario a verificar con datos históricos: la entrada de mejor calidad coincide con una secuencia de cruces de medias móviles en confluencia multi-timeframe (15m + 5m, no hay velas de 3m cacheadas — usar 1m como proxy más fino) — MA25 "alcanzando" a MA7 mientras el precio ya perforó hacia MA50/MA99, seguido de un mechazo final y explosión hacia la media más lejana todavía por encima. Pendiente de análisis sistemático sobre los 185 trades reales para confirmar si es un patrón consistente o solo esta muestra visual puntual.
+
+### TODO general del epic (para no perder de vista al retomar)
+
+- Nexus-15 "pro": esperar a que madure la historia de OFI/funding/liquidaciones (arrancó 2026-07-17) y reentrenar incluyéndolas como features — sin esto, ya se probó 2 veces que no mejora (ver sección 5)
+- Cablear `/whale/<symbol>` hasta el widget del dashboard (agente → backend .NET → SignalR → Angular) — sección 4.4/4.5
+- Sección 3 (liquidaciones): reintentar el diagnóstico del WS de Binance de tanto en tanto — no confirmado como bloqueo permanente, aunque Bybit ya cubre la necesidad real
+- Sección 7 (Arrow Reversal): las 3 tareas de arriba, recién identificadas, sin empezar
