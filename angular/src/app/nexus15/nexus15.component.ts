@@ -86,6 +86,9 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
   isStaircaseLoading = signal(false);
   arrowPeakResults = signal<ArrowPeakItemDto[]>([]);
   isArrowPeakLoading = signal(false);
+  arrowPeakV2Results = signal<any[]>([]);
+  isArrowPeakV2Loading = signal(false);
+  arrowPeakV2Error = signal<string | null>(null);
 
 
 
@@ -410,6 +413,35 @@ export class Nexus15Component implements OnInit, AfterViewInit, OnDestroy {
         }
       });
     });
+  }
+
+  /**
+   * DEBUG/TEST — openspec market-data-expansion sección 7 (2026-07-18).
+   * Le pega DIRECTO al HTTP del agente Python (puerto 8002, mismo proceso
+   * que ya expone /position/.../max-adverse-price al backend .NET, CORS
+   * abierto) en vez de pasar por el proxy de python-service, porque la
+   * comparación TP original vs. TP graduado (v2) vive del lado del agente,
+   * no del analyzer. Solo funciona si Angular corre en la MISMA máquina
+   * que el agente (localhost) — no pensado para uso remoto.
+   */
+  runArrowPeakV2Compare() {
+    this.isArrowPeakV2Loading.set(true);
+    this.arrowPeakV2Results.set([]);
+    this.arrowPeakV2Error.set(null);
+    this.pushTerminal('> 🏹⚡ ARROW PEAK V2 COMPARE: TP original vs. TP graduado...');
+
+    fetch('http://127.0.0.1:8002/arrow-peak-v2-preview')
+      .then(r => r.json())
+      .then(data => {
+        this.arrowPeakV2Results.set(data.items || []);
+        this.isArrowPeakV2Loading.set(false);
+        this.pushTerminal(`✓ ARROW PEAK V2 COMPARE: ${(data.items || []).length} candidatos comparados`);
+      })
+      .catch(err => {
+        this.isArrowPeakV2Loading.set(false);
+        this.arrowPeakV2Error.set('No se pudo conectar al agente en localhost:8002 (¿está corriendo?)');
+        this.pushTerminal(`⚠ ARROW PEAK V2 COMPARE ERROR: ${err?.message || err}`);
+      });
   }
 
   runArrowPeak() {

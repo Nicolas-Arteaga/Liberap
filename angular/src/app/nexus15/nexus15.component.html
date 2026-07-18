@@ -313,6 +313,38 @@
           </div>
         </div>
 
+        <!-- ARROW PEAK V2 COMPARE Panel (DEBUG/TEST) -->
+        <div class="nx15-signal-panel mb-2" *ngIf="arrowPeakV2Results().length > 0 || arrowPeakV2Error()">
+          <div class="nx15-arrow-peak-radar">
+            <div class="arrow-peak-header">
+              <span class="arrow-peak-title">🏹⚡ ARROW PEAK V2 — TP ORIGINAL vs. TP GRADUADO</span>
+              <span class="arrow-peak-count">{{ arrowPeakV2Results().length }} CANDIDATOS</span>
+              <div class="arrow-peak-clear" (click)="arrowPeakV2Results.set([]); arrowPeakV2Error.set(null)">⨯</div>
+            </div>
+            <div *ngIf="arrowPeakV2Error()" style="color:#ff4466; padding:8px;">{{ arrowPeakV2Error() }}</div>
+            <div class="arrow-peak-table" *ngIf="!arrowPeakV2Error()">
+              <div class="arrow-peak-row arrow-peak-header-row">
+                <span class="ap-col ap-col-moneda">MONEDA</span>
+                <span class="ap-col ap-col-prev-rise">SUBIDA PREVIA</span>
+                <span class="ap-col ap-col-bleeding">ZONA</span>
+                <span class="ap-col">TP ORIGINAL</span>
+                <span class="ap-col">TP V2 (graduado)</span>
+              </div>
+              <div class="arrow-peak-row" *ngFor="let item of arrowPeakV2Results()" (click)="onSymbolChange(item.symbol)">
+                <span class="ap-col ap-col-moneda">{{ item.symbol?.replace('USDT','') }}</span>
+                <span class="ap-col ap-col-prev-rise">{{ item.prev_rise_pct | number:'1.1-1' }}%</span>
+                <span class="ap-col ap-col-bleeding" [style.color]="item.weak_zone ? '#ffdd00' : '#00ff88'">
+                  {{ item.weak_zone ? 'débil (25-50%)' : 'normal' }}
+                </span>
+                <span class="ap-col">{{ item.tp_original ?? '—' }}</span>
+                <span class="ap-col" [style.color]="item.weak_zone && item.tp_v2 !== item.tp_original ? '#00f0ff' : 'inherit'">
+                  {{ item.tp_v2 ?? '—' }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div><!-- /col-xl-8 -->
 
       <!-- RIGHT: Grupos de señales + Botones -->
@@ -446,6 +478,13 @@
                 <span class="act-icon">🏹</span>
                 <span class="act-text">ARROW PEAK SCAN</span>
                 <span class="act-spin" *ngIf="isArrowPeakLoading()"> ⟳</span>
+              </button>
+
+              <button class="nx15-activate btn-arrow-peak" (click)="runArrowPeakV2Compare()" [disabled]="isArrowPeakV2Loading()"
+                      title="DEBUG: compara el TP original vs. el TP graduado del clon (arrow_peak_v2) — le pega directo al agente en localhost:8002">
+                <span class="act-icon">🏹⚡</span>
+                <span class="act-text">ARROW PEAK V2 COMPARE</span>
+                <span class="act-spin" *ngIf="isArrowPeakV2Loading()"> ⟳</span>
               </button>
             </div>
 

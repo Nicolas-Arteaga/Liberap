@@ -3239,6 +3239,45 @@ class VergeAgent:
             logger.warning(f"[ARROW-PEAK] Scan error: {e}")
             return []
 
+    def _arrow_peak_v2_preview(self) -> list:
+        """
+        [DEBUG/TEST — no toca el loop de trading] Devuelve la comparación
+        TP original vs. TP graduado (v2) para TODOS los símbolos que ya
+        califican el patrón (pump + sangrado), no solo los que dispararon el
+        trigger de entrada exacto este ciclo — ese momento es raro (ver
+        openspec market-data-expansion sección 7), así que esto deja algo
+        para ver sin tener que esperar. Pedido explícito del usuario
+        (2026-07-18) para poder "verlo" sin esperar un trigger real.
+        """
+        base_py = config.PYTHON_SERVICE_URL.rstrip("/")
+        url = f"{base_py}/nexus15/arrow-peak"
+        timeout = int(getattr(config, "ARROW_PEAK_HTTP_TIMEOUT_SEC", 90))
+        try:
+            resp = requests.post(url, json={"symbols": config.WATCHLIST}, timeout=timeout)
+            if resp.status_code != 200:
+                return []
+            items = resp.json().get("top_5", [])
+        except Exception as e:
+            logger.warning(f"[ARROW-PEAK-V2-PREVIEW] Scan error: {e}")
+            return []
+
+        out = []
+        for item in items:
+            v1 = self._build_arrow_peak_candidate(item)
+            v2 = self._build_arrow_peak_v2_candidate(item)
+            out.append({
+                "symbol": item.get("symbol"),
+                "prev_rise_pct": item.get("prev_rise_pct"),
+                "days_bleeding": item.get("days_bleeding"),
+                "current_price": item.get("current_price"),
+                "trigger_signal": item.get("trigger_signal", False),
+                "weak_zone": v2.get("agent_audit_context", {}).get("arrow_peak_v2", {}).get("weak_zone_tp", False),
+                "tp_original": v1.get("custom_tp_price"),
+                "tp_v2": v2.get("custom_tp_price"),
+                "sl": v1.get("custom_sl_price"),
+            })
+        return out
+
     def _build_arrow_peak_candidate(self, item: dict) -> dict:
         """
         [ARROW PEAK] Construye el candidato SHORT: SL = techo del pico + buffer
@@ -4998,6 +5037,14 @@ def _build_agent_response(path, agent):
             return activity
         except Exception:
             return {"symbol": symbol, "available": False}
+    if path == '/arrow-peak-v2-preview':
+        # DEBUG/TEST — pedido explícito del usuario (2026-07-18) para poder
+        # "ver" el clon (arrow_peak_v2, TP graduado) sin esperar un trigger
+        # real, que es raro. No toca el loop de trading en absoluto.
+        try:
+            return {"items": agent._arrow_peak_v2_preview()}
+        except Exception as e:
+            return {"items": [], "error": str(e)}
     return None
 
 async def handle_agent_request(reader, writer, agent):
