@@ -55,6 +55,13 @@ def _build_response(path):
             return get_cache().get_all_tickers()
         except:
             return {}
+    elif path.startswith('/market/ofi/'):
+        symbol = path.split('/')[-1].upper()
+        try:
+            from kline_cache import get_cache
+            return get_cache().get_latest_ofi(symbol)  # None si no hay dato o está stale
+        except:
+            return None
     elif path.startswith('/audit/'):
         if '/summary' in path:
             return {"balance": 10000, "winRate": 0, "trades": 0, "pnlTotal": 0}
@@ -201,6 +208,13 @@ def main_startup():
             threading.Thread(target=ws_loop, args=(exc_name,), daemon=True).start()
             agent_log(f"🚀 Canal {exc_name.upper()} iniciado.")
             time.sleep(0.3)
+
+        # Order book / OFI (solo Binance — openspec market-data-expansion, sección 1)
+        set_exchange_status("orderbook", "CONNECTING")
+        from orderbook_ws import run_orderbook_stream
+        threading.Thread(target=run_orderbook_stream, args=(agent_log, set_exchange_status), daemon=True).start()
+        agent_log("🚀 Canal ORDERBOOK (OFI) iniciado.")
+
         agent_log("💎 Sistema Market-WS totalmente operativo.")
     except Exception as e:
         agent_log(f"❌ ERROR CRITICO EN STARTUP: {e}")

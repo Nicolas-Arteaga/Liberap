@@ -292,6 +292,8 @@ freqtrade/user_data/*.sqlite-wal
 __pycache__/
 *.pyc
 agent/data/
+python-service/nexus15/data/
+python-service/nexus15/models/
 agent/logs/
 scratch/create_agent_profile.*
 # Marcador interno del hook de progress-log (bookkeeping, no aporta valor versionado)

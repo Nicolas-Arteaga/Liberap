@@ -91,7 +91,7 @@ def train(data_path: str):
     with open(f"{save_dir}/nexus15_meta.json", "w") as f:
         json.dump(meta, f, indent=2)
 
-    print(f"✅ NEXUS-15 model saved to {save_dir}/")
+    print(f"NEXUS-15 model saved to {save_dir}/")
 
 
 if __name__ == "__main__":

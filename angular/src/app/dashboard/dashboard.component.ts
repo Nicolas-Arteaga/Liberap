@@ -536,12 +536,16 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     const style = alert.style || alert.Style || 'DayTrading (15m)';
     const historicProb = winProb != null ? winProb * 100 : 0;
 
-    // Keyword matching for generic logs without structured data
+    // Keyword matching solo para squeeze/liquidación (heurística de UI, no
+    // pretende ser un dato "real"). El whaleScore YA NO se inventa acá con un
+    // default fijo si el mensaje menciona "ballena" — openspec
+    // market-data-expansion sección 4: ese score fijo de 65 era exactamente
+    // el antipatrón "parece un dato real y no lo es" (ver PROGRESS_LOG
+    // 2026-07-15/16). Si el backend no manda whaleInfluence real, queda en 0
+    // y el bloque de abajo simplemente no lo muestra — ver agent/whale_tracker.py
+    // para la fuente real (on-chain, gratis, cobertura hoy limitada a BTCUSDT).
     if (alert.message) {
       const msg = alert.message.toLowerCase();
-      if (msg.includes('ballena') || msg.includes('whale') || msg.includes('acumulación')) {
-        if (whaleScore === 0) whaleScore = 65; // Default score if keyword matched
-      }
       if (msg.includes('squeeze') || msg.includes('liquidación') || msg.includes('cluster')) {
         isSqueeze = true;
       }

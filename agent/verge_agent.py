@@ -4813,6 +4813,20 @@ def _build_agent_response(path, agent):
                 return {"tradeId": trade_id, "maxAdversePrice": max_adv}
             else:
                 return {"tradeId": trade_id, "maxAdversePrice": None, "error": "Position not found"}
+    if path.startswith('/whale/'):
+        # openspec market-data-expansion, sección 4 — reemplaza el widget de
+        # ballenas por keyword-matching. None real (no "score":0 inventado)
+        # si el símbolo no tiene cobertura on-chain — ver whale_tracker.py.
+        symbol = path.split('/')[-1].upper()
+        try:
+            from kline_cache import get_cache
+            activity = get_cache().get_whale_activity(symbol)
+            if activity is None:
+                return {"symbol": symbol, "available": False}
+            activity["available"] = True
+            return activity
+        except Exception:
+            return {"symbol": symbol, "available": False}
     return None
 
 async def handle_agent_request(reader, writer, agent):
@@ -4906,6 +4920,61 @@ if __name__ == "__main__":
             daemon=True
         )
         http_thread.start()
+
+        # Order book / OFI — captura propia acá en el host (no solo en el
+        # contenedor Docker market-ws), porque backtest_engine.py lee
+        # agent/data/klines.db (este archivo, el del host) y el contenedor
+        # cachea en un volumen Docker separado que solo ve python-service vía
+        # HTTP. Mismo patrón WS persistente que ya usa el resto del agente
+        # para klines — nada de REST polling repetido (ver circuit_breaker.py
+        # y la lección del baneo de Binance del 2026-07-12/14).
+        from orderbook_ws import run_orderbook_stream
+        orderbook_thread = threading.Thread(
+            target=run_orderbook_stream,
+            args=(logger.info, None),
+            daemon=True
+        )
+        orderbook_thread.start()
+
+        # Funding rate — REST de baja frecuencia (cada 2h), no WS: el funding
+        # solo cambia cada ~8h, un stream persistente sería sobre-ingeniería
+        # (ver funding_rates.py para por qué tampoco se usó el WS de markPrice).
+        from funding_rates import run_funding_capture
+        funding_thread = threading.Thread(
+            target=run_funding_capture,
+            args=(logger.info,),
+            daemon=True
+        )
+        funding_thread.start()
+
+        # Whale tracking on-chain — 100% gratis, sin proveedor pago (WS
+        # público de blockchain.info, sin cuenta/API key). Ver whale_tracker.py
+        # para el alcance real (BTCUSDT siempre; ERC-20 opt-in vía
+        # ETHERSCAN_API_KEY, que el usuario tiene que generar él mismo).
+        from whale_tracker import run_btc_whale_capture, run_erc20_whale_capture
+        whale_thread = threading.Thread(
+            target=run_btc_whale_capture,
+            args=(logger.info,),
+            daemon=True
+        )
+        whale_thread.start()
+        whale_erc20_thread = threading.Thread(
+            target=run_erc20_whale_capture,
+            args=(logger.info,),
+            daemon=True
+        )
+        whale_erc20_thread.start()
+
+        # Liquidaciones — vía Bybit (allLiquidation), no Binance (forceOrder
+        # no entrega datos en este entorno ni el REST público existe más).
+        # Ver liquidation_tracker.py para el diagnóstico completo.
+        from liquidation_tracker import run_liquidation_capture
+        liquidation_thread = threading.Thread(
+            target=run_liquidation_capture,
+            args=(logger.info,),
+            daemon=True
+        )
+        liquidation_thread.start()
 
         agent.run()
     except KeyboardInterrupt:

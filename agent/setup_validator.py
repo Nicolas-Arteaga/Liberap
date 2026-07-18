@@ -4,6 +4,7 @@ Devuelve métricas para auditoría / trade_analytics.
 """
 from __future__ import annotations
 
+import json
 import logging
 import math
 import time
@@ -1117,6 +1118,71 @@ def validate_pre_trade(
             f"errors={btc_health.get('errors', '?')} regime={btc_health.get('current_regime', '?')} "
             f"| Corr: ok={corr_success} fallbacks={corr_fallbacks}"
         )
+
+    # ── VETO GLOBAL (opt-in): Funding rate extremo ──
+    # openspec market-data-expansion, sección 2. Opt-in vía patternParamsJson
+    # ("fundingFilter": {"enabled": true, "maxAbsFundingPct": 0.05}) para no
+    # tocar perfiles existentes que no lo configuren — mismo criterio que los
+    # grupos de _evaluate_ma_geometry_profile. maxAbsFundingPct en % (ej. 0.05
+    # = 0.05%, un funding ya considerado extremo; Binance liquida cada 8h).
+    try:
+        funding_cfg = (json.loads(profile.get("patternParamsJson") or "{}").get("fundingFilter") or {}) if profile else {}
+    except Exception:
+        funding_cfg = {}
+    if funding_cfg.get("enabled"):
+        from kline_cache import get_cache
+        funding_row = get_cache().get_latest_funding(symbol)
+        if funding_row is not None:
+            funding_pct = funding_row["funding_rate"] * 100.0
+            max_abs = float(funding_cfg.get("maxAbsFundingPct", 0.05))
+            # LONG con funding ya muy positivo = largos sobre-apalancados
+            # pagando caro por sostener la posición (señal de agotamiento).
+            # SHORT con funding ya muy negativo = mismo razonamiento espejado.
+            if side == 0 and funding_pct > max_abs:
+                logger.info(
+                    "[VETO] funding_extreme_long — %s | funding=%.4f%% > limit=%.2f%%",
+                    symbol, funding_pct, max_abs
+                )
+                return False, "funding_extreme_long", {"funding_pct": funding_pct, "max_limit": max_abs}
+            if side == 1 and funding_pct < -max_abs:
+                logger.info(
+                    "[VETO] funding_extreme_short — %s | funding=%.4f%% < limit=-%.2f%%",
+                    symbol, funding_pct, max_abs
+                )
+                return False, "funding_extreme_short", {"funding_pct": funding_pct, "max_limit": -max_abs}
+        # funding_row is None (símbolo aún sin backfill) → no se vetea, fail-open,
+        # mismo espíritu que el resto de fallbacks explícitos de este proyecto
+        # (nunca bloquear un trade por falta de un dato opcional).
+
+    # ── VETO GLOBAL (opt-in): Cascada de liquidaciones activa en contra ──
+    # openspec market-data-expansion, sección 3. Opt-in vía patternParamsJson
+    # ("liquidationFilter": {"enabled": true}) — no abrir en la MISMA
+    # dirección que una cascada reciente (spec: si acaban de liquidarse
+    # longs masivamente, un SHORT nuevo puede estar llegando tarde al
+    # movimiento, no al principio de uno). side="Sell" en la cascada =
+    # longs liquidados (vender forzado) → riesgo para SHORT nuevo (side=1).
+    # side="Buy" = shorts liquidados → riesgo para LONG nuevo (side=0).
+    try:
+        liq_cfg = (json.loads(profile.get("patternParamsJson") or "{}").get("liquidationFilter") or {}) if profile else {}
+    except Exception:
+        liq_cfg = {}
+    if liq_cfg.get("enabled"):
+        from kline_cache import get_cache
+        cascade = get_cache().get_liquidation_cascade(
+            symbol,
+            recent_minutes=int(liq_cfg.get("recentMinutes", 15)),
+            baseline_hours=int(liq_cfg.get("baselineHours", 4)),
+            threshold_multiplier=float(liq_cfg.get("thresholdMultiplier", 3.0)),
+        )
+        # cascade is None (sin cobertura) → fail-open, mismo criterio que funding.
+        if cascade is not None and cascade.get("cascade_side"):
+            risky_side = 1 if cascade["cascade_side"] == "Sell" else 0  # Sell cascade -> riesgo SHORT, Buy cascade -> riesgo LONG
+            if side == risky_side:
+                logger.info(
+                    "[VETO] liquidation_cascade_same_direction — %s | cascade_side=%s magnitude=$%.0f side=%s",
+                    symbol, cascade["cascade_side"], cascade["magnitude"], "LONG" if side == 0 else "SHORT"
+                )
+                return False, "liquidation_cascade_same_direction", cascade
 
     # ── VETO GLOBAL: Agotamiento Diario (MAX_DAILY_PUMP/DUMP) ──
     # Si ya subió más del 25% en el día, vetamos LONG. Si cayó más del 30%, vetamos SHORT.

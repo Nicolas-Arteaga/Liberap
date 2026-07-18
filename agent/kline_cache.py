@@ -97,6 +97,55 @@ class KlineCache:
                 source      TEXT    NOT NULL DEFAULT 'binance',
                 updated_at  INTEGER NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS orderbook_ofi (
+                symbol      TEXT    NOT NULL,
+                timestamp   INTEGER NOT NULL,
+                ofi         REAL    NOT NULL,
+                bid_volume  REAL    NOT NULL,
+                ask_volume  REAL    NOT NULL,
+                levels      INTEGER NOT NULL,
+                PRIMARY KEY (symbol, timestamp)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_ofi_lookup
+                ON orderbook_ofi (symbol, timestamp DESC);
+
+            CREATE TABLE IF NOT EXISTS funding_rates (
+                symbol        TEXT    NOT NULL,
+                funding_time  INTEGER NOT NULL,
+                funding_rate  REAL    NOT NULL,
+                updated_at    INTEGER NOT NULL,
+                PRIMARY KEY (symbol, funding_time)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_funding_lookup
+                ON funding_rates (symbol, funding_time DESC);
+
+            CREATE TABLE IF NOT EXISTS whale_events (
+                symbol      TEXT    NOT NULL,
+                timestamp   INTEGER NOT NULL,
+                value       REAL    NOT NULL,
+                tx_hash     TEXT,
+                source      TEXT    NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_whale_lookup
+                ON whale_events (symbol, timestamp DESC);
+
+            CREATE INDEX IF NOT EXISTS idx_whale_txhash
+                ON whale_events (tx_hash);
+
+            CREATE TABLE IF NOT EXISTS liquidations (
+                symbol      TEXT    NOT NULL,
+                timestamp   INTEGER NOT NULL,
+                side        TEXT    NOT NULL,
+                qty         REAL    NOT NULL,
+                price       REAL    NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_liquidations_lookup
+                ON liquidations (symbol, timestamp DESC);
         """)
         conn.commit()
         # Safe migration: add 'source' column to existing databases
@@ -339,6 +388,351 @@ class KlineCache:
         """, (interval, min_candles)).fetchall()
         return [row["symbol"] for row in rows]
 
+    # ──────────────────────────────────────────────────────────
+    # Order Flow Imbalance (OFI) — order book imbalance
+    # ──────────────────────────────────────────────────────────
+
+    def upsert_ofi(self, symbol: str, ofi: float, bid_volume: float, ask_volume: float, levels: int):
+        """
+        Guarda un snapshot de Order Flow Imbalance. El caller (orderbook_ws.py)
+        ya decide la frecuencia de escritura (throttle) — acá solo se persiste,
+        mismo criterio que upsert_kline/upsert_live_price (no deciden su
+        propia cadencia, la reciben del caller).
+        """
+        conn = self._conn()
+        now = int(time.time())
+        conn.execute("""
+            INSERT INTO orderbook_ofi (symbol, timestamp, ofi, bid_volume, ask_volume, levels)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(symbol, timestamp) DO UPDATE SET
+                ofi        = excluded.ofi,
+                bid_volume = excluded.bid_volume,
+                ask_volume = excluded.ask_volume,
+                levels     = excluded.levels
+        """, (symbol, now, ofi, bid_volume, ask_volume, levels))
+        conn.commit()
+
+    def get_latest_ofi(self, symbol: str, max_age_s: int = 60) -> Optional[dict]:
+        """
+        Último OFI conocido para un símbolo, para uso en vivo (filtro de
+        estrategia). Devuelve None si no hay dato o está más viejo que
+        max_age_s — mismo criterio de staleness que get_live_price, nunca
+        un valor viejo servido sin indicarlo.
+        """
+        conn = self._conn()
+        row = conn.execute("""
+            SELECT timestamp, ofi, bid_volume, ask_volume, levels
+            FROM orderbook_ofi
+            WHERE symbol = ?
+            ORDER BY timestamp DESC
+            LIMIT 1
+        """, (symbol,)).fetchone()
+        if row is None:
+            return None
+        age = time.time() - row["timestamp"]
+        if age > max_age_s:
+            return None
+        return {
+            "symbol":     symbol,
+            "ofi":        row["ofi"],
+            "bid_volume": row["bid_volume"],
+            "ask_volume": row["ask_volume"],
+            "levels":     row["levels"],
+            "age_s":      round(age, 1),
+        }
+
+    def get_ofi_before(self, symbol: str, timestamp_ms: int) -> Optional[float]:
+        """
+        Último OFI conocido antes o en timestamp_ms (ms, formato open_time de
+        klines) — para backtesting sin lookahead, mismo principio que ya usa
+        agent/backtest_engine.py para las MAs (nunca datos posteriores al
+        índice de vela evaluado). Devuelve None si no hay ningún snapshot
+        anterior a ese punto (ej. backtesteando un período previo a que este
+        símbolo empezara a capturarse).
+        """
+        conn = self._conn()
+        row = conn.execute("""
+            SELECT ofi FROM orderbook_ofi
+            WHERE symbol = ? AND timestamp <= ?
+            ORDER BY timestamp DESC
+            LIMIT 1
+        """, (symbol, timestamp_ms // 1000)).fetchone()
+        return row["ofi"] if row else None
+
+    def get_ofi_series_aligned(self, symbol: str, open_times_ms: list) -> list:
+        """
+        Reconstruye una serie de OFI alineada a una lista de open_time (ms,
+        ascendente — mismo orden que get_klines()) de velas: un valor por
+        vela, el último OFI conocido a esa vela o antes (None si todavía no
+        había captura en ese punto — nunca inventa un valor).
+
+        Mismo principio de precómputo O(n) que _precompute_ma_series en
+        backtest_engine.py (una sola pasada mergeando dos listas ya
+        ordenadas) en vez de una query SQL por vela — evita repetir el
+        problema de escalado O(n²) que ya apareció una vez en este proyecto.
+        Requiere agent/backtest_engine.py para usarla en un backtest real
+        (spec: "Exposición del OFI al motor de backtesting").
+        """
+        if not open_times_ms:
+            return []
+        conn = self._conn()
+        rows = conn.execute("""
+            SELECT timestamp, ofi FROM orderbook_ofi
+            WHERE symbol = ?
+            ORDER BY timestamp ASC
+        """, (symbol,)).fetchall()
+
+        result = []
+        idx = 0
+        last_ofi = None
+        n = len(rows)
+        for ot_ms in open_times_ms:
+            ot_s = ot_ms // 1000
+            while idx < n and rows[idx]["timestamp"] <= ot_s:
+                last_ofi = rows[idx]["ofi"]
+                idx += 1
+            result.append(last_ofi)
+        return result
+
+    # ──────────────────────────────────────────────────────────
+    # Funding rate
+    # ──────────────────────────────────────────────────────────
+
+    def bulk_upsert_funding(self, symbol: str, records: list):
+        """
+        records: lista de {funding_time (ms), funding_rate}, tal como devuelve
+        /fapi/v1/fundingRate. Idempotente (upsert por PK symbol+funding_time)
+        así que re-backfillear el mismo período no duplica ni requiere lógica
+        de "ya lo tengo" — mismo criterio que bulk_upsert_klines.
+        """
+        if not records:
+            return
+        now = int(time.time())
+        conn = self._conn()
+        conn.executemany("""
+            INSERT INTO funding_rates (symbol, funding_time, funding_rate, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(symbol, funding_time) DO UPDATE SET
+                funding_rate = excluded.funding_rate,
+                updated_at   = excluded.updated_at
+        """, [
+            (symbol, int(r["funding_time"]), float(r["funding_rate"]), now)
+            for r in records
+        ])
+        conn.commit()
+
+    def get_latest_funding(self, symbol: str) -> Optional[dict]:
+        """
+        Último funding rate conocido (settlement real, no una estimación en
+        vivo). A diferencia de get_live_price/get_latest_ofi no hay chequeo
+        de staleness por edad: el funding solo cambia cada ~8h, así que un
+        valor de unas horas de antigüedad sigue siendo el vigente, no un
+        dato viejo — es None únicamente si el símbolo nunca se backfilleó.
+        """
+        conn = self._conn()
+        row = conn.execute("""
+            SELECT funding_time, funding_rate FROM funding_rates
+            WHERE symbol = ?
+            ORDER BY funding_time DESC
+            LIMIT 1
+        """, (symbol,)).fetchone()
+        if row is None:
+            return None
+        return {"symbol": symbol, "funding_rate": row["funding_rate"], "funding_time": row["funding_time"]}
+
+    def count_funding_periods(self, symbol: str) -> int:
+        """Cuántos períodos de funding ya están cacheados para este símbolo."""
+        conn = self._conn()
+        row = conn.execute(
+            "SELECT COUNT(*) as c FROM funding_rates WHERE symbol = ?", (symbol,)
+        ).fetchone()
+        return row["c"]
+
+    def get_funding_before(self, symbol: str, timestamp_ms: int) -> Optional[float]:
+        """Último funding rate vigente antes o en timestamp_ms — sin lookahead, para backtest."""
+        conn = self._conn()
+        row = conn.execute("""
+            SELECT funding_rate FROM funding_rates
+            WHERE symbol = ? AND funding_time <= ?
+            ORDER BY funding_time DESC
+            LIMIT 1
+        """, (symbol, timestamp_ms)).fetchone()
+        return row["funding_rate"] if row else None
+
+    def get_funding_series_aligned(self, symbol: str, open_times_ms: list) -> list:
+        """
+        Mismo patrón O(n) que get_ofi_series_aligned: un funding rate por
+        vela (el último vigente a esa vela o antes), en vez de una query por
+        vela.
+        """
+        if not open_times_ms:
+            return []
+        conn = self._conn()
+        rows = conn.execute("""
+            SELECT funding_time, funding_rate FROM funding_rates
+            WHERE symbol = ?
+            ORDER BY funding_time ASC
+        """, (symbol,)).fetchall()
+
+        result = []
+        idx = 0
+        last_rate = None
+        n = len(rows)
+        for ot_ms in open_times_ms:
+            while idx < n and rows[idx]["funding_time"] <= ot_ms:
+                last_rate = rows[idx]["funding_rate"]
+                idx += 1
+            result.append(last_rate)
+        return result
+
+    # ──────────────────────────────────────────────────────────
+    # On-chain whale activity
+    # ──────────────────────────────────────────────────────────
+
+    def insert_whale_event(self, symbol: str, value: float, source: str, tx_hash: str = None):
+        """Registra una transferencia on-chain de tamaño 'ballena' detectada en vivo."""
+        conn = self._conn()
+        conn.execute(
+            "INSERT INTO whale_events (symbol, timestamp, value, tx_hash, source) VALUES (?, ?, ?, ?, ?)",
+            (symbol, int(time.time()), value, tx_hash, source)
+        )
+        conn.commit()
+
+    def has_whale_tx(self, tx_hash: str) -> bool:
+        """Dedupe: True si ya se registró esta tx (evita inflar count/total_value re-insertando lo mismo en cada poll)."""
+        if not tx_hash:
+            return False
+        conn = self._conn()
+        return conn.execute("SELECT 1 FROM whale_events WHERE tx_hash = ? LIMIT 1", (tx_hash,)).fetchone() is not None
+
+    def get_whale_activity(self, symbol: str, window_minutes: int = 15) -> Optional[dict]:
+        """
+        Actividad de ballenas real en los últimos window_minutes. Devuelve
+        None SOLO si esta fuente nunca capturó nada para este símbolo (sin
+        cobertura, ej. no es BTC y no hay ETHERSCAN_API_KEY configurada) —
+        no confundir con {"count": 0, ...}, que significa "cobertura real,
+        pero sin actividad ballena en la ventana" (spec 4.3/4.5: nunca un
+        score inventado, y distinguir "sin dato" de "dato real en cero").
+        """
+        conn = self._conn()
+        has_any = conn.execute(
+            "SELECT 1 FROM whale_events WHERE symbol = ? LIMIT 1", (symbol,)
+        ).fetchone()
+        if has_any is None:
+            return None
+        cutoff = int(time.time()) - window_minutes * 60
+        rows = conn.execute("""
+            SELECT value, source FROM whale_events
+            WHERE symbol = ? AND timestamp >= ?
+        """, (symbol, cutoff)).fetchall()
+        return {
+            "symbol": symbol,
+            "count": len(rows),
+            "total_value": round(sum(r["value"] for r in rows), 4),
+            "source": rows[0]["source"] if rows else "onchain",
+            "window_minutes": window_minutes,
+        }
+
+    def prune_old_whale_events(self, keep_hours: int = 72):
+        conn = self._conn()
+        cutoff = int(time.time()) - keep_hours * 3600
+        conn.execute("DELETE FROM whale_events WHERE timestamp < ?", (cutoff,))
+        conn.commit()
+
+    # ──────────────────────────────────────────────────────────
+    # Liquidaciones (Bybit allLiquidation — Binance forceOrder no
+    # disponible en este entorno, ver liquidation_tracker.py)
+    # ──────────────────────────────────────────────────────────
+
+    def insert_liquidation(self, symbol: str, side: str, qty: float, price: float, timestamp_ms: int = None):
+        """side: 'Sell' = se liquidó un LONG (venta forzada) | 'Buy' = se liquidó un SHORT (compra forzada)."""
+        conn = self._conn()
+        ts = int(timestamp_ms) if timestamp_ms is not None else int(time.time() * 1000)
+        conn.execute(
+            "INSERT INTO liquidations (symbol, timestamp, side, qty, price) VALUES (?, ?, ?, ?, ?)",
+            (symbol, ts, side, qty, price)
+        )
+        conn.commit()
+
+    def get_liquidation_cascade(
+        self, symbol: str, recent_minutes: int = 15, baseline_hours: int = 4,
+        threshold_multiplier: float = 3.0, min_cascade_usd: float = 20_000.0,
+        at_timestamp_ms: int = None,
+    ) -> Optional[dict]:
+        """
+        Compara el volumen liquidado (USD, qty*price) por lado en la ventana
+        reciente contra el promedio por-ventana de las baseline_hours previas
+        del MISMO símbolo — spec: "supera el umbral respecto al promedio del
+        símbolo", no un umbral fijo global (símbolos chicos y grandes tienen
+        escalas muy distintas).
+
+        at_timestamp_ms: si se pasa (backtest), usa ese instante como "ahora"
+        en vez de time.time() — permite reconstruir el estado histórico sin
+        lookahead (spec: "Historial reconstruible para backtesting").
+
+        Devuelve None si el símbolo nunca tuvo liquidaciones capturadas (sin
+        cobertura) — no un {"cascade": False} vacío que parezca dato real.
+        """
+        conn = self._conn()
+        now_ms = int(at_timestamp_ms) if at_timestamp_ms is not None else int(time.time() * 1000)
+        has_any = conn.execute("SELECT 1 FROM liquidations WHERE symbol = ? AND timestamp <= ? LIMIT 1", (symbol, now_ms)).fetchone()
+        if has_any is None:
+            return None
+
+        recent_cutoff = now_ms - recent_minutes * 60_000
+        baseline_cutoff = now_ms - baseline_hours * 3_600_000
+
+        def _sums(lo, hi):
+            rows = conn.execute("""
+                SELECT side, SUM(qty * price) as v FROM liquidations
+                WHERE symbol = ? AND timestamp >= ? AND timestamp < ?
+                GROUP BY side
+            """, (symbol, lo, hi)).fetchall()
+            return {r["side"]: r["v"] for r in rows}
+
+        recent = _sums(recent_cutoff, now_ms + 1)
+        baseline = _sums(baseline_cutoff, recent_cutoff)
+        num_buckets = max(1.0, (baseline_hours * 60.0) / recent_minutes)
+
+        result = {"symbol": symbol, "recent_minutes": recent_minutes, "cascade_side": None, "magnitude": 0.0}
+        for side in ("Sell", "Buy"):  # Sell=longs liquidados, Buy=shorts liquidados
+            recent_v = recent.get(side, 0.0) or 0.0
+            baseline_avg = (baseline.get(side, 0.0) or 0.0) / num_buckets
+            if recent_v >= min_cascade_usd and recent_v >= threshold_multiplier * max(baseline_avg, 1.0):
+                if recent_v > result["magnitude"]:
+                    result["cascade_side"] = side
+                    result["magnitude"] = round(recent_v, 2)
+        return result
+
+    def get_liquidation_events_before(self, symbol: str, timestamp_ms: int, lookback_ms: int) -> list:
+        """Eventos crudos en [timestamp_ms - lookback_ms, timestamp_ms] — building block para backtest."""
+        conn = self._conn()
+        rows = conn.execute("""
+            SELECT timestamp, side, qty, price FROM liquidations
+            WHERE symbol = ? AND timestamp >= ? AND timestamp <= ?
+            ORDER BY timestamp ASC
+        """, (symbol, timestamp_ms - lookback_ms, timestamp_ms)).fetchall()
+        return [dict(r) for r in rows]
+
+    def prune_old_liquidations(self, keep_hours: int = 24 * 7):
+        conn = self._conn()
+        cutoff = int(time.time() * 1000) - keep_hours * 3_600_000
+        conn.execute("DELETE FROM liquidations WHERE timestamp < ?", (cutoff,))
+        conn.commit()
+
+    def prune_old_ofi(self, keep_hours: int = 24 * 30):
+        """
+        Borra snapshots de OFI más viejos que keep_hours. Con throttle de
+        escritura de ~30s/símbolo, 30 días son ~2.6M filas totales para 30
+        símbolos — manejable con el índice (symbol, timestamp); sin este
+        prune la tabla crece sin límite (mismo riesgo que prune_old_klines,
+        que existe pero nunca se llama — acá sí se llama, ver orderbook_ws.py).
+        """
+        conn = self._conn()
+        cutoff = int(time.time()) - keep_hours * 3600
+        conn.execute("DELETE FROM orderbook_ofi WHERE timestamp < ?", (cutoff,))
+        conn.commit()
+
     def count_klines(self, symbol: str, interval: str = "15m") -> int:
         """Returns total kline count for a symbol."""
         conn = self._conn()
@@ -365,6 +759,8 @@ class KlineCache:
             "symbols_with_history":  conn.execute("SELECT COUNT(DISTINCT symbol) as c FROM klines").fetchone()["c"],
             "live_prices":           conn.execute("SELECT COUNT(*) as c FROM live_prices").fetchone()["c"],
             "live_prices_by_source": sources,
+            "orderbook_ofi_rows":    conn.execute("SELECT COUNT(*) as c FROM orderbook_ofi").fetchone()["c"],
+            "orderbook_ofi_symbols": conn.execute("SELECT COUNT(DISTINCT symbol) as c FROM orderbook_ofi").fetchone()["c"],
             "db_path":               self._db_path,
         }
 
