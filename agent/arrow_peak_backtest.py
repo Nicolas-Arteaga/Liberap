@@ -123,11 +123,28 @@ def _ema(values: list, span: int) -> list:
     return out
 
 
-def run_arrow_peak_backtest(symbol: str, fee_pct: float = 0.0) -> BacktestResult:
+def run_arrow_peak_backtest(symbol: str, fee_pct: float = 0.0, trigger_ma_period: int = 99, require_red_bigger: bool = True) -> BacktestResult:
+    """
+    trigger_ma_period: qué EMA de 15m gobierna el gatillo de entrada (toque +
+    vela roja de rechazo). Default 99 = comportamiento original/en producción.
+    25 = hipótesis del usuario (2026-07-18): entrar en el PRIMER retroceso
+    serio que toca la MA25 (más arriba, más cerca del pico) en vez de esperar
+    a que el precio baje más y recién ahí toque la MA99 — mejor precio de
+    entrada para un SHORT si el rechazo ahí es real. arrow_peak_analyzer.py
+    (el código en vivo) solo calcula MA99, no MA25 — se usa la misma fórmula
+    EMA por consistencia metodológica, no porque exista un precedente en
+    producción para MA25 en Arrow Peak.
+
+    require_red_bigger: si True (default, igual que producción), exige vela
+    roja Y más grande que la verde anterior. Si False — hipótesis del
+    usuario (2026-07-18): "quizás con que toque la MA99 en rojo ya es
+    suficiente" — solo exige vela roja tocando la media, sin comparar
+    tamaño contra la vela anterior.
+    """
     cache = get_cache()
     klines_1h = cache.get_klines(symbol, "1h", limit=100_000)
     klines_15m = cache.get_klines(symbol, "15m", limit=100_000)
-    result = BacktestResult(profile_name="Arrow Reversal", symbol=symbol)
+    result = BacktestResult(profile_name=f"Arrow Reversal (trigger MA{trigger_ma_period})", symbol=symbol)
     result.candles_available = len(klines_15m)
 
     if len(klines_1h) < MIN_1H_CANDLES or len(klines_15m) < 110:
@@ -141,7 +158,7 @@ def run_arrow_peak_backtest(symbol: str, fee_pct: float = 0.0) -> BacktestResult
     highs_15m = [k["high"] for k in klines_15m]
     lows_15m = [k["low"] for k in klines_15m]
     opens_15m = [k["open"] for k in klines_15m]
-    ma99_series = _ema(closes_15m, 99)
+    ma99_series = _ema(closes_15m, trigger_ma_period)
 
     # Índice del día calendario de cada vela 15m (para saber qué días diarios ya cerraron)
     day_index_by_ts = {d["day"]: i for i, d in enumerate(daily)}
@@ -178,10 +195,13 @@ def run_arrow_peak_backtest(symbol: str, fee_pct: float = 0.0) -> BacktestResult
         if pattern:
             dist_ma99_pct = (closes_15m[i] - ma99_series[i]) / ma99_series[i] * 100
             is_red = closes_15m[i] < opens_15m[i]
-            prev_was_green = closes_15m[i - 1] > opens_15m[i - 1]
-            red_bigger = is_red and prev_was_green and abs(closes_15m[i] - opens_15m[i]) > abs(closes_15m[i - 1] - opens_15m[i - 1])
+            if require_red_bigger:
+                prev_was_green = closes_15m[i - 1] > opens_15m[i - 1]
+                red_condition = is_red and prev_was_green and abs(closes_15m[i] - opens_15m[i]) > abs(closes_15m[i - 1] - opens_15m[i - 1])
+            else:
+                red_condition = is_red  # hipótesis 2026-07-18: solo vela roja tocando la media, sin comparar tamaño
             touches_ma99 = abs(dist_ma99_pct) < 0.5
-            if touches_ma99 and red_bigger:
+            if touches_ma99 and red_condition:
                 entry_price = closes_15m[i]
                 sl_price = pattern["peak_price"] * (1 + SL_BUFFER_PCT / 100.0)
                 custom_tp = pattern["arrow_start_price"] * (1 + TP_BUFFER_PCT / 100.0)
@@ -230,6 +250,8 @@ def main():
     ap.add_argument("--symbols", default=None, help="Coma-separado; si se omite, corre contra todos los símbolos con historia suficiente")
     ap.add_argument("--fee-pct", type=float, default=0.08, help="Fee ida+vuelta, %% (default 0.08 ~ taker Binance futures)")
     ap.add_argument("--export-csv", default=None, help="Vuelca cada trade cerrado (symbol, prev_rise_pct, bleeding_days, candles_to_exit, pnl_pct, exit_reason) a este CSV")
+    ap.add_argument("--trigger-ma", type=int, default=99, help="Qué EMA de 15m gobierna el gatillo de entrada (99=original, 25=hipótesis de entrada temprana)")
+    ap.add_argument("--no-require-red-bigger", action="store_true", help="Hipótesis 2026-07-18: solo exige vela roja tocando la media, sin comparar tamaño contra la verde anterior")
     args = ap.parse_args()
 
     cache = get_cache()
@@ -245,7 +267,7 @@ def main():
     all_trades = []
     per_symbol = []
     for idx, symbol in enumerate(symbols):
-        res = run_arrow_peak_backtest(symbol, fee_pct=args.fee_pct)
+        res = run_arrow_peak_backtest(symbol, fee_pct=args.fee_pct, trigger_ma_period=args.trigger_ma, require_red_bigger=not args.no_require_red_bigger)
         if res.closed:
             per_symbol.append(res.summary())
             all_trades.extend(res.closed)

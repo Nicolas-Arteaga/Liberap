@@ -3362,11 +3362,29 @@ class VergeAgent:
         weak_hi = float(getattr(config, "ARROW_PEAK_V2_WEAK_ZONE_HIGH_PCT", 50.0))
         in_weak_zone = weak_lo <= prev_rise_pct < weak_hi
 
+        full_tp = arrow_start_price * (1 + tp_buffer_pct / 100.0) if arrow_start_price > 0 else None
+
         if in_weak_zone and peak_price > 0 and arrow_start_price > 0:
             half_retracement_price = peak_price - (peak_price - arrow_start_price) * 0.5
-            custom_tp = half_retracement_price * (1 + tp_buffer_pct / 100.0)
+            graduated_tp = half_retracement_price * (1 + tp_buffer_pct / 100.0)
+            # Fix real 2026-07-19 (encontrado con un caso real, RAVEUSDT):
+            # el TP acortado puede dejar una relación riesgo/beneficio pésima
+            # si el precio todavía está cerca del pico (ahí arriesgaba 11%
+            # para ganar 2.75%) — el SL queda fijo en el pico, así que
+            # achicar SOLO el TP puede romper el R:R sin querer. Si el R:R
+            # del TP graduado es peor que el mínimo aceptable, se usa el TP
+            # completo del original en su lugar — el clon nunca queda peor
+            # que la estrategia base, en el peor caso empata con ella.
+            if custom_sl and price > 0 and graduated_tp < price < custom_sl:
+                reward = price - graduated_tp
+                risk = custom_sl - price
+                rr = (reward / risk) if risk > 0 else 0.0
+                min_rr = float(getattr(config, "ARROW_PEAK_V2_MIN_RR", 1.0))
+                custom_tp = graduated_tp if rr >= min_rr else full_tp
+            else:
+                custom_tp = graduated_tp
         else:
-            custom_tp = arrow_start_price * (1 + tp_buffer_pct / 100.0) if arrow_start_price > 0 else None
+            custom_tp = full_tp
 
         if custom_tp is not None and custom_tp >= price:
             custom_tp = None  # el objetivo quedó por encima del precio actual, no sirve como TP de SHORT

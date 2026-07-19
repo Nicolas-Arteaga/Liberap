@@ -276,6 +276,10 @@ ARROW_PEAK_V2_ENABLED = os.getenv("ARROW_PEAK_V2_ENABLED", "false").lower() in (
 # retroceso (peak -> arrow_start) en vez del 100% del original.
 ARROW_PEAK_V2_WEAK_ZONE_LOW_PCT = float(os.getenv("ARROW_PEAK_V2_WEAK_ZONE_LOW_PCT", "25.0"))
 ARROW_PEAK_V2_WEAK_ZONE_HIGH_PCT = float(os.getenv("ARROW_PEAK_V2_WEAK_ZONE_HIGH_PCT", "50.0"))
+# Fix 2026-07-19 (caso real RAVEUSDT: arriesgaba 11% para ganar 2.75%) — si
+# el TP graduado da una relación riesgo/beneficio peor que esto, se usa el
+# TP completo del original en su lugar.
+ARROW_PEAK_V2_MIN_RR = float(os.getenv("ARROW_PEAK_V2_MIN_RR", "1.0"))
 
 # ==========================================
 # MA SLOPE — "Cruce de Medias" anticipado (Casos 1/2/3, 1H)
