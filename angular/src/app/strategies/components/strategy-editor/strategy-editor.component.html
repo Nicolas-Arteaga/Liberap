@@ -113,6 +113,20 @@
         </div>
 
         <div class="field-group">
+          <label class="field-label">Ejecución contra Binance</label>
+          <div class="toggle-card" [class.on]="model.broadcastToBinance"
+               (click)="model.broadcastToBinance = !model.broadcastToBinance"
+               style="border-color: rgb(240 185 11 / 40%);"
+               [style.background]="model.broadcastToBinance ? 'rgb(240 185 11 / 12%)' : ''">
+            <div class="toggle-dot"></div>
+            <span>{{ model.broadcastToBinance ? 'Binance (real, Testnet o Mainnet según el agente)' : 'Solo simulación interna' }}</span>
+          </div>
+          <p class="field-hint">Si está activado, cada entrada/salida de esta estrategia se espeja contra Binance
+            además de la simulación — usa el mismo modo (Testnet/Mainnet) que tenga corriendo el agente. Dejalo
+            apagado para probar en simulación antes de arriesgar una cuenta real.</p>
+        </div>
+
+        <div class="field-group">
           <label class="field-label">Tipo de Estrategia</label>
           <div class="direction-selector">
             <button class="dir-btn" [class.active-auto]="!isPatternStrategy" (click)="onStrategyTypeChange('Generic')">
@@ -155,6 +169,26 @@
             </button>
           </div>
           <p class="field-hint">Busca la zona con mayor rango real hasta el TP en esta temporalidad, no la de mejor score compuesto. Soporta LONG y SHORT según la dirección del gap.</p>
+        </div>
+
+        <div class="field-group" *ngIf="isFvgStrategy">
+          <label class="field-label">Filtro de Agotamiento (opcional)</label>
+          <div class="toggle-card" [class.on]="fvgParams.requireExhaustion"
+               (click)="fvgParams.requireExhaustion = !fvgParams.requireExhaustion">
+            <div class="toggle-dot"></div>
+            <span>{{ fvgParams.requireExhaustion ? 'Activado — exige agotamiento previo' : 'Apagado — cualquier gap (comportamiento clásico)' }}</span>
+          </div>
+          <div class="field-group" *ngIf="fvgParams.requireExhaustion" style="margin-top: 10px;">
+            <label class="field-label">Pendiente mínima de EMA50 (°)</label>
+            <input class="field-input" type="number" step="0.5" min="0"
+                   [(ngModel)]="fvgParams.minExhaustionSlopeDeg" placeholder="3.0">
+            <p class="field-hint">
+              Solo deja pasar un SHORT si la subida previa fue pronunciada (pendiente de EMA50 ≥ este valor),
+              y un LONG solo si la caída previa fue igual de pronunciada (espejo). Auditoría real 2026-07-22
+              sobre 163 trades de FVG-15m: los SHORT con pendiente previa ≥3° dieron 29.2% win rate / +$46.40,
+              contra 13.6%/-$7.52 sin el filtro — ese 15% de los trades generó el 65% de toda la ganancia.
+            </p>
+          </div>
         </div>
 
         <div class="field-group" *ngIf="isAdnCompression">

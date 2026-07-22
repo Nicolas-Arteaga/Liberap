@@ -72,6 +72,7 @@ export interface CreateUpdateStrategyProfileDto {
   nexusMaxPriceDriftPct: number;
   strategyType?: string;
   patternParamsJson?: string;
+  broadcastToBinance: boolean;
 }
 
 export interface EnhancedAnalysisDto {
@@ -217,6 +218,7 @@ export interface StrategyProfileDto extends EntityDto<string> {
   nexusMaxPriceDriftPct: number;
   strategyType?: string;
   patternParamsJson?: string;
+  broadcastToBinance: boolean;
   winRate: number;
   totalTrades: number;
   netPnL: number;

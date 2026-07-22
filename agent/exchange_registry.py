@@ -362,7 +362,12 @@ EXCHANGES: Dict[str, ExchangeConfig] = {
         api_key=os.getenv("OKX_API_KEY"),
         api_secret=os.getenv("OKX_API_SECRET"),
         ping_payload="ping",
-        ws_url_builder=lambda syms: "wss://ws.okx.com:8443/ws/v5/public",
+        # Bug real 2026-07-22: /public YA NO sirve el canal de velas — OKX
+        # devuelve {"event":"error","msg":"Wrong URL or channel:candle15m...
+        # doesn't exist"} (code 60018), verificado en vivo. Las velas viven
+        # en el endpoint /business desde que OKX separó los canales de
+        # market-data de mayor volumen del endpoint público general.
+        ws_url_builder=lambda syms: "wss://ws.okx.com:8443/ws/v5/business",
         subscribe_fn=_subscribe_okx,
         message_parser=_parse_okx,
         rest_kline_url="https://www.okx.com/api/v5/market/candles",

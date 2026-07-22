@@ -6,9 +6,45 @@ import hmac
 import time
 import os
 import config
+from pathlib import Path
 from typing import Dict, Any, Optional
 
 logger = logging.getLogger("PositionManager")
+
+# ──────────────────────────────────────────────────────────────
+# Alerta Telegram cuando el mirror a Binance falla en silencio
+# ──────────────────────────────────────────────────────────────
+# Bug real 2026-07-20: BLUAIUSDT abrió en la simulación interna pero el
+# mirror a Binance Testnet falló ("Invalid symbol", el símbolo existe en
+# el exchangeInfo de testnet pero el motor de matching lo rechaza) y nadie
+# se enteró hasta chequear Binance a mano. Reusa las credenciales que ya
+# armamos en tools/ip_alert/config.json (mismo bot de Telegram).
+_TELEGRAM_CONFIG_PATH = Path(__file__).resolve().parent.parent / "tools" / "ip_alert" / "config.json"
+
+
+def _notify_binance_mirror_failure(action: str, symbol: str, reason: str):
+    try:
+        if not _TELEGRAM_CONFIG_PATH.exists():
+            return
+        cfg = json.loads(_TELEGRAM_CONFIG_PATH.read_text(encoding="utf-8"))
+        token = cfg.get("telegram_bot_token")
+        chat_id = cfg.get("telegram_chat_id")
+        if not token or not chat_id:
+            return
+        msg = (
+            f"⚠️ MIRROR A BINANCE FALLÓ ({action})\n"
+            f"Símbolo: {symbol}\n"
+            f"Motivo: {reason}\n"
+            f"La simulación interna sigue de largo — esta operación NO tiene "
+            f"contraparte real en Binance."
+        )
+        requests.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={"chat_id": chat_id, "text": msg},
+            timeout=10,
+        )
+    except Exception as e:
+        logger.warning(f"[BinanceDirect] No se pudo enviar alerta de Telegram: {e}")
 
 # ──────────────────────────────────────────────────────────────
 # Binance Futures Direct Client (bypasses C# backend)
@@ -30,6 +66,28 @@ class BinanceDirectClient:
             self.base_url = "https://fapi.binance.com"
             version = "3.3"
         self._precision_cache: dict = {}
+        self._symbol_status_cache: dict = {}
+        self._leverage_set_cache: set = set()
+
+        # Lista negra de símbolos que Binance rechazó con "Invalid symbol" -
+        # persistida por entorno (testnet y mainnet tienen universos de
+        # símbolos DISTINTOS; BLUAIUSDT existe en mainnet pero no en testnet,
+        # bug real 2026-07-20). El propio exchangeInfo de testnet puede
+        # mentir (listar un símbolo que su motor de matching igual rechaza),
+        # así que en vez de confiar en exchangeInfo, aprendemos de los
+        # rechazos reales y no volvemos a intentar ese símbolo nunca más
+        # en este entorno.
+        env_tag = "testnet" if self.use_testnet else "mainnet"
+        self._invalid_symbols_path = (
+            Path(__file__).resolve().parent / "data" / f"binance_invalid_symbols_{env_tag}.json"
+        )
+        self._invalid_symbols: set = self._load_invalid_symbols()
+        # Precalienta el cache de precisión (TODOS los símbolos, una sola
+        # llamada a exchangeInfo) en un hilo aparte apenas se crea el
+        # cliente, para que el primer trade real de la sesión no pague el
+        # ~1s de bajar exchangeInfo en el camino caliente de la orden.
+        import threading as _threading
+        _threading.Thread(target=self._warm_precision_cache, daemon=True).start()
         logger.info(f"[BinanceDirect] PositionManager v{version} loaded - closePosition=true with fallbacks ({'TESTNET' if self.use_testnet else 'MAINNET'})")
 
     def _sign(self, params: dict) -> dict:
@@ -46,6 +104,47 @@ class BinanceDirectClient:
     def _headers(self) -> dict:
         return {"X-MBX-APIKEY": self.api_key}
 
+    def _load_invalid_symbols(self) -> set:
+        try:
+            if self._invalid_symbols_path.exists():
+                data = json.loads(self._invalid_symbols_path.read_text(encoding="utf-8"))
+                symbols = set(data.get("symbols", []))
+                if symbols:
+                    logger.info(f"[BinanceDirect] {len(symbols)} símbolos inválidos cargados de {self._invalid_symbols_path.name}: {sorted(symbols)}")
+                return symbols
+        except Exception as e:
+            logger.warning(f"[BinanceDirect] No se pudo cargar la lista de símbolos inválidos: {e}")
+        return set()
+
+    def _mark_symbol_invalid(self, symbol: str):
+        self._invalid_symbols.add(symbol)
+        try:
+            self._invalid_symbols_path.parent.mkdir(parents=True, exist_ok=True)
+            self._invalid_symbols_path.write_text(
+                json.dumps({"symbols": sorted(self._invalid_symbols)}, indent=2), encoding="utf-8"
+            )
+            logger.warning(f"[BinanceDirect] {symbol} marcado como inválido para este entorno — no se reintentará.")
+        except Exception as e:
+            logger.warning(f"[BinanceDirect] No se pudo persistir símbolo inválido {symbol}: {e}")
+
+    def is_tradable(self, symbol: str) -> bool:
+        """True solo si el exchangeInfo de ESTE entorno (testnet o mainnet,
+        según self.base_url) marca el símbolo con status="TRADING". Chequeo
+        proactivo — no espera a que Binance rechace la orden para enterarse
+        (PENDING_TRADING/BREAK/etc. igual aparecen listados, ver bug real
+        2026-07-20 con BLUAIUSDT/CLOUSDT)."""
+        if symbol not in self._symbol_status_cache:
+            # fuerza el fetch/parseo de exchangeInfo si todavía no corrió
+            self.get_symbol_precision(symbol)
+        return self._symbol_status_cache.get(symbol) == "TRADING"
+
+    def _warm_precision_cache(self):
+        try:
+            self.get_symbol_precision("BTCUSDT")
+            logger.info(f"[BinanceDirect] Cache de precisión precalentado ({len(self._precision_cache)} símbolos).")
+        except Exception as e:
+            logger.warning(f"[BinanceDirect] No se pudo precalentar el cache de precisión: {e}")
+
     def get_symbol_precision(self, symbol: str):
         """Returns (qty_precision, price_precision) for a symbol."""
         if symbol in self._precision_cache:
@@ -60,14 +159,27 @@ class BinanceDirectClient:
             resp = requests.get(url, timeout=10)
             if resp.status_code == 200:
                 symbols_list = resp.json().get("symbols", [])
+                # Cachea TODOS los símbolos de esta llamada (no solo el pedido)
+                # para que el próximo símbolo nuevo ya la tenga resuelta y no
+                # pague de nuevo el ~1s de bajar el exchangeInfo completo.
                 for s in symbols_list:
-                    if s.get("symbol") == symbol:
-                        qty_p = s.get("quantityPrecision", 3)
-                        price_p = s.get("pricePrecision", 4)
-                        self._precision_cache[symbol] = (qty_p, price_p)
-                        logger.info(f"[BinanceDirect] Precision for {symbol} fetched from API: qty={qty_p}, price={price_p}")
-                        fallback_used = False
-                        return qty_p, price_p
+                    s_name = s.get("symbol")
+                    if s_name:
+                        self._precision_cache[s_name] = (
+                            s.get("quantityPrecision", 3), s.get("pricePrecision", 4)
+                        )
+                        # Bug real 2026-07-20: BLUAIUSDT y CLOUSDT figuran en el
+                        # exchangeInfo de testnet PERO con status="PENDING_TRADING"
+                        # (mainnet los tiene en "TRADING") — Binance los lista mucho
+                        # antes de habilitarlos para operar de verdad. El campo que
+                        # realmente distingue "puedo operar esto en este entorno" no
+                        # es "está en la lista", es este status.
+                        self._symbol_status_cache[s_name] = s.get("status", "UNKNOWN")
+                if symbol in self._precision_cache:
+                    qty_p, price_p = self._precision_cache[symbol]
+                    logger.info(f"[BinanceDirect] Precision for {symbol} fetched from API: qty={qty_p}, price={price_p}")
+                    fallback_used = False
+                    return qty_p, price_p
                 logger.warning(f"[BinanceDirect] Symbol {symbol} not found in exchangeInfo.")
             else:
                 logger.warning(f"[BinanceDirect] exchangeInfo returned HTTP {resp.status_code}: {resp.text}")
@@ -136,23 +248,46 @@ class BinanceDirectClient:
         if not self.api_key or not self.api_secret:
             logger.error("[BinanceDirect] No API keys configured.")
             return False
-            
+
+        if symbol in self._invalid_symbols:
+            logger.warning(
+                f"[BinanceDirect] {symbol} está en la lista negra de este entorno ({env_str}) — "
+                f"no existe/no opera acá aunque exista en el otro entorno. Salteo sin intentar."
+            )
+            return False
+
+        if not self.is_tradable(symbol):
+            status = self._symbol_status_cache.get(symbol, "UNKNOWN")
+            logger.warning(
+                f"[BinanceDirect] {symbol} figura en exchangeInfo de {env_str} pero con status={status} "
+                f"(no 'TRADING') — Binance lo rechazaría. Salteo proactivamente sin gastar la orden."
+            )
+            self._mark_symbol_invalid(symbol)
+            return False
+
         qty_p, price_p = self.get_symbol_precision(symbol)
         qty = round(quantity, qty_p)
         opposite = "SELL" if side == "BUY" else "BUY"
         logger.info(f"[BinanceDirect] Precision: qty_p={qty_p}, price_p={price_p}, rounded_qty={qty}, opposite={opposite}")
 
-        # 0. Set Leverage to 1x (Spot-like mode for both Mainnet and Testnet)
-        try:
-            leverage_url = f"{self.base_url}/fapi/v1/leverage"
-            lev_params = self._sign({"symbol": symbol, "leverage": 1})
-            lev_resp = requests.post(leverage_url, params=lev_params, headers=self._headers(), timeout=10)
-            if lev_resp.status_code == 200:
-                logger.info(f"[BinanceDirect] Auto-adjusted leverage to 1x. Response: {lev_resp.text}")
-            else:
-                logger.warning(f"[BinanceDirect] Leverage adjustment returned code {lev_resp.status_code}: {lev_resp.text}")
-        except Exception as e:
-            logger.warning(f"[BinanceDirect] Failed to auto-adjust leverage: {e}")
+        # 0. Set Leverage to 1x (Spot-like mode for both Mainnet and Testnet).
+        # Se cachea por símbolo — el leverage 1x ya seteado no cambia entre
+        # trades, repetir esta llamada en CADA entrada solo suma ~0.5-0.8s
+        # de latencia evitable (bug real 2026-07-20, ver PROGRESS_LOG).
+        if symbol not in self._leverage_set_cache:
+            try:
+                leverage_url = f"{self.base_url}/fapi/v1/leverage"
+                lev_params = self._sign({"symbol": symbol, "leverage": 1})
+                lev_resp = requests.post(leverage_url, params=lev_params, headers=self._headers(), timeout=10)
+                if lev_resp.status_code == 200:
+                    logger.info(f"[BinanceDirect] Auto-adjusted leverage to 1x. Response: {lev_resp.text}")
+                    self._leverage_set_cache.add(symbol)
+                else:
+                    logger.warning(f"[BinanceDirect] Leverage adjustment returned code {lev_resp.status_code}: {lev_resp.text}")
+            except Exception as e:
+                logger.warning(f"[BinanceDirect] Failed to auto-adjust leverage: {e}")
+        else:
+            logger.info(f"[BinanceDirect] Leverage 1x ya confirmado para {symbol} esta sesión — salteo la llamada.")
 
         # 1. Entry Market Order
         logger.info(f"[BinanceDirect] Step 1/3: Entry {side} {qty} {symbol} @ MARKET (env={env_str})")
@@ -170,6 +305,8 @@ class BinanceDirectClient:
         if not r["success"]:
             logger.error(f"[BinanceDirect] Entry failed: {r.get('error')}. Raw response: {r.get('raw_response')}")
             logger.info("[BinanceDirect] ========== open_position FAILED at Entry ==========")
+            if "invalid symbol" in str(r.get("error", "")).lower():
+                self._mark_symbol_invalid(symbol)
             return False
             
         logger.info(f"[BinanceDirect] ✅ Entry OK — orderId={r['orderId']}")
@@ -387,6 +524,17 @@ def get_binance_direct() -> BinanceDirectClient:
     if _binance_direct is None:
         _binance_direct = BinanceDirectClient()
     return _binance_direct
+
+
+def is_symbol_invalid_for_current_env(symbol: str) -> bool:
+    """True si el símbolo ya está en la lista negra aprendida (rechazo previo
+    real de Binance) O si el exchangeInfo del entorno actual dice que no está
+    en status TRADING (chequeo proactivo, no espera a fallar una orden).
+    Usado para vetar el candidato ANTES de abrir la simulación interna."""
+    client = get_binance_direct()
+    if symbol in client._invalid_symbols:
+        return True
+    return not client.is_tradable(symbol)
 
 class PositionManager:
     """
@@ -709,13 +857,16 @@ class PositionManager:
         """
         side_str = "BUY" if side == 0 else "SELL"
         logger.info(f"[BinanceDirect] open_binance_trade: {symbol} {side_str} qty={quantity} TP={tp_price} SL={sl_price}")
-        return get_binance_direct().open_position(
+        ok = get_binance_direct().open_position(
             symbol=symbol,
             side=side_str,
             quantity=quantity,
             tp_price=tp_price,
             sl_price=sl_price
         )
+        if not ok:
+            _notify_binance_mirror_failure("APERTURA", symbol, "ver logs del agente para el error exacto de Binance")
+        return ok
 
     def close_binance_trade(self, symbol: str) -> bool:
         """
@@ -723,4 +874,7 @@ class PositionManager:
         Bypasses the C# backend entirely — no restart needed.
         """
         logger.info(f"[BinanceDirect] close_binance_trade: {symbol}")
-        return get_binance_direct().close_position(symbol=symbol)
+        ok = get_binance_direct().close_position(symbol=symbol)
+        if not ok:
+            _notify_binance_mirror_failure("CIERRE", symbol, "ver logs del agente para el error exacto de Binance")
+        return ok

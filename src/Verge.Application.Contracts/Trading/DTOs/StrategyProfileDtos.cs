@@ -52,6 +52,9 @@ public class StrategyProfileDto : EntityDto<Guid>
     public string StrategyType { get; set; } = "Generic";
     public string? PatternParamsJson { get; set; }
 
+    // Ejecución real contra Binance (Testnet/Mainnet)
+    public bool BroadcastToBinance { get; set; }
+
     // Metrics (Calculated)
     public double WinRate { get; set; }
     public int TotalTrades { get; set; }
@@ -103,4 +106,7 @@ public class CreateUpdateStrategyProfileDto
     // Motor de patrones (genérico)
     public string StrategyType { get; set; } = "Generic";
     public string? PatternParamsJson { get; set; }
+
+    // Ejecución real contra Binance (Testnet/Mainnet)
+    public bool BroadcastToBinance { get; set; } = false;
 }

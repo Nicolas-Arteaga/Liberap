@@ -30,6 +30,10 @@ export interface StrategyProfile {
   enabledDays?: string[]; // 'Mon', 'Tue', etc.
   extremeRsiVeto: boolean;
 
+  // Ejecución real contra Binance (Testnet/Mainnet), reemplaza el hardcodeo
+  // que antes solo mataba por id/nombre de estrategia en el agente.
+  broadcastToBinance?: boolean;
+
   // Métricas (opcional para visualización)
   winRate?: number;
   totalTrades?: number;

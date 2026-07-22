@@ -149,6 +149,7 @@ export class HistoryComponent {
           return db - da;
         });
         this.recomputeAll();
+        this.loadStats();
         this.cdr.markForCheck();
       },
       error: () => this.cdr.markForCheck()
@@ -228,19 +229,17 @@ export class HistoryComponent {
     const start = (this.currentPage - 1) * this.pageSize;
     this._paginatedTrades = filtered.slice(start, start + this.pageSize);
 
-    // 4. Stats – single pass over filtered array
-    let profit = 0, wins = 0, closedCount = 0;
-    for (const t of filtered) {
-      profit += t.realizedPnl || 0;
-      if (t.status === 1 || t.status === 2 || t.status === 6) {
-        closedCount++;
-        if (t.status === 1) wins++;
-      }
-    }
-    this._totalProfit   = profit;
-    this._totalTrades   = filtered.length;
-    this._winRate       = closedCount > 0 ? Math.round((wins / closedCount) * 100) : 0;
-    this._averageProfit = closedCount > 0 ? profit / closedCount : 0;
+    // 4. Stats — se piden aparte, NO acá (ver loadStats()). Bug real
+    // 2026-07-19 (primera vuelta de este mismo fix): esto llamaba a
+    // loadStats() en cada recomputeAll(), incluyendo el patch de
+    // tradeUpdate$ que llega UNA VEZ POR SEGUNDO POR CADA POSICIÓN ABIERTA
+    // (SimulationMarkPriceWorker.cs tickea mark price cada 1s) — con ~20
+    // posiciones abiertas eso disparaba ~20 pedidos HTTP por segundo al
+    // mismo endpoint, que se cancelaban entre sí (OperationCanceledException
+    // en cascada, dashboard entero mostrando $0). Esos ticks solo tocan
+    // unrealizedPnl, nunca realizedPnl — no pueden cambiar estos totales,
+    // así que no hace falta pedirlos de nuevo ahí. loadStats() ahora se
+    // llama solo en loadData() y setStrategyFilter().
 
     // 5. Chip options (stable when strategies haven't changed)
     this._strategyChipOptions = this.strategies.map(s => ({
@@ -250,11 +249,31 @@ export class HistoryComponent {
     }));
   }
 
+  // ── Stats (agregados reales del server, sin límite — fix 2026-07-19) ───────
+  private loadStats() {
+    const id = this.strategyFilter === 'all' ? undefined : this.strategyFilter;
+    this.tradeService.getPerformanceStats(id).subscribe({
+      next: (stats: SimulationPerformanceDto) => {
+        this._totalProfit   = stats.totalGain ?? 0;
+        this._totalTrades   = stats.totalTrades ?? 0;
+        this._winRate       = Math.round(stats.winRate ?? 0);
+        this._averageProfit = stats.avgPerTrade ?? 0;
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        // Fail-open silencioso: si el endpoint agregado falla, no se
+        // reemplazan los totales por 0 — quedan con el último valor
+        // conocido en vez de mostrar un dato inventado/vacío.
+      }
+    });
+  }
+
   // ── Public actions ─────────────────────────────────────────────────────────
   setStrategyFilter(value: string) {
     this.strategyFilter = value;
     this.currentPage = 1;
     this.recomputeAll();
+    this.loadStats();
   }
 
   resetPage() {

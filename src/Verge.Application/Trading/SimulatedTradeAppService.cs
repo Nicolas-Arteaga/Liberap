@@ -566,9 +566,16 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
     }
 
     [HttpGet]
-    public async Task<SimulationPerformanceDto> GetPerformanceStatsAsync()
+    public async Task<SimulationPerformanceDto> GetPerformanceStatsAsync(Guid? strategyProfileId = null)
     {
         var userId = CurrentUser.Id!.Value;
+        // Sin límite de cantidad — trae TODOS los trades del usuario, cerrados,
+        // sin importar cuántos haya. Fix 2026-07-19: el Historial calculaba
+        // estos mismos totales del lado del cliente sobre GetRecentTradesAsync
+        // (capado a 1000), y con 1934 trades reales en la cuenta eso cortaba
+        // en silencio los más viejos de cualquier estrategia — el "Total
+        // Trades"/Win Rate/Ganancia mostrados quedaban incompletos sin que
+        // nadie lo notara. Este endpoint agrega TODO del lado del server.
         var trades = await _tradeRepo.GetListAsync(t => t.UserId == userId && t.Status != TradeStatus.Open);
 
         // Get active strategies to filter trades
@@ -577,11 +584,23 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         var activeStrategyIds = activeStrategies.Select(s => s.Id).ToHashSet();
 
         // Filter trades: include trades with no strategy (default) OR trades from active strategies
-        var filteredTrades = trades.Where(t => 
-            !t.StrategyProfileId.HasValue || 
-            t.StrategyProfileId.Value == Guid.Empty || 
+        var filteredTrades = trades.Where(t =>
+            !t.StrategyProfileId.HasValue ||
+            t.StrategyProfileId.Value == Guid.Empty ||
             activeStrategyIds.Contains(t.StrategyProfileId.Value)
         ).ToList();
+
+        // Filtro opcional por estrategia puntual (mismo criterio que ya usaba
+        // el Historial del lado del cliente: Guid.Empty = "sin estrategia").
+        if (strategyProfileId.HasValue)
+        {
+            var targetId = strategyProfileId.Value;
+            filteredTrades = filteredTrades.Where(t =>
+                targetId == Guid.Empty
+                    ? (!t.StrategyProfileId.HasValue || t.StrategyProfileId.Value == Guid.Empty)
+                    : t.StrategyProfileId.HasValue && t.StrategyProfileId.Value == targetId
+            ).ToList();
+        }
 
         var stats = new SimulationPerformanceDto();
         if (!filteredTrades.Any())

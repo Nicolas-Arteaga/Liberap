@@ -193,6 +193,13 @@ class VergeAgent:
         self.signals   = SignalEngine(self.fetcher)
         self.risk      = RiskManager(self.fetcher)
         self.positions = PositionManager(self.auth)
+
+        # Crea el cliente de Binance YA (no al primer trade real) para que el
+        # precalentado del cache de precisión tenga tiempo de terminar antes
+        # de que haga falta — ver position_manager.py _warm_precision_cache.
+        if getattr(config, "BINANCE_REAL_TRADING", False):
+            from position_manager import get_binance_direct
+            get_binance_direct()
         self.report    = ReportEngine()
         self.btc_filter = BTCMacroFilter(self.fetcher)
         self.btc_corr   = BTCCorrelation(self.fetcher, self.btc_filter)
@@ -3843,6 +3850,35 @@ class VergeAgent:
         score = float(profile.get("minConfluenceScore", 80.0))
         profile_name = profile.get("name", "FVG")
 
+        # ── Filtro de agotamiento (config-only, opt-in por perfil) ──────────
+        # Auditoría real 2026-07-22 sobre 163 trades de FVG-15m: los SHORT que
+        # entran contra una subida previa fuertemente parabólica (pendiente de
+        # EMA50 pronunciada, agotamiento clásico) tienen 29.2% win rate y
+        # +$46.40 en total, contra 13.6%/-$7.52 cuando la pendiente previa es
+        # plana — ese 15% de los trades genera el 65% de toda la ganancia. Los
+        # LONG no mostraron el mismo corte limpio en la data, pero se aplica
+        # la condición espejo por consistencia direccional (misma idea:
+        # comprar solo tras una caída fuerte, no cualquier gap alcista).
+        # No se toca el perfil original — esto solo se activa si el perfil
+        # trae `requireExhaustion: true` en su PatternParamsJson (ej. el clon
+        # "FVG - 15m Pulido"), vía UI de /strategies, sin código hardcodeado
+        # por nombre/id de perfil.
+        try:
+            fvg_params = json.loads(profile.get("patternParamsJson") or "{}")
+        except Exception:
+            fvg_params = {}
+
+        if fvg_params.get("requireExhaustion"):
+            min_slope = float(fvg_params.get("minExhaustionSlopeDeg", 3.0))
+            snapshot = self._compute_compression_snapshot(symbol, {})
+            slope = snapshot.get("slope_ema50_deg")
+            if slope is None:
+                return None  # sin datos suficientes, no arriesgamos el trade
+            if side_int == 1 and slope < min_slope:
+                return None  # SHORT: exige subida previa pronunciada (agotamiento)
+            if side_int == 0 and slope > -min_slope:
+                return None  # LONG: exige caída previa pronunciada (espejo)
+
         return {
             "symbol": symbol,
             "confluence_score": score,
@@ -4580,6 +4616,18 @@ class VergeAgent:
             # SHORTs: no bloquear, el dump de BTC los favorece. Solo loggear contexto.
             logger.info(f"[BTC-INFO] {symbol} SHORT con régimen BTC={btc_regime}")
 
+        # ── BINANCE INVALID-SYMBOL GATE ────────────────────────────────────────────
+        # Si esta estrategia espeja a Binance y el símbolo ya fue rechazado con
+        # "Invalid symbol" en este entorno (bug real: BLUAIUSDT existe en mainnet
+        # pero no en testnet), no abrimos ni la simulación interna — evita que
+        # queden trades "fantasma" sin contraparte real cuando el objetivo de
+        # esta prueba es justamente validar contra Binance de verdad.
+        if getattr(config, "BINANCE_REAL_TRADING", False) and profile and profile.get("broadcastToBinance"):
+            from position_manager import is_symbol_invalid_for_current_env
+            if is_symbol_invalid_for_current_env(symbol):
+                logger.warning(f"[BINANCE REAL] {symbol} inválido en este entorno — se salta el candidato completo (ni simulación interna).")
+                return False
+
         # ── NEXUS-5 AUTO-EXECUTION GATE ────────────────────────────────────────────
         # If NEXUS5_ONLY_AUTO_EXECUTE is True: only trades from NEXUS-5 (total_sweep) execute automatically.
         # All other sources are logged as PENDING_CONFIRMATION and skipped.
@@ -4600,10 +4648,9 @@ class VergeAgent:
         if trade_result:
             # ── Mirror entry to Binance if real trading is enabled ──
             if getattr(config, "BINANCE_REAL_TRADING", False):
-                p_id = profile.get("id") if profile else None
-                p_name = profile.get("name") if profile else ""
-                is_ma_cross = (p_id == "3a214744-f0b9-68bb-f235-438a39d39d33") or (p_name == "MA Cross Momentum")
-                if is_ma_cross:
+                # broadcastToBinance viene del StrategyProfile (switch en /strategies) -
+                # reemplaza el hardcodeo previo por id/nombre (solo "MA Cross Momentum").
+                if profile and profile.get("broadcastToBinance"):
                     try:
                         entry_px = float(pos_details.get("entry_price", market_px))
                         margin = float(pos_details.get("margin", 150.0))
@@ -4925,9 +4972,7 @@ class VergeAgent:
                     if getattr(config, "BINANCE_REAL_TRADING", False):
                         p_id = pos.get("strategy_profile_id") or pos.get("strategyProfileId")
                         profile = next((p for p in self.active_profiles if p.get("id") == p_id), None)
-                        p_name = profile.get("name", "") if profile else ""
-                        is_ma_cross = (p_id == "3a214744-f0b9-68bb-f235-438a39d39d33") or (p_name == "MA Cross Momentum")
-                        if is_ma_cross:
+                        if profile and profile.get("broadcastToBinance"):
                             try:
                                 logger.info(f"[BINANCE REAL] Mirroring close of {symbol} to Binance")
                                 self.positions.close_binance_trade(symbol)

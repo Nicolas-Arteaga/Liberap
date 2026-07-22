@@ -26,10 +26,11 @@ export class SimulatedTradeService {
     { apiName: this.apiName,...config });
   
 
-  getPerformanceStats = (config?: Partial<Rest.Config>) =>
+  getPerformanceStats = (strategyProfileId?: string, config?: Partial<Rest.Config>) =>
     this.restService.request<any, SimulationPerformanceDto>({
       method: 'GET',
       url: '/api/app/simulated-trade/performance-stats',
+      params: { strategyProfileId },
     },
     { apiName: this.apiName,...config });
   

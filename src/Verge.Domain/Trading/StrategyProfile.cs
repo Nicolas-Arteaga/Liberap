@@ -52,6 +52,13 @@ public class StrategyProfile : FullAuditedAggregateRoot<Guid>
     public string StrategyType { get; set; } = "Generic";
     public string? PatternParamsJson { get; set; }
 
+    // ── Ejecución real contra Binance ────────────────────────────────────────
+    // Si es true, el agente (en modo Testnet o Mainnet) espeja cada entrada/salida
+    // de esta estrategia contra Binance ademas de la simulacion interna.
+    // Reemplaza el hardcodeo por id/nombre que existia antes (solo "MA Cross
+    // Momentum"), ver agent/verge_agent.py.
+    public bool BroadcastToBinance { get; set; } = false;
+
     protected StrategyProfile() { }
 
     public StrategyProfile(Guid id, Guid userId, string name) : base(id)

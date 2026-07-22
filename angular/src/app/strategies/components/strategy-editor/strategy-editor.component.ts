@@ -66,10 +66,18 @@ function defaultAdnParams(): AdnCompressionParams {
  */
 export interface FvgPatternParams {
   timeframe: '1m' | '5m' | '15m';
+  // Filtro de agotamiento (opt-in, default apagado — no afecta a los
+  // perfiles FVG existentes). Auditoría real 2026-07-22 sobre FVG-15m:
+  // los SHORT que entran contra una subida previa fuertemente parabólica
+  // (pendiente de EMA50 pronunciada) dieron 29.2% win rate / +$46.40,
+  // contra 13.6%/-$7.52 sin ese filtro — ese 15% de los trades generó el
+  // 65% de toda la ganancia. Ver agent/verge_agent.py::_build_fvg_candidate.
+  requireExhaustion?: boolean;
+  minExhaustionSlopeDeg?: number;
 }
 
 function defaultFvgParams(): FvgPatternParams {
-  return { timeframe: '5m' };
+  return { timeframe: '5m', requireExhaustion: false, minExhaustionSlopeDeg: 3.0 };
 }
 
 @Component({
@@ -118,6 +126,7 @@ export class StrategyEditorComponent implements OnInit {
     nexusMaxPriceDriftPct: 0.025,
     strategyType: 'Generic',
     patternParamsJson: undefined,
+    broadcastToBinance: false,
   };
 
   /**

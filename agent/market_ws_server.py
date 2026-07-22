@@ -1,6 +1,17 @@
-print(">>> INICIANDO VERGE MARKET WS (V1.3 Docker-Native)", flush=True)
 import os
 import sys
+
+# La consola de Windows usa cp1252 por default, que no soporta los emojis
+# de agent_log() (✅, 🌐, ❌, etc.) — sin esto el proceso entero crashea con
+# UnicodeEncodeError apenas intenta loguear el primer emoji (bug real
+# 2026-07-22, encontrado al redirigir la salida a un archivo tras un corte
+# de luz: nunca se notó antes porque la consola interactiva de Windows a
+# veces tolera UTF-8 parcialmente, un archivo/pipe no).
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+print(">>> INICIANDO VERGE MARKET WS (V1.3 Docker-Native)", flush=True)
 import time
 import json
 import asyncio
@@ -149,8 +160,34 @@ def ws_loop(exchange_name):
                     agent_log(f"📡 {exchange_name.upper()} suscripto a {len(symbols)} símbolos.")
                 except Exception as e:
                     agent_log(f"❌ {exchange_name.upper()} subscribe_fn falló: {type(e).__name__}: {e}")
+
+                # BUG REAL 2026-07-22: exc.ping_payload ("ping") estaba definido
+                # en exchange_registry.py para OKX/Bitget pero nunca se usaba en
+                # ningún lado — run_forever() no manda ningún keepalive, y estos
+                # exchanges cortan la conexión a los 30s sin actividad del
+                # cliente. El ping de bajo nivel de websocket-client (parámetro
+                # ping_interval de run_forever) manda un frame de control WS,
+                # no el mensaje de texto "ping" que estos exchanges esperan —
+                # mismo problema ya visto con el stream de liquidaciones de
+                # Bybit. Resultado real: OKX reconectaba cada 30-90s y jamás
+                # llegaba a acumular datos reales (written=0 siempre, solo
+                # alcanzaba a recibir el ack de suscripción antes de cortarse).
+                if exc.ping_payload:
+                    def _keepalive(ws=ws, payload=exc.ping_payload, name=exchange_name):
+                        while ws.keep_running:
+                            time.sleep(20)
+                            try:
+                                if ws.keep_running:
+                                    ws.send(payload)
+                            except Exception:
+                                break
+                    threading.Thread(target=_keepalive, daemon=True).start()
             def on_message(ws, msg):
                 msg_count["total"] += 1
+                if msg == "pong":
+                    # Respuesta al keepalive de texto plano (no es JSON) —
+                    # no cuenta como error, es la confirmación esperada.
+                    return
                 try:
                     data = pyjson.loads(msg)
                     parsed = exc.message_parser(data)
