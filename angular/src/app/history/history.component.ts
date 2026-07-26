@@ -140,8 +140,18 @@ export class HistoryComponent {
 
   // ── Data loading ──────────────────────────────────────────────────────────
   loadData() {
-    // Load trades
-    this.tradeService.getRecentTrades(1000).subscribe({
+    // Bug real 2026-07-25: pedir siempre "las 1000 más recientes de TODA la
+    // cuenta" y filtrar recién del lado del cliente hacía que, con una
+    // estrategia puntual seleccionada, sus trades más viejos quedaran
+    // empujados fuera de esa ventana si hubo 1000+ trades de OTRAS
+    // estrategias en el medio (pasó de verdad con Arrow Reversal: sus
+    // primeras 6 ganadoras de 10-17 jul desaparecieron del gráfico/lista
+    // porque hubo 2000+ trades de otras estrategias después). Ahora, con
+    // un filtro de estrategia activo, el backend filtra ANTES de aplicar
+    // el límite — trae las 1000 más recientes de ESA estrategia, no de
+    // toda la cuenta.
+    const scopedStrategyId = this.strategyFilter === 'all' ? undefined : this.strategyFilter;
+    this.tradeService.getRecentTrades(1000, scopedStrategyId).subscribe({
       next: trades => {
         this.realTrades = trades.sort((a, b) => {
           const da = new Date(a.closedAt || a.openedAt || '').getTime();
@@ -272,8 +282,11 @@ export class HistoryComponent {
   setStrategyFilter(value: string) {
     this.strategyFilter = value;
     this.currentPage = 1;
-    this.recomputeAll();
-    this.loadStats();
+    // loadData() ahora depende del filtro (ver bug real 2026-07-25 arriba en
+    // loadData) — hay que volver a pedir los trades escopeados a la
+    // estrategia elegida, no solo recalcular sobre los que ya estaban en
+    // memoria (esos podían faltarle los más viejos de esta estrategia).
+    this.loadData();
   }
 
   resetPage() {
@@ -436,6 +449,23 @@ export class HistoryComponent {
     const pct = this.getTpProgressDisplay(trade);
     if (pct == null) return 0;
     return Math.max(0, Math.min(100, pct));
+  }
+
+  /**
+   * Pico histórico de acercamiento al TP, visible TAMBIÉN mientras el trade
+   * sigue abierto (no solo al cerrar). Bug real 2026-07-22: un trade podía
+   * haber llegado a 98.95% del TP y retroceder a 70%, y mientras seguía
+   * abierto la UI solo mostraba el 70% en vivo — el usuario no tenía forma
+   * de saber qué tan cerca había estado, justo cuando esa info más importa
+   * (para decidir si dejarlo correr). El dato siempre existió en DB
+   * (MaxTpProgressPct, actualizado en tiempo real); esto solo lo muestra.
+   */
+  getTpProgressPeakDisplay(trade: SimulatedTradeDto): number | null {
+    if (trade.status !== 0) return null; // ya cerrado: el pico ES el valor principal, no hace falta duplicar
+    const max = trade.maxTpProgressPct;
+    const current = trade.tpProgressPct;
+    if (max == null || current == null) return null;
+    return max > current + 0.5 ? max : null; // solo mostrar si el pico fue meaningfully mayor al actual
   }
 
   getTpProgressBarClass(trade: SimulatedTradeDto): string {

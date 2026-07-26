@@ -106,21 +106,12 @@ class ArrowPeakAnalyzer:
             logger.info(f"[ARROW PEAK] {symbol}: Insufficient 1D candles ({len(candles_1d) if candles_1d else 0})")
             return None
 
-        # Bug real encontrado 2026-07-19 (causó una pérdida real en BULLAUSDT):
-        # Binance devuelve la vela diaria de HOY como último elemento aunque
-        # todavía no cerró — se estaba contando como "día de sangrado
-        # confirmado" un día parcial que más tarde, al cerrar completo,
-        # terminó siendo VERDE (revirtió la caída de la mañana). Se descarta
-        # acá la última vela si todavía no pasaron 24h desde que abrió.
-        import time as _time
-        now_ms = int(_time.time() * 1000)
-        last_open_ms = int(candles_1d[-1][0])
-        if last_open_ms + 24 * 3600 * 1000 > now_ms:
-            candles_1d = candles_1d[:-1]
-        if len(candles_1d) < 15:
-            logger.info(f"[ARROW PEAK] {symbol}: Insufficient CLOSED 1D candles after descartar el día en formación")
-            return None
-
+        # 2026-07-25: revertido a pedido explícito del usuario el fix del
+        # 2026-07-19 (descartar la vela del día en formación) — entraba más
+        # tarde en el proceso de reversión (medido: 37.8% -> 46.1% de
+        # retroceso promedio al entrar), empeorando el R:R real aunque el TP
+        # nominal fuera el mismo. Vuelve al comportamiento del 16/7. No
+        # volver a tocar esta estrategia sin acuerdo explícito.
         df_1d = pd.DataFrame(candles_1d)
         # Binance returns 12 fields, we only need first 6
         df_1d = df_1d.iloc[:, :6]

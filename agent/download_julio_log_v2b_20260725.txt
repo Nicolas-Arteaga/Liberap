@@ -1,0 +1,25 @@
+>>> Completando julio (1-25) para 428 simbolos, 64 workers HTTP en paralelo
+  progreso: 500/10700 requests, 46080 velas insertadas
+  progreso: 1000/10700 requests, 92160 velas insertadas
+  progreso: 1500/10700 requests, 138240 velas insertadas
+  progreso: 2000/10700 requests, 184224 velas insertadas
+  progreso: 2500/10700 requests, 229671 velas insertadas
+  progreso: 3000/10700 requests, 275655 velas insertadas
+  progreso: 3500/10700 requests, 321831 velas insertadas
+  progreso: 4000/10700 requests, 367911 velas insertadas
+  progreso: 4500/10700 requests, 413991 velas insertadas
+  progreso: 5000/10700 requests, 459247 velas insertadas
+  progreso: 5500/10700 requests, 505231 velas insertadas
+  progreso: 6000/10700 requests, 551311 velas insertadas
+  progreso: 6500/10700 requests, 597391 velas insertadas
+  progreso: 7000/10700 requests, 643471 velas insertadas
+  progreso: 7500/10700 requests, 689647 velas insertadas
+  progreso: 8000/10700 requests, 735727 velas insertadas
+  progreso: 8500/10700 requests, 780886 velas insertadas
+  progreso: 9000/10700 requests, 826966 velas insertadas
+  progreso: 9500/10700 requests, 873046 velas insertadas
+  progreso: 10000/10700 requests, 919126 velas insertadas
+  progreso: 10500/10700 requests, 965206 velas insertadas
+
+>>> Listo. Total velas nuevas: 983638
+>>> Simbolos sin NINGUN dato de julio nuevo: 0

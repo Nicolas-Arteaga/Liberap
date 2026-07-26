@@ -204,6 +204,7 @@ class VergeAgent:
         self.btc_filter = BTCMacroFilter(self.fetcher)
         self.btc_corr   = BTCCorrelation(self.fetcher, self.btc_filter)
         self.active_profiles = []
+        self.all_profiles = []  # incluye pausadas — necesario para gestionar posiciones ya abiertas
 
         self._tier3_index = 0
         self._last_profile_sync = 0
@@ -228,6 +229,7 @@ class VergeAgent:
             f"Total={len(config.WATCHLIST)}"
         )
         self.active_profiles = []
+        self.all_profiles = []
 
     @staticmethod
     def _json_safe_for_audit(obj, depth: int = 0):
@@ -775,8 +777,23 @@ class VergeAgent:
         # GUIDs originales (00000000-...-0000/0001) — se calibran desde /strategies como
         # cualquier otro perfil. Cada perfil evalúa candidatos independientemente con su
         # propio slot limit.
-        self.active_profiles = db_profiles
-        
+        #
+        # Bug real 2026-07-25: el switch "Activa/Pausada" de /strategies (campo
+        # isActive) nunca se chequeaba acá — el agente escaneaba TODAS las
+        # estrategias (activas y pausadas) igual, el switch era puramente
+        # cosmético en la UI. Con cada vez más estrategias (18 y contando) esto
+        # infla el tiempo de ciclo sin necesidad — filtrar acá permite pausar una
+        # estrategia (dejar de escanearla) sin borrarla ni perder su historial.
+        # self.all_profiles (SIN filtrar) es necesario para gestionar posiciones
+        # YA ABIERTAS de una estrategia recién pausada (timeout, mirror a
+        # Binance, etc. — líneas más abajo) — pausar no debe dejar huérfana una
+        # posición que ya está corriendo, solo evitar candidatos NUEVOS.
+        self.all_profiles = db_profiles
+        paused = [p.get("name") for p in db_profiles if not p.get("isActive", True)]
+        self.active_profiles = [p for p in db_profiles if p.get("isActive", True)]
+        if paused:
+            logger.info(f"[PAUSED] Excluidas del escaneo de candidatos nuevos (isActive=false): {paused}")
+
         logger.info(f"Active strategies this cycle: {[p['name'] for p in self.active_profiles]}")
 
         self._manage_open_positions()
@@ -3855,10 +3872,13 @@ class VergeAgent:
         # entran contra una subida previa fuertemente parabólica (pendiente de
         # EMA50 pronunciada, agotamiento clásico) tienen 29.2% win rate y
         # +$46.40 en total, contra 13.6%/-$7.52 cuando la pendiente previa es
-        # plana — ese 15% de los trades genera el 65% de toda la ganancia. Los
-        # LONG no mostraron el mismo corte limpio en la data, pero se aplica
-        # la condición espejo por consistencia direccional (misma idea:
-        # comprar solo tras una caída fuerte, no cualquier gap alcista).
+        # plana — ese 15% de los trades genera el 65% de toda la ganancia.
+        # 2026-07-25: el espejo para LONG (exigir caída previa pronunciada) se
+        # probó en vivo en "FVG - 15m Pulido" — resultado real: 7.7% WR,
+        # -$16.27 en 26 trades, PEOR que sin filtro (11.1% WR). Descartado
+        # para LONG; este bloque ahora solo aplica de verdad al lado SHORT
+        # (el chequeo de LONG queda por si algún perfil futuro lo quisiera
+        # probar explícitamente, pero no se usa en ningún perfil activo hoy).
         # No se toca el perfil original — esto solo se activa si el perfil
         # trae `requireExhaustion: true` en su PatternParamsJson (ej. el clon
         # "FVG - 15m Pulido"), vía UI de /strategies, sin código hardcodeado
@@ -3877,7 +3897,24 @@ class VergeAgent:
             if side_int == 1 and slope < min_slope:
                 return None  # SHORT: exige subida previa pronunciada (agotamiento)
             if side_int == 0 and slope > -min_slope:
-                return None  # LONG: exige caída previa pronunciada (espejo)
+                return None  # LONG: espejo, descartado por evidencia real (ver arriba)
+
+        # ── Filtro de gap chico para LONG (config-only, opt-in) ─────────────
+        # Auditoría real 2026-07-25 sobre 143 LONG de FVG-15m: la pendiente NO
+        # explica a los mejores ganadores (CHILLGUYUSDT +$25.17 tenía pendiente
+        # +58.5° por una mecha explosiva puntual, no una tendencia real — la
+        # pendiente se contamina fácil con UNA vela rara porque es un promedio).
+        # Lo que sí separa limpio: gap_pct < 0.3% da n=45, WR=15.6%,
+        # +$73.15 — casi 5x el total real de LONG (+$15.23), o sea el resto
+        # de los trades (gap más ancho) suma en conjunto -$57.92. Mismo
+        # mecanismo que ya funciona en el Short (gap angosto = entrada más
+        # limpia), simétrico entre direcciones. Opt-in vía `maxGapPct` en
+        # PatternParamsJson — no toca ningún perfil existente.
+        if fvg_params.get("maxGapPct") is not None:
+            max_gap = float(fvg_params.get("maxGapPct"))
+            gap_pct = item.get("gap_pct")
+            if gap_pct is None or float(gap_pct) >= max_gap:
+                return None
 
         return {
             "symbol": symbol,
@@ -4830,8 +4867,8 @@ class VergeAgent:
             if not should_close and not is_diamond:
                 # Buscar profile correspondiente
                 p_id = pos.get("strategy_profile_id")
-                profile = next((p for p in self.active_profiles if p.get("id") == p_id), None)
-                
+                profile = next((p for p in self.all_profiles if p.get("id") == p_id), None)
+
                 if profile:
                     max_candles = int(profile.get("maxTradeDurationCandles", 16))
                 else:
@@ -4971,7 +5008,7 @@ class VergeAgent:
                     # ── Mirror close to Binance if real trading is enabled ──
                     if getattr(config, "BINANCE_REAL_TRADING", False):
                         p_id = pos.get("strategy_profile_id") or pos.get("strategyProfileId")
-                        profile = next((p for p in self.active_profiles if p.get("id") == p_id), None)
+                        profile = next((p for p in self.all_profiles if p.get("id") == p_id), None)
                         if profile and profile.get("broadcastToBinance"):
                             try:
                                 logger.info(f"[BINANCE REAL] Mirroring close of {symbol} to Binance")

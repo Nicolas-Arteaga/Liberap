@@ -191,6 +191,27 @@
           </div>
         </div>
 
+        <div class="field-group" *ngIf="isFvgStrategy">
+          <label class="field-label">Filtro de Gap Chico (opcional, Long y Short)</label>
+          <div class="toggle-card" [class.on]="fvgParams.maxGapPct !== undefined && fvgParams.maxGapPct !== null"
+               (click)="fvgParams.maxGapPct = (fvgParams.maxGapPct !== undefined && fvgParams.maxGapPct !== null) ? undefined : 0.3">
+            <div class="toggle-dot"></div>
+            <span>{{ (fvgParams.maxGapPct !== undefined && fvgParams.maxGapPct !== null) ? 'Activado — exige gap angosto' : 'Apagado — cualquier tamaño de gap' }}</span>
+          </div>
+          <div class="field-group" *ngIf="fvgParams.maxGapPct !== undefined && fvgParams.maxGapPct !== null" style="margin-top: 10px;">
+            <label class="field-label">Gap máximo permitido (%)</label>
+            <input class="field-input" type="number" step="0.05" min="0"
+                   [(ngModel)]="fvgParams.maxGapPct" placeholder="0.3">
+            <p class="field-hint">
+              Solo deja pasar candidatos cuyo hueco (gap_pct) sea menor a este valor. Auditoría real 2026-07-25
+              sobre 143 LONG de FVG-15m: gap_pct &lt; 0.3% dio 45 trades / 15.6% win rate / +$73.15 — casi 5x
+              el total real de LONG (+$15.23), es decir el resto de los trades (gap más ancho) sumó en
+              conjunto -$57.92. La pendiente de EMA50 NO sirve como filtro para LONG (se contamina fácil con
+              una mecha puntual); este filtro estructural sí funciona, simétrico con el mismo mecanismo del Short.
+            </p>
+          </div>
+        </div>
+
         <div class="field-group" *ngIf="isAdnCompression">
           <label class="field-label">Temporalidad</label>
           <div class="direction-selector">

@@ -1,0 +1,22 @@
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=136min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=321 | Total=421
+simbolos disponibles: 428
+  20/428 simbolos, 69s transcurridos
+  40/428 simbolos, 135s transcurridos
+  60/428 simbolos, 198s transcurridos
+  80/428 simbolos, 261s transcurridos
+  100/428 simbolos, 313s transcurridos
+Traceback (most recent call last):
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\run_engine_v4_multiex_20260726.py", line 37, in <module>
+    result = engine.run_ma_geometry(profile, symbols, start_ms, end_ms, progress_cb=prog)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\engine.py", line 286, in run_ma_geometry
+    self.fetcher.set_active_symbol(symbol, intervals=("15m", interval))
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\engine.py", line 80, in set_active_symbol
+    rows15 = self._load_15m(symbol)
+             ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\engine.py", line 105, in _load_15m
+    cur.execute(
+sqlite3.OperationalError: database is locked

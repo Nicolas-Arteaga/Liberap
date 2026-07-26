@@ -90,6 +90,14 @@ public class SimulatedTrade : FullAuditedAggregateRoot<Guid>
     public string? ExitAuditJson { get; set; }
 
     /// <summary>
+    /// Etiqueta manual para excluir un trade puntual de las estadísticas
+    /// agregadas (GetPerformanceStatsAsync) sin borrarlo — el trade sigue
+    /// visible en el Historial para auditoría, solo no cuenta para el
+    /// Win Rate/Ganancia Total/Avg. Null = cuenta normal.
+    /// </summary>
+    public string? ExclusionTag { get; set; }
+
+    /// <summary>
     /// Links this trade to the StrategyProfile that generated it.
     /// Null for trades opened before multi-strategy was implemented.
     /// </summary>

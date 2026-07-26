@@ -35,11 +35,11 @@ export class SimulatedTradeService {
     { apiName: this.apiName,...config });
   
 
-  getRecentTrades = (limit: number = 20, config?: Partial<Rest.Config>) =>
+  getRecentTrades = (limit: number = 20, strategyProfileId?: string, config?: Partial<Rest.Config>) =>
     this.restService.request<any, SimulatedTradeDto[]>({
       method: 'GET',
       url: '/api/app/simulated-trade/recent-trades',
-      params: { limit },
+      params: { limit, strategyProfileId },
     },
     { apiName: this.apiName,...config });
   

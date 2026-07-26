@@ -1,0 +1,27 @@
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=87min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=322 | Total=422
+>>> bybit: 105 simbolos
+  [bybit] 20/105 simbolos, total velas=268910
+  [bybit] 40/105 simbolos, total velas=674428
+  [bybit] 60/105 simbolos, total velas=970785
+  [bybit] 80/105 simbolos, total velas=1347196
+  [bybit] 100/105 simbolos, total velas=1708890
+>>> bybit listo
+>>> okx: 105 simbolos
+  [okx] 20/105 simbolos, total velas=1893221
+  [okx] 40/105 simbolos, total velas=1988737
+  [okx] 60/105 simbolos, total velas=2084737
+  [okx] 80/105 simbolos, total velas=2168737
+  [okx] 100/105 simbolos, total velas=2249800
+>>> okx listo
+>>> bitget: 107 simbolos
+  [bitget] 20/107 simbolos, total velas=2606796
+  [bitget] 40/107 simbolos, total velas=2965699
+  [bitget] 60/107 simbolos, total velas=3315569
+  [bitget] 80/107 simbolos, total velas=3708374
+  [bitget] 100/107 simbolos, total velas=4079330
+>>> bitget listo
+
+>>> TOTAL velas multi-exchange: 4237803

@@ -102,7 +102,15 @@ MIN_ENTRY_NEXUS  = float(os.getenv("MIN_ENTRY_NEXUS",  "76.0"))  # v10.8: THE TR
 MIN_UPGRADE_NEXUS = float(os.getenv("MIN_UPGRADE_NEXUS", "80.0"))  # Nexus mínimo para reemplazar la peor posición
 PROFILE_MIN_NEXUS_CONFIDENCE = float(os.getenv("PROFILE_MIN_NEXUS_CONFIDENCE", "76.0"))  # v10.8: THE TRIAD — 76% mínimo de seguridad
 MAX_TRADES_PER_DAY = 50            # v10.8: THE TRIAD — 50 trades diarios (suficiente para 3 estrategias)
-MAX_POSITION_DURATION_HOURS = 48
+# Bug real 2026-07-24: este timer cerraba CUALQUIER posición a las 48hs
+# clavadas, sin importar TP/SL ni si iba ganando — violaba directamente la
+# regla de "SL/TP fijo, sin salidas por tiempo" (ver PROGRESS_LOG). Pasó en
+# vivo con FVG-15m Pulido: NIGHTUSDT llegó a estar a 98.95% del TP (a
+# centavos de +$22-24) y el timer lo cortó igual a las 48hs en +$17,
+# perdiendo ganancia real ya generada por la propia estrategia. Se sube a
+# 30 días — una red de seguridad real (ej. símbolo deslistado) en vez de
+# una salida encubierta.
+MAX_POSITION_DURATION_HOURS = 24 * 30
 MAX_TRADE_DURATION_CANDLES = int(os.getenv("MAX_TRADE_DURATION_CANDLES", "8"))
 DEFAULT_LEVERAGE = 1
 

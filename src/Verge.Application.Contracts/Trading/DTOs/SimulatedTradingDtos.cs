@@ -73,6 +73,12 @@ public class SimulatedTradeDto : EntityDto<Guid>
     public string? ExitAuditJson { get; set; }
 
     /// <summary>
+    /// Etiqueta manual de exclusión de estadísticas (ver SimulatedTrade.cs).
+    /// Null = cuenta normal en Win Rate/Ganancia Total.
+    /// </summary>
+    public string? ExclusionTag { get; set; }
+
+    /// <summary>
     /// Live progress toward TP as of the last mark price update (% of entry-to-TP distance).
     /// 0 = at entry, 100 = at TP. Can be negative or exceed 100. Null if TpPrice isn't set.
     /// </summary>

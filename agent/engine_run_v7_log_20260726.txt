@@ -1,0 +1,79 @@
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=223min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=318 | Total=418
+simbolos disponibles: 425
+  20/425 simbolos, 287s transcurridos
+  40/425 simbolos, 585s transcurridos
+  60/425 simbolos, 852s transcurridos
+  80/425 simbolos, 1084s transcurridos
+  100/425 simbolos, 1302s transcurridos
+  120/425 simbolos, 1543s transcurridos
+  140/425 simbolos, 1908s transcurridos
+  160/425 simbolos, 2234s transcurridos
+  180/425 simbolos, 2522s transcurridos
+  200/425 simbolos, 2828s transcurridos
+  220/425 simbolos, 3115s transcurridos
+  240/425 simbolos, 3434s transcurridos
+  260/425 simbolos, 3671s transcurridos
+  280/425 simbolos, 3929s transcurridos
+  300/425 simbolos, 4230s transcurridos
+  320/425 simbolos, 4506s transcurridos
+  340/425 simbolos, 4715s transcurridos
+  360/425 simbolos, 5021s transcurridos
+  380/425 simbolos, 5277s transcurridos
+  400/425 simbolos, 5603s transcurridos
+  420/425 simbolos, 5887s transcurridos
+  425/425 simbolos, 5973s transcurridos
+{
+  "strategy_name": "MA Slope Caso 3",
+  "total_signals": 6790,
+  "accepted_trades": 460,
+  "rejected_no_slot": 6330,
+  "win_rate_pct": 14.1,
+  "total_pnl_usdt": 31.07,
+  "capital": 450.0,
+  "monthly_breakdown": {
+    "2025-12": {
+      "trades": 37,
+      "pnl": 23.22,
+      "win_rate_pct": 16.2
+    },
+    "2026-01": {
+      "trades": 66,
+      "pnl": 10.28,
+      "win_rate_pct": 15.2
+    },
+    "2026-02": {
+      "trades": 41,
+      "pnl": 48.0,
+      "win_rate_pct": 19.5
+    },
+    "2026-03": {
+      "trades": 74,
+      "pnl": 4.17,
+      "win_rate_pct": 14.9
+    },
+    "2026-04": {
+      "trades": 85,
+      "pnl": -105.07,
+      "win_rate_pct": 7.1
+    },
+    "2026-05": {
+      "trades": 54,
+      "pnl": -0.99,
+      "win_rate_pct": 13.0
+    },
+    "2026-06": {
+      "trades": 43,
+      "pnl": 63.71,
+      "win_rate_pct": 20.9
+    },
+    "2026-07": {
+      "trades": 60,
+      "pnl": -12.25,
+      "win_rate_pct": 13.3
+    }
+  }
+}
+Guardado: ma_slope_case3_ENGINE_v7_FINAL_20260726.json

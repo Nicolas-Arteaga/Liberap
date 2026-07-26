@@ -1,0 +1,4 @@
+>>> Completando julio (1-25) para 428 simbolos, 16 workers HTTP en paralelo
+  progreso: 500/10700 requests, 46176 velas insertadas
+  progreso: 1000/10700 requests, 92256 velas insertadas
+  progreso: 1500/10700 requests, 138240 velas insertadas

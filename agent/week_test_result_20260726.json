@@ -1,0 +1,164 @@
+{
+  "strategy_name": "MA Slope Caso 3",
+  "total_signals": 46,
+  "accepted_trades": 12,
+  "rejected_no_slot": 34,
+  "win_rate_pct": 16.7,
+  "total_pnl_usdt": 0.27,
+  "capital": 450.0,
+  "monthly_breakdown": {
+    "2026-07": {
+      "trades": 12,
+      "pnl": 0.27,
+      "win_rate_pct": 16.7
+    }
+  },
+  "trades": [
+    {
+      "symbol": "ANTHROPICUSDT",
+      "side": 1,
+      "open_time": 1783731900000,
+      "entry": 1628.99,
+      "sl": 1650.5723,
+      "tp": 1482.3809,
+      "margin": 150.0,
+      "close_reason": "zombie_timeout",
+      "close_time": 1784089500000,
+      "_zombie_close_price": 1629.05,
+      "pnl": -0.12552710575263926
+    },
+    {
+      "symbol": "CBRSUSDT",
+      "side": 1,
+      "open_time": 1783735500000,
+      "entry": 214.18,
+      "sl": 217.8166,
+      "tp": 194.119,
+      "margin": 150.0,
+      "close_reason": "TP",
+      "close_time": 1784036400000,
+      "pnl": 13.935251003828558
+    },
+    {
+      "symbol": "WDCUSDT",
+      "side": 1,
+      "open_time": 1783736100000,
+      "entry": 581.7,
+      "sl": 590.6278,
+      "tp": 545.655,
+      "margin": 150.0,
+      "close_reason": "TP",
+      "close_time": 1783920900000,
+      "pnl": 9.178457452295016
+    },
+    {
+      "symbol": "USUSDT",
+      "side": 1,
+      "open_time": 1783947300000,
+      "entry": 0.02502,
+      "sl": 0.0254823,
+      "tp": 0.022518,
+      "margin": 150.0,
+      "close_reason": "SL",
+      "close_time": 1783981800000,
+      "pnl": -2.8926913669064676
+    },
+    {
+      "symbol": "MSFTUSDT",
+      "side": 1,
+      "open_time": 1783987200000,
+      "entry": 390.17,
+      "sl": 397.7885,
+      "tp": 355.0547,
+      "margin": 150.0,
+      "close_reason": "SL",
+      "close_time": 1784125500000,
+      "pnl": -3.050087167132269
+    },
+    {
+      "symbol": "STARUSDT",
+      "side": 1,
+      "open_time": 1784064300000,
+      "entry": 0.16171,
+      "sl": 0.1648017,
+      "tp": 0.1476205,
+      "margin": 150.0,
+      "close_reason": "SL",
+      "close_time": 1784068200000,
+      "pnl": -2.988966062704845
+    },
+    {
+      "symbol": "GOOGLUSDT",
+      "side": 1,
+      "open_time": 1784103900000,
+      "entry": 358.51,
+      "sl": 364.5595,
+      "tp": 326.2441,
+      "margin": 150.0,
+      "close_reason": "SL",
+      "close_time": 1784123100000,
+      "pnl": -2.65211338595856
+    },
+    {
+      "symbol": "PUMPUSDT",
+      "side": 1,
+      "open_time": 1784113800000,
+      "entry": 0.001661,
+      "sl": 0.0016867,
+      "tp": 0.001526,
+      "margin": 150.0,
+      "close_reason": "SL",
+      "close_time": 1784135100000,
+      "pnl": -2.441819385912104
+    },
+    {
+      "symbol": "NATGASUSDT",
+      "side": 1,
+      "open_time": 1784157000000,
+      "entry": 2.878,
+      "sl": 2.93304,
+      "tp": 2.61898,
+      "margin": 150.0,
+      "close_reason": "zombie_timeout",
+      "close_time": 1784340900000,
+      "_zombie_close_price": 2.89,
+      "pnl": -0.7456845031271723
+    },
+    {
+      "symbol": "AAPLUSDT",
+      "side": 1,
+      "open_time": 1784183100000,
+      "entry": 327.01,
+      "sl": 331.6234,
+      "tp": 297.5791,
+      "margin": 150.0,
+      "close_reason": "SL",
+      "close_time": 1784217000000,
+      "pnl": -2.2370202868413873
+    },
+    {
+      "symbol": "EVAAUSDT",
+      "side": 1,
+      "open_time": 1784231100000,
+      "entry": 1.075,
+      "sl": 1.096658,
+      "tp": 0.9675,
+      "margin": 150.0,
+      "close_reason": "SL",
+      "close_time": 1784241600000,
+      "pnl": -3.1432553302325514
+    },
+    {
+      "symbol": "GUAUSDT",
+      "side": 1,
+      "open_time": 1784239500000,
+      "entry": 0.05466,
+      "sl": 0.05555,
+      "tp": 0.0509925,
+      "margin": 150.0,
+      "close_reason": "SL",
+      "close_time": 1784246700000,
+      "pnl": -2.5633479692645498
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+>>> julio (1-25) para 425 simbolos, 48 workers
+  progreso: 500/10625 requests, 138240 velas
+  progreso: 1000/10625 requests, 276480 velas
+  progreso: 1500/10625 requests, 415008 velas
+  progreso: 2000/10625 requests, 553248 velas
+  progreso: 2500/10625 requests, 691200 velas
+  progreso: 3000/10625 requests, 829728 velas
+  progreso: 3500/10625 requests, 967968 velas
+  progreso: 4000/10625 requests, 1105920 velas
+  progreso: 4500/10625 requests, 1244448 velas
+  progreso: 5000/10625 requests, 1382400 velas
+  progreso: 5500/10625 requests, 1520640 velas
+  progreso: 6000/10625 requests, 1659168 velas
+  progreso: 6500/10625 requests, 1797120 velas
+  progreso: 7000/10625 requests, 1935648 velas
+  progreso: 7500/10625 requests, 2073888 velas
+  progreso: 8000/10625 requests, 2212128 velas
+  progreso: 8500/10625 requests, 2350368 velas
+  progreso: 9000/10625 requests, 2488608 velas
+  progreso: 9500/10625 requests, 2626848 velas
+  progreso: 10000/10625 requests, 2764800 velas
+  progreso: 10500/10625 requests, 2903040 velas
+
+>>> Listo. Total velas julio 5m: 2937600

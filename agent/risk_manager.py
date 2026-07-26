@@ -510,6 +510,28 @@ class RiskManager:
             tp_price = self._apply_structural_tp_cap(symbol, side, cp, tp_price)
             tp_distance_price = abs(tp_price - cp)
 
+        # ── Piso mínimo de R:R para modos de TP estructural (config-only) ──
+        # Bug real 2026-07-25: fvg_mode/arrow_peak_mode/ma_slope_mode (incluye
+        # ADN Compression, que reusa este mismo flag) /golden_uturn_mode
+        # calculan su TP desde un nivel de precio real (gap, origen de flecha,
+        # piso de %, etc.), NUNCA validado contra el SL resultante — el campo
+        # MinRR de cada perfil existe pero jamás se chequeaba para estos
+        # modos. Auditoría real sobre 1269 trades de la familia FVG: R:R<4:1
+        # dio -$189.54 en conjunto, R:R>=4:1 dio +$161.30 — el corte solo
+        # rechaza el candidato (no abre nada, ni gana ni pierde), no cambia
+        # el tamaño de la posición. Caso real: GWEIUSDT (R:R=2.98:1) terminó
+        # en SL por -$6.11; con este piso en 4:1 nunca se hubiera abierto.
+        if fvg_mode or arrow_peak_mode or ma_slope_mode or golden_uturn_mode or structural_sniper_mode:
+            if stop_distance > 0:
+                actual_rr = tp_distance_price / stop_distance
+                min_rr_required = float(profile.get("minRR", 1.5)) if profile else 1.5
+                if actual_rr < min_rr_required:
+                    logger.info(
+                        f"[MIN-RR-VETO] {symbol}: R:R real={actual_rr:.2f}:1 < mínimo del perfil "
+                        f"({min_rr_required:.2f}:1) — candidato rechazado, no se abre."
+                    )
+                    return None
+
         # ── v10.3 Fixed Bullet: Margen fijo de 150 USDT para TODOS los trades ──
         # Eliminamos el cálculo de qty basado en risk_usd / stop_distance
         # Ahora usamos siempre el margen configurado ($150 USDT)

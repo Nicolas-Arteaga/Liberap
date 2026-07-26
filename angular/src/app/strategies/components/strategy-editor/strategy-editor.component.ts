@@ -74,10 +74,16 @@ export interface FvgPatternParams {
   // 65% de toda la ganancia. Ver agent/verge_agent.py::_build_fvg_candidate.
   requireExhaustion?: boolean;
   minExhaustionSlopeDeg?: number;
+  // Filtro de gap chico (opt-in, default apagado). Auditoría real 2026-07-25
+  // sobre 143 LONG de FVG-15m: gap_pct < 0.3% da 45 trades/15.6% WR/+$73.15,
+  // casi 5x el total real de LONG — el resto (gap más ancho) suma en
+  // conjunto -$57.92. La pendiente NO sirve para LONG (se contamina con
+  // mechas puntuales); esto sí. Simétrico con el mismo mecanismo del Short.
+  maxGapPct?: number;
 }
 
 function defaultFvgParams(): FvgPatternParams {
-  return { timeframe: '5m', requireExhaustion: false, minExhaustionSlopeDeg: 3.0 };
+  return { timeframe: '5m', requireExhaustion: false, minExhaustionSlopeDeg: 3.0, maxGapPct: undefined };
 }
 
 @Component({

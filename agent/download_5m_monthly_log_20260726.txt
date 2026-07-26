@@ -1,0 +1,17 @@
+>>> 428 simbolos x 7 meses = 2996 requests, 24 workers
+  progreso: 200/2996 requests, 1596222 velas
+  progreso: 400/2996 requests, 3050994 velas
+  progreso: 600/2996 requests, 4416296 velas
+  progreso: 800/2996 requests, 5716670 velas
+  progreso: 1000/2996 requests, 7301191 velas
+  progreso: 1200/2996 requests, 8864634 velas
+  progreso: 1400/2996 requests, 10350320 velas
+  progreso: 1600/2996 requests, 11909508 velas
+  progreso: 1800/2996 requests, 13307683 velas
+  progreso: 2000/2996 requests, 14640516 velas
+  progreso: 2200/2996 requests, 16079518 velas
+  progreso: 2400/2996 requests, 17309242 velas
+  progreso: 2600/2996 requests, 18864097 velas
+  progreso: 2800/2996 requests, 20438307 velas
+
+>>> Listo. Total velas 5m (mensual): 22000193

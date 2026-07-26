@@ -1,0 +1,68 @@
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=29min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=321 | Total=421
+simbolos disponibles: 428
+  40/428 simbolos, 31s transcurridos
+  80/428 simbolos, 59s transcurridos
+  120/428 simbolos, 83s transcurridos
+  160/428 simbolos, 116s transcurridos
+  200/428 simbolos, 141s transcurridos
+  240/428 simbolos, 172s transcurridos
+  280/428 simbolos, 202s transcurridos
+  320/428 simbolos, 231s transcurridos
+  360/428 simbolos, 256s transcurridos
+  400/428 simbolos, 285s transcurridos
+  428/428 simbolos, 306s transcurridos
+{
+  "strategy_name": "MA Slope Caso 3",
+  "total_signals": 203,
+  "accepted_trades": 119,
+  "rejected_no_slot": 84,
+  "win_rate_pct": 24.4,
+  "total_pnl_usdt": 104.19,
+  "capital": 450.0,
+  "monthly_breakdown": {
+    "2025-12": {
+      "trades": 14,
+      "pnl": 11.92,
+      "win_rate_pct": 21.4
+    },
+    "2026-01": {
+      "trades": 4,
+      "pnl": 2.38,
+      "win_rate_pct": 25.0
+    },
+    "2026-02": {
+      "trades": 1,
+      "pnl": 11.66,
+      "win_rate_pct": 100.0
+    },
+    "2026-03": {
+      "trades": 1,
+      "pnl": -3.01,
+      "win_rate_pct": 0.0
+    },
+    "2026-04": {
+      "trades": 2,
+      "pnl": -5.57,
+      "win_rate_pct": 0.0
+    },
+    "2026-05": {
+      "trades": 34,
+      "pnl": 78.56,
+      "win_rate_pct": 35.3
+    },
+    "2026-06": {
+      "trades": 35,
+      "pnl": 22.76,
+      "win_rate_pct": 22.9
+    },
+    "2026-07": {
+      "trades": 28,
+      "pnl": -14.5,
+      "win_rate_pct": 14.3
+    }
+  }
+}
+Guardado: ma_slope_case3_ENGINE_v2_20260726.json

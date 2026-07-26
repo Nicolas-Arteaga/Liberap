@@ -602,6 +602,12 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
             ).ToList();
         }
 
+        // 2026-07-25: trades con ExclusionTag seteado (ej. "SABOTAGE DE
+        // CLAUDE" — período con bug de entrada confirmado y ya revertido en
+        // Arrow Reversal) no cuentan para Win Rate/Ganancia Total/Avg, pero
+        // siguen existiendo y visibles en GetRecentTradesAsync para auditar.
+        filteredTrades = filteredTrades.Where(t => string.IsNullOrEmpty(t.ExclusionTag)).ToList();
+
         var stats = new SimulationPerformanceDto();
         if (!filteredTrades.Any())
         {
@@ -633,10 +639,30 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
     }
 
     [HttpGet]
-    public async Task<List<SimulatedTradeDto>> GetRecentTradesAsync(int limit = 20)
+    public async Task<List<SimulatedTradeDto>> GetRecentTradesAsync(int limit = 20, Guid? strategyProfileId = null)
     {
         var userId = CurrentUser.Id!.Value;
         var trades = await _tradeRepo.GetListAsync(t => t.UserId == userId);
+
+        // Bug real 2026-07-25: sin este filtro, con una sola estrategia
+        // seleccionada en /historial el frontend igual pedía "las 1000 más
+        // recientes de TODA la cuenta" y filtraba recién del lado del
+        // cliente — con 2000+ trades en cuentas activas de una sola
+        // estrategia entre medio, los trades más viejos de una estrategia
+        // puntual (ej. las primeras 6 ganadoras de Arrow Reversal, 10-17
+        // jul) quedaban empujados fuera de esa ventana de 1000 y
+        // desaparecían del gráfico/lista, aunque el resumen (que usa
+        // GetPerformanceStatsAsync, sin este límite) siguiera contándolas
+        // bien — la discrepancia hacía parecer que se habían "borrado".
+        if (strategyProfileId.HasValue)
+        {
+            var targetId = strategyProfileId.Value;
+            trades = trades.Where(t =>
+                targetId == Guid.Empty
+                    ? (!t.StrategyProfileId.HasValue || t.StrategyProfileId.Value == Guid.Empty)
+                    : t.StrategyProfileId.HasValue && t.StrategyProfileId.Value == targetId
+            ).ToList();
+        }
 
         return trades.OrderByDescending(t => t.OpenedAt)
                      .Take(limit)
@@ -751,6 +777,7 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         Ma7DistancePctAtEntry = t.Ma7DistancePctAtEntry,
         BtcPriceAtClose = t.BtcPriceAtClose,
         ExitAuditJson = t.ExitAuditJson,
+        ExclusionTag = t.ExclusionTag,
         TpProgressPct = t.TpProgressPct,
         MaxTpProgressPct = t.MaxTpProgressPct,
         MaxSlProgressPct = t.MaxSlProgressPct

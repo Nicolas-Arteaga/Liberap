@@ -1,0 +1,7 @@
+>>> Completando julio (1-25) para 428 simbolos
+Traceback (most recent call last):
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\download_binance_vision_daily_all.py", line 65, in <module>
+    main()
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\download_binance_vision_daily_all.py", line 55, in main
+    conn.executemany("INSERT OR IGNORE INTO klines_clean VALUES (?,?,?,?,?,?,?,?)", rows)
+sqlite3.OperationalError: database is locked

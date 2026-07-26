@@ -1,0 +1,30 @@
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=159min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=318 | Total=418
+simbolos disponibles: 425
+  50/425 simbolos, 89s transcurridos
+  100/425 simbolos, 145s transcurridos
+  150/425 simbolos, 204s transcurridos
+  200/425 simbolos, 264s transcurridos
+  250/425 simbolos, 319s transcurridos
+  300/425 simbolos, 372s transcurridos
+  350/425 simbolos, 428s transcurridos
+  400/425 simbolos, 490s transcurridos
+  425/425 simbolos, 521s transcurridos
+
+=== SEÑALES GENERADAS (total_signals, antes de filtro de cupo) ===
+total_signals: 46
+accepted_trades: 12
+  ANTHROPICUSDT side=1 open_utc=2026-07-11 01:05:00
+  CBRSUSDT     side=1 open_utc=2026-07-11 02:05:00
+  WDCUSDT      side=1 open_utc=2026-07-11 02:15:00
+  USUSDT       side=1 open_utc=2026-07-13 12:55:00
+  MSFTUSDT     side=1 open_utc=2026-07-14 00:00:00
+  STARUSDT     side=1 open_utc=2026-07-14 21:25:00
+  GOOGLUSDT    side=1 open_utc=2026-07-15 08:25:00
+  PUMPUSDT     side=1 open_utc=2026-07-15 11:10:00
+  NATGASUSDT   side=1 open_utc=2026-07-15 23:10:00
+  AAPLUSDT     side=1 open_utc=2026-07-16 06:25:00
+  EVAAUSDT     side=1 open_utc=2026-07-16 19:45:00
+  GUAUSDT      side=1 open_utc=2026-07-16 22:05:00

@@ -1,0 +1,100 @@
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=277min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=325 | Total=425
+simbolos disponibles: 425
+  10/425 simbolos, 154s transcurridos
+  20/425 simbolos, 284s transcurridos
+  30/425 simbolos, 438s transcurridos
+  40/425 simbolos, 564s transcurridos
+  50/425 simbolos, 683s transcurridos
+  60/425 simbolos, 822s transcurridos
+  70/425 simbolos, 960s transcurridos
+  80/425 simbolos, 1081s transcurridos
+  90/425 simbolos, 1207s transcurridos
+  100/425 simbolos, 1332s transcurridos
+  110/425 simbolos, 1443s transcurridos
+  120/425 simbolos, 1574s transcurridos
+  130/425 simbolos, 1709s transcurridos
+  140/425 simbolos, 1855s transcurridos
+  150/425 simbolos, 2010s transcurridos
+  160/425 simbolos, 2151s transcurridos
+  170/425 simbolos, 2291s transcurridos
+  180/425 simbolos, 2425s transcurridos
+  190/425 simbolos, 2563s transcurridos
+  200/425 simbolos, 2707s transcurridos
+  210/425 simbolos, 2843s transcurridos
+  220/425 simbolos, 2987s transcurridos
+  230/425 simbolos, 3127s transcurridos
+  240/425 simbolos, 3287s transcurridos
+  250/425 simbolos, 3370s transcurridos
+  260/425 simbolos, 3493s transcurridos
+  270/425 simbolos, 3614s transcurridos
+  280/425 simbolos, 3744s transcurridos
+  290/425 simbolos, 3894s transcurridos
+  300/425 simbolos, 4025s transcurridos
+  310/425 simbolos, 4152s transcurridos
+  320/425 simbolos, 4297s transcurridos
+  330/425 simbolos, 4403s transcurridos
+  340/425 simbolos, 4504s transcurridos
+  350/425 simbolos, 4650s transcurridos
+  360/425 simbolos, 4822s transcurridos
+  370/425 simbolos, 4964s transcurridos
+  380/425 simbolos, 5090s transcurridos
+  390/425 simbolos, 5249s transcurridos
+  400/425 simbolos, 5398s transcurridos
+  410/425 simbolos, 5575s transcurridos
+  420/425 simbolos, 5769s transcurridos
+  425/425 simbolos, 5864s transcurridos
+{
+  "strategy_name": "MA Slope Caso 3",
+  "total_signals": 2809,
+  "accepted_trades": 450,
+  "rejected_no_slot": 2359,
+  "win_rate_pct": 12.9,
+  "total_pnl_usdt": -143.96,
+  "capital": 450.0,
+  "monthly_breakdown": {
+    "2025-12": {
+      "trades": 39,
+      "pnl": 6.91,
+      "win_rate_pct": 15.4
+    },
+    "2026-01": {
+      "trades": 71,
+      "pnl": -60.01,
+      "win_rate_pct": 9.9
+    },
+    "2026-02": {
+      "trades": 37,
+      "pnl": 30.27,
+      "win_rate_pct": 18.9
+    },
+    "2026-03": {
+      "trades": 55,
+      "pnl": 40.57,
+      "win_rate_pct": 20.0
+    },
+    "2026-04": {
+      "trades": 90,
+      "pnl": -134.44,
+      "win_rate_pct": 5.6
+    },
+    "2026-05": {
+      "trades": 58,
+      "pnl": -42.33,
+      "win_rate_pct": 12.1
+    },
+    "2026-06": {
+      "trades": 65,
+      "pnl": 28.68,
+      "win_rate_pct": 16.9
+    },
+    "2026-07": {
+      "trades": 35,
+      "pnl": -13.62,
+      "win_rate_pct": 11.4
+    }
+  }
+}
+Guardado: ma_slope_case3_ENGINE_v6_zombie_20260726.json
