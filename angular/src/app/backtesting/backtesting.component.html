@@ -13,109 +13,91 @@
     <main class="px-4">
         <!-- Card 1: Configuración del backtest -->
         <app-card-content class="mb-4">
-            <h2 class="text-white fs-5 mb-3">Parámetros Históricos</h2>
+            <h2 class="text-white fs-5 mb-3">Parámetros del Backtest</h2>
 
-            <div class="row mb-3">
-                <div class="col-6">
-                    <app-label>Par de Trading</app-label>
-                    <app-select [(ngModel)]="config.symbol">
-                        <option *ngFor="let s of symbols" [value]="s">{{ s }}</option>
-                    </app-select>
-                </div>
-                <div class="col-6">
-                    <app-label>Timeframe</app-label>
-                    <app-select [(ngModel)]="config.timeframe">
-                        <option *ngFor="let t of timeframes" [value]="t">{{ t }}</option>
-                    </app-select>
-                </div>
+            <div class="mb-3">
+                <app-label>Estrategia</app-label>
+                <app-select [options]="strategyOptions" [value]="selectedProfileId" (valueChange)="selectedProfileId = $event"></app-select>
+                <p *ngIf="!profiles.length" class="text-white-50 small mt-1 mb-0">
+                    Cargando estrategias (solo tipo MaGeometry soportado por ahora)...
+                </p>
             </div>
 
             <div class="row">
                 <div class="col-6">
                     <app-label>Fecha Inicio</app-label>
-                    <app-input type="date" [(ngModel)]="config.startDate"></app-input>
+                    <app-input type="date" [(ngModel)]="startDate"></app-input>
                 </div>
                 <div class="col-6">
                     <app-label>Fecha Fin</app-label>
-                    <app-input type="date" [(ngModel)]="config.endDate"></app-input>
+                    <app-input type="date" [(ngModel)]="endDate"></app-input>
                 </div>
-            </div>
-        </app-card-content>
-
-        <!-- Card 2: Configuración de estrategia (Versión simplificada de /configure-strategy) -->
-        <app-card-content class="mb-4">
-            <h2 class="text-white fs-5 mb-3">Configuración de Estrategia</h2>
-
-            <div class="mb-3">
-                <app-label>Dirección</app-label>
-                <app-select [(ngModel)]="config.strategy.direction">
-                    <option value="long">Solo LONG</option>
-                    <option value="short">Solo SHORT</option>
-                    <option value="auto">Automático (IA)</option>
-                </app-select>
-            </div>
-
-            <div class="row mb-3">
-                <div class="col-6">
-                    <app-label>Apalancamiento</app-label>
-                    <app-input type="number" [(ngModel)]="config.strategy.leverage"></app-input>
-                </div>
-                <div class="col-6">
-                    <app-label>Stop Loss (%)</app-label>
-                    <app-input type="number" [(ngModel)]="config.strategy.autoStopLoss"></app-input>
-                </div>
-            </div>
-
-            <div class="d-flex justify-content-between align-items-center">
-                <app-label class="mb-0">Riesgo: {{ config.strategy.riskLevel | uppercase }}</app-label>
-                <app-toggle [value]="config.strategy.autoStopLoss"></app-toggle>
             </div>
         </app-card-content>
 
         <!-- Botón Ejecutar -->
-        <app-glass-button [variant]="isRunning ? 'outline' : 'solid'" class="w-full py-3 mb-4" (click)="runBacktest()"
-            [disabled]="isRunning">
-            {{ isRunning ? '⌛ Procesando Datos...' : '▶️ Ejecutar Backtest' }}
+        <app-glass-button [variant]="isRunning ? 'outline' : 'solid'" class="w-full py-3 mb-3" (click)="runBacktest()"
+            [disabled]="isRunning || !profiles.length">
+            {{ isRunning ? '⌛ Corriendo backtest...' : '▶️ Ejecutar Backtest' }}
         </app-glass-button>
 
-        <!-- Card 3: Resultados (Solo si hay resultados) -->
+        <!-- Barra de progreso -->
+        <div *ngIf="isRunning" class="mb-4">
+            <div class="d-flex justify-content-between mb-1">
+                <span class="text-white-50 small">Procesando símbolos...</span>
+                <span class="text-white-50 small">{{ progressDone }}/{{ progressTotal }} ({{ progressPct }}%)</span>
+            </div>
+            <div class="progress" style="height: 6px;">
+                <div class="progress-bar bg-success" [style.width.%]="progressPct"></div>
+            </div>
+        </div>
+
+        <div *ngIf="errorMessage" class="alert alert-danger">
+            {{ errorMessage }}
+        </div>
+
+        <!-- Card de Resultados -->
         <div *ngIf="results" class="fade-in">
             <app-card-content class="mb-4">
-                <h2 class="text-white fs-5 mb-3">Resultados de la Simulación</h2>
+                <h2 class="text-white fs-5 mb-1">Resultados — {{ results.strategy_name }}</h2>
+                <p class="text-white-50 small mb-3">{{ startDate }} → {{ endDate }} · capital simulado ${{ results.capital }}</p>
 
                 <div class="row g-3">
                     <div class="col-6">
                         <div class="bg-white bg-opacity-5 p-3 rounded">
-                            <p class="text-white-50 small mb-1">Total Trades</p>
-                            <p class="text-white fs-4 fw-bold mb-0">{{ results.totalTrades }}</p>
+                            <p class="text-white-50 small mb-1">Trades Aceptados</p>
+                            <p class="text-white fs-4 fw-bold mb-0">{{ results.accepted_trades }}</p>
+                            <p class="text-white-50 text-xs mb-0">{{ results.total_signals }} señales detectadas · {{ results.rejected_no_slot }} sin cupo</p>
                         </div>
                     </div>
                     <div class="col-6">
                         <div class="bg-white bg-opacity-5 p-3 rounded">
                             <p class="text-white-50 small mb-1">Win Rate</p>
-                            <p class="text-success fs-4 fw-bold mb-0">{{ results.winRate }}%</p>
+                            <p class="text-white fs-4 fw-bold mb-0">{{ results.win_rate_pct }}%</p>
                         </div>
                     </div>
-                    <div class="col-6">
+                    <div class="col-12">
                         <div class="bg-white bg-opacity-5 p-3 rounded">
-                            <p class="text-white-50 small mb-1">Profit Total</p>
-                            <p class="text-success fs-4 fw-bold mb-0">+${{ results.totalProfit }}</p>
-                        </div>
-                    </div>
-                    <div class="col-6">
-                        <div class="bg-white bg-opacity-5 p-3 rounded">
-                            <p class="text-white-50 small mb-1">Max Drawdown</p>
-                            <p class="text-danger fs-4 fw-bold mb-0">-{{ results.maxDrawdown }}%</p>
+                            <p class="text-white-50 small mb-1">PnL Total (neto, con fees)</p>
+                            <p class="fs-3 fw-bold mb-0" [class.text-success]="results.total_pnl_usdt >= 0" [class.text-danger]="results.total_pnl_usdt < 0">
+                                {{ results.total_pnl_usdt >= 0 ? '+' : '' }}${{ results.total_pnl_usdt }}
+                            </p>
                         </div>
                     </div>
                 </div>
             </app-card-content>
 
-            <!-- Card 4: Gráfico de equity -->
+            <!-- Desglose mensual -->
             <app-card-content class="mb-4">
-                <h2 class="text-white fs-5 mb-3">Curva de Crecimiento</h2>
-                <div style="height: 200px;">
-                    <app-payment-chart [data]="results.equityCurve"></app-payment-chart>
+                <h2 class="text-white fs-5 mb-3">Desglose Mensual</h2>
+                <div class="d-flex flex-column gap-2">
+                    <div *ngFor="let m of monthlyEntries" class="d-flex justify-content-between align-items-center bg-white bg-opacity-5 p-2 rounded">
+                        <span class="text-white-50 small">{{ formatMonth(m.month) }}</span>
+                        <span class="text-white-50 text-xs">{{ m.trades }} trades · {{ m.win_rate_pct }}% WR</span>
+                        <span class="fw-bold" [class.text-success]="m.pnl >= 0" [class.text-danger]="m.pnl < 0">
+                            {{ m.pnl >= 0 ? '+' : '' }}${{ m.pnl }}
+                        </span>
+                    </div>
                 </div>
             </app-card-content>
         </div>
