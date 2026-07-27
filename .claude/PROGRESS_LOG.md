@@ -2,6 +2,10 @@
 
 Changelog corto y fechado de fixes/features/decisiones por sesión. Ver `~/.claude/CLAUDE.md` para cómo se usa esto.
 
+## 2026-07-27
+- Continuación pasada la medianoche de la sesión del 26/7 (módulo de backtesting): selector "Todos/Top 40" símbolos, fix de progreso granular (`multiprocessing.Manager` Queue en vez de progreso por lote), feedback visual del selector, `symbols_used`/`symbols_count` en el resultado. Logs sueltos del servidor de backtest (`agent/backtest_api_log*.txt`) sacados de git y agregados a `.gitignore` (se reescriben todo el tiempo mientras el server corre, no aportan valor versionado).
+- Reportado por el usuario y sin resolver todavía: el backend .NET (`Verge.HttpApi.Host.exe`) crasheó solo (exit code -529697949, excepción no manejada) — falta el stack trace real para diagnosticar (el log en disco quedó congelado desde marzo).
+
 ## 2026-07-26
 - **Datos históricos limpios completados**: `agent/data/binance_vision_clean.db` ahora cubre dic 2025 - jul 2026 (428 símbolos, incluye julio completo día por día que antes faltaba en 403/428 símbolos — bug de cobertura silencioso que había invalidado comparaciones previas). Scripts de descarga paralela (`agent/download_binance_vision_daily_all_v2.py`, 64 workers HTTP, no toca la API en vivo) reemplazan al secuencial original (~10x más rápido).
 - **Motor de backtest genérico arrancado** (`agent/backtest/engine.py`) — reusa `verge_agent.py`/`risk_manager.py` REALES (instanciados con `__new__`, fetcher histórico inyectado) en vez de reimplementar la lógica a mano por estrategia, que había causado bugs reales (backtests previos de MA Slope Caso 3 y FVG se salteaban el tope estructural de TP de `risk_manager.py`). Primer alcance: StrategyType=MaGeometry. Optimizado con bisect (evita O(n²)) y evaluación cada 15min con vela parcial (igual que producción, que lee la vela en formación, no solo cerradas) — validado 1:1 contra un trade real (NVDAUSDT) con match casi exacto en MA7/25/50/99.

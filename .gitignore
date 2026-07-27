@@ -298,3 +298,4 @@ agent/logs/
 scratch/create_agent_profile.*
 # Marcador interno del hook de progress-log (bookkeeping, no aporta valor versionado)
 .claude/.progress_log_marker
+agent/backtest_api_log*.txt
