@@ -19,20 +19,53 @@
                 <app-label>Estrategia</app-label>
                 <app-select [options]="strategyOptions" [value]="selectedProfileId" (valueChange)="selectedProfileId = $event"></app-select>
                 <p *ngIf="!profiles.length" class="text-white-50 small mt-1 mb-0">
-                    Cargando estrategias (solo tipo MaGeometry soportado por ahora)...
+                    Cargando estrategias (MaGeometry, FVG, AdnCompression soportadas por ahora)...
                 </p>
             </div>
 
             <div class="row">
                 <div class="col-6">
                     <app-label>Fecha Inicio</app-label>
-                    <app-input type="date" [(ngModel)]="startDate"></app-input>
+                    <app-input type="date" [(ngModel)]="startDate" (ngModelChange)="coverageGapCount = null"></app-input>
                 </div>
                 <div class="col-6">
                     <app-label>Fecha Fin</app-label>
-                    <app-input type="date" [(ngModel)]="endDate"></app-input>
+                    <app-input type="date" [(ngModel)]="endDate" (ngModelChange)="coverageGapCount = null"></app-input>
                 </div>
             </div>
+        </app-card-content>
+
+        <!-- Card: cobertura de datos / actualizar -->
+        <app-card-content class="mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h2 class="text-white fs-5 mb-0">Datos Históricos</h2>
+                <button class="btn btn-sm btn-outline-light" (click)="checkCoverage()" [disabled]="isSyncing">
+                    Chequear cobertura
+                </button>
+            </div>
+
+            <p *ngIf="coverageGapCount === 0" class="text-success small mb-2">
+                ✓ Cobertura completa para este rango.
+            </p>
+            <p *ngIf="coverageGapCount !== null && coverageGapCount > 0" class="text-warning small mb-2">
+                Faltan {{ coverageGapCount }} combinaciones símbolo/día en este rango.
+            </p>
+
+            <app-glass-button [variant]="isSyncing ? 'outline' : 'solid'" class="w-full py-2" (click)="syncData()" [disabled]="isSyncing">
+                {{ isSyncing ? '⌛ Actualizando datos...' : '🔄 Actualizar datos' }}
+            </app-glass-button>
+
+            <div *ngIf="isSyncing" class="mt-2">
+                <div class="d-flex justify-content-between mb-1">
+                    <span class="text-white-50 small">Descargando lo que falta...</span>
+                    <span class="text-white-50 small">{{ syncDone }}/{{ syncTotal }} ({{ syncProgressPct }}%)</span>
+                </div>
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar bg-info" [style.width.%]="syncProgressPct"></div>
+                </div>
+            </div>
+
+            <p *ngIf="syncMessage" class="text-white-50 small mt-2 mb-0">{{ syncMessage }}</p>
         </app-card-content>
 
         <!-- Botón Ejecutar -->
@@ -56,50 +89,84 @@
             {{ errorMessage }}
         </div>
 
-        <!-- Card de Resultados -->
-        <div *ngIf="results" class="fade-in">
-            <app-card-content class="mb-4">
-                <h2 class="text-white fs-5 mb-1">Resultados — {{ results.strategy_name }}</h2>
-                <p class="text-white-50 small mb-3">{{ startDate }} → {{ endDate }} · capital simulado ${{ results.capital }}</p>
+        <!-- Resultado de la corrida recien ejecutada -->
+        <ng-container *ngIf="results">
+            <ng-container *ngTemplateOutlet="resultBlock; context: { result: results, dateRange: startDate + ' → ' + endDate }"></ng-container>
+        </ng-container>
 
-                <div class="row g-3">
-                    <div class="col-6">
-                        <div class="bg-white bg-opacity-5 p-3 rounded">
-                            <p class="text-white-50 small mb-1">Trades Aceptados</p>
-                            <p class="text-white fs-4 fw-bold mb-0">{{ results.accepted_trades }}</p>
-                            <p class="text-white-50 text-xs mb-0">{{ results.total_signals }} señales detectadas · {{ results.rejected_no_slot }} sin cupo</p>
-                        </div>
-                    </div>
-                    <div class="col-6">
-                        <div class="bg-white bg-opacity-5 p-3 rounded">
-                            <p class="text-white-50 small mb-1">Win Rate</p>
-                            <p class="text-white fs-4 fw-bold mb-0">{{ results.win_rate_pct }}%</p>
-                        </div>
-                    </div>
-                    <div class="col-12">
-                        <div class="bg-white bg-opacity-5 p-3 rounded">
-                            <p class="text-white-50 small mb-1">PnL Total (neto, con fees)</p>
-                            <p class="fs-3 fw-bold mb-0" [class.text-success]="results.total_pnl_usdt >= 0" [class.text-danger]="results.total_pnl_usdt < 0">
-                                {{ results.total_pnl_usdt >= 0 ? '+' : '' }}${{ results.total_pnl_usdt }}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </app-card-content>
+        <!-- Detalle de una corrida del historial -->
+        <div *ngIf="viewingRun" class="fade-in">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-white-50 small">Corrida guardada</span>
+                <button class="btn btn-sm btn-outline-light" (click)="closeRunDetail()">Cerrar</button>
+            </div>
+            <ng-container *ngTemplateOutlet="resultBlock; context: { result: viewingRun, dateRange: '' }"></ng-container>
+        </div>
 
-            <!-- Desglose mensual -->
-            <app-card-content class="mb-4">
-                <h2 class="text-white fs-5 mb-3">Desglose Mensual</h2>
-                <div class="d-flex flex-column gap-2">
-                    <div *ngFor="let m of monthlyEntries" class="d-flex justify-content-between align-items-center bg-white bg-opacity-5 p-2 rounded">
-                        <span class="text-white-50 small">{{ formatMonth(m.month) }}</span>
-                        <span class="text-white-50 text-xs">{{ m.trades }} trades · {{ m.win_rate_pct }}% WR</span>
-                        <span class="fw-bold" [class.text-success]="m.pnl >= 0" [class.text-danger]="m.pnl < 0">
-                            {{ m.pnl >= 0 ? '+' : '' }}${{ m.pnl }}
+        <!-- Historial de corridas -->
+        <app-card-content class="mb-4" *ngIf="runs.length">
+            <h2 class="text-white fs-5 mb-3">Corridas Anteriores</h2>
+            <div class="d-flex flex-column gap-2">
+                <button
+                    *ngFor="let r of runs"
+                    class="btn text-start bg-white bg-opacity-5 border-0 p-2 rounded"
+                    (click)="viewRun(r.id)">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-white small">{{ r.strategyName }}</span>
+                        <span class="fw-bold" [class.text-success]="r.totalPnlUsdt >= 0" [class.text-danger]="r.totalPnlUsdt < 0">
+                            {{ r.totalPnlUsdt >= 0 ? '+' : '' }}${{ r.totalPnlUsdt }}
                         </span>
                     </div>
-                </div>
-            </app-card-content>
-        </div>
+                    <div class="text-white-50 text-xs">
+                        {{ r.startDate }} → {{ r.endDate }} · {{ r.acceptedTrades }} trades · {{ r.winRatePct }}% WR
+                    </div>
+                </button>
+            </div>
+        </app-card-content>
     </main>
 </div>
+
+<!-- Template reusable de resultados (corrida nueva o del historial) -->
+<ng-template #resultBlock let-result="result" let-dateRange="dateRange">
+    <app-card-content class="mb-4">
+        <h2 class="text-white fs-5 mb-1">Resultados — {{ result.strategy_name }}</h2>
+        <p *ngIf="dateRange" class="text-white-50 small mb-3">{{ dateRange }} · capital simulado ${{ result.capital }}</p>
+
+        <div class="row g-3">
+            <div class="col-6">
+                <div class="bg-white bg-opacity-5 p-3 rounded">
+                    <p class="text-white-50 small mb-1">Trades Aceptados</p>
+                    <p class="text-white fs-4 fw-bold mb-0">{{ result.accepted_trades }}</p>
+                    <p class="text-white-50 text-xs mb-0">{{ result.total_signals }} señales detectadas · {{ result.rejected_no_slot }} sin cupo</p>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="bg-white bg-opacity-5 p-3 rounded">
+                    <p class="text-white-50 small mb-1">Win Rate</p>
+                    <p class="text-white fs-4 fw-bold mb-0">{{ result.win_rate_pct }}%</p>
+                </div>
+            </div>
+            <div class="col-12">
+                <div class="bg-white bg-opacity-5 p-3 rounded">
+                    <p class="text-white-50 small mb-1">PnL Total (neto, con fees)</p>
+                    <p class="fs-3 fw-bold mb-0" [class.text-success]="result.total_pnl_usdt >= 0" [class.text-danger]="result.total_pnl_usdt < 0">
+                        {{ result.total_pnl_usdt >= 0 ? '+' : '' }}${{ result.total_pnl_usdt }}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </app-card-content>
+
+    <app-card-content class="mb-4">
+        <h2 class="text-white fs-5 mb-3">Desglose Mensual</h2>
+        <div class="d-flex flex-column gap-2">
+            <div *ngFor="let m of monthlyEntries(result)" class="d-flex justify-content-between align-items-center bg-white bg-opacity-5 p-2 rounded">
+                <span class="text-white-50 small">{{ formatMonth(m.month) }}</span>
+                <span class="text-white-50 text-xs">{{ m.trades }} trades · {{ m.win_rate_pct }}% WR</span>
+                <span class="fw-bold" [class.text-success]="m.pnl >= 0" [class.text-danger]="m.pnl < 0">
+                    {{ m.pnl >= 0 ? '+' : '' }}${{ m.pnl }}
+                </span>
+            </div>
+        </div>
+    </app-card-content>
+</ng-template>

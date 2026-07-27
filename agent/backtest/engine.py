@@ -39,6 +39,7 @@ from verge_agent import VergeAgent  # noqa: E402
 from risk_manager import RiskManager  # noqa: E402
 import config as agent_config  # noqa: E402
 from fvg.analyzer import FvgAnalyzer  # noqa: E402
+from adn_compression.analyzer import AdnCompressionAnalyzer  # noqa: E402
 
 # verge_agent.py configura logging a archivo con rotacion al importarse (para
 # el agente EN VIVO) -- en un backtest eso genera miles de writes a disco y
@@ -274,13 +275,37 @@ def make_fvg_analyzer(fetcher: HistoricalFetcher) -> FvgAnalyzer:
     return analyzer
 
 
+def make_adn_agent(fetcher: HistoricalFetcher) -> VergeAgent:
+    """Idem make_fvg_agent, para StrategyType=AdnCompression.
+    `_build_adn_compression_candidate` no usa self.fetcher directamente
+    (solo recibe el item ya armado), pero se mantiene el patron por si
+    alguna variante futura lo necesita."""
+    agent = VergeAgent.__new__(VergeAgent)
+    agent.fetcher = fetcher
+    return agent
+
+
+def make_adn_analyzer(fetcher: HistoricalFetcher) -> AdnCompressionAnalyzer:
+    """AdnCompressionAnalyzer real (python-service/adn_compression/analyzer.py)
+    con _fetch_klines monkeypatcheado a datos historicos -- mismo patron que
+    make_fvg_analyzer."""
+    analyzer = AdnCompressionAnalyzer()
+    analyzer._fetch_klines = lambda symbol, interval, limit: [
+        [r[0], r[1], r[2], r[3], r[4], r[5]] for r in fetcher.get_klines_with_partial(symbol, interval, limit)
+    ]
+    return analyzer
+
+
 class BacktestEngine:
     def __init__(self, db_path: str = DB_PATH):
+        self.db_path = db_path
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
         self.fetcher = HistoricalFetcher(self.conn)
         self.ma_agent = make_ma_geometry_agent(self.fetcher)
         self.fvg_agent = make_fvg_agent(self.fetcher)
         self.fvg_analyzer = make_fvg_analyzer(self.fetcher)
+        self.adn_agent = make_adn_agent(self.fetcher)
+        self.adn_analyzer = make_adn_analyzer(self.fetcher)
         self.risk_manager = RiskManager(fetcher=self.fetcher)
 
     def available_symbols(self) -> list:
@@ -354,6 +379,41 @@ class BacktestEngine:
                 return None
             item_dict = item.model_dump() if hasattr(item, "model_dump") else dict(item)
             return self.fvg_agent._build_fvg_candidate(item_dict, profile)
+
+        return self._run_generic(profile, symbols, start_ms, end_ms, interval,
+                                  candidate_fn, balance, progress_cb, shadow_mode)
+
+    def run_adn_compression(
+        self,
+        profile: dict,
+        symbols: list,
+        start_ms: int,
+        end_ms: int,
+        balance: float = 10_000.0,
+        progress_cb: Optional[Callable[[int, int], None]] = None,
+        shadow_mode: bool = False,
+    ) -> dict:
+        """
+        StrategyType=AdnCompression. Reusa AdnCompressionAnalyzer real
+        (python-service/adn_compression/analyzer.py) + verge_agent.py::
+        _build_adn_compression_candidate. Igual que produccion
+        (_run_adn_compression_scan): solo genera candidato en fase
+        PULLBACK_TO_MA7 y direccion LONG (short queda para mas adelante,
+        nunca implementado en produccion tampoco).
+        """
+        import json
+        params = json.loads(profile.get("patternParamsJson") or "{}")
+        interval = params.get("timeframe") or "5m"
+
+        def candidate_fn(symbol):
+            try:
+                item = self.adn_analyzer._analyze_symbol(symbol, interval)
+            except Exception:
+                return None
+            if not item or item.phase != "PULLBACK_TO_MA7" or item.direction != "LONG":
+                return None
+            item_dict = item.model_dump() if hasattr(item, "model_dump") else dict(item)
+            return self.adn_agent._build_adn_compression_candidate(item_dict, profile)
 
         return self._run_generic(profile, symbols, start_ms, end_ms, interval,
                                   candidate_fn, balance, progress_cb, shadow_mode)
@@ -509,7 +569,17 @@ class BacktestEngine:
             fees = (qty * t["entry"] + qty * close_px) * FEE_PER_SIDE
             t["pnl"] = gross - fees
 
-        trades.sort(key=lambda t: t["open_time"])
+        # Desempate por simbolo (alfabetico) cuando dos señales comparten el
+        # mismo open_time -- necesario para que run_parallel de un resultado
+        # IDENTICO al secuencial: en paralelo, las señales se combinan en el
+        # orden en que cada proceso termina (no determinista), asi que sin
+        # este segundo criterio el ganador de un cupo de capital empatado
+        # podia variar entre corridas (bug real 2026-07-26: 6790 señales
+        # identicas en ambas corridas, pero 466 vs 460 aceptadas y PnL de
+        # signo distinto solo por el orden de desempate). available_symbols()
+        # ya devuelve la lista ordenada alfabeticamente, que es como el motor
+        # secuencial itera -- este sort reproduce ese mismo orden siempre.
+        trades.sort(key=lambda t: (t["open_time"], t["symbol"]))
         open_slots, accepted, rejected = [], [], 0
         for t in trades:
             open_slots = [ct for ct in open_slots if ct > t["open_time"]]
@@ -544,3 +614,75 @@ class BacktestEngine:
                                    for k, v in sorted(monthly.items())},
             "trades": accepted,
         }
+
+    def run_parallel(
+        self,
+        strategy_type: str,
+        profile: dict,
+        symbols: list,
+        start_ms: int,
+        end_ms: int,
+        balance: float = 10_000.0,
+        progress_cb: Optional[Callable[[int, int], None]] = None,
+        max_workers: Optional[int] = None,
+    ) -> dict:
+        """
+        Corre la deteccion de candidatos (la parte CPU-bound, sin I/O una vez
+        cargados los datos) en paralelo por lotes de simbolos, via
+        ProcessPoolExecutor -- threads no ayudan aca por el GIL (SMA/slope en
+        Python puro). Cada proceso abre su PROPIA conexion sqlite de solo
+        lectura y su propio BacktestEngine (no se puede compartir `self`
+        entre procesos, no es picklable). El capital de 3 slots se calcula
+        UNA sola vez sobre el conjunto combinado de señales de todos los
+        procesos -- nunca por separado, para no inflar artificialmente el
+        cupo disponible.
+        """
+        import os as _os
+        from concurrent.futures import ProcessPoolExecutor, as_completed
+
+        n_workers = max_workers or min(_os.cpu_count() or 4, 8)
+        n_workers = max(1, min(n_workers, len(symbols))) if symbols else 1
+        batches = [symbols[i::n_workers] for i in range(n_workers)]
+        batches = [b for b in batches if b]
+
+        all_raw_trades = []
+        done_batches = 0
+        if progress_cb:
+            progress_cb(0, len(symbols))
+
+        with ProcessPoolExecutor(max_workers=len(batches)) as ex:
+            futures = {
+                ex.submit(_parallel_worker, strategy_type, profile, batch, start_ms, end_ms, balance, self.db_path): batch
+                for batch in batches
+            }
+            symbols_done = 0
+            for fut in as_completed(futures):
+                batch = futures[fut]
+                raw_trades = fut.result()
+                all_raw_trades.extend(raw_trades)
+                symbols_done += len(batch)
+                done_batches += 1
+                if progress_cb:
+                    progress_cb(symbols_done, len(symbols))
+
+        return self._capital_sim(all_raw_trades, profile)
+
+
+def _parallel_worker(strategy_type: str, profile: dict, symbols: list, start_ms: int, end_ms: int,
+                      balance: float, db_path: str) -> list:
+    """
+    Funcion de nivel de modulo (picklable, requisito de ProcessPoolExecutor)
+    -- se ejecuta en un proceso hijo, arma su propio BacktestEngine y corre
+    el runner correspondiente SOLO sobre su lote de simbolos, devolviendo
+    las señales crudas (antes de capital_sim, que se aplica una sola vez en
+    el proceso principal sobre el total combinado).
+    """
+    engine = BacktestEngine(db_path)
+    runners = {
+        "MaGeometry": engine.run_ma_geometry,
+        "FVG": engine.run_fvg,
+        "AdnCompression": engine.run_adn_compression,
+    }
+    runner = runners[strategy_type]
+    result = runner(profile, symbols, start_ms, end_ms, balance=balance)
+    return result["all_signals_raw"]

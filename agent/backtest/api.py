@@ -29,6 +29,8 @@ import requests
 import config
 from auth_manager import AuthManager
 from backtest.engine import BacktestEngine
+from backtest import storage
+from backtest import data_sync
 
 app = FastAPI(title="Verge Backtest API")
 app.add_middleware(
@@ -79,26 +81,40 @@ def _run_job(job_id: str, profile: dict, symbols: list, start_ms: int, end_ms: i
             job["done"] = done
             job["total"] = total
 
-        # Registro de StrategyType -> metodo del motor. Agregar una nueva
-        # estrategia (que YA reusa el patron _run_generic) es agregar una
-        # linea aca -- ver agent/backtest/engine.py::run_ma_geometry/run_fvg
-        # para el ejemplo de como conectar un tipo nuevo.
+        # Registro de StrategyType -> soportado por el motor. Agregar una
+        # estrategia nueva (que YA reusa el patron _run_generic) es agregar
+        # su nombre aca -- ver agent/backtest/engine.py::run_ma_geometry/
+        # run_fvg/run_adn_compression para el ejemplo de como conectar un
+        # tipo nuevo, y _parallel_worker para registrarlo tambien ahi.
         strategy_type = profile.get("strategyType")
-        runners = {
-            "MaGeometry": engine.run_ma_geometry,
-            "FVG": engine.run_fvg,
-        }
-        runner = runners.get(strategy_type)
-        if not runner:
+        supported = ("MaGeometry", "FVG", "AdnCompression")
+        if strategy_type not in supported:
             job["status"] = "failed"
-            job["error"] = f"StrategyType='{strategy_type}' aun no conectado al motor (soportados: {list(runners.keys())})"
+            job["error"] = f"StrategyType='{strategy_type}' aun no conectado al motor (soportados: {list(supported)})"
             return
 
-        result = runner(profile, symbols, start_ms, end_ms, progress_cb=progress_cb)
+        # run_parallel reparte los simbolos entre procesos (CPU-bound, el
+        # GIL no deja que threads ayuden aca) y aplica el capital de 3 slots
+        # UNA sola vez sobre el total combinado -- mismo resultado que la
+        # version secuencial, mucho mas rapido (corrida de 8 meses/425
+        # simbolos: de ~100min a una fraccion de eso).
+        result = engine.run_parallel(strategy_type, profile, symbols, start_ms, end_ms, progress_cb=progress_cb)
         result.pop("all_signals_raw", None)
         result.pop("shadow_signals", None)
         job["result"] = result
         job["status"] = "completed"
+
+        # Persistencia -- cada corrida completada se guarda sola, nunca se
+        # pisa una anterior (tabla backtest_runs, ver backtest/storage.py).
+        try:
+            start_date = job.get("start_date")
+            end_date = job.get("end_date")
+            run_id = storage.save_run(engine.conn, result, profile, start_date, end_date)
+            job["run_id"] = run_id
+        except Exception as e:
+            # No fallar el job por un error de persistencia -- el resultado
+            # ya esta disponible via /backtest/result/{job_id} igual.
+            job["persist_error"] = str(e)
     except Exception as e:
         job["status"] = "failed"
         job["error"] = str(e)
@@ -115,12 +131,32 @@ def run_backtest(req: RunRequest):
     end_ms = int(datetime.strptime(req.endDate, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp() * 1000)
 
     job_id = str(uuid.uuid4())
-    _jobs[job_id] = {"status": "running", "done": 0, "total": len(symbols), "created_at": time.time()}
+    _jobs[job_id] = {
+        "status": "running", "done": 0, "total": len(symbols), "created_at": time.time(),
+        "start_date": req.startDate, "end_date": req.endDate,
+    }
 
     t = threading.Thread(target=_run_job, args=(job_id, profile, symbols, start_ms, end_ms), daemon=True)
     t.start()
 
     return {"jobId": job_id}
+
+
+@app.get("/backtest/jobs/active")
+def get_active_jobs():
+    """
+    Fallback de recuperacion de progreso cuando la UI no tiene NADA guardado
+    en localStorage (ej. la corrida arranco antes de que existiera ese
+    guardado, o el usuario abre la pantalla desde otro navegador/dispositivo)
+    -- lista los jobs con status='running' para que el frontend se pueda
+    reenganchar igual, sin depender exclusivamente del localStorage.
+    """
+    active = [
+        {"jobId": jid, "kind": "run" if "start_date" in job else "sync",
+         "done": job.get("done", 0), "total": job.get("total", 0)}
+        for jid, job in _jobs.items() if job.get("status") == "running"
+    ]
+    return {"active": active}
 
 
 @app.get("/backtest/status/{job_id}")
@@ -145,6 +181,66 @@ def get_result(job_id: str):
 @app.get("/backtest/symbols")
 def list_symbols():
     return {"symbols": get_engine().available_symbols()}
+
+
+# ── Historial de corridas (backtest/storage.py) ──────────────────────────
+@app.get("/backtest/runs")
+def get_runs(strategyProfileId: Optional[str] = None):
+    return {"runs": storage.list_runs(get_engine().conn, strategyProfileId)}
+
+
+@app.get("/backtest/runs/{run_id}")
+def get_run_detail(run_id: str):
+    result = storage.get_run(get_engine().conn, run_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="corrida no encontrada")
+    return result
+
+
+# ── Sincronizacion de datos (backtest/data_sync.py) ──────────────────────
+class SyncRequest(BaseModel):
+    startDate: str
+    endDate: str
+    symbols: Optional[list[str]] = None
+
+
+def _sync_job(job_id: str, symbols: list, start_ms: int, end_ms: int):
+    job = _jobs[job_id]
+    try:
+        def progress_cb(done, total):
+            job["done"] = done
+            job["total"] = total
+
+        summary = data_sync.sync_coverage(symbols, start_ms, end_ms, progress_cb=progress_cb)
+        job["result"] = summary
+        job["status"] = "completed"
+    except Exception as e:
+        job["status"] = "failed"
+        job["error"] = str(e)
+
+
+@app.get("/backtest/data/coverage")
+def data_coverage(startDate: str, endDate: str, symbols: Optional[str] = None):
+    """symbols: coma-separado opcional, si se omite usa el watchlist completo ya cacheado."""
+    sym_list = symbols.split(",") if symbols else get_engine().available_symbols()
+    start_ms = int(datetime.strptime(startDate, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp() * 1000)
+    end_ms = int(datetime.strptime(endDate, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp() * 1000)
+    gaps = data_sync.check_coverage(sym_list, start_ms, end_ms)
+    total_gaps = sum(len(v) for table in gaps.values() for v in table.values())
+    return {"gaps": gaps, "total_missing_symbol_days": total_gaps}
+
+
+@app.post("/backtest/data/sync")
+def data_sync_run(req: SyncRequest):
+    sym_list = req.symbols or get_engine().available_symbols()
+    start_ms = int(datetime.strptime(req.startDate, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp() * 1000)
+    end_ms = int(datetime.strptime(req.endDate, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp() * 1000)
+
+    job_id = str(uuid.uuid4())
+    _jobs[job_id] = {"status": "running", "done": 0, "total": 0, "created_at": time.time()}
+    t = threading.Thread(target=_sync_job, args=(job_id, sym_list, start_ms, end_ms), daemon=True)
+    t.start()
+    return {"jobId": job_id}
 
 
 if __name__ == "__main__":
