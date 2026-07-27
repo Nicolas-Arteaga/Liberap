@@ -568,12 +568,12 @@ class BacktestEngine:
             if progress_cb:
                 progress_cb(idx + 1, total)
 
-        result = self._capital_sim(all_trades, profile)
+        result = self._capital_sim(all_trades, profile, symbols_used=symbols)
         result["all_signals_raw"] = all_trades
         result["shadow_signals"] = shadow_signals
         return result
 
-    def _capital_sim(self, trades: list, profile: dict) -> dict:
+    def _capital_sim(self, trades: list, profile: dict, symbols_used: Optional[list] = None) -> dict:
         margin = float(profile.get("marginPerTrade", 150))
         slots = int(profile.get("maxOpenPositions", 3))
 
@@ -633,6 +633,8 @@ class BacktestEngine:
                                         "win_rate_pct": round(v["wins"] / v["trades"] * 100, 1)}
                                    for k, v in sorted(monthly.items())},
             "trades": accepted,
+            "symbols_used": sorted(symbols_used) if symbols_used else None,
+            "symbols_count": len(symbols_used) if symbols_used else None,
         }
 
     def run_parallel(
@@ -658,38 +660,64 @@ class BacktestEngine:
         cupo disponible.
         """
         import os as _os
-        from concurrent.futures import ProcessPoolExecutor, as_completed
+        import multiprocessing
+        import queue as _queue
+        from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
 
         n_workers = max_workers or min(_os.cpu_count() or 4, 8)
         n_workers = max(1, min(n_workers, len(symbols))) if symbols else 1
         batches = [symbols[i::n_workers] for i in range(n_workers)]
         batches = [b for b in batches if b]
 
-        all_raw_trades = []
-        done_batches = 0
+        total_symbols = len(symbols)
         if progress_cb:
-            progress_cb(0, len(symbols))
+            progress_cb(0, total_symbols)
+
+        # Progreso granular real (por simbolo, no por lote entero) -- bug
+        # real 2026-07-26: con progreso por lote, la barra quedaba en 0%
+        # durante minutos hasta que el PRIMER lote completo terminaba,
+        # aunque el trabajo ya estuviera avanzando de verdad adentro de cada
+        # proceso. Cada worker reporta 1 mensaje por simbolo terminado a
+        # esta cola compartida (multiprocessing.Manager, picklable entre
+        # procesos); el proceso principal la drena sin bloquear mientras
+        # espera que terminen los futures.
+        manager = multiprocessing.Manager()
+        progress_queue = manager.Queue()
+
+        all_raw_trades = []
+        done_count = 0
 
         with ProcessPoolExecutor(max_workers=len(batches)) as ex:
             futures = {
-                ex.submit(_parallel_worker, strategy_type, profile, batch, start_ms, end_ms, balance, self.db_path): batch
+                ex.submit(_parallel_worker, strategy_type, profile, batch, start_ms, end_ms, balance,
+                          self.db_path, progress_queue): batch
                 for batch in batches
             }
-            symbols_done = 0
-            for fut in as_completed(futures):
-                batch = futures[fut]
-                raw_trades = fut.result()
-                all_raw_trades.extend(raw_trades)
-                symbols_done += len(batch)
-                done_batches += 1
-                if progress_cb:
-                    progress_cb(symbols_done, len(symbols))
+            pending = set(futures.keys())
+            while pending:
+                drained = 0
+                while True:
+                    try:
+                        progress_queue.get_nowait()
+                        drained += 1
+                    except _queue.Empty:
+                        break
+                if drained and progress_cb:
+                    done_count = min(done_count + drained, total_symbols)
+                    progress_cb(done_count, total_symbols)
 
-        return self._capital_sim(all_raw_trades, profile)
+                done_now, pending = wait(pending, timeout=0.5, return_when=FIRST_COMPLETED)
+                for fut in done_now:
+                    all_raw_trades.extend(fut.result())
+
+        if progress_cb:
+            progress_cb(total_symbols, total_symbols)
+
+        return self._capital_sim(all_raw_trades, profile, symbols_used=symbols)
 
 
 def _parallel_worker(strategy_type: str, profile: dict, symbols: list, start_ms: int, end_ms: int,
-                      balance: float, db_path: str) -> list:
+                      balance: float, db_path: str, progress_queue=None) -> list:
     """
     Funcion de nivel de modulo (picklable, requisito de ProcessPoolExecutor)
     -- se ejecuta en un proceso hijo, arma su propio BacktestEngine y corre
@@ -704,5 +732,10 @@ def _parallel_worker(strategy_type: str, profile: dict, symbols: list, start_ms:
         "AdnCompression": engine.run_adn_compression,
     }
     runner = runners[strategy_type]
-    result = runner(profile, symbols, start_ms, end_ms, balance=balance)
+
+    def _report_progress(done, total):
+        if progress_queue is not None:
+            progress_queue.put(1)  # 1 simbolo mas terminado en ESTE lote
+
+    result = runner(profile, symbols, start_ms, end_ms, balance=balance, progress_cb=_report_progress)
     return result["all_signals_raw"]

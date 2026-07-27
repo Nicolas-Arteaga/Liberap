@@ -36,15 +36,23 @@
 
             <div>
                 <app-label>Universo de símbolos</app-label>
-                <div class="d-flex gap-3 mt-1">
-                    <label class="d-flex align-items-center gap-2 text-white-50 small mb-0">
-                        <input type="radio" name="symbolScope" value="all" [(ngModel)]="symbolScope">
+                <div class="d-flex gap-2 mt-1">
+                    <button
+                        type="button"
+                        class="btn btn-sm flex-fill"
+                        [class.btn-success]="symbolScope === 'all'"
+                        [class.btn-outline-light]="symbolScope !== 'all'"
+                        (click)="symbolScope = 'all'">
                         Todos (400+ símbolos)
-                    </label>
-                    <label class="d-flex align-items-center gap-2 text-white-50 small mb-0">
-                        <input type="radio" name="symbolScope" value="top40" [(ngModel)]="symbolScope">
+                    </button>
+                    <button
+                        type="button"
+                        class="btn btn-sm flex-fill"
+                        [class.btn-success]="symbolScope === 'top40'"
+                        [class.btn-outline-light]="symbolScope !== 'top40'"
+                        (click)="symbolScope = 'top40'">
                         Top 40 (más líquidos, menos ruido)
-                    </label>
+                    </button>
                 </div>
             </div>
         </app-card-content>
@@ -144,7 +152,11 @@
 <ng-template #resultBlock let-result="result" let-dateRange="dateRange">
     <app-card-content class="mb-4">
         <h2 class="text-white fs-5 mb-1">Resultados — {{ result.strategy_name }}</h2>
-        <p *ngIf="dateRange" class="text-white-50 small mb-3">{{ dateRange }} · capital simulado ${{ result.capital }}</p>
+        <p *ngIf="dateRange" class="text-white-50 small mb-1">{{ dateRange }} · capital simulado ${{ result.capital }}</p>
+        <p *ngIf="result.symbols_count" class="text-white-50 text-xs mb-3">
+            Universo: {{ result.symbols_count }} símbolos
+            <span *ngIf="result.symbols_count <= 40"> — {{ result.symbols_used.join(', ') }}</span>
+        </p>
 
         <div class="row g-3">
             <div class="col-6">

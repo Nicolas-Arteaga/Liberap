@@ -43,6 +43,8 @@ interface BacktestResult {
   total_pnl_usdt: number;
   capital: number;
   monthly_breakdown: Record<string, MonthlyBreakdownEntry>;
+  symbols_used?: string[] | null;
+  symbols_count?: number | null;
 }
 
 interface JobStatus {
