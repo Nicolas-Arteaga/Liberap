@@ -65,6 +65,19 @@ CAP_TABLE = "klines_clean"
 
 FEE_PER_SIDE = 0.0004  # 0.04%, mismo supuesto usado en todos los capital-sims de hoy
 
+# Top 40 por capitalizacion/liquidez real (mismo criterio ya usado para el
+# backtest de FVG large-cap de hoy, agent/download_binance_vision.py) --
+# pedido del usuario: poder testear solo estos en vez de los 400+ del
+# watchlist completo (mucho menos ruido de pares chicos/ilíquidos).
+TOP_40_SYMBOLS = [
+    "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT", "ADAUSDT",
+    "AVAXUSDT", "LINKUSDT", "DOTUSDT", "LTCUSDT", "ATOMUSDT", "NEARUSDT", "APTUSDT",
+    "ARBUSDT", "OPUSDT", "SUIUSDT", "INJUSDT", "TIAUSDT", "SEIUSDT", "FILUSDT",
+    "ETCUSDT", "TRXUSDT", "BCHUSDT", "UNIUSDT", "AAVEUSDT", "MKRUSDT", "RUNEUSDT",
+    "FTMUSDT", "GALAUSDT", "SANDUSDT", "MANAUSDT", "AXSUSDT", "CHZUSDT", "ENJUSDT",
+    "XLMUSDT", "ALGOUSDT", "VETUSDT", "EOSUSDT", "WLDUSDT",
+]
+
 _INTERVAL_MS = {"5m": BASE_MS, "15m": CAP_MS, "1h": 3600_000, "4h": 14400_000, "1d": 86400_000}
 
 
@@ -315,6 +328,13 @@ class BacktestEngine:
         cur.execute("SELECT DISTINCT symbol FROM klines_5m WHERE interval=?", (BASE_INTERVAL,))
         base_syms = set(r[0] for r in cur.fetchall())
         return sorted(binance_syms & base_syms)
+
+    def top40_symbols(self) -> list:
+        """Interseccion de TOP_40_SYMBOLS con lo que realmente tenemos
+        cacheado -- preserva el orden de TOP_40_SYMBOLS (por capitalizacion),
+        no alfabetico."""
+        available = set(self.available_symbols())
+        return [s for s in TOP_40_SYMBOLS if s in available]
 
     def run_ma_geometry(
         self,

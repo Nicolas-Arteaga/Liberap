@@ -23,7 +23,7 @@
                 </p>
             </div>
 
-            <div class="row">
+            <div class="row mb-3">
                 <div class="col-6">
                     <app-label>Fecha Inicio</app-label>
                     <app-input type="date" [(ngModel)]="startDate" (ngModelChange)="coverageGapCount = null"></app-input>
@@ -31,6 +31,20 @@
                 <div class="col-6">
                     <app-label>Fecha Fin</app-label>
                     <app-input type="date" [(ngModel)]="endDate" (ngModelChange)="coverageGapCount = null"></app-input>
+                </div>
+            </div>
+
+            <div>
+                <app-label>Universo de símbolos</app-label>
+                <div class="d-flex gap-3 mt-1">
+                    <label class="d-flex align-items-center gap-2 text-white-50 small mb-0">
+                        <input type="radio" name="symbolScope" value="all" [(ngModel)]="symbolScope">
+                        Todos (400+ símbolos)
+                    </label>
+                    <label class="d-flex align-items-center gap-2 text-white-50 small mb-0">
+                        <input type="radio" name="symbolScope" value="top40" [(ngModel)]="symbolScope">
+                        Top 40 (más líquidos, menos ruido)
+                    </label>
                 </div>
             </div>
         </app-card-content>

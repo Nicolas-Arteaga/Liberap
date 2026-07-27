@@ -2,6 +2,7 @@ import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { of } from 'rxjs';
 import { Router } from '@angular/router';
 import { CardContentComponent } from 'src/shared/components/card-content/card-content.component';
 import { GlassButtonComponent } from 'src/shared/components/glass-button/glass-button.component';
@@ -96,6 +97,10 @@ export class BacktestingComponent implements OnInit, OnDestroy {
   selectedProfileId = '';
   startDate = '2025-12-01';
   endDate = new Date().toISOString().slice(0, 10);
+
+  // Alcance de símbolos: todo el watchlist (400+) o solo el top 40 por
+  // capitalización/liquidez (menos ruido de pares chicos).
+  symbolScope: 'all' | 'top40' = 'all';
 
   isRunning = false;
   progressDone = 0;
@@ -235,23 +240,41 @@ export class BacktestingComponent implements OnInit, OnDestroy {
     this.progressDone = 0;
     this.progressTotal = 0;
 
-    this.http
-      .post<{ jobId: string }>(`${BACKTEST_API_BASE}/backtest/run`, {
-        strategyProfileId: this.selectedProfileId,
-        startDate: this.startDate,
-        endDate: this.endDate,
-      })
-      .subscribe({
-        next: (resp) => {
-          this.jobId = resp.jobId;
-          localStorage.setItem(RUN_JOB_STORAGE_KEY, resp.jobId);
-          this.startPolling();
-        },
-        error: () => {
-          this.isRunning = false;
-          this.errorMessage = 'No se pudo iniciar el backtest (¿está corriendo agent/backtest/api.py?).';
-        },
-      });
+    // symbolScope=top40 -> pide la lista de símbolos top 40 al servidor
+    // (por capitalización/liquidez, ya intersectada con lo que hay
+    // cacheado) y la manda explícita; symbolScope=all -> no manda `symbols`,
+    // el servidor usa el watchlist completo (comportamiento de siempre).
+    const symbols$ =
+      this.symbolScope === 'top40'
+        ? this.http.get<{ symbols: string[] }>(`${BACKTEST_API_BASE}/backtest/symbols/top40`)
+        : of<{ symbols: string[] | undefined }>({ symbols: undefined });
+
+    symbols$.subscribe({
+      next: (resp) => {
+        this.http
+          .post<{ jobId: string }>(`${BACKTEST_API_BASE}/backtest/run`, {
+            strategyProfileId: this.selectedProfileId,
+            startDate: this.startDate,
+            endDate: this.endDate,
+            symbols: resp.symbols,
+          })
+          .subscribe({
+            next: (runResp) => {
+              this.jobId = runResp.jobId;
+              localStorage.setItem(RUN_JOB_STORAGE_KEY, runResp.jobId);
+              this.startPolling();
+            },
+            error: () => {
+              this.isRunning = false;
+              this.errorMessage = 'No se pudo iniciar el backtest (¿está corriendo agent/backtest/api.py?).';
+            },
+          });
+      },
+      error: () => {
+        this.isRunning = false;
+        this.errorMessage = 'No se pudo obtener la lista de símbolos top 40.';
+      },
+    });
   }
 
   private startPolling() {

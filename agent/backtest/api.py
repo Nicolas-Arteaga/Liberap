@@ -183,6 +183,11 @@ def list_symbols():
     return {"symbols": get_engine().available_symbols()}
 
 
+@app.get("/backtest/symbols/top40")
+def list_top40_symbols():
+    return {"symbols": get_engine().top40_symbols()}
+
+
 # ── Historial de corridas (backtest/storage.py) ──────────────────────────
 @app.get("/backtest/runs")
 def get_runs(strategyProfileId: Optional[str] = None):
