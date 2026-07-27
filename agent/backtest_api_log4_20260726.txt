@@ -1,0 +1,50 @@
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=148min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=306 | Total=406
+INFO:     Started server process [29088]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8010 (Press CTRL+C to quit)
+INFO:     127.0.0.1:64762 - "GET /backtest/data/coverage?startDate=2026-07-24&endDate=2026-07-26&symbols=BTCUSDT,ETHUSDT,COMPUSDT HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64801 - "POST /backtest/data/sync HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51196 - "GET /backtest/status/a9539e14-82a7-4bf8-b6ea-852cd1d0bcf9 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54161 - "GET /backtest/data/coverage?startDate=2026-07-24&endDate=2026-07-26&symbols=BTCUSDT,ETHUSDT,COMPUSDT HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56688 - "POST /backtest/run HTTP/1.1" 200 OK
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=172min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=306 | Total=406
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=172min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=306 | Total=406
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=172min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=306 | Total=406
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=172min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=306 | Total=406
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=172min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=306 | Total=406
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=172min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=306 | Total=406
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=172min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=306 | Total=406
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=172min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=306 | Total=406
+INFO:     127.0.0.1:55170 - "GET /backtest/status/34c9ae40-b12e-4f61-a811-681f6d4fe643 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50136 - "GET /backtest/status/34c9ae40-b12e-4f61-a811-681f6d4fe643 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57509 - "GET /backtest/status/34c9ae40-b12e-4f61-a811-681f6d4fe643 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51505 - "GET /backtest/status/34c9ae40-b12e-4f61-a811-681f6d4fe643 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64902 - "GET /backtest/result/34c9ae40-b12e-4f61-a811-681f6d4fe643 HTTP/1.1" 200 OK

@@ -515,3 +515,164 @@ INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-345921
 INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65184 - "OPTIONS /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61026 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49518 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49467 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64888 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61546 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50529 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50702 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50317 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51446 - "GET /backtest/status/6a9ae20f-c5b1-4643-91c7-34592197cec1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58823 - "OPTIONS /backtest/runs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61710 - "OPTIONS /backtest/runs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51496 - "GET /backtest/runs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51496 - "GET /backtest/runs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62061 - "GET /backtest/symbols HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63235 - "OPTIONS /backtest/runs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57066 - "OPTIONS /backtest/runs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58957 - "GET /backtest/runs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:57066 - "GET /backtest/runs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:60332 - "GET /backtest/runs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:60332 - "GET /backtest/runs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:53333 - "GET /backtest/runs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:53333 - "GET /backtest/runs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54651 - "GET /backtest/runs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54651 - "GET /backtest/runs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:65249 - "GET /backtest/runs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:65249 - "GET /backtest/runs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51566 - "GET /backtest/runs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51566 - "GET /backtest/runs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51337 - "GET /backtest/runs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51337 - "GET /backtest/runs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:64620 - "GET /backtest/runs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52018 - "OPTIONS /backtest/jobs/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59063 - "OPTIONS /backtest/jobs/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64620 - "GET /backtest/runs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:61461 - "GET /backtest/jobs/active HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:64620 - "GET /backtest/jobs/active HTTP/1.1" 404 Not Found

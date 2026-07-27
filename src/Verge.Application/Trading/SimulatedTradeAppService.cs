@@ -581,7 +581,7 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         // Get active strategies to filter trades
         var strategyProfileRepo = LazyServiceProvider.LazyGetRequiredService<IRepository<StrategyProfile, Guid>>();
         var activeStrategies = await strategyProfileRepo.GetListAsync(s => s.UserId == userId && s.IsActive);
-        var activeStrategyIds = activeStrategies.Select(s => s.Id).ToHashSet();
+        var activeStrategyIds = activeStrategies.Select(s => s.Id).ToHashSet(); 
 
         // Filter trades: include trades with no strategy (default) OR trades from active strategies
         var filteredTrades = trades.Where(t =>
