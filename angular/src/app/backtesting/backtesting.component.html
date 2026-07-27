@@ -131,7 +131,7 @@
             <div class="d-flex flex-column gap-2">
                 <button
                     *ngFor="let r of runs"
-                    class="btn text-start bg-white bg-opacity-5 border-0 p-2 rounded"
+                    class="btn text-start bg-dark border-0 p-2 rounded"
                     (click)="viewRun(r.id)">
                     <div class="d-flex justify-content-between align-items-center">
                         <span class="text-white small">{{ r.strategyName }}</span>
@@ -160,20 +160,20 @@
 
         <div class="row g-3">
             <div class="col-6">
-                <div class="bg-white bg-opacity-5 p-3 rounded">
+                <div class="bg-dark p-3 rounded">
                     <p class="text-white-50 small mb-1">Trades Aceptados</p>
                     <p class="text-white fs-4 fw-bold mb-0">{{ result.accepted_trades }}</p>
                     <p class="text-white-50 text-xs mb-0">{{ result.total_signals }} señales detectadas · {{ result.rejected_no_slot }} sin cupo</p>
                 </div>
             </div>
             <div class="col-6">
-                <div class="bg-white bg-opacity-5 p-3 rounded">
+                <div class="bg-dark p-3 rounded">
                     <p class="text-white-50 small mb-1">Win Rate</p>
                     <p class="text-white fs-4 fw-bold mb-0">{{ result.win_rate_pct }}%</p>
                 </div>
             </div>
             <div class="col-12">
-                <div class="bg-white bg-opacity-5 p-3 rounded">
+                <div class="bg-dark p-3 rounded">
                     <p class="text-white-50 small mb-1">PnL Total (neto, con fees)</p>
                     <p class="fs-3 fw-bold mb-0" [class.text-success]="result.total_pnl_usdt >= 0" [class.text-danger]="result.total_pnl_usdt < 0">
                         {{ result.total_pnl_usdt >= 0 ? '+' : '' }}${{ result.total_pnl_usdt }}
@@ -186,7 +186,7 @@
     <app-card-content class="mb-4">
         <h2 class="text-white fs-5 mb-3">Desglose Mensual</h2>
         <div class="d-flex flex-column gap-2">
-            <div *ngFor="let m of monthlyEntries(result)" class="d-flex justify-content-between align-items-center bg-white bg-opacity-5 p-2 rounded">
+            <div *ngFor="let m of monthlyEntries(result)" class="d-flex justify-content-between align-items-center bg-dark p-2 rounded">
                 <span class="text-white-50 small">{{ formatMonth(m.month) }}</span>
                 <span class="text-white-50 text-xs">{{ m.trades }} trades · {{ m.win_rate_pct }}% WR</span>
                 <span class="fw-bold" [class.text-success]="m.pnl >= 0" [class.text-danger]="m.pnl < 0">
