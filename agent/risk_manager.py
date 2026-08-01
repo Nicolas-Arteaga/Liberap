@@ -503,10 +503,16 @@ class RiskManager:
             logger.error("Nexus stop_distance invalid side=%s cp=%s sl=%s", side, cp, sl_price)
             return None
 
-        # Tope estructural universal — FVG y Arrow Peak ya calculan su propio
-        # TP estructural (con su propio haircut), aplicarlo de nuevo encima
-        # solo los recortaría el doble sin necesidad.
-        if not (fvg_mode or arrow_peak_mode):
+        # Tope estructural universal — FVG, Arrow Peak y MA Slope ya calculan
+        # su propio TP estructural (con su propio piso/haircut), aplicarlo de
+        # nuevo encima solo los recortaría el doble sin necesidad. Bug real
+        # 2026-07-27: ma_slope_mode NO estaba excluido acá — el cap genérico
+        # (basado en 400 velas históricas) recortaba el TP ya calibrado por
+        # el propio motor de MA Slope, tirando el R:R real a 0.5-2:1 y
+        # activando el MIN-RR-VETO de más abajo en el 100% de los casos.
+        # Caso real: AAPLUSDT con TP ya estirado a RR=5.73 según su piso
+        # mínimo, el cap lo recortaba a RR=1.15 — vetaba una estrategia sana.
+        if not (fvg_mode or arrow_peak_mode or ma_slope_mode):
             tp_price = self._apply_structural_tp_cap(symbol, side, cp, tp_price)
             tp_distance_price = abs(tp_price - cp)
 

@@ -368,15 +368,27 @@ public class SimulatedTradeAppService : ApplicationService, ISimulatedTradeAppSe
         // 1. Resolve current price FIRST (outside the DB lock/retry to keep it fast)
         // Fetch trade symbol once for price resolution (using a one-off scope to avoid tracking)
         string symbol;
+        decimal fallbackAnchor;
         using (var scope = _scopeFactory.CreateScope())
         {
             var tRepo = scope.ServiceProvider.GetRequiredService<IRepository<SimulatedTrade, Guid>>();
             var t = await tRepo.GetAsync(tradeId);
             symbol = t.Symbol;
+            fallbackAnchor = t.MarkPrice > 0 ? t.MarkPrice : t.EntryPrice;
         }
-        
-        var closePrice = await ResolveCurrentPriceAsync(symbol)
-            ?? throw new UserFriendlyException($"Could not fetch current price for {symbol}.");
+
+        // Bug real 2026-07-27: instrumentos "TradFi Perps" (AAPLUSDT, GOOGLUSDT,
+        // HK1810USDT, etc., de MA Slope Caso 3) NUNCA van a resolver precio via
+        // Binance/Bybit/OKX -- no son cripto, ResolveCurrentPriceAsync siempre
+        // devuelve null para ellos. Tirar acá dejaba el trade imposible de
+        // cerrar para siempre (todo intento de TP/SL/zombie-timeout crasheaba
+        // con esta misma excepción sin controlar). SimulationMarkPriceWorker
+        // ya tickea MarkPrice cada 1s con su propio filtro de outliers -- es
+        // un ancla confiable, mismo patrón que el guard de desviación de más
+        // abajo. Solo se cae al Entry si ni siquiera hay MarkPrice todavía.
+        var closePrice = await ResolveCurrentPriceAsync(symbol) ?? fallbackAnchor;
+        if (closePrice <= 0)
+            throw new UserFriendlyException($"Could not fetch current price for {symbol}.");
 
         SimulatedTradeDto resultDto = null;
         int maxRetries = 5;

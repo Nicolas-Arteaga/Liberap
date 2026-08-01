@@ -1,0 +1,12 @@
+.git
+node_modules
+**/node_modules
+**/bin
+**/obj
+angular/dist
+agent/data
+agent/logs
+agent/*.txt
+**/__pycache__
+**/*.pyc
+.env

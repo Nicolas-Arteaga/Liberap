@@ -58,9 +58,35 @@ services:
       - market_ws_data:/app/data
     restart: always
 
+  backtest:
+    build:
+      context: .
+      dockerfile: agent/Dockerfile.backtest
+    image: verge-backtest
+    container_name: verge-backtest
+    environment:
+      - ABP_BACKEND_URL=https://host.docker.internal:44396
+    ports:
+      - "8010:8010"
+    volumes:
+      # Volumen NOMBRADO (no bind mount) -- la DB historica pesa 3.5GB+ y
+      # SQLite hace muchas lecturas chicas al escanear; un bind mount desde
+      # NTFS via la capa de virtualizacion de Docker Desktop en Windows es
+      # brutalmente lento para ese patron de acceso (confirmado: una query
+      # simple nunca volvia ni con 60s de timeout). Un volumen nombrado vive
+      # nativo en el filesystem de la VM de Docker, sin esa capa -- rapido.
+      # Poblado una vez desde agent/data/ (ver PROGRESS_LOG), despues el
+      # propio servicio lo mantiene actualizado via /backtest/data/sync.
+      - verge_backtest_data:/app/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
+
   # El backend se corre localmente en el host, no en Docker.
 
 volumes:
   redis_data:
   pg_data:
   market_ws_data:
+  verge_backtest_data:
+    external: true
