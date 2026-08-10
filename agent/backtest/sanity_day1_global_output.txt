@@ -1,0 +1,36 @@
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=104min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=333 | Total=433
+426 simbolos
+  progreso: 0/290
+  progreso: 290/290
+señales=391 trades=28 rechazados_sin_cupo=363 PnL=$-7.93
+  AINUSDT         side=0 open=2026-07-12 00:00:00+00:00 pnl=$-1.12
+  CBRSUSDT        side=1 open=2026-07-12 00:00:00+00:00 pnl=$-0.86
+  THETAUSDT       side=1 open=2026-07-12 00:00:00+00:00 pnl=$-2.12
+  BSBUSDT         side=1 open=2026-07-12 00:15:00+00:00 pnl=$-1.35
+  1MBABYDOGEUSDT  side=1 open=2026-07-12 00:25:00+00:00 pnl=$-1.75
+  AVAAIUSDT       side=0 open=2026-07-12 01:40:00+00:00 pnl=$-1.11
+  1INCHUSDT       side=0 open=2026-07-12 01:50:00+00:00 pnl=$-0.68
+  AWEUSDT         side=1 open=2026-07-12 02:10:00+00:00 pnl=$-1.77
+  WUSDT           side=1 open=2026-07-12 03:10:00+00:00 pnl=$-0.85
+  IOUSDT          side=0 open=2026-07-12 03:15:00+00:00 pnl=$-1.00
+  POWERUSDT       side=0 open=2026-07-12 03:15:00+00:00 pnl=$-2.89
+  AKEUSDT         side=1 open=2026-07-12 04:35:00+00:00 pnl=$9.22
+  HEMIUSDT        side=1 open=2026-07-12 04:50:00+00:00 pnl=$-0.52
+  DYMUSDT         side=1 open=2026-07-12 05:10:00+00:00 pnl=$-0.34
+  BANANAS31USDT   side=0 open=2026-07-12 08:20:00+00:00 pnl=$-0.43
+  1000BONKUSDT    side=0 open=2026-07-12 08:30:00+00:00 pnl=$-0.34
+  SANTOSUSDT      side=1 open=2026-07-12 09:20:00+00:00 pnl=$-0.48
+  ARPAUSDT        side=0 open=2026-07-12 09:45:00+00:00 pnl=$2.26
+  MSFTUSDT        side=0 open=2026-07-12 12:10:00+00:00 pnl=$-0.47
+  HBARUSDT        side=0 open=2026-07-12 13:10:00+00:00 pnl=$-0.59
+  KITEUSDT        side=1 open=2026-07-12 13:20:00+00:00 pnl=$-0.35
+  ONGUSDT         side=1 open=2026-07-12 13:20:00+00:00 pnl=$1.50
+  XAGUSDT         side=1 open=2026-07-12 13:40:00+00:00 pnl=$0.78
+  EWYUSDT         side=1 open=2026-07-12 21:30:00+00:00 pnl=$-0.27
+  BNBUSDT         side=1 open=2026-07-12 21:35:00+00:00 pnl=$0.71
+  BILLUSDT        side=0 open=2026-07-12 22:25:00+00:00 pnl=$-2.10
+  XNYUSDT         side=1 open=2026-07-12 23:20:00+00:00 pnl=$-0.51
+  DRAMUSDT        side=1 open=2026-07-12 23:30:00+00:00 pnl=$-0.51

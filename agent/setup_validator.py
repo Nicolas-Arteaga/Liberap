@@ -36,6 +36,7 @@ def _is_direct_injection_candidate(candidate: dict) -> bool:
         or candidate.get("total_sweep_mode")
         or candidate.get("golden_uturn_mode")
         or candidate.get("fvg_mode")
+        or candidate.get("meme_short_top_mode")
     )
 
 

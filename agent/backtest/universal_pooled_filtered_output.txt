@@ -1,0 +1,6 @@
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=354min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=325 | Total=425
+señales=4870 | trades=1820 | rechazados=3050 | WR=32.4% | PnL=$81.44
+trades/dia: 7.52

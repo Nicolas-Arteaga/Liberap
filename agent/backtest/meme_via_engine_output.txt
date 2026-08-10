@@ -1,0 +1,32 @@
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=357min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=320 | Total=420
+Validando via motor real (_run_generic + risk_manager.py) | ventana 2025-12-01 -> 2026-07-31
+Referencia (script standalone): +$573.90 total, 19/23 positivos
+====================================================================================================
+1000BONKUSDT    | señales= 132 | trades= 132 | WR= 45.5% | PnL=$   107.43
+1000FLOKIUSDT   | señales= 120 | trades= 120 | WR= 36.7% | PnL=$    38.82
+1000SHIBUSDT    | señales=  89 | trades=  89 | WR= 31.5% | PnL=$     7.27
+WIFUSDT         | señales= 145 | trades= 145 | WR= 33.8% | PnL=$    11.13
+PNUTUSDT        | señales= 134 | trades= 134 | WR= 34.3% | PnL=$    66.23
+MEWUSDT         | señales= 139 | trades= 139 | WR= 31.7% | PnL=$     9.87
+BOMEUSDT        | señales= 153 | trades= 153 | WR= 35.3% | PnL=$    63.68
+NEIROUSDT       | señales= 137 | trades= 137 | WR= 27.0% | PnL=$   -47.33
+CHILLGUYUSDT    | señales= 157 | trades= 157 | WR= 36.3% | PnL=$    48.65
+MOODENGUSDT     | señales= 146 | trades= 146 | WR= 33.6% | PnL=$    55.10
+ACTUSDT         | señales= 136 | trades= 136 | WR= 31.6% | PnL=$    -6.12
+TURBOUSDT       | señales= 141 | trades= 141 | WR= 36.2% | PnL=$    52.66
+MEMEUSDT        | señales= 119 | trades= 119 | WR= 32.8% | PnL=$    31.93
+1000PEPEUSDT    | señales= 129 | trades= 129 | WR= 42.6% | PnL=$   122.55
+GMTUSDT         | señales= 115 | trades= 115 | WR= 33.0% | PnL=$    21.46
+APEUSDT         | señales= 128 | trades= 128 | WR= 40.6% | PnL=$    85.15
+JASMYUSDT       | señales= 121 | trades= 121 | WR= 33.9% | PnL=$    14.51
+HOTUSDT         | señales= 106 | trades= 106 | WR= 26.4% | PnL=$     5.21
+CFXUSDT         | señales= 108 | trades= 108 | WR= 31.5% | PnL=$    -4.64
+1000CATUSDT     | señales= 122 | trades= 122 | WR= 34.4% | PnL=$    22.24
+CAKEUSDT        | señales=  62 | trades=  62 | WR= 38.7% | PnL=$    11.38
+ARKMUSDT        | señales= 143 | trades= 143 | WR= 34.3% | PnL=$    31.05
+BLURUSDT        | señales= 123 | trades= 123 | WR= 34.1% | PnL=$    -7.87
+====================================================================================================
+PnL TOTAL via motor real: $740.36 | 19/23 positivos

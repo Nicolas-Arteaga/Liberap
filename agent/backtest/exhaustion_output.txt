@@ -1,0 +1,14 @@
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=142min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=319 | Total=419
+Ventana: 2025-12-01 -> 2026-07-31 (8 meses completos)
+Reversion por Agotamiento | RSI(14) 35.0/65.0 | precio fuera de las 4 MAs | movimiento previo >=0.5% en 8 velas | TP=1.8% SL=1.0%
+====================================================================================================
+--- BTCUSDT (donde se mino el patron) ---
+BTCUSDT         | señales=  232 | trades= 232 | WR= 22.0% | PnL=$   -38.33 | PF=0.807
+
+--- Sombras confirmadas visualmente (mismo patron, precio mas chico) ---
+SUIUSDT         | señales=  241 | trades= 241 | WR= 29.5% | PnL=$   -36.30 | PF=0.845
+DOGEUSDT        | señales=  241 | trades= 241 | WR= 23.2% | PnL=$   -72.59 | PF=0.696
+1000PEPEUSDT    | señales=  241 | trades= 241 | WR= 28.2% | PnL=$   -75.78 | PF=0.709

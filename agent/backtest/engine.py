@@ -40,6 +40,7 @@ from risk_manager import RiskManager  # noqa: E402
 import config as agent_config  # noqa: E402
 from fvg.analyzer import FvgAnalyzer  # noqa: E402
 from adn_compression.analyzer import AdnCompressionAnalyzer  # noqa: E402
+from kline_cache import get_cache  # noqa: E402 -- OFI/funding/liquidaciones (agent/data/klines.db, DB separada de binance_vision_clean.db)
 
 # verge_agent.py configura logging a archivo con rotacion al importarse (para
 # el agente EN VIVO) -- en un backtest eso genera miles de writes a disco y
@@ -345,6 +346,7 @@ class BacktestEngine:
         balance: float = 10_000.0,
         progress_cb: Optional[Callable[[int, int], None]] = None,
         shadow_mode: bool = False,
+        signal_filters: Optional[dict] = None,
     ) -> dict:
         """StrategyType=MaGeometry. profile: dict con las keys reales de
         StrategyProfile (patternParamsJson, allowLong, allowShort,
@@ -361,7 +363,8 @@ class BacktestEngine:
             return self.ma_agent._evaluate_ma_geometry_profile(profile, geo)
 
         return self._run_generic(profile, symbols, start_ms, end_ms, interval,
-                                  candidate_fn, balance, progress_cb, shadow_mode)
+                                  candidate_fn, balance, progress_cb, shadow_mode,
+                                  signal_filters=signal_filters)
 
     def run_fvg(
         self,
@@ -372,6 +375,7 @@ class BacktestEngine:
         balance: float = 10_000.0,
         progress_cb: Optional[Callable[[int, int], None]] = None,
         shadow_mode: bool = False,
+        signal_filters: Optional[dict] = None,
     ) -> dict:
         """
         StrategyType=FVG. Reusa FvgAnalyzer real (python-service/fvg/analyzer.py,
@@ -401,7 +405,65 @@ class BacktestEngine:
             return self.fvg_agent._build_fvg_candidate(item_dict, profile)
 
         return self._run_generic(profile, symbols, start_ms, end_ms, interval,
-                                  candidate_fn, balance, progress_cb, shadow_mode)
+                                  candidate_fn, balance, progress_cb, shadow_mode,
+                                  signal_filters=signal_filters)
+
+    @staticmethod
+    def _passes_signal_filters(cache, symbol: str, now_ms: int, candidate: dict, sf: dict) -> bool:
+        """
+        Replica exacta de los vetoes opt-in de setup_validator.py (funding
+        extremo, cascada de liquidaciones -- secciones 2 y 3 del epic
+        market-data-expansion) mas un filtro de OFI direccional nuevo
+        (seccion 1, todavia sin veto de produccion -- es justamente lo que
+        este A/B decide si vale la pena agregar). Point-in-time (now_ms),
+        nunca time.time() -- sin lookahead, mismo principio que el resto del
+        motor. Side: 0=LONG, 1=SHORT (igual que risk_manager/candidate).
+        """
+        side = int(candidate.get("side", 0))
+
+        ofi_cfg = sf.get("ofi_direction") or {}
+        if ofi_cfg.get("enabled"):
+            ofi = cache.get_ofi_before(symbol, now_ms)
+            if ofi is not None:
+                min_abs = float(ofi_cfg.get("min_abs_ofi", 0.1))
+                # OFI > 0 = presion compradora (mas volumen en el bid) -> favorece LONG.
+                # OFI < 0 = presion vendedora -> favorece SHORT. Igual que produccion
+                # nunca vetea por "neutral" (|ofi| < min_abs), solo por señal clara
+                # en contra de la direccion del candidato.
+                if side == 0 and ofi < -min_abs:
+                    return False
+                if side == 1 and ofi > min_abs:
+                    return False
+            # ofi is None (sin cobertura en ese punto) -> fail-open.
+
+        funding_cfg = sf.get("funding_extreme") or {}
+        if funding_cfg.get("enabled"):
+            funding_rate = cache.get_funding_before(symbol, now_ms)
+            if funding_rate is not None:
+                funding_pct = funding_rate * 100.0
+                max_abs = float(funding_cfg.get("max_abs_funding_pct", 0.05))
+                if side == 0 and funding_pct > max_abs:
+                    return False
+                if side == 1 and funding_pct < -max_abs:
+                    return False
+            # funding_rate is None -> fail-open, igual que produccion.
+
+        liq_cfg = sf.get("liquidation_cascade") or {}
+        if liq_cfg.get("enabled"):
+            cascade = cache.get_liquidation_cascade(
+                symbol,
+                recent_minutes=int(liq_cfg.get("recent_minutes", 15)),
+                baseline_hours=int(liq_cfg.get("baseline_hours", 4)),
+                threshold_multiplier=float(liq_cfg.get("threshold_multiplier", 3.0)),
+                at_timestamp_ms=now_ms,
+            )
+            if cascade is not None and cascade.get("cascade_side"):
+                risky_side = 1 if cascade["cascade_side"] == "Sell" else 0
+                if side == risky_side:
+                    return False
+            # cascade is None (sin cobertura) -> fail-open, igual que produccion.
+
+        return True
 
     def run_adn_compression(
         self,
@@ -412,6 +474,7 @@ class BacktestEngine:
         balance: float = 10_000.0,
         progress_cb: Optional[Callable[[int, int], None]] = None,
         shadow_mode: bool = False,
+        signal_filters: Optional[dict] = None,
     ) -> dict:
         """
         StrategyType=AdnCompression. Reusa AdnCompressionAnalyzer real
@@ -436,7 +499,144 @@ class BacktestEngine:
             return self.adn_agent._build_adn_compression_candidate(item_dict, profile)
 
         return self._run_generic(profile, symbols, start_ms, end_ms, interval,
-                                  candidate_fn, balance, progress_cb, shadow_mode)
+                                  candidate_fn, balance, progress_cb, shadow_mode,
+                                  signal_filters=signal_filters)
+
+    def run_fvg_global(
+        self,
+        profile: dict,
+        symbols: list,
+        start_ms: int,
+        end_ms: int,
+        balance: float = 10_000.0,
+        progress_cb: Optional[Callable[[int, int], None]] = None,
+    ) -> dict:
+        """
+        StrategyType=FVG, version FIEL a produccion -- root cause real
+        2026-08-09: run_fvg/_run_generic caminan cada simbolo AISLADO en su
+        propia linea de tiempo, sin competencia entre simbolos. Produccion
+        real (python-service/fvg/analyzer.py::scan, linea 419-459) hace lo
+        OPUESTO: en cada ciclo de 5 min escanea TODO el watchlist de una,
+        ordena por tp_distance_pct y se queda con el TOP 5 -- el resto de
+        los simbolos, aunque tengan zona valida, se descarta ese ciclo sin
+        intentar abrir nada. Confirmado con datos reales: para el mismo dia
+        (12/7/2026) run_fvg genero 24 trades en simbolos que NO coinciden
+        NI UNO con los 10 trades reales que el agente ejecuto ese dia --
+        no era un problema de PnL, eran candidatos completamente distintos.
+
+        Esta version camina el tiempo GLOBALMENTE (un solo reloj de 5 min
+        para todos los simbolos, no un walk por simbolo), en cada paso
+        escanea todos los simbolos vivos, aplica el mismo corte top-5 por
+        tp_distance_pct, y solo ahi intenta abrir (respetando por simbolo
+        el mismo criterio de _run_generic: no re-entrar si ya hay una
+        posicion abierta en ese simbolo, ni mas de 1 intento por dia).
+        """
+        import json
+        params = json.loads(profile.get("patternParamsJson") or "{}")
+        interval = params.get("timeframe") or "15m"
+        allow_long = profile.get("allowLong", True)
+        allow_short = profile.get("allowShort", True)
+
+        # Precalienta cache de klines de cada simbolo (evita miles de misses
+        # de sqlite entreverados con el loop de escaneo).
+        active_symbols = []
+        for symbol in symbols:
+            self.fetcher.set_active_symbol(symbol, intervals=(BASE_INTERVAL, interval))
+            rows_base, _ = self.fetcher._active_by_interval[BASE_INTERVAL]
+            if len(rows_base) >= 150 * (_INTERVAL_MS[interval] // BASE_MS) + 20:
+                active_symbols.append(symbol)
+
+        open_trades: dict[str, dict] = {}   # symbol -> trade abierto
+        last_trade_day: dict[str, object] = {}
+        all_trades = []
+
+        # Reloj global: todos los timestamps de 5m dentro del rango, tomados
+        # del primer simbolo activo (todos comparten la misma grilla de 5m).
+        self.fetcher.set_active_symbol(active_symbols[0], intervals=(BASE_INTERVAL,))
+        rows0, times0 = self.fetcher._active_by_interval[BASE_INTERVAL]
+        start_idx = bisect.bisect_left(times0, start_ms - BASE_MS)
+        end_idx = bisect.bisect_right(times0, end_ms)
+        total_ticks = max(0, end_idx - start_idx)
+
+        for tick_n, i in enumerate(range(start_idx, end_idx)):
+            now_ms = rows0[i][0] + BASE_MS
+            self.fetcher.set_now(now_ms)
+
+            raw_candidates = []  # (tp_distance_pct, symbol, item)
+            for symbol in active_symbols:
+                self.fetcher.set_active_symbol(symbol, intervals=(BASE_INTERVAL, interval))
+
+                ot = open_trades.get(symbol)
+                if ot:
+                    rows, times = self.fetcher._active_by_interval[BASE_INTERVAL]
+                    idx_now = bisect.bisect_right(times, now_ms - BASE_MS) - 1
+                    if idx_now < 0:
+                        continue
+                    h, l, c = rows[idx_now][2], rows[idx_now][3], rows[idx_now][4]
+                    side = ot["side"]
+                    hit_tp = (l <= ot["tp"]) if side == 1 else (h >= ot["tp"])
+                    hit_sl = (h >= ot["sl"]) if side == 1 else (l <= ot["sl"])
+                    if hit_tp:
+                        all_trades.append({**ot, "close_reason": "TP", "close_time": now_ms})
+                        del open_trades[symbol]
+                    elif hit_sl:
+                        all_trades.append({**ot, "close_reason": "SL", "close_time": now_ms})
+                        del open_trades[symbol]
+                    else:
+                        max_candles = int(profile.get("maxTradeDurationCandles", 16))
+                        candles_open = (now_ms - ot["open_time"]) / (15 * 60 * 1000)
+                        if candles_open >= max_candles:
+                            entry = ot["entry"]
+                            pnl_pct = (c - entry) / entry if side == 0 else (entry - c) / entry
+                            if pnl_pct < 0:
+                                all_trades.append({**ot, "close_reason": "zombie_timeout",
+                                                    "close_time": now_ms, "_zombie_close_price": c})
+                                del open_trades[symbol]
+                    continue  # simbolo con posicion abierta no compite por top-5
+
+                day_key = datetime.utcfromtimestamp(now_ms / 1000).date()
+                if last_trade_day.get(symbol) == day_key:
+                    continue
+
+                try:
+                    item, _reason = self.fvg_analyzer._scan_symbol(symbol, interval, sort_by="range")
+                except Exception:
+                    continue
+                if not item:
+                    continue
+                if item.direction == "bullish" and not allow_long:
+                    continue
+                if item.direction == "bearish" and not allow_short:
+                    continue
+                raw_candidates.append((item.tp_distance_pct, symbol, item))
+
+            # ── Corte real: top 5 por tp_distance_pct de TODO el universo ──
+            raw_candidates.sort(key=lambda x: x[0], reverse=True)
+            for _tp_dist, symbol, item in raw_candidates[:5]:
+                item_dict = item.model_dump() if hasattr(item, "model_dump") else dict(item)
+                candidate = self.fvg_agent._build_fvg_candidate(item_dict, profile)
+                if not candidate:
+                    continue
+                self.fetcher.set_active_symbol(symbol, intervals=(BASE_INTERVAL, interval))
+                risk = self.risk_manager._calculate_position_nexus_style(symbol, candidate, balance, profile)
+                if not risk:
+                    continue
+                open_trades[symbol] = {
+                    "symbol": symbol, "side": risk["side"], "open_time": now_ms,
+                    "entry": risk["entry_price"], "sl": risk["sl_price"], "tp": risk["tp_price"],
+                    "margin": risk["margin"],
+                }
+                last_trade_day[symbol] = day_key
+
+            if progress_cb and tick_n % 500 == 0:
+                progress_cb(tick_n, total_ticks)
+
+        if progress_cb:
+            progress_cb(total_ticks, total_ticks)
+
+        result = self._capital_sim(all_trades, profile, symbols_used=active_symbols)
+        result["all_signals_raw"] = all_trades
+        return result
 
     def _run_generic(
         self,
@@ -449,6 +649,7 @@ class BacktestEngine:
         balance: float = 10_000.0,
         progress_cb: Optional[Callable[[int, int], None]] = None,
         shadow_mode: bool = False,
+        signal_filters: Optional[dict] = None,
     ) -> dict:
         """
         Motor de caminata GENERICO -- cualquier StrategyType lo puede usar
@@ -457,7 +658,23 @@ class BacktestEngine:
         (avance cada 5 min, TP/SL, zombie_timeout, capital limitado,
         shadow_mode) es igual para todas -- ya validado 1:1 contra trades
         reales con MaGeometry (ver PROGRESS_LOG 2026-07-26).
+
+        signal_filters (opt-in, epic market-data-expansion #156, tareas
+        1.7/2.6/3.6): dict opcional para el A/B de señales de order
+        flow/funding/liquidaciones sin tocar produccion. Mismos vetoes que
+        setup_validator.py (funding_extreme_*, liquidation_cascade_same_
+        direction) mas un filtro direccional de OFI nuevo (todavia no existe
+        en produccion, es lo que este A/B evalua si vale la pena agregar).
+        Sin cobertura de dato para ese symbol/momento -> fail-open, mismo
+        criterio que produccion (nunca bloquear por falta de un dato
+        opcional). Shape:
+          {"ofi_direction": {"enabled": True, "min_abs_ofi": 0.1},
+           "funding_extreme": {"enabled": True, "max_abs_funding_pct": 0.05},
+           "liquidation_cascade": {"enabled": True, "recent_minutes": 15,
+                                    "baseline_hours": 4, "threshold_multiplier": 3.0}}
         """
+        sf = signal_filters or {}
+        cache = get_cache() if sf else None
         interval_ms = _INTERVAL_MS[interval]
         min_candles = 150
         min_base_needed = min_candles * (interval_ms // BASE_MS)
@@ -543,6 +760,10 @@ class BacktestEngine:
 
                 candidate = candidate_fn(symbol)
                 if not candidate:
+                    j += 1
+                    continue
+
+                if sf and not self._passes_signal_filters(cache, symbol, now_ms, candidate, sf):
                     j += 1
                     continue
 

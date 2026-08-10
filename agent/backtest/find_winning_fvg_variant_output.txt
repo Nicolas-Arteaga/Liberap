@@ -1,0 +1,18 @@
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=105min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=322 | Total=422
+TOP_40_SYMBOLS (40) | 2025-12-01 -> 2026-08-09 (251 dias)
+
+====================================================================================================
+original (baseline)
+====================================================================================================
+  [original (baseline)] progreso: 0/69984
+  [original (baseline)] progreso: 2000/69984
+  [original (baseline)] progreso: 4000/69984
+  [original (baseline)] progreso: 6000/69984
+  [original (baseline)] progreso: 8000/69984
+  [original (baseline)] progreso: 10000/69984
+  [original (baseline)] progreso: 12000/69984
+  [original (baseline)] progreso: 14000/69984
+  [original (baseline)] progreso: 16000/69984

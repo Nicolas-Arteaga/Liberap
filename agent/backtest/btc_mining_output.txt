@@ -1,0 +1,34 @@
+BTCUSDT: 23328 velas de 15m | buscando rupturas >= 1.5% en 8 velas (120min)
+Eventos detectados: 224 rupturas alcistas | 237 rupturas bajistas
+
+====================================================================================================
+RUPTURAS ALCISTAS (subio >=1.5%)
+====================================================================================================
+Caracteristica ANTES del evento |          1ra mitad (n=140) |           2da mitad (n=84) | robusto?
+below_all_mas                | tasa= 42.0% base= 25.4% lift=1.65x | tasa= 47.6% base= 24.8% lift=1.92x | SI
+above_all_mas                | tasa= 16.7% base= 24.3% lift=0.69x | tasa= 16.7% base= 26.6% lift=0.63x | no
+compressed                   | tasa=  9.4% base= 20.5% lift=0.46x | tasa= 21.4% base= 26.9% lift=0.80x | no
+prior_falling                | tasa= 31.9% base= 17.3% lift=1.85x | tasa= 38.1% base= 13.5% lift=2.82x | SI
+prior_rising                 | tasa= 20.3% base= 16.0% lift=1.27x | tasa= 14.3% base= 12.3% lift=1.16x | no
+prior_flat                   | tasa= 47.8% base= 66.7% lift=0.72x | tasa= 47.6% base= 74.2% lift=0.64x | no
+rsi_low                      | tasa= 18.1% base=  9.2% lift=1.97x | tasa= 19.0% base=  9.3% lift=2.05x | SI
+rsi_mid                      | tasa= 74.6% base= 83.1% lift=0.90x | tasa= 75.0% base= 81.9% lift=0.92x | no
+rsi_high                     | tasa=  7.2% base=  7.7% lift=0.94x | tasa=  6.0% base=  8.8% lift=0.67x | no
+ma7_below_ma99               | tasa= 55.8% base= 52.3% lift=1.07x | tasa= 60.7% base= 49.2% lift=1.23x | no
+ma7_above_ma99               | tasa= 44.2% base= 47.7% lift=0.93x | tasa= 39.3% base= 50.8% lift=0.77x | no
+
+====================================================================================================
+RUPTURAS BAJISTAS (cayo >=1.5%)
+====================================================================================================
+Caracteristica ANTES del evento |          1ra mitad (n=157) |           2da mitad (n=80) | robusto?
+below_all_mas                | tasa= 26.8% base= 25.4% lift=1.05x | tasa= 28.7% base= 24.8% lift=1.16x | no
+above_all_mas                | tasa= 32.7% base= 24.3% lift=1.35x | tasa= 23.8% base= 26.6% lift=0.89x | no
+compressed                   | tasa= 15.0% base= 20.5% lift=0.73x | tasa= 20.0% base= 26.9% lift=0.74x | no
+prior_falling                | tasa= 24.8% base= 17.3% lift=1.44x | tasa= 15.0% base= 13.5% lift=1.11x | no
+prior_rising                 | tasa= 28.8% base= 16.0% lift=1.79x | tasa= 23.8% base= 12.3% lift=1.93x | SI
+prior_flat                   | tasa= 46.4% base= 66.7% lift=0.70x | tasa= 61.3% base= 74.2% lift=0.83x | no
+rsi_low                      | tasa= 11.1% base=  9.2% lift=1.21x | tasa= 10.0% base=  9.3% lift=1.08x | no
+rsi_mid                      | tasa= 72.5% base= 83.1% lift=0.87x | tasa= 78.8% base= 81.9% lift=0.96x | no
+rsi_high                     | tasa= 16.3% base=  7.7% lift=2.13x | tasa= 11.2% base=  8.8% lift=1.27x | SI
+ma7_below_ma99               | tasa= 56.9% base= 52.3% lift=1.09x | tasa= 65.0% base= 49.2% lift=1.32x | no
+ma7_above_ma99               | tasa= 43.1% base= 47.7% lift=0.90x | tasa= 35.0% base= 50.8% lift=0.69x | no

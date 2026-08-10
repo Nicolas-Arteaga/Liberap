@@ -1,0 +1,18 @@
+BTCUSDT: 23328 velas de 15m cargadas (binance_vision_clean.db)
+Horizonte: 16 velas (4h) | Baseline incondicional: retorno medio=-0.018% | WR=49.8%
+===================================================================================================================
+Condicion                                        |    n1   ret1%   wr1% |    n2   ret2%   wr2% | robusto?
+Compresion + cruce arriba (patron del usuario)   |   141   0.120   54.6 |   193  -0.089   46.1 | no
+Cruce violento arriba MA99                       |   281   0.097   52.0 |   305  -0.097   43.6 | no
+RSI<30 (sobreventa)                              |   498  -0.043   55.4 |   497   0.121   57.3 | no
+Golden cross MA7/MA25                            |   293   0.074   52.6 |   320  -0.081   42.8 | no
+Cruce violento abajo MA99                        |   282   0.088   55.3 |   305  -0.044   48.2 | no
+Compresion + cruce abajo (patron del usuario)    |   144   0.046   52.1 |   185  -0.060   49.2 | no
+RSI>70 (sobrecompra)                             |   417  -0.083   41.0 |   436  -0.021   47.5 | no
+Stack bajista (MA7<25<50<99, precio abajo)       |  1414  -0.063   52.9 |  1321  -0.018   51.9 | no
+Volumen >= 2x promedio                           |  1178  -0.052   50.4 |  1187   0.026   50.8 | no
+MAs comprimidas (<0.4%)                          |  2379  -0.031   48.8 |  3130   0.031   55.3 | no
+Death cross MA7/MA25                             |   294  -0.003   50.7 |   319   0.049   55.2 | no
+Stack alcista (MA7>25>50>99, precio arriba)      |  1281  -0.048   43.0 |  1569   0.001   47.7 | no
+===================================================================================================================
+Condiciones robustas (edge consistente en ambas mitades del historico): 0

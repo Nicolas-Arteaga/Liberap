@@ -1,0 +1,57 @@
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=300min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=317 | Total=417
+AAVEUSDT trades= 121
+ADAUSDT trades= 102
+ALGOUSDT trades= 116
+APTUSDT trades= 130
+ARBUSDT trades= 126
+ATOMUSDT trades= 94
+AVAXUSDT trades= 90
+AXSUSDT trades= 133
+BCHUSDT trades= 74
+BNBUSDT trades= 38
+CHZUSDT trades= 122
+DOGEUSDT trades= 89
+DOTUSDT trades= 106
+ENJUSDT trades= 130
+ETCUSDT trades= 83
+FILUSDT trades= 114
+FTMUSDT trades= 0
+GALAUSDT trades= 118
+INJUSDT trades= 144
+LINKUSDT trades= 88
+LTCUSDT trades= 55
+MANAUSDT trades= 112
+MKRUSDT trades= 0
+NEARUSDT trades= 135
+OPUSDT trades= 138
+RUNEUSDT trades= 103
+SANDUSDT trades= 104
+SEIUSDT trades= 105
+SOLUSDT trades= 88
+SUIUSDT trades= 114
+TIAUSDT trades= 145
+TRXUSDT trades= 1
+UNIUSDT trades= 117
+VETUSDT trades= 101
+WLDUSDT trades= 132
+XLMUSDT trades= 113
+XRPUSDT trades= 79
+BUSDT trades= 149
+AIGENSYNUSDT trades= 59
+JOEUSDT trades= 113
+HOLOUSDT trades= 144
+GUAUSDT trades= 156
+CRVUSDT trades= 121
+BRUSDT trades= 152
+UBUSDT trades= 175
+BEAMXUSDT trades= 118
+YFIUSDT trades= 73
+QNTUSDT trades= 102
+AKTUSDT trades= 147
+AKEUSDT trades= 170
+BEUSDT trades= 30
+GRASSUSDT trades= 163
+TOTAL TRADES ACEPTADOS (con limite de 3 cupos por simbolo): 5532

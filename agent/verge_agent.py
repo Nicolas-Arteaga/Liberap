@@ -146,19 +146,60 @@ AGENT_MAX_CANDIDATES_PER_CYCLE = int(getattr(config, "AGENT_MAX_CANDIDATES_PER_C
 from logging.handlers import TimedRotatingFileHandler
 import os as _os
 
+
+class _ResilientTimedRotatingFileHandler(TimedRotatingFileHandler):
+    """
+    Bug real 2026-08-03: a medianoche, doRollover() intenta renombrar
+    agent.log -> agent.log.<fecha> -- en Windows eso falla con
+    PermissionError si CUALQUIER otro proceso/programa tiene el archivo
+    abierto (ej. un editor con el log abierto para verlo en vivo, no hace
+    falta que lo este ESCRIBIENDO). El handler base no atrapa ese error:
+    cada linea de log posterior reintenta la rotacion, falla de nuevo, e
+    imprime "--- Logging error ---" + traceback -- cientos de veces
+    seguidas, sin frenar al agente pero inundando la consola/terminal en
+    vivo. Con este fix: si la rotacion falla, se salta por este ciclo
+    (sigue escribiendo en el mismo agent.log) y reintenta a la proxima
+    medianoche -- nunca bloquea ni ensucia la salida.
+    """
+    def doRollover(self):
+        try:
+            super().doRollover()
+        except (PermissionError, OSError) as e:
+            logging.getLogger("VergeAgent").warning(
+                f"[LOG-ROTATE] No se pudo rotar agent.log (archivo en uso por otro proceso) — "
+                f"se sigue escribiendo en el mismo archivo, reintenta a la proxima medianoche: {e}"
+            )
+
+
 _LOG_DIR = _os.path.join(_os.path.dirname(__file__), "logs")
 _os.makedirs(_LOG_DIR, exist_ok=True)
-_file_handler = TimedRotatingFileHandler(
+_file_handler = _ResilientTimedRotatingFileHandler(
     _os.path.join(_LOG_DIR, "agent.log"),
     when="midnight",
     backupCount=1,
     encoding="utf-8",
 )
 
+_stdout_handler_stream = sys.stdout
+if hasattr(sys.stdout, "reconfigure"):
+    # Bug real 2026-08-03: el StreamHandler de consola no tenia encoding
+    # explicito -- en una terminal Windows con encoding cp1252 (no UTF-8),
+    # cualquier emoji en un mensaje de log (el agente los usa todo el
+    # tiempo: 📊🐋💥❌✅) tira UnicodeEncodeError. logging atrapa el error
+    # de CADA linea y sigue (no frena el agente), pero spamea
+    # "--- Logging error ---" + traceback sin parar -- mismo bug ya
+    # arreglado antes en market_ws_server.py, nunca se replico el fix aca.
+    # errors="replace" evita el crash de encoding sin tocar el archivo
+    # (que ya escribe en UTF-8 real via _file_handler).
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(name)s] %(levelname)s: %(message)s',
-    handlers=[logging.StreamHandler(sys.stdout), _file_handler]
+    handlers=[logging.StreamHandler(_stdout_handler_stream), _file_handler]
 )
 logger = logging.getLogger("VergeAgent")
 
@@ -1382,6 +1423,21 @@ class VergeAgent:
         if getattr(config, "FVG_STRATEGY_ENABLED", True):
             fvg_injected = 0
             for fc in self._run_fvg_scan():
+                # ── Shadow log "FVG v2" (2026-08-09, solo lectura/append) ──
+                # NO afecta candidates/trades reales -- registra, para cada
+                # candidato del top-5 REAL de este ciclo (mismo watchlist,
+                # mismos datos, misma competencia que ya paso /fvg/scan), si
+                # hubiera pasado los filtros minados (maxGapPct/tp_dist/
+                # u_shape) que fallaron en vivo la vez pasada por no poder
+                # reconstruir el watchlist historico en un backtest. Esto
+                # mide hacia ADELANTE con el sistema real, sin inventar
+                # historia. Se resuelve despues comparando contra el precio
+                # real (agent/backtest/resolve_fvg_shadow_v2.py).
+                try:
+                    self._log_fvg_shadow_v2(fc)
+                except Exception:
+                    pass
+
                 symbol = fc.get("symbol")
                 if not symbol or self._should_skip(symbol):
                     continue
@@ -1408,6 +1464,41 @@ class VergeAgent:
 
             if fvg_injected:
                 logger.info(f"[FVG-INJECT] {fvg_injected} nuevos (total candidates={len(candidates)})")
+
+        # ── PUMP REAPER: Inyección directa (por perfil, mismo criterio que FVG/ADN) ──
+        # Short del blow-off top en memecoins de alta beta -- minado y validado
+        # 2026-08-02 (mineria cross-symbol + robustez temporal + out-of-sample +
+        # motor real de backtest, ver memoria verge_meme_short_top): RSI(14)>65
+        # + precio arriba de MA7/25/50/99 + subio >1.8% en 2h + volumen real +
+        # confirmacion de giro -> SHORT. Cada perfil StrategyType=Generic con
+        # AllowedSources="meme_short_top" es dueño exclusivo de sus candidatos
+        # (source=f"meme_short_top:{profile_id}"), mismo patron que ma_pattern/
+        # adn_compression/fvg.
+        if getattr(config, "PUMP_REAPER_ENABLED", True):
+            reaper_injected = 0
+            for rc in self._run_pump_reaper_scan():
+                symbol = rc.get("symbol")
+                if not symbol or self._should_skip(symbol):
+                    continue
+                try:
+                    v_ok, v_code, _ = validate_pre_trade(
+                        rc, rc["price_at_signal"], btc_filter=self.btc_filter, btc_corr=self.btc_corr
+                    )
+                    if not v_ok:
+                        logger.info(f"[PUMP-REAPER-INJECT] VETO {symbol} ({rc.get('source')}): {v_code}")
+                        continue
+                except Exception as e:
+                    logger.warning(f"[PUMP-REAPER-INJECT] Error validando {symbol}: {e}")
+                    continue
+
+                candidates.append(rc)
+                reaper_injected += 1
+                logger.warning(
+                    f"[PUMP-REAPER-INJECT] {symbol} | Score={rc['confluence_score']} | {rc['reasons'][0]}"
+                )
+
+            if reaper_injected:
+                logger.info(f"[PUMP-REAPER-INJECT] {reaper_injected} nuevos (total candidates={len(candidates)})")
 
         # ── TOTAL-SWEEP v13.0: The Sinfonía Final ───────────────────────────────────────
         # NEXUS-5 Bottom Sniper > 90% → HUNTING_READY → Volume Radar → Ley de Nico G>R
@@ -1910,6 +2001,19 @@ class VergeAgent:
                     allow_short = profile.get("allowShort", True)
                     cand_side = int(c.get("side", 0))
                     if (cand_side == 0 and not allow_long) or (cand_side == 1 and not allow_short):
+                        continue
+                    p_candidates.append(c)
+                    continue
+
+                # PUMP REAPER: mismo criterio que MA PATTERN/ADN/FVG arriba —
+                # dueño exclusivo de sus propios candidatos
+                # (source=f"meme_short_top:{profile_id}").
+                if raw_src.startswith("meme_short_top:"):
+                    if raw_src != f"meme_short_top:{profile.get('id')}":
+                        continue
+                    allow_short = profile.get("allowShort", True)
+                    cand_side = int(c.get("side", 0))
+                    if cand_side == 1 and not allow_short:
                         continue
                     p_candidates.append(c)
                     continue
@@ -3750,6 +3854,162 @@ class VergeAgent:
             },
         }
 
+    # Canasta validada 2026-08-02 (mineria + backtest + out-of-sample + motor
+    # real, ver memoria verge_meme_short_top) -- memecoins/small-caps de alta
+    # beta, no el watchlist completo (el patron es especifico de este tipo de
+    # instrumento, probado y descartado en majors/blue-chip alts, ver
+    # strategy_exhaustion_reversal_v3.py: -$428 en 20 majors vs +$740 acá).
+    PUMP_REAPER_BASKET = [
+        "1000BONKUSDT", "1000FLOKIUSDT", "1000SHIBUSDT", "WIFUSDT", "PNUTUSDT", "MEWUSDT",
+        "BOMEUSDT", "NEIROUSDT", "CHILLGUYUSDT", "MOODENGUSDT", "ACTUSDT", "TURBOUSDT",
+        "MEMEUSDT", "1000PEPEUSDT", "GMTUSDT", "APEUSDT", "JASMYUSDT", "HOTUSDT", "CFXUSDT",
+        "1000CATUSDT", "CAKEUSDT", "ARKMUSDT", "BLURUSDT",
+    ]
+    _PUMP_REAPER_MA_PERIODS = (7, 25, 50, 99)
+    _PUMP_REAPER_RSI_PERIOD = 14
+    _PUMP_REAPER_RSI_HIGH = 65.0
+    _PUMP_REAPER_PRIOR_WINDOW = 8       # velas de 15m = 2h
+    _PUMP_REAPER_PRIOR_MOVE_PCT = 1.8
+    _PUMP_REAPER_CONFIRM_LOOKBACK = 4
+    _PUMP_REAPER_VOLUME_LOOKBACK = 20
+    _PUMP_REAPER_VOLUME_MULT = 1.3
+    _PUMP_REAPER_ATR_PERIOD = 14
+    _PUMP_REAPER_ATR_SL_MULT = 2.0
+    _PUMP_REAPER_ATR_TP_MULT = 4.0
+
+    @staticmethod
+    def _pump_reaper_sma(closes: list, period: int) -> float:
+        window = closes[-period:]
+        return sum(window) / len(window)
+
+    @staticmethod
+    def _pump_reaper_rsi(closes: list) -> float:
+        period = VergeAgent._PUMP_REAPER_RSI_PERIOD
+        if len(closes) < period + 1:
+            return 50.0
+        window = closes[-(period + 1):]
+        gains, losses = 0.0, 0.0
+        for i in range(1, len(window)):
+            d = window[i] - window[i - 1]
+            gains += max(d, 0.0)
+            losses += max(-d, 0.0)
+        avg_gain, avg_loss = gains / period, losses / period
+        if avg_loss == 0:
+            return 100.0
+        return 100.0 - (100.0 / (1.0 + avg_gain / avg_loss))
+
+    @staticmethod
+    def _pump_reaper_atr(candles: list) -> float:
+        period = VergeAgent._PUMP_REAPER_ATR_PERIOD
+        window = candles[-(period + 1):]
+        if len(window) < 2:
+            return 0.0
+        trs = []
+        for i in range(1, len(window)):
+            h, l = float(window[i]["high"]), float(window[i]["low"])
+            prev_close = float(window[i - 1]["close"])
+            trs.append(max(h - l, abs(h - prev_close), abs(l - prev_close)))
+        return sum(trs) / len(trs) if trs else 0.0
+
+    def _run_pump_reaper_scan(self) -> list:
+        """
+        [PUMP REAPER] Short del blow-off top en memecoins de alta beta.
+        Patron minado 2026-08-02 (ver memoria verge_meme_short_top): RSI(14)>65
+        + precio arriba de MA7/25/50/99 + subio >1.8% en 2h + volumen real +
+        confirmacion de giro (cierre actual < anterior Y RSI ya bajando).
+        SL/TP por ATR (SL=2.0xATR, TP=4.0xATR, R:R 2:1) -- validado via
+        backtest/engine.py (motor real): +$740.36/8 meses, 19/23 simbolos.
+        """
+        reaper_profiles = [p for p in self.active_profiles if p.get("allowedSources") == "meme_short_top"]
+        if not reaper_profiles:
+            return []
+
+        buffer_needed = (max(self._PUMP_REAPER_MA_PERIODS) + self._PUMP_REAPER_RSI_PERIOD
+                          + self._PUMP_REAPER_PRIOR_WINDOW + self._PUMP_REAPER_CONFIRM_LOOKBACK)
+
+        found = []
+        for symbol in self.PUMP_REAPER_BASKET:
+            try:
+                candles = self.fetcher.get_klines_for_nexus(symbol, interval="15m", limit=buffer_needed + 20)
+            except Exception as e:
+                logger.debug(f"[PUMP-REAPER] {symbol}: error trayendo klines ({e})")
+                continue
+            if not candles or len(candles) < buffer_needed:
+                continue
+
+            closes_full = [float(c["close"]) for c in candles]
+            volumes_full = [float(c["volume"]) for c in candles]
+
+            def exhaustion_short_state(closes):
+                if len(closes) < max(self._PUMP_REAPER_MA_PERIODS) + self._PUMP_REAPER_RSI_PERIOD + self._PUMP_REAPER_PRIOR_WINDOW:
+                    return False
+                cp_ = closes[-1]
+                mas_ = {p: self._pump_reaper_sma(closes, p) for p in self._PUMP_REAPER_MA_PERIODS}
+                rsi_ = self._pump_reaper_rsi(closes)
+                prior_ = (cp_ - closes[-1 - self._PUMP_REAPER_PRIOR_WINDOW]) / closes[-1 - self._PUMP_REAPER_PRIOR_WINDOW] * 100
+                return rsi_ > self._PUMP_REAPER_RSI_HIGH and cp_ > max(mas_.values()) and prior_ > self._PUMP_REAPER_PRIOR_MOVE_PCT
+
+            def volume_confirmed(upto):
+                vols = volumes_full[:upto]
+                if len(vols) < self._PUMP_REAPER_VOLUME_LOOKBACK + 1:
+                    return False
+                recent_vol = vols[-1]
+                avg_vol = sum(vols[-self._PUMP_REAPER_VOLUME_LOOKBACK - 1:-1]) / self._PUMP_REAPER_VOLUME_LOOKBACK
+                return avg_vol > 0 and recent_vol >= self._PUMP_REAPER_VOLUME_MULT * avg_vol
+
+            found_state = False
+            for back in range(0, self._PUMP_REAPER_CONFIRM_LOOKBACK + 1):
+                upto = len(closes_full) - back
+                if exhaustion_short_state(closes_full[:upto]) and volume_confirmed(upto):
+                    found_state = True
+                    break
+            if not found_state:
+                continue
+
+            rsi_now = self._pump_reaper_rsi(closes_full)
+            rsi_prev = self._pump_reaper_rsi(closes_full[:-1])
+            cp = closes_full[-1]
+            prev_close = closes_full[-2]
+            if not (cp < prev_close and rsi_now < rsi_prev):
+                continue
+
+            atr = self._pump_reaper_atr(candles)
+            if atr <= 0:
+                continue
+
+            sl = cp + self._PUMP_REAPER_ATR_SL_MULT * atr
+            tp = cp - self._PUMP_REAPER_ATR_TP_MULT * atr
+
+            for profile in reaper_profiles:
+                if not profile.get("allowShort", True):
+                    continue
+                score = float(profile.get("minConfluenceScore", 50.0))
+                found.append({
+                    "symbol": symbol,
+                    "confluence_score": score,
+                    "nexus_confidence": score,
+                    "trade_direction": "SHORT",
+                    "side": 1,
+                    "source": f"meme_short_top:{profile.get('id')}",
+                    "meme_short_top_mode": True,
+                    "price_at_signal": cp,
+                    "custom_sl_price": sl,
+                    "custom_tp_price": tp,
+                    "reasons": [f"[{profile.get('name', 'Pump Reaper')}] Blow-off top RSI={rsi_now:.1f} — agotamiento de pump"],
+                    "agent_audit_context": {
+                        "pump_reaper": {
+                            "rsi": round(rsi_now, 2),
+                            "atr": atr,
+                            "sl_price": sl,
+                            "tp_price": tp,
+                        },
+                        "scar": {},
+                        "nexus15": {},
+                    },
+                })
+
+        return found
+
     def _run_fvg_scan(self) -> list:
         """
         [FVG] Para cada perfil activo StrategyType=FVG, pide el mismo scan
@@ -3809,6 +4069,45 @@ class VergeAgent:
                     found.append(cand)
 
         return found
+
+    _FVG_SHADOW_V2_LOG = _os.path.join(_os.path.dirname(__file__), "logs", "fvg_shadow_v2.jsonl")
+
+    def _log_fvg_shadow_v2(self, fc: dict) -> None:
+        """
+        Append-only, nunca lanza ni modifica `fc` -- ver comentario en el
+        call site (FVG-INJECT). Un solo archivo propio (no agent.log, evita
+        el bug de rotacion compartido) al que solo esta funcion escribe.
+        """
+        symbol = fc.get("symbol")
+        if not symbol:
+            return
+        audit = fc.get("agent_audit_context", {}).get("fvg", {})
+        gap_pct = audit.get("gap_pct")
+        tp_distance_pct = audit.get("tp_distance_pct")
+        snapshot = self._compute_compression_snapshot(symbol, {})
+        u_shape_count = snapshot.get("u_shape_count")
+
+        passes_v2 = (
+            gap_pct is not None and gap_pct <= 2.5
+            and tp_distance_pct is not None and tp_distance_pct <= 25
+            and u_shape_count is not None and u_shape_count < 9
+        )
+
+        row = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "symbol": symbol,
+            "side": fc.get("side"),
+            "price_at_signal": fc.get("price_at_signal"),
+            "custom_sl_price": fc.get("custom_sl_price"),
+            "custom_tp_price": fc.get("custom_tp_price"),
+            "gap_pct": gap_pct,
+            "tp_distance_pct": tp_distance_pct,
+            "u_shape_count": u_shape_count,
+            "passes_v2": passes_v2,
+        }
+        _os.makedirs(_os.path.dirname(self._FVG_SHADOW_V2_LOG), exist_ok=True)
+        with open(self._FVG_SHADOW_V2_LOG, "a", encoding="utf-8") as f:
+            f.write(json.dumps(row) + "\n")
 
     def _build_fvg_candidate(self, item: dict, profile: dict) -> Optional[dict]:
         """
@@ -3914,6 +4213,31 @@ class VergeAgent:
             max_gap = float(fvg_params.get("maxGapPct"))
             gap_pct = item.get("gap_pct")
             if gap_pct is None or float(gap_pct) >= max_gap:
+                return None
+
+        # ── Filtro combinado "Gap Chico v2" (config-only, opt-in) ───────────
+        # Mineria real 2026-08-05 sobre los 268 trades reales de "FVG - 15m"
+        # (el unico perfil FVG que gana de verdad — todos los clones probados
+        # antes, incluido el "Gap Chico" de maxGapPct<=1.0, dieron negativo
+        # porque cortaban justo la mejor franja de gap, 1-2.5%). Validado con
+        # split temporal (primera vs segunda mitad cronologica de los datos,
+        # mismo criterio que la auditoria del 22/7): los 3 filtros de abajo
+        # mejoran PnL en AMBAS mitades por separado, no solo en el agregado
+        # ($149.67 -> $232.89 total, +55.6%, WR 14.9%->17.0%, sobre 268->188
+        # trades). Opt-in vía `maxTpDistancePct`/`maxUShapeCount` en
+        # PatternParamsJson (maxGapPct ya existia, acá se reusa con 2.5 en
+        # vez de 1.0 — el hallazgo real es que el gap>2.5% es el problema,
+        # no el gap>=1%).
+        if fvg_params.get("maxTpDistancePct") is not None:
+            max_tp_dist = float(fvg_params.get("maxTpDistancePct"))
+            if tp_distance_pct > max_tp_dist:
+                return None
+
+        if fvg_params.get("maxUShapeCount") is not None:
+            max_u = float(fvg_params.get("maxUShapeCount"))
+            snapshot_ushape = self._compute_compression_snapshot(symbol, {})
+            u_count = snapshot_ushape.get("u_shape_count")
+            if u_count is not None and u_count >= max_u:
                 return None
 
         return {

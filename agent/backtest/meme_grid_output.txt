@@ -1,0 +1,13 @@
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=271min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=317 | Total=417
+Grid search sobre 19 memecoins -- 5 combinaciones de R:R
+==========================================================================================
+SL1.0/TP2.0 (R:R 2:1, mas ajustado)      | PnL total=$   101.03 | positivos=13/19
+SL1.5/TP3.0 (baseline conocido)          | PnL total=$   227.01 | positivos=14/19
+SL1.5/TP4.5 (R:R 3:1)                    | PnL total=$   341.59 | positivos=14/19
+SL1.0/TP3.0 (R:R 3:1, SL angosto)        | PnL total=$   243.63 | positivos=17/19
+SL2.0/TP4.0 (R:R 2:1, mas ancho)         | PnL total=$   386.45 | positivos=14/19
+==========================================================================================
+MEJOR: SL2.0/TP4.0 (R:R 2:1, mas ancho) -> PnL=$386.45, 14/19 positivos

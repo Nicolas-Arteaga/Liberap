@@ -1,0 +1,41 @@
+  progreso: 50/350 simbolos | 50 procesados | 8128 rupturas alcistas | 7370 bajistas
+  progreso: 100/350 simbolos | 100 procesados | 17305 rupturas alcistas | 15778 bajistas
+  progreso: 150/350 simbolos | 150 procesados | 26537 rupturas alcistas | 24131 bajistas
+  progreso: 200/350 simbolos | 200 procesados | 34923 rupturas alcistas | 31725 bajistas
+  progreso: 250/350 simbolos | 250 procesados | 43619 rupturas alcistas | 39589 bajistas
+  progreso: 300/350 simbolos | 300 procesados | 52727 rupturas alcistas | 47847 bajistas
+  progreso: 350/350 simbolos | 350 procesados | 61799 rupturas alcistas | 55953 bajistas
+
+Total: 350 simbolos procesados | 61799 rupturas alcistas | 55953 bajistas (>= 3.0%)
+
+===================================================================================================================
+RUPTURAS ALCISTAS (subio >=3% en 2h) -- POOL de 350 altcoins diversos
+===================================================================================================================
+Caracteristica               |  lift POOL |  lift promedio x simbolo |  simbolos con lift>1.2 | robusto?
+below_all_mas                |      1.20x |                    1.23x | 160/342 simbolos       | no
+above_all_mas                |      1.01x |                    0.98x | 40/342 simbolos       | no
+compressed                   |      0.21x |                    0.43x | 3/342 simbolos       | no
+prior_falling                |      1.43x |                    1.39x | 261/342 simbolos       | SI
+prior_rising                 |      1.20x |                    1.09x | 70/342 simbolos       | no
+prior_flat                   |      0.53x |                    0.65x | 0/342 simbolos       | no
+rsi_low                      |      1.47x |                    1.60x | 289/342 simbolos       | SI
+rsi_mid                      |      0.91x |                    0.88x | 1/342 simbolos       | no
+rsi_high                     |      1.25x |                    1.44x | 258/342 simbolos       | SI
+ma7_below_ma99               |      0.90x |                    0.93x | 11/342 simbolos       | no
+ma7_above_ma99               |      1.12x |                    1.09x | 69/342 simbolos       | no
+
+===================================================================================================================
+RUPTURAS BAJISTAS (cayo >=3% en 2h) -- POOL de 350 altcoins diversos
+===================================================================================================================
+Caracteristica               |  lift POOL |  lift promedio x simbolo |  simbolos con lift>1.2 | robusto?
+below_all_mas                |      0.83x |                    0.83x | 10/342 simbolos       | no
+above_all_mas                |      1.47x |                    1.43x | 287/342 simbolos       | SI
+compressed                   |      0.21x |                    0.42x | 6/342 simbolos       | no
+prior_falling                |      1.08x |                    1.00x | 36/342 simbolos       | no
+prior_rising                 |      1.57x |                    1.48x | 322/342 simbolos       | SI
+prior_flat                   |      0.54x |                    0.66x | 0/342 simbolos       | no
+rsi_low                      |      0.98x |                    0.98x | 64/342 simbolos       | no
+rsi_mid                      |      0.93x |                    0.92x | 0/342 simbolos       | no
+rsi_high                     |      1.62x |                    1.88x | 324/342 simbolos       | SI
+ma7_below_ma99               |      0.94x |                    0.98x | 25/342 simbolos       | no
+ma7_above_ma99               |      1.07x |                    1.02x | 37/342 simbolos       | no

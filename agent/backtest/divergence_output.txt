@@ -1,0 +1,20 @@
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=148min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=315 | Total=415
+Simbolos: 426 | ventana 2026-07-17 -> 2026-08-01
+Estrategia: Divergencia RSI/Precio | RSI(14) en 15m | pivotes ventana=3 | TP=2.0xATR | SL=pivote+colchon
+  progreso: 50/426 simbolos | 618 señales acumuladas
+  progreso: 100/426 simbolos | 1237 señales acumuladas
+  progreso: 150/426 simbolos | 1846 señales acumuladas
+  progreso: 200/426 simbolos | 2440 señales acumuladas
+  progreso: 250/426 simbolos | 3055 señales acumuladas
+  progreso: 300/426 simbolos | 3668 señales acumuladas
+  progreso: 350/426 simbolos | 4261 señales acumuladas
+  progreso: 400/426 simbolos | 4871 señales acumuladas
+  progreso: 426/426 simbolos | 5203 señales acumuladas
+====================================================================================================
+RSI Divergence | señales=5203 | trades=409 | WR=41.3% | PnL=$-73.19 | PF=0.842
+====================================================================================================
+Referencia (misma ventana 15 dias): Caso 3=+$8.70 (PF 1.132) | FVG-15m=-$9.70 (PF 0.956)
+Est.1 RSI+BB=+$10.08 (PF 1.031) | Est.2 Squeeze=-$45.07 (PF 0.887) | Est.3 SR Bounce=-$62.58 (PF 0.788) | Est.4 Donchian=-$16.94 (PF 0.969)

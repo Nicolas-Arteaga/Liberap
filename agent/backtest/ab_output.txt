@@ -1,0 +1,25 @@
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=161min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=326 | Total=426
+Simbolos disponibles: 426 | ventana 2026-07-17 -> 2026-08-01
+====================================================================================================
+Corriendo: baseline (sin filtros)...
+  -> trades=33 (de 517 señales) | WR=15.2% | PnL=$8.7 | PF=1.132
+Corriendo: + OFI direccional...
+  -> trades=32 (de 471 señales) | WR=12.5% | PnL=$-6.6 | PF=0.9
+Corriendo: + funding extremo...
+  -> trades=33 (de 515 señales) | WR=15.2% | PnL=$8.7 | PF=1.132
+Corriendo: + cascada liquidaciones...
+  -> trades=33 (de 517 señales) | WR=15.2% | PnL=$8.7 | PF=1.132
+====================================================================================================
+Escenario                      |  señales |  trades |    WR% |        PnL |     PF
+baseline (sin filtros)         |      517 |      33 |   15.2 |       8.70 |  1.132
++ OFI direccional              |      471 |      32 |   12.5 |      -6.60 |  0.900
++ funding extremo              |      515 |      33 |   15.2 |       8.70 |  1.132
++ cascada liquidaciones        |      517 |      33 |   15.2 |       8.70 |  1.132
+====================================================================================================
+Baseline: PnL=$8.7 PF=1.132
+  + OFI direccional: delta PnL=$-15.30 | delta PF=-0.232 -> empeora
+  + funding extremo: delta PnL=$+0.00 | delta PF=+0.000 -> neutro
+  + cascada liquidaciones: delta PnL=$+0.00 | delta PF=+0.000 -> neutro

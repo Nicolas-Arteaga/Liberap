@@ -1,0 +1,30 @@
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=229min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=325 | Total=425
+Ventana: 2025-12-01 -> 2026-07-31 (8 meses completos)
+Reversion por Agotamiento v3 (calibrada para alts) | RSI(14) 35.0/65.0 + confirmacion de giro | movimiento previo >=1.0% | TP=3.0xATR SL=1.5xATR (R:R 2.0:1)
+Canasta: 20 simbolos (patron validado con lift real cross-alt en alt_breakout_mining.py)
+====================================================================================================
+BTCUSDT         | señales=  183 | trades= 183 | WR= 27.3% | PnL=$   -14.18 | PF=0.879
+SUIUSDT         | señales=  234 | trades= 234 | WR= 33.3% | PnL=$    -3.87 | PF=0.982
+DOGEUSDT        | señales=  223 | trades= 223 | WR= 29.1% | PnL=$   -32.67 | PF=0.825
+ADAUSDT         | señales=  231 | trades= 231 | WR= 32.9% | PnL=$    -9.21 | PF=0.954
+XRPUSDT         | señales=  216 | trades= 216 | WR= 28.7% | PnL=$   -39.69 | PF=0.76
+LINKUSDT        | señales=  226 | trades= 226 | WR= 27.9% | PnL=$   -40.37 | PF=0.785
+AVAXUSDT        | señales=  230 | trades= 230 | WR= 36.1% | PnL=$    25.79 | PF=1.152
+LTCUSDT         | señales=  217 | trades= 217 | WR= 33.6% | PnL=$     3.61 | PF=1.024
+DOTUSDT         | señales=  238 | trades= 238 | WR= 28.6% | PnL=$   -24.98 | PF=0.884
+ATOMUSDT        | señales=  233 | trades= 233 | WR= 27.9% | PnL=$   -38.78 | PF=0.807
+NEARUSDT        | señales=  239 | trades= 239 | WR= 31.4% | PnL=$    -8.03 | PF=0.969
+FILUSDT         | señales=  238 | trades= 238 | WR= 29.4% | PnL=$   -35.86 | PF=0.859
+UNIUSDT         | señales=  234 | trades= 234 | WR= 29.1% | PnL=$   -28.96 | PF=0.874
+SANDUSDT        | señales=  238 | trades= 238 | WR= 31.9% | PnL=$   -26.03 | PF=0.881
+GALAUSDT        | señales=  240 | trades= 240 | WR= 27.1% | PnL=$   -54.10 | PF=0.803
+ALGOUSDT        | señales=  239 | trades= 239 | WR= 34.3% | PnL=$    -0.41 | PF=0.998
+XLMUSDT         | señales=  232 | trades= 232 | WR= 24.6% | PnL=$   -89.76 | PF=0.619
+VETUSDT         | señales=  236 | trades= 236 | WR= 31.8% | PnL=$   -15.59 | PF=0.918
+ETCUSDT         | señales=  228 | trades= 228 | WR= 32.5% | PnL=$    -0.86 | PF=0.995
+RUNEUSDT        | señales=  228 | trades= 228 | WR= 33.3% | PnL=$     5.39 | PF=1.03
+====================================================================================================
+PnL TOTAL sumado de los 20 simbolos: $-428.56

@@ -1,0 +1,19 @@
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=86min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=321 | Total=421
+Simbolos: 426 | ventana 2026-07-17 -> 2026-08-01
+Estrategia: RSI(14) extremo (<=30.0/>=70.0) + Bollinger(20,2.0) en 15m | SL=1.5% mas alla de banda | TP=banda media
+  progreso: 50/426 simbolos | 736 señales acumuladas
+  progreso: 100/426 simbolos | 1477 señales acumuladas
+  progreso: 150/426 simbolos | 2215 señales acumuladas
+  progreso: 200/426 simbolos | 2937 señales acumuladas
+  progreso: 250/426 simbolos | 3660 señales acumuladas
+  progreso: 300/426 simbolos | 4401 señales acumuladas
+  progreso: 350/426 simbolos | 5140 señales acumuladas
+  progreso: 400/426 simbolos | 5884 señales acumuladas
+  progreso: 426/426 simbolos | 6264 señales acumuladas
+====================================================================================================
+RSI+Bollinger Mean Reversion | señales=6264 | trades=327 | WR=53.2% | PnL=$10.08 | PF=1.031
+====================================================================================================
+Referencia: MA Slope Caso 3 historico real = +$76.74 (WR 64.3%) | FVG-15m historico real = +$83.35 (WR 13.9%)

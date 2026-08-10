@@ -1,0 +1,116 @@
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=14min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=322 | Total=422
+FVG - 15m | 426 simbolos | ventana 2025-12-01 -> 2026-07-31 (8 meses)
+  progreso: 0/426
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=15min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=321 | Total=421
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=15min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=323 | Total=423
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=15min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=323 | Total=423
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=15min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=321 | Total=421
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=15min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=322 | Total=422
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=15min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=323 | Total=423
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=15min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=323 | Total=423
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=15min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=321 | Total=421
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=15min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=323 | Total=423
+  progreso: 50/426
+Traceback (most recent call last):
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\queues.py", line 246, in _feed
+    send_bytes(obj)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\connection.py", line 184, in send_bytes
+    self._check_closed()
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\connection.py", line 137, in _check_closed
+    raise OSError("handle is closed")
+OSError: handle is closed
+Traceback (most recent call last):
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\queues.py", line 246, in _feed
+    send_bytes(obj)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\connection.py", line 184, in send_bytes
+    self._check_closed()
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\connection.py", line 137, in _check_closed
+    raise OSError("handle is closed")
+OSError: handle is closed
+Traceback (most recent call last):
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\queues.py", line 246, in _feed
+    send_bytes(obj)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\connection.py", line 184, in send_bytes
+    self._check_closed()
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\connection.py", line 137, in _check_closed
+    raise OSError("handle is closed")
+OSError: handle is closed
+Traceback (most recent call last):
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\queues.py", line 246, in _feed
+    send_bytes(obj)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\connection.py", line 184, in send_bytes
+    self._check_closed()
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\connection.py", line 137, in _check_closed
+    raise OSError("handle is closed")
+OSError: handle is closed
+Traceback (most recent call last):
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\queues.py", line 246, in _feed
+    send_bytes(obj)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\connection.py", line 184, in send_bytes
+    self._check_closed()
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\connection.py", line 137, in _check_closed
+    raise OSError("handle is closed")
+OSError: handle is closed
+Traceback (most recent call last):
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\queues.py", line 246, in _feed
+    send_bytes(obj)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\connection.py", line 184, in send_bytes
+    self._check_closed()
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\connection.py", line 137, in _check_closed
+    raise OSError("handle is closed")
+OSError: handle is closed
+Traceback (most recent call last):
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\queues.py", line 246, in _feed
+    send_bytes(obj)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\connection.py", line 184, in send_bytes
+    self._check_closed()
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\connection.py", line 137, in _check_closed
+    raise OSError("handle is closed")
+OSError: handle is closed
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\run_fvg15m_full_8months.py", line 63, in <module>
+    main()
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\run_fvg15m_full_8months.py", line 51, in main
+    result = engine.run_parallel("FVG", PROFILE, symbols, START_MS, END_MS, progress_cb=progress)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\engine.py", line 796, in run_parallel
+    all_raw_trades.extend(fut.result())
+                          ^^^^^^^^^^^^
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+concurrent.futures.process.BrokenProcessPool: A process in the process pool was terminated abruptly while the future was running or pending.

@@ -1,0 +1,284 @@
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=38min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=327 | Total=427
+FVG - 15m | 426 simbolos | ventana 2025-12-01 -> 2026-07-31 (8 meses)
+  progreso: 0/426
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=38min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=327 | Total=427
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=38min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=327 | Total=427
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=38min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=327 | Total=427
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=38min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=327 | Total=427
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=38min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=327 | Total=427
+  progreso: 50/426
+2026-08-03 00:05:43,493 [RiskManager] ERROR: [RISK_ERROR] tp_price absurdo para LONG BULLAUSDT | tp=0.2296675 entry=0.02495 (>300%) â€” trade bloqueado
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\logging\handlers.py", line 74, in emit
+    self.doRollover()
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\logging\handlers.py", line 443, in doRollover
+    self.rotate(self.baseFilename, dfn)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\logging\handlers.py", line 115, in rotate
+    os.rename(source, dest)
+PermissionError: [WinError 32] El proceso no tiene acceso al archivo porque está siendo utilizado por otro proceso: 'C:\\Users\\Nicolas\\Desktop\\Verge\\Verge\\agent\\logs\\agent.log' -> 'C:\\Users\\Nicolas\\Desktop\\Verge\\Verge\\agent\\logs\\agent.log.2026-08-02'
+Call stack:
+  File "<string>", line 1, in <module>
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\spawn.py", line 122, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\spawn.py", line 135, in _main
+    return self._bootstrap(parent_sentinel)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\process.py", line 314, in _bootstrap
+    self.run()
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\process.py", line 261, in _process_worker
+    r = call_item.fn(*call_item.args, **call_item.kwargs)
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\engine.py", line 825, in _parallel_worker
+    result = runner(profile, symbols, start_ms, end_ms, balance=balance, progress_cb=_report_progress)
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\engine.py", line 407, in run_fvg
+    return self._run_generic(profile, symbols, start_ms, end_ms, interval,
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\engine.py", line 634, in _run_generic
+    risk = self.risk_manager._calculate_position_nexus_style(
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\..\risk_manager.py", line 626, in _calculate_position_nexus_style
+    logger.error(
+Message: '[RISK_ERROR] tp_price absurdo para LONG %s | tp=%s entry=%s (>300%%) — trade bloqueado'
+Arguments: ('BULLAUSDT', 0.2296675, 0.02495)
+2026-08-03 00:05:47,474 [RiskManager] ERROR: [RISK_ERROR] tp_price absurdo para LONG BULLAUSDT | tp=0.23052 entry=0.02646 (>300%) â€” trade bloqueado
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\logging\handlers.py", line 74, in emit
+    self.doRollover()
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\logging\handlers.py", line 443, in doRollover
+    self.rotate(self.baseFilename, dfn)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\logging\handlers.py", line 115, in rotate
+    os.rename(source, dest)
+PermissionError: [WinError 32] El proceso no tiene acceso al archivo porque está siendo utilizado por otro proceso: 'C:\\Users\\Nicolas\\Desktop\\Verge\\Verge\\agent\\logs\\agent.log' -> 'C:\\Users\\Nicolas\\Desktop\\Verge\\Verge\\agent\\logs\\agent.log.2026-08-02'
+Call stack:
+  File "<string>", line 1, in <module>
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\spawn.py", line 122, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\spawn.py", line 135, in _main
+    return self._bootstrap(parent_sentinel)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\process.py", line 314, in _bootstrap
+    self.run()
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\process.py", line 261, in _process_worker
+    r = call_item.fn(*call_item.args, **call_item.kwargs)
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\engine.py", line 825, in _parallel_worker
+    result = runner(profile, symbols, start_ms, end_ms, balance=balance, progress_cb=_report_progress)
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\engine.py", line 407, in run_fvg
+    return self._run_generic(profile, symbols, start_ms, end_ms, interval,
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\engine.py", line 634, in _run_generic
+    risk = self.risk_manager._calculate_position_nexus_style(
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\..\risk_manager.py", line 626, in _calculate_position_nexus_style
+    logger.error(
+Message: '[RISK_ERROR] tp_price absurdo para LONG %s | tp=%s entry=%s (>300%%) — trade bloqueado'
+Arguments: ('BULLAUSDT', 0.23052, 0.02646)
+  progreso: 100/426
+2026-08-03 00:26:39,863 [RiskManager] ERROR: [RISK_ERROR] tp_price absurdo para LONG DEXEUSDT | tp=21.4865 entry=4.325 (>300%) â€” trade bloqueado
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\logging\handlers.py", line 74, in emit
+    self.doRollover()
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\logging\handlers.py", line 443, in doRollover
+    self.rotate(self.baseFilename, dfn)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\logging\handlers.py", line 115, in rotate
+    os.rename(source, dest)
+PermissionError: [WinError 32] El proceso no tiene acceso al archivo porque está siendo utilizado por otro proceso: 'C:\\Users\\Nicolas\\Desktop\\Verge\\Verge\\agent\\logs\\agent.log' -> 'C:\\Users\\Nicolas\\Desktop\\Verge\\Verge\\agent\\logs\\agent.log.2026-08-02'
+Call stack:
+  File "<string>", line 1, in <module>
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\spawn.py", line 122, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\spawn.py", line 135, in _main
+    return self._bootstrap(parent_sentinel)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\process.py", line 314, in _bootstrap
+    self.run()
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\process.py", line 261, in _process_worker
+    r = call_item.fn(*call_item.args, **call_item.kwargs)
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\engine.py", line 825, in _parallel_worker
+    result = runner(profile, symbols, start_ms, end_ms, balance=balance, progress_cb=_report_progress)
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\engine.py", line 407, in run_fvg
+    return self._run_generic(profile, symbols, start_ms, end_ms, interval,
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\engine.py", line 634, in _run_generic
+    risk = self.risk_manager._calculate_position_nexus_style(
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\..\risk_manager.py", line 626, in _calculate_position_nexus_style
+    logger.error(
+Message: '[RISK_ERROR] tp_price absurdo para LONG %s | tp=%s entry=%s (>300%%) — trade bloqueado'
+Arguments: ('DEXEUSDT', 21.4865, 4.325)
+2026-08-03 00:26:41,208 [RiskManager] ERROR: [RISK_ERROR] tp_price absurdo para LONG DEXEUSDT | tp=21.51345 entry=4.378 (>300%) â€” trade bloqueado
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\logging\handlers.py", line 74, in emit
+    self.doRollover()
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\logging\handlers.py", line 443, in doRollover
+    self.rotate(self.baseFilename, dfn)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\logging\handlers.py", line 115, in rotate
+    os.rename(source, dest)
+PermissionError: [WinError 32] El proceso no tiene acceso al archivo porque está siendo utilizado por otro proceso: 'C:\\Users\\Nicolas\\Desktop\\Verge\\Verge\\agent\\logs\\agent.log' -> 'C:\\Users\\Nicolas\\Desktop\\Verge\\Verge\\agent\\logs\\agent.log.2026-08-02'
+Call stack:
+  File "<string>", line 1, in <module>
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\spawn.py", line 122, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\spawn.py", line 135, in _main
+    return self._bootstrap(parent_sentinel)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\process.py", line 314, in _bootstrap
+    self.run()
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\process.py", line 261, in _process_worker
+    r = call_item.fn(*call_item.args, **call_item.kwargs)
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\engine.py", line 825, in _parallel_worker
+    result = runner(profile, symbols, start_ms, end_ms, balance=balance, progress_cb=_report_progress)
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\engine.py", line 407, in run_fvg
+    return self._run_generic(profile, symbols, start_ms, end_ms, interval,
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\engine.py", line 634, in _run_generic
+    risk = self.risk_manager._calculate_position_nexus_style(
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\..\risk_manager.py", line 626, in _calculate_position_nexus_style
+    logger.error(
+Message: '[RISK_ERROR] tp_price absurdo para LONG %s | tp=%s entry=%s (>300%%) — trade bloqueado'
+Arguments: ('DEXEUSDT', 21.51345, 4.378)
+2026-08-03 00:30:42,076 [RiskManager] ERROR: [RISK_ERROR] tp_price absurdo para LONG ESPORTSUSDT | tp=0.36395999999999995 entry=0.0416 (>300%) â€” trade bloqueado
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\logging\handlers.py", line 74, in emit
+    self.doRollover()
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\logging\handlers.py", line 443, in doRollover
+    self.rotate(self.baseFilename, dfn)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\logging\handlers.py", line 115, in rotate
+    os.rename(source, dest)
+PermissionError: [WinError 32] El proceso no tiene acceso al archivo porque está siendo utilizado por otro proceso: 'C:\\Users\\Nicolas\\Desktop\\Verge\\Verge\\agent\\logs\\agent.log' -> 'C:\\Users\\Nicolas\\Desktop\\Verge\\Verge\\agent\\logs\\agent.log.2026-08-02'
+Call stack:
+  File "<string>", line 1, in <module>
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\spawn.py", line 122, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\spawn.py", line 135, in _main
+    return self._bootstrap(parent_sentinel)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\process.py", line 314, in _bootstrap
+    self.run()
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\process.py", line 261, in _process_worker
+    r = call_item.fn(*call_item.args, **call_item.kwargs)
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\engine.py", line 825, in _parallel_worker
+    result = runner(profile, symbols, start_ms, end_ms, balance=balance, progress_cb=_report_progress)
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\engine.py", line 407, in run_fvg
+    return self._run_generic(profile, symbols, start_ms, end_ms, interval,
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\engine.py", line 634, in _run_generic
+    risk = self.risk_manager._calculate_position_nexus_style(
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\..\risk_manager.py", line 626, in _calculate_position_nexus_style
+    logger.error(
+Message: '[RISK_ERROR] tp_price absurdo para LONG %s | tp=%s entry=%s (>300%%) — trade bloqueado'
+Arguments: ('ESPORTSUSDT', 0.36395999999999995, 0.0416)
+2026-08-03 00:31:32,097 [RiskManager] ERROR: [RISK_ERROR] tp_price absurdo para LONG ESPORTSUSDT | tp=0.114292 entry=0.0316 (>300%) â€” trade bloqueado
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\logging\handlers.py", line 74, in emit
+    self.doRollover()
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\logging\handlers.py", line 443, in doRollover
+    self.rotate(self.baseFilename, dfn)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\logging\handlers.py", line 115, in rotate
+    os.rename(source, dest)
+PermissionError: [WinError 32] El proceso no tiene acceso al archivo porque está siendo utilizado por otro proceso: 'C:\\Users\\Nicolas\\Desktop\\Verge\\Verge\\agent\\logs\\agent.log' -> 'C:\\Users\\Nicolas\\Desktop\\Verge\\Verge\\agent\\logs\\agent.log.2026-08-02'
+Call stack:
+  File "<string>", line 1, in <module>
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\spawn.py", line 122, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\spawn.py", line 135, in _main
+    return self._bootstrap(parent_sentinel)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\process.py", line 314, in _bootstrap
+    self.run()
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\process.py", line 261, in _process_worker
+    r = call_item.fn(*call_item.args, **call_item.kwargs)
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\engine.py", line 825, in _parallel_worker
+    result = runner(profile, symbols, start_ms, end_ms, balance=balance, progress_cb=_report_progress)
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\engine.py", line 407, in run_fvg
+    return self._run_generic(profile, symbols, start_ms, end_ms, interval,
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\engine.py", line 634, in _run_generic
+    risk = self.risk_manager._calculate_position_nexus_style(
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\..\risk_manager.py", line 626, in _calculate_position_nexus_style
+    logger.error(
+Message: '[RISK_ERROR] tp_price absurdo para LONG %s | tp=%s entry=%s (>300%%) — trade bloqueado'
+Arguments: ('ESPORTSUSDT', 0.114292, 0.0316)
+2026-08-03 00:31:32,260 [RiskManager] ERROR: [RISK_ERROR] tp_price absurdo para LONG ESPORTSUSDT | tp=0.11461649999999998 entry=0.03216 (>300%) â€” trade bloqueado
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\logging\handlers.py", line 74, in emit
+    self.doRollover()
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\logging\handlers.py", line 443, in doRollover
+    self.rotate(self.baseFilename, dfn)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\logging\handlers.py", line 115, in rotate
+    os.rename(source, dest)
+PermissionError: [WinError 32] El proceso no tiene acceso al archivo porque está siendo utilizado por otro proceso: 'C:\\Users\\Nicolas\\Desktop\\Verge\\Verge\\agent\\logs\\agent.log' -> 'C:\\Users\\Nicolas\\Desktop\\Verge\\Verge\\agent\\logs\\agent.log.2026-08-02'
+Call stack:
+  File "<string>", line 1, in <module>
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\spawn.py", line 122, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\spawn.py", line 135, in _main
+    return self._bootstrap(parent_sentinel)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\process.py", line 314, in _bootstrap
+    self.run()
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\process.py", line 261, in _process_worker
+    r = call_item.fn(*call_item.args, **call_item.kwargs)
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\engine.py", line 825, in _parallel_worker
+    result = runner(profile, symbols, start_ms, end_ms, balance=balance, progress_cb=_report_progress)
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\engine.py", line 407, in run_fvg
+    return self._run_generic(profile, symbols, start_ms, end_ms, interval,
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\engine.py", line 634, in _run_generic
+    risk = self.risk_manager._calculate_position_nexus_style(
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\..\risk_manager.py", line 626, in _calculate_position_nexus_style
+    logger.error(
+Message: '[RISK_ERROR] tp_price absurdo para LONG %s | tp=%s entry=%s (>300%%) — trade bloqueado'
+Arguments: ('ESPORTSUSDT', 0.11461649999999998, 0.03216)
+2026-08-03 00:31:32,304 [RiskManager] ERROR: [RISK_ERROR] tp_price absurdo para LONG ESPORTSUSDT | tp=0.114292 entry=0.03164 (>300%) â€” trade bloqueado
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\logging\handlers.py", line 74, in emit
+    self.doRollover()
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\logging\handlers.py", line 443, in doRollover
+    self.rotate(self.baseFilename, dfn)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\logging\handlers.py", line 115, in rotate
+    os.rename(source, dest)
+PermissionError: [WinError 32] El proceso no tiene acceso al archivo porque está siendo utilizado por otro proceso: 'C:\\Users\\Nicolas\\Desktop\\Verge\\Verge\\agent\\logs\\agent.log' -> 'C:\\Users\\Nicolas\\Desktop\\Verge\\Verge\\agent\\logs\\agent.log.2026-08-02'
+Call stack:
+  File "<string>", line 1, in <module>
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\spawn.py", line 122, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\spawn.py", line 135, in _main
+    return self._bootstrap(parent_sentinel)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\process.py", line 314, in _bootstrap
+    self.run()
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\Nicolas\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\process.py", line 261, in _process_worker
+    r = call_item.fn(*call_item.args, **call_item.kwargs)
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\engine.py", line 825, in _parallel_worker
+    result = runner(profile, symbols, start_ms, end_ms, balance=balance, progress_cb=_report_progress)
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\engine.py", line 407, in run_fvg
+    return self._run_generic(profile, symbols, start_ms, end_ms, interval,
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\engine.py", line 634, in _run_generic
+    risk = self.risk_manager._calculate_position_nexus_style(
+  File "C:\Users\Nicolas\Desktop\Verge\Verge\agent\backtest\..\backtest\..\risk_manager.py", line 626, in _calculate_position_nexus_style
+    logger.error(
+Message: '[RISK_ERROR] tp_price absurdo para LONG %s | tp=%s entry=%s (>300%%) — trade bloqueado'
+Arguments: ('ESPORTSUSDT', 0.114292, 0.03164)

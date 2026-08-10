@@ -1,0 +1,86 @@
+Simbolos a comparar contra BTCUSDT: 428
+BTCUSDT: 23328 velas cargadas
+  progreso: 100/428
+  progreso: 200/428
+  progreso: 300/428
+  progreso: 400/428
+==========================================================================================
+Simbolo         | Correlacion |  Lag (velas 15m) | Velas superpuestas
+ETHUSDT         |      0.8928 |                0 |              23327
+LINKUSDT        |      0.8597 |                0 |              23327
+SOLUSDT         |      0.8524 |                0 |              23327
+BNBUSDT         |      0.8279 |                0 |              23327
+XRPUSDT         |      0.8092 |                0 |              23327
+DOGEUSDT        |      0.8000 |                0 |              23327
+AVAXUSDT        |      0.7960 |                0 |              23327
+SUIUSDT         |      0.7803 |                0 |              23327
+LTCUSDT         |      0.7787 |                0 |              23327
+ADAUSDT         |      0.7783 |                0 |              23327
+1000PEPEUSDT    |      0.7672 |                0 |              11807
+ETCUSDT         |      0.7601 |                0 |              23327
+VETUSDT         |      0.7560 |                0 |              23327
+MSTRUSDT        |      0.7399 |                0 |               8831
+ARBUSDT         |      0.7351 |                0 |              23327
+==========================================================================================
+Pares con correlacion >= 0.6 (sombra fuerte de BTC): 61
+  ETHUSDT (corr=0.893, lag=0)
+  LINKUSDT (corr=0.860, lag=0)
+  SOLUSDT (corr=0.852, lag=0)
+  BNBUSDT (corr=0.828, lag=0)
+  XRPUSDT (corr=0.809, lag=0)
+  DOGEUSDT (corr=0.800, lag=0)
+  AVAXUSDT (corr=0.796, lag=0)
+  SUIUSDT (corr=0.780, lag=0)
+  LTCUSDT (corr=0.779, lag=0)
+  ADAUSDT (corr=0.778, lag=0)
+  1000PEPEUSDT (corr=0.767, lag=0)
+  ETCUSDT (corr=0.760, lag=0)
+  VETUSDT (corr=0.756, lag=0)
+  MSTRUSDT (corr=0.740, lag=0)
+  ARBUSDT (corr=0.735, lag=0)
+  DOTUSDT (corr=0.733, lag=0)
+  RUNEUSDT (corr=0.726, lag=0)
+  VIRTUALUSDT (corr=0.726, lag=0)
+  AAVEUSDT (corr=0.713, lag=0)
+  PENGUUSDT (corr=0.704, lag=0)
+  APTUSDT (corr=0.704, lag=0)
+  OPUSDT (corr=0.699, lag=0)
+  SEIUSDT (corr=0.696, lag=0)
+  CVXUSDT (corr=0.696, lag=0)
+  SANDUSDT (corr=0.691, lag=0)
+  GALAUSDT (corr=0.690, lag=0)
+  1000FLOKIUSDT (corr=0.689, lag=0)
+  UNIUSDT (corr=0.685, lag=0)
+  1000SHIBUSDT (corr=0.680, lag=0)
+  NEIROUSDT (corr=0.669, lag=0)
+  POLUSDT (corr=0.668, lag=0)
+  STXUSDT (corr=0.668, lag=0)
+  FILUSDT (corr=0.666, lag=0)
+  1000BONKUSDT (corr=0.662, lag=0)
+  TIAUSDT (corr=0.660, lag=0)
+  FETUSDT (corr=0.659, lag=0)
+  BOMEUSDT (corr=0.658, lag=0)
+  TAOUSDT (corr=0.654, lag=0)
+  JUPUSDT (corr=0.650, lag=0)
+  MANAUSDT (corr=0.649, lag=0)
+  PNUTUSDT (corr=0.636, lag=0)
+  GMXUSDT (corr=0.633, lag=0)
+  MEWUSDT (corr=0.632, lag=0)
+  XLMUSDT (corr=0.628, lag=0)
+  AEROUSDT (corr=0.627, lag=0)
+  SPXUSDT (corr=0.625, lag=0)
+  ALGOUSDT (corr=0.623, lag=0)
+  NEARUSDT (corr=0.621, lag=0)
+  BMNRUSDT (corr=0.621, lag=0)
+  AVAUSDT (corr=0.619, lag=0)
+  RENDERUSDT (corr=0.616, lag=0)
+  PIXELUSDT (corr=0.615, lag=0)
+  ATOMUSDT (corr=0.615, lag=0)
+  NEOUSDT (corr=0.614, lag=0)
+  JOEUSDT (corr=0.612, lag=0)
+  PUMPUSDT (corr=0.612, lag=0)
+  INJUSDT (corr=0.609, lag=0)
+  COINUSDT (corr=0.603, lag=0)
+  HBARUSDT (corr=0.602, lag=0)
+  AZTECUSDT (corr=0.601, lag=0)
+  WIFUSDT (corr=0.600, lag=0)

@@ -1,0 +1,33 @@
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=326min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=317 | Total=417
+Validando via motor real (_run_generic + risk_manager.py) | POOLED: 3 cupos TOTALES compartidos entre 23 simbolos
+ventana 2025-12-01 -> 2026-07-31
+====================================================================================================
+señales totales=2905 | trades aceptados=1507 | rechazados sin cupo=1398 | WR=33.2% | PnL TOTAL=$153.01
+Periodo: 242 dias | trades/dia promedio: 6.23
+====================================================================================================
+1000BONKUSDT    | trades= 92 | PnL=$   68.24
+1000FLOKIUSDT   | trades= 74 | PnL=$   44.34
+1000SHIBUSDT    | trades= 39 | PnL=$  -18.04
+WIFUSDT         | trades= 48 | PnL=$   -7.79
+PNUTUSDT        | trades= 48 | PnL=$  -25.17
+MEWUSDT         | trades= 51 | PnL=$  -24.99
+BOMEUSDT        | trades= 80 | PnL=$    9.09
+NEIROUSDT       | trades= 52 | PnL=$  -43.56
+CHILLGUYUSDT    | trades=101 | PnL=$   35.63
+MOODENGUSDT     | trades= 63 | PnL=$  -15.67
+ACTUSDT         | trades= 96 | PnL=$  -36.14
+TURBOUSDT       | trades= 55 | PnL=$  -23.12
+MEMEUSDT        | trades= 54 | PnL=$   21.92
+1000PEPEUSDT    | trades= 62 | PnL=$   59.92
+GMTUSDT         | trades= 71 | PnL=$   47.48
+APEUSDT         | trades= 76 | PnL=$   33.89
+JASMYUSDT       | trades= 71 | PnL=$   42.40
+HOTUSDT         | trades= 64 | PnL=$    1.15
+CFXUSDT         | trades= 50 | PnL=$  -36.58
+1000CATUSDT     | trades= 83 | PnL=$   11.75
+CAKEUSDT        | trades= 27 | PnL=$   -5.76
+ARKMUSDT        | trades= 72 | PnL=$   32.01
+BLURUSDT        | trades= 78 | PnL=$  -17.97

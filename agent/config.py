@@ -327,6 +327,12 @@ ADN_COMPRESSION_HTTP_TIMEOUT_SEC = int(os.getenv("ADN_COMPRESSION_HTTP_TIMEOUT_S
 # cálculo de ATR/perfil genérico.
 FVG_STRATEGY_ENABLED = os.getenv("FVG_STRATEGY_ENABLED", "true").lower() in ("1", "true", "yes")
 FVG_STRATEGY_HTTP_TIMEOUT_SEC = int(os.getenv("FVG_STRATEGY_HTTP_TIMEOUT_SEC", "90"))
+# Pump Reaper (2026-08-02, ver memoria verge_meme_short_top): short del
+# blow-off top en memecoins de alta beta. El switch real de "opera o no" es
+# el IsActive del StrategyProfile (creado en false) -- este flag es la
+# válvula de emergencia a nivel código, no hace falta tocarlo para
+# activar/desactivar el uso normal.
+PUMP_REAPER_ENABLED = os.getenv("PUMP_REAPER_ENABLED", "true").lower() in ("1", "true", "yes")
 # 2026-07-13: SL estructural (borde del gap + buffer) puede quedar
 # desproporcionado cuando la zona ya está agotada/vieja (ej. LRCUSDT, SL a
 # ~78% de distancia) — un scalp de gap de 3 velas nunca debería tener un SL

@@ -1,0 +1,19 @@
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=313min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=320 | Total=420
+Simbolos: 426 | ventana 2026-07-17 -> 2026-08-01
+Corriendo: FVG-15m baseline (sin filtro geometrico)...
+  -> trades=323 (de 6327) | WR=22.9% | PnL=$-9.7 | PF=0.956 | avg_win=$2.86 avg_loss=$-0.89
+Corriendo: FVG-15m + confirmacion geometrica Caso 3 (SHORT-only)...
+2026-08-01 22:25:48,874 [RiskManager] ERROR: [RISK_ERROR] tp_price absurdo para LONG DEXEUSDT | tp=21.4865 entry=4.325 (>300%) — trade bloqueado
+2026-08-01 22:25:49,937 [RiskManager] ERROR: [RISK_ERROR] tp_price absurdo para LONG DEXEUSDT | tp=21.51345 entry=4.378 (>300%) — trade bloqueado
+2026-08-01 22:45:12,080 [RiskManager] ERROR: [RISK_ERROR] tp_price absurdo para LONG KORUUSDT | tp=226.064 entry=17.41 (>300%) — trade bloqueado
+2026-08-01 22:45:12,281 [RiskManager] ERROR: [RISK_ERROR] tp_price absurdo para LONG KORUUSDT | tp=225.943 entry=17.16 (>300%) — trade bloqueado
+  -> trades=475 (de 6218) | WR=14.9% | PnL=$-165.42 | PF=0.577 | avg_win=$3.17 avg_loss=$-0.97
+====================================================================================================
+Escenario                                |  señales |  trades |    WR% |        PnL |     PF
+FVG-15m baseline                         |     6327 |     323 |   22.9 |      -9.70 |  0.956
+FVG-15m + geometria Caso 3               |     6218 |     475 |   14.9 |    -165.42 |  0.577
+====================================================================================================
+delta PnL=$-155.72 | PF 0.956 -> 0.577 -> no mejora

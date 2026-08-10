@@ -245,10 +245,14 @@ class RiskManager:
         arrow_peak_mode = signal_data.get("arrow_peak_mode", False) or signal_data.get("arrow_peak_v2_mode", False)
         ma_slope_mode = signal_data.get("ma_slope_mode", False)
         fvg_mode = signal_data.get("fvg_mode", False)
+        # Short del Blow-off Top (memecoins, 2026-08-02, ver memoria
+        # verge_meme_short_top): SL/TP por ATR calculados en el detector,
+        # esta rama solo los respeta -- mismo patron que fvg_mode/arrow_peak_mode.
+        meme_short_top_mode = signal_data.get("meme_short_top_mode", False)
         custom_sl_price = signal_data.get("custom_sl_price")
         side_for_custom_sl = int(signal_data.get("side", 0))
 
-        if (structural_sniper_mode or golden_uturn_mode or arrow_peak_mode or ma_slope_mode or fvg_mode) and custom_sl_price:
+        if (structural_sniper_mode or golden_uturn_mode or arrow_peak_mode or ma_slope_mode or fvg_mode or meme_short_top_mode) and custom_sl_price:
             try:
                 custom_sl_f = float(custom_sl_price)
                 # LONG: el SL custom debe quedar debajo del precio actual.
@@ -314,7 +318,7 @@ class RiskManager:
 
         # 1. Distancia SL basada en volatilidad (atr o estimated_range)
         # Solo calcular si no hay custom SL de Sniper Mode
-        if not ((structural_sniper_mode or golden_uturn_mode or arrow_peak_mode or ma_slope_mode or fvg_mode) and custom_sl_price):
+        if not ((structural_sniper_mode or golden_uturn_mode or arrow_peak_mode or ma_slope_mode or fvg_mode or meme_short_top_mode) and custom_sl_price):
             if profile:
                 sl_mult = float(profile.get("slMultiplier", 0.8))
             else:
@@ -335,7 +339,7 @@ class RiskManager:
 
         # Calcular base SL sin el multiplicador de Clone para el Take Profit
         # Para Sniper/Golden/Arrow Peak/MA Slope/FVG con custom SL, usar el mismo sl_distance_price calculado
-        if (structural_sniper_mode or golden_uturn_mode or arrow_peak_mode or ma_slope_mode or fvg_mode) and custom_sl_price:
+        if (structural_sniper_mode or golden_uturn_mode or arrow_peak_mode or ma_slope_mode or fvg_mode or meme_short_top_mode) and custom_sl_price:
             base_sl_distance_price = sl_distance_price
         else:
             if profile and profile.get("name") == "Scalping Clone":
@@ -488,6 +492,35 @@ class RiskManager:
                     f"usando fallback RR×SL ({tp_distance_price/cp*100:.2f}%)"
                 )
 
+        # [MEME SHORT TOP] TP estructural: el detector ya calculó SL/TP por
+        # ATR (SL=2.0xATR, TP=4.0xATR, R:R 2:1 fijo -- ver memoria
+        # verge_meme_short_top) directo en custom_tp_price, mismo criterio
+        # que FVG/Arrow Peak: no recalcular con RR×SL genérico encima.
+        if meme_short_top_mode:
+            meme_custom_tp = signal_data.get("custom_tp_price")
+            meme_custom_tp_f = None
+            if meme_custom_tp:
+                try:
+                    meme_custom_tp_f = float(meme_custom_tp)
+                except (TypeError, ValueError):
+                    meme_custom_tp_f = None
+            meme_side = int(signal_data.get("side", 0))
+            is_valid_meme_tp = meme_custom_tp_f is not None and (
+                (meme_side == 0 and meme_custom_tp_f > cp) or
+                (meme_side == 1 and 0 < meme_custom_tp_f < cp)
+            )
+            if is_valid_meme_tp:
+                tp_distance_price = abs(meme_custom_tp_f - cp)
+                logger.info(
+                    f"[MEME-SHORT-TOP-RISK] {symbol}: TP={meme_custom_tp_f:.6f} "
+                    f"(distancia={tp_distance_price/cp*100:.2f}%)"
+                )
+            else:
+                logger.warning(
+                    f"[MEME-SHORT-TOP-RISK] {symbol}: TP estructural inválido/ausente, "
+                    f"usando fallback RR×SL ({tp_distance_price/cp*100:.2f}%)"
+                )
+
         side = int(signal_data.get("side", 0))
 
         if side == 0:
@@ -512,7 +545,7 @@ class RiskManager:
         # activando el MIN-RR-VETO de más abajo en el 100% de los casos.
         # Caso real: AAPLUSDT con TP ya estirado a RR=5.73 según su piso
         # mínimo, el cap lo recortaba a RR=1.15 — vetaba una estrategia sana.
-        if not (fvg_mode or arrow_peak_mode or ma_slope_mode):
+        if not (fvg_mode or arrow_peak_mode or ma_slope_mode or meme_short_top_mode):
             tp_price = self._apply_structural_tp_cap(symbol, side, cp, tp_price)
             tp_distance_price = abs(tp_price - cp)
 
@@ -527,7 +560,7 @@ class RiskManager:
         # rechaza el candidato (no abre nada, ni gana ni pierde), no cambia
         # el tamaño de la posición. Caso real: GWEIUSDT (R:R=2.98:1) terminó
         # en SL por -$6.11; con este piso en 4:1 nunca se hubiera abierto.
-        if fvg_mode or arrow_peak_mode or ma_slope_mode or golden_uturn_mode or structural_sniper_mode:
+        if fvg_mode or arrow_peak_mode or ma_slope_mode or golden_uturn_mode or structural_sniper_mode or meme_short_top_mode:
             if stop_distance > 0:
                 actual_rr = tp_distance_price / stop_distance
                 min_rr_required = float(profile.get("minRR", 1.5)) if profile else 1.5

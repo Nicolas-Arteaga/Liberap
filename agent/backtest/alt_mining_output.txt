@@ -1,0 +1,53 @@
+  SUIUSDT: 176 rupturas alcistas, 173 bajistas (>= 3.0%)
+  DOGEUSDT: 109 rupturas alcistas, 113 bajistas (>= 3.0%)
+  ADAUSDT: 142 rupturas alcistas, 126 bajistas (>= 3.0%)
+  XRPUSDT: 80 rupturas alcistas, 70 bajistas (>= 3.0%)
+  LINKUSDT: 95 rupturas alcistas, 95 bajistas (>= 3.0%)
+  AVAXUSDT: 109 rupturas alcistas, 121 bajistas (>= 3.0%)
+  LTCUSDT: 39 rupturas alcistas, 61 bajistas (>= 3.0%)
+  DOTUSDT: 135 rupturas alcistas, 138 bajistas (>= 3.0%)
+  ATOMUSDT: 90 rupturas alcistas, 90 bajistas (>= 3.0%)
+  NEARUSDT: 287 rupturas alcistas, 225 bajistas (>= 3.0%)
+  FILUSDT: 195 rupturas alcistas, 187 bajistas (>= 3.0%)
+  UNIUSDT: 184 rupturas alcistas, 168 bajistas (>= 3.0%)
+  SANDUSDT: 175 rupturas alcistas, 167 bajistas (>= 3.0%)
+  GALAUSDT: 194 rupturas alcistas, 185 bajistas (>= 3.0%)
+  ALGOUSDT: 184 rupturas alcistas, 141 bajistas (>= 3.0%)
+  XLMUSDT: 158 rupturas alcistas, 145 bajistas (>= 3.0%)
+  VETUSDT: 111 rupturas alcistas, 116 bajistas (>= 3.0%)
+  ETCUSDT: 84 rupturas alcistas, 80 bajistas (>= 3.0%)
+  RUNEUSDT: 134 rupturas alcistas, 116 bajistas (>= 3.0%)
+
+Total pooled: 2681 rupturas alcistas | 2517 bajistas sobre 19 altcoins
+
+==============================================================================================================
+RUPTURAS ALCISTAS (subio >=3% en 2h) -- POOL de altcoins
+==============================================================================================================
+Caracteristica               |  lift POOL |  lift promedio x simbolo |  simbolos con lift>1.2 | robusto?
+below_all_mas                |      1.28x |                    1.32x | 15/19 simbolos           | SI
+above_all_mas                |      1.00x |                    1.00x | 2/19 simbolos           | no
+compressed                   |      0.32x |                    0.35x | 0/19 simbolos           | no
+prior_falling                |      1.55x |                    1.56x | 19/19 simbolos           | SI
+prior_rising                 |      1.20x |                    1.15x | 7/19 simbolos           | no
+prior_flat                   |      0.60x |                    0.63x | 0/19 simbolos           | no
+rsi_low                      |      1.64x |                    1.73x | 18/19 simbolos           | SI
+rsi_mid                      |      0.86x |                    0.85x | 0/19 simbolos           | no
+rsi_high                     |      1.55x |                    1.55x | 16/19 simbolos           | SI
+ma7_below_ma99               |      0.94x |                    0.95x | 0/19 simbolos           | no
+ma7_above_ma99               |      1.08x |                    1.06x | 3/19 simbolos           | no
+
+==============================================================================================================
+RUPTURAS BAJISTAS (cayo >=3% en 2h) -- POOL de altcoins
+==============================================================================================================
+Caracteristica               |  lift POOL |  lift promedio x simbolo |  simbolos con lift>1.2 | robusto?
+below_all_mas                |      0.88x |                    0.90x | 0/19 simbolos           | no
+above_all_mas                |      1.41x |                    1.38x | 14/19 simbolos           | SI
+compressed                   |      0.50x |                    0.55x | 0/19 simbolos           | no
+prior_falling                |      1.07x |                    1.07x | 5/19 simbolos           | no
+prior_rising                 |      1.60x |                    1.56x | 19/19 simbolos           | SI
+prior_flat                   |      0.66x |                    0.69x | 0/19 simbolos           | no
+rsi_low                      |      0.86x |                    0.90x | 2/19 simbolos           | no
+rsi_mid                      |      0.94x |                    0.94x | 0/19 simbolos           | no
+rsi_high                     |      1.76x |                    1.73x | 17/19 simbolos           | SI
+ma7_below_ma99               |      1.05x |                    1.08x | 4/19 simbolos           | no
+ma7_above_ma99               |      0.94x |                    0.91x | 1/19 simbolos           | no
