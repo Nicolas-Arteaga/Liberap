@@ -328,6 +328,12 @@ def invariant_research_run(run_id: str):
     return result
 
 
+@app.get("/research/strategies")
+def invariant_research_strategies(limit: int = 100):
+    """VIRE hypothesis registry; never exposes or changes execution profiles."""
+    return {"strategies": invariant_research.list_strategies(get_engine().conn, max(1, min(limit, 500)))}
+
+
 def _run_funding_research(job_id: str, req: FundingResearchRequest):
     try:
         cfg = funding_research.FundingConfig(

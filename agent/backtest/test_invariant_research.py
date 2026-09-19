@@ -50,12 +50,19 @@ class InvariantResearchE2E(unittest.TestCase):
         pairs = {(c["symbol_a"], c["symbol_b"]): c for c in result["candidates"]}
         self.assertIn(("AAAUSDT", "BBBUSDT"), pairs)
         candidate = pairs[("AAAUSDT", "BBBUSDT")]
+        self.assertTrue(candidate["strategy"]["id"].startswith("vire:pair-mean-reversion:"))
+        self.assertEqual(candidate["strategy"]["family"], "pair_mean_reversion")
+        self.assertEqual(candidate["strategy"]["signal_sources"], ["price"])
+        self.assertTrue(candidate["trade_diagnostics"]["oos"]["trades"])
         self.assertGreater(candidate["relationship"]["aligned_bars"], 600)
         self.assertGreaterEqual(candidate["stressed_oos"]["cost"], candidate["oos"]["cost"])
         self.assertFalse(result["promotion_policy"]["paper_ready_allowed"])
         self.assertEqual(result["summary"]["paper_ready"], 0)
         self.assertIsNotNone(vire.get_run(self.conn, result["run_id"]))
         self.assertEqual(vire.list_runs(self.conn)[0]["run_id"], result["run_id"])
+        strategies = vire.list_strategies(self.conn)
+        self.assertGreaterEqual(len(strategies), 1)
+        self.assertEqual(strategies[0]["strategy_id"], candidate["strategy"]["id"])
         tables = {r[0] for r in self.conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         self.assertNotIn("StrategyProfiles", tables)
 

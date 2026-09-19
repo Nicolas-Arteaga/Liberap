@@ -6,6 +6,7 @@ It reads historical OHLCV only and persists an append-only research ledger.
 from __future__ import annotations
 
 import json
+import hashlib
 import math
 import os
 import sqlite3
@@ -76,6 +77,16 @@ def init_research_db(conn: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS invariant_research_candidates (
           id TEXT PRIMARY KEY, run_id TEXT NOT NULL, symbol_a TEXT NOT NULL,
           symbol_b TEXT NOT NULL, status TEXT NOT NULL, candidate_json TEXT NOT NULL
+        )""")
+    # This registry belongs to VIRE only.  It deliberately does not create or
+    # modify an execution StrategyProfile: research hypotheses and live
+    # strategies are different entities with different safety contracts.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS invariant_research_strategies (
+          strategy_id TEXT PRIMARY KEY, name TEXT NOT NULL, family TEXT NOT NULL,
+          version TEXT NOT NULL, thesis TEXT NOT NULL, first_seen TEXT NOT NULL,
+          last_seen TEXT NOT NULL, latest_status TEXT NOT NULL,
+          latest_candidate_json TEXT NOT NULL
         )""")
     conn.commit()
 
@@ -171,7 +182,8 @@ def _train_relationship(x_train: np.ndarray, y_train: np.ndarray):
 
 
 def _simulate(x: np.ndarray, y: np.ndarray, residual: np.ndarray, beta: float,
-              policy: ExitPolicy, cost_bps_per_leg: float, capital: float) -> dict:
+              policy: ExitPolicy, cost_bps_per_leg: float, capital: float,
+              timestamps: np.ndarray | None = None) -> dict:
     # Rolling statistics are shifted one bar so no signal sees its own close.
     lookback = 288
     if len(residual) <= lookback + 2:
@@ -180,6 +192,7 @@ def _simulate(x: np.ndarray, y: np.ndarray, residual: np.ndarray, beta: float,
     entry_x = entry_y = 0.0
     entry_z = 0.0
     opened_at = 0
+    best_open_return = worst_open_return = 0.0
     trades = []
     total_cost = 0.0
     two_leg_roundtrip_cost = capital * (cost_bps_per_leg / 10000.0) * 4.0
@@ -192,21 +205,35 @@ def _simulate(x: np.ndarray, y: np.ndarray, residual: np.ndarray, beta: float,
         if position == 0:
             if z >= policy.entry_z:
                 position, entry_x, entry_y, entry_z, opened_at = -1, x[i], y[i], z, i
+                best_open_return = worst_open_return = 0.0
             elif z <= -policy.entry_z:
                 position, entry_x, entry_y, entry_z, opened_at = 1, x[i], y[i], z, i
+                best_open_return = worst_open_return = 0.0
             continue
+        open_return = position * ((y[i] - entry_y) - beta * (x[i] - entry_x))
+        best_open_return = max(best_open_return, float(open_return))
+        worst_open_return = min(worst_open_return, float(open_return))
         exit_now = (position == -1 and z <= policy.exit_z) or (position == 1 and z >= -policy.exit_z)
         stop_now = abs(z) >= policy.stop_z
         time_now = i - opened_at >= policy.max_bars
         if not (exit_now or stop_now or time_now):
             continue
         # long spread = long B / short beta*A; short is its exact inverse.
-        gross_return = position * ((y[i] - entry_y) - beta * (x[i] - entry_x))
+        gross_return = open_return
         pnl = capital * gross_return - two_leg_roundtrip_cost
         total_cost += two_leg_roundtrip_cost
-        trades.append({"pnl": round(float(pnl), 8), "bars": i - opened_at,
-                       "entry_z": round(entry_z, 4), "exit_z": round(z, 4),
-                       "reason": "mean" if exit_now else ("stop" if stop_now else "time")})
+        trades.append({
+            "entry_time_ms": int(timestamps[opened_at]) if timestamps is not None else None,
+            "exit_time_ms": int(timestamps[i]) if timestamps is not None else None,
+            "side": "long_spread" if position == 1 else "short_spread",
+            "gross_pnl": round(float(capital * gross_return), 8),
+            "cost": round(float(two_leg_roundtrip_cost), 8),
+            "pnl": round(float(pnl), 8), "bars": i - opened_at,
+            "mfe": round(float(capital * best_open_return), 8),
+            "mae": round(float(capital * worst_open_return), 8),
+            "entry_z": round(entry_z, 4), "exit_z": round(z, 4),
+            "reason": "mean" if exit_now else ("stop" if stop_now else "time"),
+        })
         position = 0
     return {"pnl": round(sum(t["pnl"] for t in trades), 8), "trades": trades, "cost": round(total_cost, 8)}
 
@@ -216,9 +243,38 @@ def _metrics(sim: dict) -> dict:
     count = len(pnls)
     total = float(sum(pnls))
     best_share = max(pnls) / total if total > 0 and pnls else 1.0
+    gross_profit = sum(p for p in pnls if p > 0)
+    gross_loss = abs(sum(p for p in pnls if p < 0))
+    curve, peak, max_drawdown = 0.0, 0.0, 0.0
+    for pnl in pnls:
+        curve += pnl; peak = max(peak, curve); max_drawdown = min(max_drawdown, curve - peak)
     return {"net_pnl": round(total, 4), "trades": count,
             "win_rate": round(100 * sum(p > 0 for p in pnls) / count, 2) if count else 0.0,
-            "best_trade_share": round(best_share, 4), "cost": sim["cost"]}
+            "best_trade_share": round(best_share, 4), "cost": sim["cost"],
+            "profit_factor": round(gross_profit / gross_loss, 4) if gross_loss else None,
+            "max_drawdown": round(max_drawdown, 4),
+            "avg_trade": round(total / count, 4) if count else 0.0}
+
+
+def _trade_diagnostics(sim: dict) -> dict:
+    """Explain outcomes mechanically, without claiming causal factors we did not model.
+
+    Each trade stores exit mechanics, adverse/favourable excursion and full
+    costs.  This makes it possible to inspect *why the simulated rule* won or
+    lost rather than showing a single aggregate PnL.
+    """
+    trades = sim["trades"]
+    by_exit: dict[str, dict] = {}
+    for trade in trades:
+        bucket = by_exit.setdefault(trade["reason"], {"trades": 0, "net_pnl": 0.0, "wins": 0, "losses": 0})
+        bucket["trades"] += 1; bucket["net_pnl"] += trade["pnl"]
+        bucket["wins"] += int(trade["pnl"] > 0); bucket["losses"] += int(trade["pnl"] <= 0)
+    return {
+        "attribution_scope": "mechanical_exit_and_excursion_only",
+        "by_exit": [{"reason": key, "trades": value["trades"], "net_pnl": round(value["net_pnl"], 4),
+                     "wins": value["wins"], "losses": value["losses"]} for key, value in sorted(by_exit.items())],
+        "trades": trades,
+    }
 
 
 def _feature_snapshot(conn: sqlite3.Connection, symbols: tuple[str, ...], start_ms: int, end_ms: int) -> dict:
@@ -272,6 +328,7 @@ def _evaluate_pair(symbol_a: str, symbol_b: str, prices_a: dict, prices_b: dict,
     ts, x, y = aligned
     x_train, x_val, x_oos = _split(x)
     y_train, y_val, y_oos = _split(y)
+    ts_train, ts_val, ts_oos = _split(np.array(ts, dtype=np.int64))
     fit = _train_relationship(x_train, y_train)
     if not fit:
         return None
@@ -286,35 +343,73 @@ def _evaluate_pair(symbol_a: str, symbol_b: str, prices_a: dict, prices_b: dict,
     base_cost_bps = config.fee_bps_per_leg + config.slippage_bps_per_leg
     train_scores = []
     for policy in DEFAULT_POLICIES:
-        sim = _simulate(x_train, y_train, r_train, beta, policy, base_cost_bps, config.capital_per_trade)
+        sim = _simulate(x_train, y_train, r_train, beta, policy, base_cost_bps, config.capital_per_trade, ts_train)
         train_scores.append((_metrics(sim), policy))
     best_train, policy = max(train_scores, key=lambda item: item[0]["net_pnl"])
-    validation = _metrics(_simulate(x_val, y_val, r_val, beta, policy, base_cost_bps, config.capital_per_trade))
-    oos_sim = _simulate(x_oos, y_oos, r_oos, beta, policy, base_cost_bps, config.capital_per_trade)
+    validation_sim = _simulate(x_val, y_val, r_val, beta, policy, base_cost_bps, config.capital_per_trade, ts_val)
+    validation = _metrics(validation_sim)
+    oos_sim = _simulate(x_oos, y_oos, r_oos, beta, policy, base_cost_bps, config.capital_per_trade, ts_oos)
     oos = _metrics(oos_sim)
     stressed = _metrics(_simulate(x_oos, y_oos, r_oos, beta, policy,
                                   base_cost_bps + config.perturbation_bps_per_leg,
-                                  config.capital_per_trade))
+                                  config.capital_per_trade, ts_oos))
     neighbours = []
     for neighbour in DEFAULT_POLICIES:
         neighbours.append(_metrics(_simulate(x_oos, y_oos, r_oos, beta, neighbour,
-                                             base_cost_bps, config.capital_per_trade))["net_pnl"])
+                                             base_cost_bps, config.capital_per_trade, ts_oos))["net_pnl"])
     status = "PAPER_READY" if (
         validation["net_pnl"] > 0 and oos["net_pnl"] > 0 and stressed["net_pnl"] > 0
         and oos["trades"] >= config.min_oos_trades and oos["best_trade_share"] <= 0.45
         and sum(v > 0 for v in neighbours) >= max(2, len(neighbours) // 2)
     ) else "REJECTED"
+    strategy_payload = {
+        "family": "pair_mean_reversion",
+        "symbols": [symbol_a, symbol_b],
+        "policy": asdict(policy),
+        "feature_role": (feature_context or {}).get("role", "unavailable"),
+        "cost_model": {"fee_bps_per_leg": config.fee_bps_per_leg,
+                       "slippage_bps_per_leg": config.slippage_bps_per_leg,
+                       "stress_bps_per_leg": config.perturbation_bps_per_leg},
+    }
+    version = hashlib.sha256(json.dumps(strategy_payload, sort_keys=True).encode()).hexdigest()[:12]
+    strategy = {
+        "id": f"vire:pair-mean-reversion:{symbol_a}:{symbol_b}:{policy.key}",
+        "name": f"VIRE Pair Reversion — {symbol_a}/{symbol_b} ({policy.key})",
+        "family": "pair_mean_reversion",
+        "version": version,
+        "thesis": "El spread logarítmico entre dos activos cointegrados revierte tras una desviación extrema; se valida fuera de muestra con costos y estrés.",
+        "entry": {"long_spread_when_z_lte": -policy.entry_z, "short_spread_when_z_gte": policy.entry_z},
+        "exit": {"mean_reversion_z": policy.exit_z, "stop_z": policy.stop_z, "max_bars": policy.max_bars},
+        "signal_sources": ["price"],
+        "feature_scope": (feature_context or {}).get("role", "unavailable"),
+    }
     return {
         "symbol_a": symbol_a, "symbol_b": symbol_b, "status": status,
+        "strategy": strategy,
         "relationship": {"hedge_ratio": round(beta, 6), "ar1_phi": round(phi, 6),
                            "half_life_bars": round(half_life, 2), "aligned_bars": len(ts)},
         "policy": asdict(policy), "train": best_train, "validation": validation,
         "oos": oos, "stressed_oos": stressed,
+        "trade_diagnostics": {"validation": _trade_diagnostics(validation_sim), "oos": _trade_diagnostics(oos_sim)},
         "feature_context": feature_context or {"role": "unavailable"},
         "parameter_neighbourhood_positive": sum(v > 0 for v in neighbours),
         "parameter_neighbourhood_total": len(neighbours),
         "rejection_reasons": [] if status == "PAPER_READY" else _reasons(validation, oos, stressed, config, neighbours),
     }
+
+
+def _upsert_strategy_registry(conn: sqlite3.Connection, candidate: dict, seen_at: str) -> None:
+    strategy = candidate["strategy"]
+    conn.execute("""
+        INSERT INTO invariant_research_strategies
+          (strategy_id,name,family,version,thesis,first_seen,last_seen,latest_status,latest_candidate_json)
+        VALUES (?,?,?,?,?,?,?,?,?)
+        ON CONFLICT(strategy_id) DO UPDATE SET
+          name=excluded.name, family=excluded.family, version=excluded.version,
+          thesis=excluded.thesis, last_seen=excluded.last_seen,
+          latest_status=excluded.latest_status, latest_candidate_json=excluded.latest_candidate_json
+    """, (strategy["id"], strategy["name"], strategy["family"], strategy["version"], strategy["thesis"],
+          seen_at, seen_at, candidate["status"], json.dumps(candidate)))
 
 
 def _reasons(validation: dict, oos: dict, stressed: dict, config: ResearchConfig, neighbours: list[float]) -> list[str]:
@@ -420,6 +515,8 @@ def run_research(conn: sqlite3.Connection, config: ResearchConfig) -> dict:
     conn.executemany("INSERT INTO invariant_research_candidates VALUES (?,?,?,?,?,?)", [
         (str(uuid.uuid4()), run_id, c["symbol_a"], c["symbol_b"], c["status"], json.dumps(c)) for c in candidates
     ])
+    for candidate in candidates:
+        _upsert_strategy_registry(conn, candidate, result["created_at"])
     conn.commit()
     return result
 
@@ -434,3 +531,13 @@ def get_run(conn: sqlite3.Connection, run_id: str) -> dict | None:
     init_research_db(conn)
     row = conn.execute("SELECT result_json FROM invariant_research_runs WHERE id=?", (run_id,)).fetchone()
     return json.loads(row[0]) if row else None
+
+
+def list_strategies(conn: sqlite3.Connection, limit: int = 100) -> list[dict]:
+    init_research_db(conn)
+    rows = conn.execute("""
+        SELECT strategy_id,name,family,version,thesis,first_seen,last_seen,latest_status,latest_candidate_json
+        FROM invariant_research_strategies ORDER BY last_seen DESC LIMIT ?
+    """, (limit,)).fetchall()
+    return [{"strategy_id": r[0], "name": r[1], "family": r[2], "version": r[3], "thesis": r[4],
+             "first_seen": r[5], "last_seen": r[6], "status": r[7], "candidate": json.loads(r[8])} for r in rows]
