@@ -1,0 +1,1 @@
+[{"name": "Momentum-Wick LONG", "n_train": 100, "pnl_train": 107.04999999999997, "n_val": 22, "pnl_val": 74.44999999999999, "n_oos": 17, "pnl_oos": 10.979999999999993, "oos_monthly": 8.446153846153841}, {"name": "Volume-Body LONG", "n_train": 203, "pnl_train": -39.58000000000001, "n_val": 45, "pnl_val": 80.22, "n_oos": 15, "pnl_oos": 11.049999999999999, "oos_monthly": 8.5}]

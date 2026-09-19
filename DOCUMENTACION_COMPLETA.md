@@ -1,5 +1,106 @@
 # VERGE TRADING SYSTEM - DOCUMENTACIÓN COMPLETA
 
+> **Nota de vigencia**: el cuerpo de este documento (arquitectura, DTOs,
+> perfiles "Standard Scalping"/"Scalping Clone", parámetros de
+> `config.py`) es de **mayo 2026** y está desactualizado en el detalle —
+> hoy hay ~20 `StrategyProfile` reales en la base (Nexus, FVG en varias
+> variantes, MA Slope Casos 1-3, GOLDEN-U-TURN, Band Touch 15m, etc.),
+> campos nuevos (`UseTrailStop`, `BroadcastToBinance`, `ExclusionTag`,
+> `MaxFavorablePrice`, `TrailLevelApplied`...) y toda una fase de
+> investigación de alpha que no está reflejada abajo. La arquitectura
+> general (ABP + Python agent + Angular + Postgres + SignalR/Redis) sigue
+> siendo correcta a alto nivel. **Anexo abajo con el estado real a
+> septiembre 2026 (hasta Round 48 + hallazgos del 14-18/9).**
+
+---
+
+## ANEXO — ESTADO REAL DEL PROYECTO (septiembre 2026, hasta Round 48 + hoy)
+
+### 1. Incidente de datos (clave para interpretar cualquier análisis histórico)
+
+Un reset de Docker Desktop (~2026-09-05/06) borró la base de producción
+(`SimulatedTrades` + `StrategyProfiles`) **sin backup**. Se reconstruyó
+el esquema y se reinsertaron ~3.682 filas desde un log legacy
+(`agent/data/trades.csv`), marcadas en el propio sistema como
+`ExtraProperties={"reconstructed":"trades.csv 2026-09-05"}`.
+**Resultado: ~99% de los trades cerrados que hoy existen en
+`SimulatedTrades` NO son operativa en vivo genuina** — son ese import
+legacy con PnL explícitamente no confiable. Solo los trades abiertos
+DESPUÉS del 2026-09-06 son reales. Cualquier análisis agregado sobre
+`SimulatedTrades` (win rate, PnL por perfil, etc.) debe filtrar por esto
+o el resultado es directamente falso (ej.: el perfil "Nexus" mostraba
++$363.260 de PnL agregado por corrupción de precio en 2 símbolos —
+ONUSDT/BBUSDT — combinada con esta reconstrucción; el número real
+limpio es otro).
+
+### 2. Trail-1 — mejora de gestión de SALIDA (no es una estrategia nueva)
+
+**Qué es**: un trailing-stop simple aplicado a trades ya abiertos por
+cualquier estrategia — cuando la ganancia flotante llega a ciertos
+niveles, mueve el SL a favor (ej.: +100bp → SL a breakeven, +150bp → SL
+asegura +50bp, +200bp → SL asegura +100bp). Nace de un hallazgo forense
+real: ~46-56% de los trades que terminaron en pérdida habían llegado a
+tener ≥100bp de ganancia flotante antes de revertir completamente.
+
+**Estado**: implementado end-to-end en C# (`TrailingStopCalculator.cs`,
+17 tests unitarios), validado con TRAIN/VAL/OOS sobre miles de trades
+reconstruidos, verificado con un harness independiente. **Administrable
+desde la UI sin tocar código ni reiniciar el backend**: switch maestro
+global (ABP Setting `Verge.TrailStop.Enabled`, tab "Trail-1 (global)" en
+Configuración) + switch por perfil (`StrategyProfile.UseTrailStop`, en
+el editor de cada estrategia). **Ambos siguen en `false` (OFF)** —
+decisión explícita: es un overlay opcional, no algo que dependa de que
+Verge "encuentre una estrategia nueva".
+
+### 3. Búsqueda de estrategia NUEVA (Rounds 43-48) — CERRADA
+
+Se intentó minar los trades reales/reconstruidos (transversal a los ~20
+perfiles, sin combinatoria ciega en las rondas finales) buscando un
+patrón de ENTRADA nuevo, con la disciplina: TRAIN/VAL/OOS + segundo
+split temporal independiente + `portfolio_engine.py` real (capital 450
+USDT, 3 slots, fees/slippage/funding reales) + prueba de remover los
+mejores trades. **Un solo candidato ("C2", SHORT en tendencia bajista
+sostenida sin aceleración de agotamiento) sobrevivió todas las pruebas
+de robustez**, pero su capacidad económica techó muy por debajo del
+objetivo (≥150 USDT/mes/450 capital) y no sobrevivió la prueba de
+remover los 3 mejores trades de OOS. Dos mecanismos nuevos adicionales
+(capitulación-reversión en extremos, expansión tras compresión) también
+fallaron. **Veredicto final: NO HAY EVIDENCIA SUFICIENTE DE UNA NUEVA
+ESTRATEGIA ECONÓMICAMENTE ÚTIL — discovery cerrado** por instrucción
+explícita del usuario, hasta que haya (a) volumen de trades genuinamente
+en vivo acumulado, o (b) una fuente de datos nunca probada (liquidaciones,
+on-chain, opciones).
+
+Reportes completos (en la raíz del repo): `TRAIL1_UI_SETTINGS_ROUND43.md`,
+`NEW_STRATEGY_DISCOVERY_ROUND43.md`, `NEXUS_FORENSIC_ROUND44.md`,
+`CROSS_PROFILE_MINING_ROUND45.md`, `GUIDED_DISCOVERY_ROUND46.md`,
+`FINAL_DISCOVERY_ROUND47_48.md`.
+
+### 4. Hallazgo del 14/9 — reversión desde el pico (confirma Trail-1 con otra métrica)
+
+A partir de una observación real del usuario en "Band Touch 15m" (un
+perfil nuevo, activado el 13/9, genuinamente en vivo — no reconstruido):
+de los trades históricos que llegaron a ≥$30 de ganancia flotante en
+algún momento, **41.8% terminaron dando vuelta TOTAL** (cerraron en SL,
+ej. un trade que llegó a +$380 flotante cerró en $0), y otro ~50% se
+dejó más de la mitad del pico sobre la mesa. Dinero total dejado sobre
+la mesa en ese grupo: **~$16.300**. Esto es exactamente el problema que
+Trail-1 resuelve — pendiente decisión del usuario sobre activarlo.
+
+### 5. Cambio de riesgo en curso: cap de SL a -$5 USDT máximo
+
+El usuario decidió (comunicado en otra sesión, "VERGE 2026-2040") que
+**ningún SL puede exceder -$5 USDT** (sobre posiciones de $150 de
+margen) — si el cálculo del agente da un SL más ajustado (-$1 a -$4), se
+respeta; si excede -$5, se cappea a -$5. Ya está en producción según el
+usuario. Al 14/9 quedaban 440 trades históricos con pérdida mayor a -$5
+(algunos posteriores a la fecha en que el cap debería estar activo) —
+pendiente de investigar si el cap está aplicado en todos los perfiles o
+solo en algunos. El usuario ya eliminó manualmente 347 trades que
+excedían el cap (acción suya, no ejecutada por este agente).
+
+---
+
 ## ÍNDICE
 1. [Arquitectura General](#arquitectura-general)
 2. [Backend - ABP Framework](#backend---abp-framework)

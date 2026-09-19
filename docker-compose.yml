@@ -66,6 +66,9 @@ services:
     container_name: verge-backtest
     environment:
       - ABP_BACKEND_URL=https://host.docker.internal:44396
+      - VIRE_LIVE_RESEARCH_DB=/app/live-research/klines.db
+      - VIRE_CANONICAL_DB=/app/research-canonical/binance_vision_clean.db
+      - VIRE_EXECUTION_AUDIT=/app/execution-audit/auto_tuner_recommendations.json
     ports:
       - "8010:8010"
     volumes:
@@ -78,9 +81,38 @@ services:
       # Poblado una vez desde agent/data/ (ver PROGRESS_LOG), despues el
       # propio servicio lo mantiene actualizado via /backtest/data/sync.
       - verge_backtest_data:/app/data
+      # Collector-owned research DB: mounted read-only so VIRE can audit
+      # liquidations without writing to or depending on container state.
+      - ./agent/data/klines.db:/app/live-research/klines.db:ro
+      # Canonical host DB is the authority for collector-owned research
+      # additions. It is mounted read-only and queried only by lightweight
+      # coverage gates; the high-throughput simulator keeps its native volume.
+      - ./agent/data/binance_vision_clean.db:/app/research-canonical/binance_vision_clean.db:ro
+      - ./agent/data/auto_tuner_recommendations.json:/app/execution-audit/auto_tuner_recommendations.json:ro
+      # Bind mount (no volumen nombrado) -- estos son archivos de texto
+      # chicos (progress log, jsonl de resultados, heartbeat del lab), no
+      # la DB de 3.5GB que motivo el volumen nombrado arriba. Sin esto, el
+      # Dockerfile los COPY-ea al build y quedan CONGELADOS para siempre --
+      # la API servia una foto fija del ultimo build, nunca el progreso
+      # real del proceso strategy_lab.py corriendo en el host (bug real
+      # encontrado 2026-08-16: el usuario nunca vio avance porque no lo
+      # habia, literalmente).
+      - ./agent/backtest:/app/backtest
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: always
+
+  # ── TRACK A: colector histórico de Open Interest ──
+  # NO se corre en Docker en Windows: SQLite WAL sobre un bind mount de Docker
+  # Desktop tira `disk I/O error` (misma razón por la que market-ws y backtest
+  # usan volúmenes NOMBRADOS y una DB separada; ver notas de esos servicios y
+  # OPEN_INTEREST_COLLECTOR.md). Y no puede escribir el klines.db del host desde
+  # un volumen nombrado sin un paso de sync — lo que anula el propósito (el
+  # research lee el klines.db del host).
+  # → El colector corre como PROCESO DEL HOST, igual que verge_agent.py y la
+  #   captura de funding_rates:
+  #       cd agent && python open_interest_collector.py
+  #   (o vía AgentProcessManager si se quiere supervisado — no wireado a propósito).
 
   # El backend se corre localmente en el host, no en Docker.
 

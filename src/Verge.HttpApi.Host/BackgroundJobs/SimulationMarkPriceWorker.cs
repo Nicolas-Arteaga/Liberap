@@ -8,9 +8,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Volo.Abp.Domain.Repositories;
+using Volo.Abp.Settings;
 using Volo.Abp.Uow;
 using Verge.Trading.DTOs;
 using System.IO;
+using Microsoft.Extensions.Configuration;
+using System.Text.Json;
 
 namespace Verge.Trading;
 
@@ -41,14 +44,52 @@ public class SimulationMarkPriceWorker : BackgroundService
     private const decimal MaxSingleTickMovePct = 0.15m; // 15%
     private static readonly Dictionary<Guid, decimal> _lastGoodPrice = new();
 
+    // 2026-08-18: lock a breakeven -- evidencia real (45 dias, SimulatedTrades):
+    // 140 trades llegaron a >=70% de progreso hacia TP y terminaron en perdida
+    // total (sl_hit/timeout), -$227 dejados en la mesa. Distinto de "Cosecha
+    // Inteligente" (trailing continuo, removido 2026-07-15 por decision del
+    // usuario): esto NUNCA mueve el SL antes de este umbral y NUNCA mueve el
+    // TP -- solo evita que un trade que ya alcanzo casi todo su objetivo
+    // termine en rojo total por una reversion.
+    // 2026-08-18: DESACTIVADO -- se habia desplegado sin backtestear primero
+    // (correccion del usuario, con razon: la disciplina de este proyecto es
+    // nunca confiar un mecanismo con capital real sin probarlo antes). Umbral
+    // en 101 = nunca se activa (TpProgressPct nunca pasa de 100 real). Re-
+    // activar (bajar a 75) solo despues de validar candle-a-candle contra
+    // datos historicos, no antes.
+    private const decimal BreakevenLockTpProgressPct = 101m;
+
+    // ROUND 36/39 -- Trail-1, PASS validado sobre 2,985 trades reales
+    // reconstruidos (TRAIN/VAL/OOS, ambas mitades, 11/12 perfiles, ambas
+    // direcciones, discrepancia de replay cerrada y explicada, ver
+    // TRAIL1_FINAL_VALIDATION_ROUND37.md / DISCREPANCY_AUDIT_ROUND39.md).
+    //
+    // ROUND 40 -- convertido de const a configuración (appsettings
+    // "TrailStop:Enabled" / "TrailStop:CanaryPercentage") para permitir
+    // un canary real sobre una fracción de posiciones, sin hardcodear
+    // símbolos ni recompilar para cambiar el porcentaje. Los DEFAULTS
+    // (usados si la sección no existe en appsettings) son los mismos
+    // valores seguros de antes: deshabilitado, 0%.
+    private readonly IConfiguration _configuration;
+
+    // ROUND 43 -- interruptor maestro global movido de appsettings/
+    // IConfiguration a un ABP Setting (Verge.TrailStop.Enabled, ver
+    // VergeSettings.cs / VergeSettingDefinitionProvider.cs). Se lee en
+    // caliente por ciclo via ISettingProvider (scoped), sin reinicio, y es
+    // administrable desde la pantalla de Configuracion de Verge. Si esta
+    // en false, Trail-1 no aplica a NINGUN perfil sin importar su
+    // UseTrailStop (defensa en profundidad).
+
     public SimulationMarkPriceWorker(
         IServiceProvider serviceProvider,
         IHubContext<TradingHub> hubContext,
-        ILogger<SimulationMarkPriceWorker> logger)
+        ILogger<SimulationMarkPriceWorker> logger,
+        IConfiguration configuration)
     {
         _serviceProvider = serviceProvider;
         _hubContext = hubContext;
         _logger = logger;
+        _configuration = configuration;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -76,9 +117,12 @@ public class SimulationMarkPriceWorker : BackgroundService
             using var scope = _serviceProvider.CreateScope();
             var tradeRepo = scope.ServiceProvider.GetRequiredService<IRepository<SimulatedTrade, Guid>>();
             var profileRepo = scope.ServiceProvider.GetRequiredService<IRepository<TraderProfile, Guid>>();
+            var strategyProfileRepo = scope.ServiceProvider.GetRequiredService<IRepository<StrategyProfile, Guid>>();
             var marketDataManager = scope.ServiceProvider.GetRequiredService<MarketDataManager>();
             var simulationService = scope.ServiceProvider.GetRequiredService<TradingSimulationService>();
             var uowManager = scope.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
+            var settingProvider = scope.ServiceProvider.GetRequiredService<ISettingProvider>();
+            bool trailStopEnabled = await settingProvider.GetAsync<bool>(Verge.Settings.VergeSettings.TrailStopEnabled, false);
 
             var openTrades = await tradeRepo.GetListAsync(t => t.Status == TradeStatus.Open);
             
@@ -98,6 +142,27 @@ public class SimulationMarkPriceWorker : BackgroundService
             }
 
             bool applyFunding = (DateTime.UtcNow - _lastFundingTime).TotalHours >= 8;
+
+            // ── Trail-1: resolver que perfiles tienen UseTrailStop=true, UNA
+            // sola vez por ciclo (no por trade) -- evita N queries extra por
+            // segundo. Perfiles sin match (trade.StrategyProfileId es null,
+            // trades legacy) quedan afuera del diccionario -> tratados como
+            // "sin Trail-1", el default mas seguro.
+            var trailStopProfileIds = new HashSet<Guid>();
+            if (trailStopEnabled)
+            {
+                var distinctProfileIds = openTrades
+                    .Where(t => t.StrategyProfileId.HasValue)
+                    .Select(t => t.StrategyProfileId!.Value)
+                    .Distinct()
+                    .ToList();
+                if (distinctProfileIds.Count > 0)
+                {
+                    var profilesWithTrail = await strategyProfileRepo.GetListAsync(
+                        p => distinctProfileIds.Contains(p.Id) && p.UseTrailStop);
+                    trailStopProfileIds = profilesWithTrail.Select(p => p.Id).ToHashSet();
+                }
+            }
 
             foreach (var trade in openTrades)
             {
@@ -195,6 +260,86 @@ public class SimulationMarkPriceWorker : BackgroundService
                     // sync that only fired once at close time.
                     UpdateExcursionTracking(trade, markPrice);
 
+                    // ── Breakeven lock (2026-08-18) ─────────────────────────────────
+                    // Una sola vez por trade: si llegó a BreakevenLockTpProgressPct%
+                    // del camino al TP, sube el SL a breakeven (+buffer de fees) para
+                    // que una reversión no lo convierta en pérdida total. Nunca aleja
+                    // el SL de donde ya estaba (solo lo ajusta si mejora la protección).
+                    if (!trade.BreakevenLocked && trade.TpProgressPct.HasValue
+                        && trade.TpProgressPct.Value >= BreakevenLockTpProgressPct
+                        && trade.SlPrice.HasValue)
+                    {
+                        bool isLongBe = trade.Side == SignalDirection.Long;
+                        const decimal feeBufferPct = 0.0015m; // ~0.15%, cubre ida+vuelta de fees con margen
+                        var breakevenPrice = isLongBe
+                            ? trade.EntryPrice * (1 + feeBufferPct)
+                            : trade.EntryPrice * (1 - feeBufferPct);
+                        bool improves = isLongBe
+                            ? breakevenPrice > trade.SlPrice.Value
+                            : breakevenPrice < trade.SlPrice.Value;
+                        if (improves)
+                        {
+                            _logger.LogInformation(
+                                "🔒 [SimulationWorker] Breakeven lock {Symbol}: SL {Old} -> {New} (TP progress {Pct}%)",
+                                trade.Symbol, trade.SlPrice.Value, breakevenPrice, trade.TpProgressPct.Value);
+                            trade.SlPrice = breakevenPrice;
+                        }
+                        trade.BreakevenLocked = true;
+                    }
+
+                    // ── Trailing stop Trail-1 — por perfil (ROUND 36-42) ────────────
+                    // Flujo normal de Verge: activable por StrategyProfile
+                    // (StrategyProfile.UseTrailStop), igual que BroadcastToBinance,
+                    // editable desde la misma UI/API de perfiles -- no un
+                    // porcentaje ciego de config. trailStopEnabled es el
+                    // interruptor maestro global (ROUND 43: ABP Setting
+                    // Verge.TrailStop.Enabled, administrable desde la UI);
+                    // ambos deben estar en true. Trades sin StrategyProfileId
+                    // (legacy o manuales) nunca reciben Trail-1 -- default
+                    // mas seguro. Si falla la actualizacion, el catch general
+                    // del trade (ver abajo) deja el SL previo intacto.
+                    if (trailStopEnabled && trade.SlPrice.HasValue && trade.MaxFavorablePrice.HasValue
+                        && trade.StrategyProfileId.HasValue && trailStopProfileIds.Contains(trade.StrategyProfileId.Value))
+                    {
+                        if (trade.TrailStopCanary is null)
+                        {
+                            trade.TrailStopCanary = true;
+                            trade.OriginalSlPrice = trade.SlPrice; // para el contrafactual post-hoc
+                            _logger.LogInformation(
+                                "🐤 [SimulationWorker] Trail-1 activo (perfil {ProfileId}): {Symbol} {Id} (SL original preservado: {Sl})",
+                                trade.StrategyProfileId, trade.Symbol, trade.Id, trade.SlPrice.Value);
+                        }
+
+                        if (trade.TrailStopCanary == true)
+                        {
+                            bool isLongTrail = trade.Side == SignalDirection.Long;
+                            var favBp = TrailingStopCalculator.FavorableExcursionBp(
+                                isLongTrail, trade.EntryPrice, trade.MaxFavorablePrice.Value);
+                            var levelBefore = trade.TrailLevelApplied;
+                            var slBefore = trade.SlPrice.Value;
+                            var trailResult = TrailingStopCalculator.Compute(
+                                isLongTrail, trade.EntryPrice, favBp, slBefore, levelBefore);
+
+                            // Telemetria SOLO en eventos relevantes (cruce de nivel),
+                            // nunca por tick -- ver TrailAuditJson en SimulatedTrade.
+                            if (trailResult.NewTrailLevel != levelBefore)
+                            {
+                                _logger.LogInformation(
+                                    "📈 [SimulationWorker] Trail-1 CANARY nivel {Lvl} {Symbol} {Id} side={Side}: "
+                                    + "entry={Entry} current={Current} favBp={Bp:N0} SL {Old} -> {New} changed={Changed}",
+                                    trailResult.NewTrailLevel, trade.Symbol, trade.Id, trade.Side,
+                                    trade.EntryPrice, markPrice, favBp, slBefore, trailResult.NewSlPrice, trailResult.Changed);
+                                AppendTrailAuditEvent(trade, trailResult.NewTrailLevel, favBp, slBefore, trailResult.NewSlPrice, trailResult.Changed);
+                            }
+
+                            if (trailResult.Changed)
+                            {
+                                trade.SlPrice = trailResult.NewSlPrice;
+                            }
+                            trade.TrailLevelApplied = trailResult.NewTrailLevel;
+                        }
+                    }
+
                     // ── Liquidation check ──────────────────────────────────────────
                     if (simulationService.IsLiquidationTriggered(markPrice, trade.LiquidationPrice, trade.Side))
                     {
@@ -261,7 +406,9 @@ public class SimulationMarkPriceWorker : BackgroundService
                         trade.Status = closeReason == "Take Profit" ? TradeStatus.Win : TradeStatus.Loss;
                         trade.ClosePrice = settlementPrice;
                         trade.ClosedAt = DateTime.UtcNow;
-                        trade.ExitReason = closeReason == "Take Profit" ? "tp_hit" : "sl_hit";
+                        trade.ExitReason = closeReason == "Take Profit"
+                            ? "tp_hit"
+                            : (trade.BreakevenLocked ? "breakeven_stop" : "sl_hit");
                         trade.RealizedPnl = realizedPnl;
                         trade.ExitFee = exitFee;
                         trade.UnrealizedPnl = 0;
@@ -404,6 +551,40 @@ public class SimulationMarkPriceWorker : BackgroundService
                 trade.MaxSlProgressPct = Math.Round(peakAdverseDist / slRange * 100m, 2);
             }
         }
+    }
+
+    /// <summary>
+    /// Telemetria de Trail-1 (ROUND 40): agrega un evento a TrailAuditJson,
+    /// acotado a los 3 niveles posibles -- nunca crece sin limite. Si el
+    /// JSON existente esta corrupto (no deberia pasar, pero un trade viejo
+    /// podria no tener el campo poblado), arranca una lista nueva en vez de
+    /// fallar el tick completo.
+    /// </summary>
+    private static void AppendTrailAuditEvent(SimulatedTrade trade, int level, decimal favBp, decimal oldSl, decimal newSl, bool changed)
+    {
+        List<Dictionary<string, object>> events;
+        try
+        {
+            events = string.IsNullOrEmpty(trade.TrailAuditJson)
+                ? new List<Dictionary<string, object>>()
+                : JsonSerializer.Deserialize<List<Dictionary<string, object>>>(trade.TrailAuditJson) ?? new();
+        }
+        catch
+        {
+            events = new List<Dictionary<string, object>>();
+        }
+
+        events.Add(new Dictionary<string, object>
+        {
+            ["level"] = level,
+            ["ts"] = DateTime.UtcNow.ToString("O"),
+            ["favBp"] = favBp,
+            ["oldSl"] = oldSl,
+            ["newSl"] = newSl,
+            ["changed"] = changed,
+        });
+
+        trade.TrailAuditJson = JsonSerializer.Serialize(events);
     }
 
     private static SimulatedTradeDto MapToDto(SimulatedTrade t) => new SimulatedTradeDto

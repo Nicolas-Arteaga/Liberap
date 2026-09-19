@@ -1,0 +1,77 @@
+[
+ {
+  "test": "OI upsert idempotente (1 fila)",
+  "pass": true,
+  "detail": "n=1"
+ },
+ {
+  "test": "OI upsert actualiza valor",
+  "pass": true,
+  "detail": "oi=111.0"
+ },
+ {
+  "test": "OI out-of-order queda ordenado al leer",
+  "pass": true,
+  "detail": "ts=[1788826001998, 1788829001998]"
+ },
+ {
+  "test": "OI gap detectable (missing>0)",
+  "pass": true,
+  "detail": "gaps={'rows': 3, 'expected': 18, 'missing': 15, 'coverage_pct': 16.67, 'first': 1788826001998, 'last': 1788831101998}"
+ },
+ {
+  "test": "OI sin duplicados tras re-insert x3",
+  "pass": true,
+  "detail": "dup_groups=0"
+ },
+ {
+  "test": "OI sobrevive reopen (restart)",
+  "pass": true,
+  "detail": "3 -> 3"
+ },
+ {
+  "test": "LIQ research insert nuevo devuelve True",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "LIQ research duplicado devuelve False",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "LIQ research dedup (1 fila)",
+  "pass": true,
+  "detail": "n=1"
+ },
+ {
+  "test": "LIQ research: eventos distintos se guardan",
+  "pass": true,
+  "detail": "n=3"
+ },
+ {
+  "test": "LIQ research out-of-order ordenado al leer",
+  "pass": true,
+  "detail": "ts=[1788820001998, 1788830501998, 1788830501998, 1788830501998]"
+ },
+ {
+  "test": "PRUNE borra del live cache la fila vieja",
+  "pass": true,
+  "detail": "live 2 -> 1"
+ },
+ {
+  "test": "PRUNE NO toca liquidations_research",
+  "pass": true,
+  "detail": "research 4 -> 4"
+ },
+ {
+  "test": "PRUNE keep_hours=0 vacia live pero research intacto",
+  "pass": true,
+  "detail": "research=4"
+ },
+ {
+  "test": "LIQ research sobrevive reopen (restart)",
+  "pass": true,
+  "detail": "4 -> 4"
+ }
+]

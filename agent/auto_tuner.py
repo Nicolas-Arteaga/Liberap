@@ -222,7 +222,10 @@ def build_recommendations(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "jsonl_path": getattr(config, "TRADE_METRICS_JSONL", ""),
         "trades_in_analysis": len(rows),
-        "total_closed_in_window": total_in_window,
+        # `rows` is already the selected closed-trade window. The former
+        # undefined name made the read-only audit crash before emitting any
+        # evidence; do not silently substitute total_available here.
+        "total_closed_in_window": len(rows),
         "source_distribution": source_split(rows),
         "notes": notes,
         "suggested_overrides": overrides,

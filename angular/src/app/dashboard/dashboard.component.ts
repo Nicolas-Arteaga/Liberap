@@ -27,6 +27,7 @@ import { TpSlModalComponent } from 'src/shared/components/tpsl-modal/tpsl-modal.
 import { PaginatorComponent } from '../shared/components/paginator/paginator.component';
 import { StrategyProfileService } from '../strategies/services/strategy-profile.service';
 import { StrategyProfileDto } from '../proxy/trading/dtos/models';
+import { FavoriteStrategiesService } from 'src/shared/services/favorite-strategies.service';
 
 interface TradingSignal {
   id: number;
@@ -103,6 +104,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   public alertService = inject(AlertService);
   private alertHistoryService = inject(AlertHistoryService);
   private strategyService = inject(StrategyProfileService);
+  favoritesService = inject(FavoriteStrategiesService);
   private destroy$ = new Subject<void>();
 
   // Estado del dashboard
@@ -377,8 +379,26 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   loadStrategyProfiles() {
     this.strategyService.getAll().subscribe(profiles => {
-      this.strategyProfiles = profiles.filter(p => p.id !== '00000000-0000-0000-0000-000000000000');
+      // 2026-08-16: "Standard Scalping" (legacy, id all-zeros) se saca de
+      // la vista por pedido explicito -- no aporta nada activo, solo
+      // ensucia la barra de tabs. El tab fijo correspondiente tambien se
+      // quito del template.
+      this.strategyProfiles = this.favoritesService.sortFavoritesFirst(
+        profiles.filter(p => p.id !== '00000000-0000-0000-0000-000000000000'),
+        p => p.id
+      );
+      // El tab 'legacy' ya no existe en la UI -- si quedo seleccionado por
+      // default, saltar al primero real disponible.
+      if (this.consoleTab === 'legacy' && this.strategyProfiles.length) {
+        this.consoleTab = this.strategyProfiles[0].id!;
+      }
     });
+  }
+
+  toggleFavoriteStrategy(id: string | undefined, event: Event): void {
+    event.stopPropagation();
+    this.favoritesService.toggle(id);
+    this.strategyProfiles = this.favoritesService.sortFavoritesFirst(this.strategyProfiles, p => p.id);
   }
 
   onStrategyChange() {

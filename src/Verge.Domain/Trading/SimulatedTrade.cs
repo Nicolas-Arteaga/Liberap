@@ -125,6 +125,66 @@ public class SimulatedTrade : FullAuditedAggregateRoot<Guid>
     /// </summary>
     public decimal? MaxSlProgressPct { get; set; }
 
+    /// <summary>
+    /// 2026-08-18: true una vez que el SL de este trade fue movido a breakeven
+    /// (entry + fees) porque llegó a BreakevenLockTpProgressPct de progreso hacia
+    /// el TP (ver SimulationMarkPriceWorker). Evidencia real que motivó esto: en
+    /// 45 días, 140 trades llegaron a ≥70% del camino al TP y terminaron en
+    /// pérdida total (sl_hit/timeout) sin nada que rescate esa ganancia ya
+    /// alcanzada -- $227 dejados en la mesa. Distinto de "Cosecha Inteligente"
+    /// (trailing continuo, removido 2026-07-15): esto NUNCA mueve el SL antes de
+    /// ese umbral y nunca mueve el TP -- solo evita que un trade ya ganado
+    /// termine en rojo total.
+    /// </summary>
+    public bool BreakevenLocked { get; set; } = false;
+
+    /// <summary>
+    /// ROUND 36/37 (research/agent/backtest/r36_exit_management.py,
+    /// r37_trail1_validation.py) — nivel de trailing stop "Trail-1" ya
+    /// aplicado a este trade: 0 = ninguno, 1 = +100bp (SL a breakeven),
+    /// 2 = +150bp (SL asegura +50bp), 3 = +200bp (SL asegura +100bp).
+    /// Monotónico (nunca retrocede) e idempotente (TrailingStopCalculator
+    /// solo actúa si el nivel objetivo es mayor a este valor). Persistido
+    /// en DB, no en memoria del proceso -- sobrevive reinicios sin estado
+    /// adicional. DESACTIVADO en producción (ver
+    /// SimulationMarkPriceWorker.TrailStopEnabled) hasta decisión
+    /// explícita del usuario tras el replay de ROUND 38.
+    /// </summary>
+    public int TrailLevelApplied { get; set; } = 0;
+
+    /// <summary>
+    /// ROUND 40 (canary) — null hasta que el worker evalúa este trade por
+    /// primera vez con el feature activo; a partir de ahí, fijo para
+    /// siempre (asignación determinística por Id, ver
+    /// SimulationMarkPriceWorker.IsCanaryAssigned). true = este trade
+    /// recibe gestión Trail-1 en vivo (grupo canary); false = se
+    /// gestiona exactamente como hoy, sin trailing (grupo control),
+    /// para poder comparar resultados reales sin abrir trades
+    /// duplicados. No se re-evalúa nunca una vez asignado.
+    /// </summary>
+    public bool? TrailStopCanary { get; set; }
+
+    /// <summary>
+    /// ROUND 40 (canary) — copia del SlPrice ORIGINAL (antes de que
+    /// cualquier movimiento de Trail-1 lo modifique), capturada la
+    /// primera vez que este trade entra al grupo canary. Necesaria para
+    /// poder reconstruir post-hoc "qué hubiera pasado sin Trail-1" sobre
+    /// un trade cuyo SlPrice en vivo sí cambió -- sin esto se pierde el
+    /// dato para el contrafactual (Parte 6 del brief).
+    /// </summary>
+    public decimal? OriginalSlPrice { get; set; }
+
+    /// <summary>
+    /// ROUND 40 (canary) — bitácora de auditoría de Trail-1, JSON array
+    /// acotado (máximo 3 entradas, una por nivel: 100/150/200bp). Cada
+    /// entrada: {level, ts, favBp, oldSl, newSl, changed}. Se escribe
+    /// SOLO en los eventos relevantes (cruce de umbral), nunca por tick
+    /// — así se puede auditar cada movimiento del stop sin loggear cada
+    /// segundo. Null si el trade nunca entró al grupo canary o nunca
+    /// cruzó ningún umbral.
+    /// </summary>
+    public string? TrailAuditJson { get; set; }
+
     protected SimulatedTrade() { }
 
     public SimulatedTrade(

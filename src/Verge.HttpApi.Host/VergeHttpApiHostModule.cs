@@ -154,6 +154,7 @@ public class VergeHttpApiHostModule : AbpModule
         context.Services.AddScoped<Verge.Trading.Scar.IPythonScarService, Verge.Trading.Scar.PythonScarService>();
         context.Services.AddScoped<Verge.Trading.Fvg.IPythonFvgService, Verge.Trading.Fvg.PythonFvgService>();
         context.Services.AddScoped<Verge.Trading.AdnCompression.IPythonAdnCompressionService, Verge.Trading.AdnCompression.PythonAdnCompressionService>();
+        context.Services.AddScoped<Verge.Trading.OrderBlock.IPythonOrderBlockService, Verge.Trading.OrderBlock.PythonOrderBlockService>();
 
 
         // Redis Configuration (Graceful startup)
@@ -219,6 +220,14 @@ public class VergeHttpApiHostModule : AbpModule
             client.Timeout = TimeSpan.FromSeconds(60);
         });
 
+
+        // Python Order Block HTTP Client
+        context.Services.AddHttpClient("PythonOrderBlock", client =>
+        {
+            var url = configuration["PythonService:Url"] ?? "http://localhost:8000";
+            client.BaseAddress = new Uri(url);
+            client.Timeout = TimeSpan.FromSeconds(60);
+        });
 
         context.Services.ConfigureApplicationCookie(options =>
         {

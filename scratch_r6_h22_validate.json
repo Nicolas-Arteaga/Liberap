@@ -1,0 +1,193 @@
+{
+ "generated_utc": "2026-09-10T00:54:29.911041+00:00",
+ "n_symbols": 150,
+ "span_months": 7.6,
+ "sides": {
+  "bull": {
+   "n": 1046,
+   "n_ctrl": 20300,
+   "horizons": {
+    "1": {
+     "real": {
+      "n": 1046,
+      "n_sym": 133,
+      "mean_bp": -0.5,
+      "ci_bp": [
+       -4.3,
+       3.7
+      ],
+      "frac_sym_pos": 0.56,
+      "top5_conc": 0.31,
+      "by_third": {
+       "0": 0.6,
+       "1": 3.9,
+       "2": -2.7
+      }
+     },
+     "placebo_mean_bp": 2.5,
+     "ctrl_mean_bp": 0.2,
+     "after_cost_bp": {
+      "0.0": -8.5,
+      "2.0": -12.5,
+      "5.0": -18.5
+     },
+     "net_bp_at_2bp_slip": -12.5,
+     "pnl_usd_per_trade_at_2bp": -0.188
+    },
+    "2": {
+     "real": {
+      "n": 1046,
+      "n_sym": 133,
+      "mean_bp": -1.6,
+      "ci_bp": [
+       -8.7,
+       4.6
+      ],
+      "frac_sym_pos": 0.54,
+      "top5_conc": 0.35,
+      "by_third": {
+       "0": -7.8,
+       "1": -0.0,
+       "2": 0.2
+      }
+     },
+     "placebo_mean_bp": 6.9,
+     "ctrl_mean_bp": 2.0,
+     "after_cost_bp": {
+      "0.0": -9.6,
+      "2.0": -13.6,
+      "5.0": -19.6
+     },
+     "net_bp_at_2bp_slip": -13.6,
+     "pnl_usd_per_trade_at_2bp": -0.204
+    },
+    "4": {
+     "real": {
+      "n": 1046,
+      "n_sym": 133,
+      "mean_bp": -8.0,
+      "ci_bp": [
+       -19.1,
+       2.1
+      ],
+      "frac_sym_pos": 0.5,
+      "top5_conc": 0.33,
+      "by_third": {
+       "0": -18.1,
+       "1": 1.9,
+       "2": -8.0
+      }
+     },
+     "placebo_mean_bp": 1.9,
+     "ctrl_mean_bp": 0.4,
+     "after_cost_bp": {
+      "0.0": -16.0,
+      "2.0": -20.0,
+      "5.0": -26.0
+     },
+     "net_bp_at_2bp_slip": -20.0,
+     "pnl_usd_per_trade_at_2bp": -0.3
+    }
+   },
+   "monetization_30m_2bp": {
+    "events_per_month": 137.1,
+    "net_bp_per_trade": -13.6,
+    "monthly_pnl_usd_est": -28.0,
+    "note": "$150 nocional/trade, holding 30m, 3 slots de $150 sobran (solapamiento bajo)"
+   }
+  },
+  "bear": {
+   "n": 1284,
+   "n_ctrl": 22350,
+   "horizons": {
+    "1": {
+     "real": {
+      "n": 1284,
+      "n_sym": 138,
+      "mean_bp": 6.0,
+      "ci_bp": [
+       2.5,
+       9.8
+      ],
+      "frac_sym_pos": 0.64,
+      "top5_conc": 0.27,
+      "by_third": {
+       "0": 13.3,
+       "1": 2.4,
+       "2": 5.2
+      }
+     },
+     "placebo_mean_bp": -1.6,
+     "ctrl_mean_bp": 0.6,
+     "after_cost_bp": {
+      "0.0": -2.0,
+      "2.0": -6.0,
+      "5.0": -12.0
+     },
+     "net_bp_at_2bp_slip": -6.0,
+     "pnl_usd_per_trade_at_2bp": -0.09
+    },
+    "2": {
+     "real": {
+      "n": 1284,
+      "n_sym": 138,
+      "mean_bp": 3.9,
+      "ci_bp": [
+       -0.6,
+       8.6
+      ],
+      "frac_sym_pos": 0.56,
+      "top5_conc": 0.28,
+      "by_third": {
+       "0": 8.8,
+       "1": 3.0,
+       "2": 2.7
+      }
+     },
+     "placebo_mean_bp": -3.2,
+     "ctrl_mean_bp": 2.0,
+     "after_cost_bp": {
+      "0.0": -4.1,
+      "2.0": -8.1,
+      "5.0": -14.1
+     },
+     "net_bp_at_2bp_slip": -8.1,
+     "pnl_usd_per_trade_at_2bp": -0.121
+    },
+    "4": {
+     "real": {
+      "n": 1284,
+      "n_sym": 138,
+      "mean_bp": 5.9,
+      "ci_bp": [
+       -2.8,
+       13.9
+      ],
+      "frac_sym_pos": 0.6,
+      "top5_conc": 0.33,
+      "by_third": {
+       "0": 13.6,
+       "1": -1.2,
+       "2": 6.8
+      }
+     },
+     "placebo_mean_bp": -6.7,
+     "ctrl_mean_bp": 1.6,
+     "after_cost_bp": {
+      "0.0": -2.1,
+      "2.0": -6.1,
+      "5.0": -12.1
+     },
+     "net_bp_at_2bp_slip": -6.1,
+     "pnl_usd_per_trade_at_2bp": -0.091
+    }
+   },
+   "monetization_30m_2bp": {
+    "events_per_month": 168.3,
+    "net_bp_per_trade": -8.1,
+    "monthly_pnl_usd_est": -20.4,
+    "note": "$150 nocional/trade, holding 30m, 3 slots de $150 sobran (solapamiento bajo)"
+   }
+  }
+ }
+}

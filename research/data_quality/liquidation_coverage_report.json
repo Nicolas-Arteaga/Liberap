@@ -1,0 +1,227 @@
+{
+ "generated_at_utc": "2026-09-09T00:44:34.648284+00:00",
+ "db": "C:\\Users\\Nicolas\\Desktop\\Verge\\Verge\\agent\\data\\klines.db",
+ "research_table_present": true,
+ "health_table_present": true,
+ "rows": 21,
+ "symbols": 9,
+ "first_utc": "2026-09-09T00:31:32.273000",
+ "last_utc": "2026-09-09T00:43:41.637000",
+ "last_obs_age_min": 0.9,
+ "span_days": 0.01,
+ "total_notional_usd": 62853.83,
+ "duplicate_rows": 0,
+ "by_venue": {
+  "bybit": 21
+ },
+ "biggest_inter_event_gap_min": 6.6,
+ "universe_symbols": 63,
+ "universe_symbols_seen": 9,
+ "universe_symbols_missing": [
+  "ETHUSDT",
+  "SOLUSDT",
+  "XRPUSDT",
+  "ZECUSDT",
+  "BANKUSDT",
+  "DOGEUSDT",
+  "BNBUSDT",
+  "DRAMUSDT",
+  "ADAUSDT",
+  "1000PEPEUSDT",
+  "SAMSUNGUSDT",
+  "PUMPUSDT",
+  "LINKUSDT",
+  "BEATUSDT",
+  "KAITOUSDT",
+  "ENAUSDT",
+  "UNIUSDT",
+  "ONDOUSDT",
+  "AAVEUSDT",
+  "PAXGUSDT",
+  "BTWUSDT",
+  "AVAXUSDT",
+  "TAOUSDT",
+  "DEXEUSDT",
+  "MRVLUSDT",
+  "ONUSDT",
+  "HOMEUSDT",
+  "LTCUSDT",
+  "BCHUSDT",
+  "XLMUSDT",
+  "FILUSDT",
+  "DOTUSDT",
+  "ALLOUSDT",
+  "1000SHIBUSDT",
+  "REUSDT",
+  "LABUSDT",
+  "XMRUSDT",
+  "COTIUSDT",
+  "ACEUSDT",
+  "XAUTUSDT",
+  "CAPUSDT",
+  "LITUSDT",
+  "ESPORTSUSDT",
+  "EPICUSDT",
+  "PENGUUSDT",
+  "INJUSDT",
+  "UBUSDT",
+  "USUSDT",
+  "BLESSUSDT",
+  "RIFUSDT",
+  "1000BONKUSDT",
+  "ZAMAUSDT",
+  "FETUSDT",
+  "GIGGLEUSDT"
+ ],
+ "events_per_day": [
+  {
+   "day": "2026-09-09",
+   "events": 21,
+   "symbols": 9,
+   "notional_usd": 62853.83
+  }
+ ],
+ "gate_60d": {
+  "target": 60,
+  "current": 0.01,
+  "remaining_d": 60.0
+ },
+ "gate_90d": {
+  "target": 90,
+  "current": 0.01,
+  "remaining_d": 90.0
+ },
+ "pct_events_persisted_ok": 100.0,
+ "per_symbol": [
+  {
+   "symbol": "WLDUSDT",
+   "events": 9,
+   "first_utc": "2026-09-09T00:32:22.011000",
+   "last_utc": "2026-09-09T00:33:24.866000",
+   "last_age_min": 11.2,
+   "notional_usd": 10724.46,
+   "in_universe": true
+  },
+  {
+   "symbol": "ARBUSDT",
+   "events": 4,
+   "first_utc": "2026-09-09T00:31:32.273000",
+   "last_utc": "2026-09-09T00:41:28.516000",
+   "last_age_min": 3.1,
+   "notional_usd": 34662.21,
+   "in_universe": true
+  },
+  {
+   "symbol": "HYPEUSDT",
+   "events": 2,
+   "first_utc": "2026-09-09T00:42:43.907000",
+   "last_utc": "2026-09-09T00:43:41.637000",
+   "last_age_min": 0.9,
+   "notional_usd": 4755.26,
+   "in_universe": true
+  },
+  {
+   "symbol": "AKEUSDT",
+   "events": 1,
+   "first_utc": "2026-09-09T00:32:49.963000",
+   "last_utc": "2026-09-09T00:32:49.963000",
+   "last_age_min": 11.7,
+   "notional_usd": 1133.94,
+   "in_universe": true
+  },
+  {
+   "symbol": "BTCUSDT",
+   "events": 1,
+   "first_utc": "2026-09-09T00:42:43.907000",
+   "last_utc": "2026-09-09T00:42:43.907000",
+   "last_age_min": 1.8,
+   "notional_usd": 2366.39,
+   "in_universe": true
+  },
+  {
+   "symbol": "NEARUSDT",
+   "events": 1,
+   "first_utc": "2026-09-09T00:32:22.942000",
+   "last_utc": "2026-09-09T00:32:22.942000",
+   "last_age_min": 12.2,
+   "notional_usd": 116.6,
+   "in_universe": true
+  },
+  {
+   "symbol": "SUIUSDT",
+   "events": 1,
+   "first_utc": "2026-09-09T00:41:28.516000",
+   "last_utc": "2026-09-09T00:41:28.516000",
+   "last_age_min": 3.1,
+   "notional_usd": 8994.7,
+   "in_universe": true
+  },
+  {
+   "symbol": "TRUMPUSDT",
+   "events": 1,
+   "first_utc": "2026-09-09T00:32:22.942000",
+   "last_utc": "2026-09-09T00:32:22.942000",
+   "last_age_min": 12.2,
+   "notional_usd": 92.39,
+   "in_universe": true
+  },
+  {
+   "symbol": "TRXUSDT",
+   "events": 1,
+   "first_utc": "2026-09-09T00:40:01.211000",
+   "last_utc": "2026-09-09T00:40:01.211000",
+   "last_age_min": 4.6,
+   "notional_usd": 7.87,
+   "in_universe": true
+  }
+ ],
+ "health_events": {
+  "connect": 3,
+  "heartbeat": 3
+ },
+ "health_recent": [
+  {
+   "ts_utc": "2026-09-09T00:42:34.667000",
+   "event": "heartbeat",
+   "symbols": 63,
+   "events_since_last": 4,
+   "note": null
+  },
+  {
+   "ts_utc": "2026-09-09T00:37:34.197000",
+   "event": "connect",
+   "symbols": 63,
+   "events_since_last": null,
+   "note": null
+  },
+  {
+   "ts_utc": "2026-09-09T00:35:19.520000",
+   "event": "heartbeat",
+   "symbols": 63,
+   "events_since_last": 14,
+   "note": null
+  },
+  {
+   "ts_utc": "2026-09-09T00:34:48.638000",
+   "event": "heartbeat",
+   "symbols": 63,
+   "events_since_last": 14,
+   "note": null
+  },
+  {
+   "ts_utc": "2026-09-09T00:30:18.967000",
+   "event": "connect",
+   "symbols": 63,
+   "events_since_last": null,
+   "note": null
+  },
+  {
+   "ts_utc": "2026-09-09T00:29:48.259000",
+   "event": "connect",
+   "symbols": 63,
+   "events_since_last": null,
+   "note": null
+  }
+ ],
+ "estimated_downtime_min": 0.0
+}

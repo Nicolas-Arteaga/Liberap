@@ -68,7 +68,9 @@ export class StrategyProfileService {
         }
 
         const wins = trades.filter(t => (t.realizedPnl || 0) > 0).length;
-        const netPnL = trades.reduce((acc, t) => acc + (t.roiPercentage || 0), 0);
+        // Monetary performance is the sum of realized PnL.  Per-trade ROI is
+        // retained for trade-level analysis, but must never be summed as PnL.
+        const netPnL = trades.reduce((acc, t) => acc + (t.realizedPnl || 0), 0);
         
         // Calculate Top Symbols
         const symbolStats = trades.reduce((acc: any, t) => {
@@ -82,10 +84,10 @@ export class StrategyProfileService {
           .sort((a, b) => b.pnl - a.pnl)
           .slice(0, 5);
 
-        // Simple equity curve (cumulative ROI)
-        let cumulative = 100;
+        // Equity curve in USDT from an explicit neutral baseline.
+        let cumulative = 0;
         const equityCurve = trades.map(t => {
-          cumulative += (t.roiPercentage || 0);
+          cumulative += (t.realizedPnl || 0);
           return cumulative;
         });
 
@@ -93,7 +95,7 @@ export class StrategyProfileService {
           winRate: (wins / trades.length) * 100,
           totalTrades: trades.length,
           netPnL: netPnL,
-          avgRR: trades.reduce((acc, t) => acc + (t.roiPercentage || 0), 0) / trades.length, // Rough avg ROI
+          avgRR: netPnL / trades.length,
           topSymbols: topSymbols,
           equityCurve: equityCurve,
           allTrades: trades.sort((a, b) => new Date(b.openedAt!).getTime() - new Date(a.openedAt!).getTime())

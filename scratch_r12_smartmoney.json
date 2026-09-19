@@ -1,0 +1,40 @@
+{
+ "generated_utc": "2026-09-11T01:27:59.339841+00:00",
+ "universe": 45,
+ "tcut": "2026-02-07",
+ "vcut": "2026-05-14",
+ "n_RL": 31454,
+ "n_RS": 44498,
+ "n_confirm": 30666,
+ "n_diverge": 22866,
+ "best_m1_usd_mo": 28.94390444830404,
+ "best_m2_usd_mo": 35.350647727083576,
+ "m1_results": {
+  "RL_SS_SHORT hold=4h 1x$450": -113.59674416918499,
+  "RL_SS_SHORT hold=4h 2x$225": -129.10388160121855,
+  "RL_SS_SHORT hold=8h 1x$450": -21.42914115137568,
+  "RL_SS_SHORT hold=8h 2x$225": -38.81762090373351,
+  "RL_SS_LONG hold=4h 1x$450": -247.3208894621637,
+  "RL_SS_LONG hold=4h 2x$225": -229.53160305869068,
+  "RL_SS_LONG hold=8h 1x$450": -161.75445773926546,
+  "RL_SS_LONG hold=8h 2x$225": -143.52550025732535,
+  "RS_SL_LONG hold=4h 1x$450": -310.6438906185885,
+  "RS_SL_LONG hold=4h 2x$225": -279.4002430647642,
+  "RS_SL_LONG hold=8h 1x$450": -216.31360754880475,
+  "RS_SL_LONG hold=8h 2x$225": -192.86065518488152,
+  "RS_SL_SHORT hold=4h 1x$450": -60.282281434210745,
+  "RS_SL_SHORT hold=4h 2x$225": -89.32365315735693,
+  "RS_SL_SHORT hold=8h 1x$450": 28.94390444830404,
+  "RS_SL_SHORT hold=8h 2x$225": 6.356219395088427
+ },
+ "m2_results": {
+  "OI-ACC confirm side=S hold=4h 1x$450": -233.74015649462245,
+  "OI-ACC confirm side=S hold=4h 2x$225": -204.79776263087805,
+  "OI-ACC confirm side=S hold=8h 1x$450": -209.5201766746169,
+  "OI-ACC confirm side=S hold=8h 2x$225": -163.55923182612162,
+  "OI-ACC diverge side=S hold=4h 1x$450": 35.350647727083576,
+  "OI-ACC diverge side=S hold=4h 2x$225": -52.07618803433776,
+  "OI-ACC diverge side=S hold=8h 1x$450": -142.87277258174626,
+  "OI-ACC diverge side=S hold=8h 2x$225": -87.52959405990464
+ }
+}

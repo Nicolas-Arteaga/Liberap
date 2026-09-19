@@ -73,6 +73,7 @@ export interface CreateUpdateStrategyProfileDto {
   strategyType?: string;
   patternParamsJson?: string;
   broadcastToBinance: boolean;
+  useTrailStop: boolean;
 }
 
 export interface EnhancedAnalysisDto {
@@ -220,6 +221,7 @@ export interface StrategyProfileDto extends EntityDto<string> {
   strategyType?: string;
   patternParamsJson?: string;
   broadcastToBinance: boolean;
+  useTrailStop: boolean;
   winRate: number;
   totalTrades: number;
   netPnL: number;

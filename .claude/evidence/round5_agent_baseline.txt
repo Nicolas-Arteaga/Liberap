@@ -1,0 +1,10 @@
+=== PRE-CHANGE BASELINE 2026-09-09T17:46:51Z ===
+log_lines_now: 1727834
+log_last_ts: 2026-09-09 12:37:51,457
+log_size_bytes: 230883408
+-- counts in last 3000 lines --
+vetos_low_confluence_tier3_last3000: 1305
+msf_all_failed_last3000: 1071
+last_ma_pattern_inject: MA-PATTERN-INJECT] 96 nuevos
+trades_executed_last3000: 0
+candidates_passed_last3000: 1

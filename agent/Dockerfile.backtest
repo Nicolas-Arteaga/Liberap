@@ -15,12 +15,13 @@ COPY agent/ /app/
 # como hermano de /app para que esa ruta relativa resuelva igual que en host.
 COPY python-service/fvg /python-service/fvg
 COPY python-service/adn_compression /python-service/adn_compression
+COPY python-service/orderblock /python-service/orderblock
 COPY python-service/shared_kline_cache.py /python-service/shared_kline_cache.py
 
 ENV PYTHONUNBUFFERED=1
 EXPOSE 8010
 
 HEALTHCHECK --interval=30s --timeout=8s --start-period=30s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8010/backtest/symbols', timeout=5)"
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8010/health', timeout=5)"
 
 CMD ["python", "-m", "backtest.api"]

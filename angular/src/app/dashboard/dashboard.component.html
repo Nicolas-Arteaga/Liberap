@@ -457,15 +457,14 @@
             <!-- Tabs: Standard Scalping + Dynamic Strategies — scroll horizontal, nunca se recortan -->
             <div class="tab-scroll-wrap flex-grow-1">
               <div class="tab-scroll d-flex align-items-stretch">
-                <div class="tab-item py-2 px-3 pointer text-xs uppercase flex-shrink-0" [class.active]="consoleTab === 'legacy'"
-                  (click)="setConsoleTab('legacy')">
-                  Standard Scalping
-                  <span class="tab-count" [class.tab-count-hot]="getActiveTradesCount(null) > 0">{{ getActiveTradesCount(null) }}</span>
-                </div>
                 <div *ngFor="let profile of strategyProfiles" class="tab-item py-2 px-3 pointer text-xs uppercase flex-shrink-0"
                   [class.active]="consoleTab === profile.id"
+                  [class.is-favorite]="favoritesService.isFavorite(profile.id)"
                   [style.--tab-accent]="profile.color || '#00f3ff'"
                   (click)="setConsoleTab(profile.id!)">
+                  <span class="tab-star-hit" (click)="toggleFavoriteStrategy(profile.id, $event)">
+                    <ion-icon class="tab-star" [name]="favoritesService.isFavorite(profile.id) ? 'star' : 'star-outline'"></ion-icon>
+                  </span>
                   <ion-icon [name]="strategyTypeIcon(profile.strategyType)" class="tab-icon"></ion-icon>
                   {{ profile.name }}
                   <span class="tab-count" [class.tab-count-hot]="getActiveTradesCount(profile.id!) > 0">{{ getActiveTradesCount(profile.id!) }}</span>

@@ -1,0 +1,34 @@
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=200min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=340 | Total=440
+
+=== Level Sweep 1H (margen $300) ===
+    SIN TOPE             n= 10836 WR= 37.3% PnL=$  6578.47 ($  824.07/mes) peor=$-84.64
+    TOPE -$5             n= 15245 WR= 25.7% PnL=$  6090.49 ($  762.94/mes) peor=$-5.24
+    TOPE -$10            n= 12190 WR= 33.7% PnL=$  6971.54 ($  873.31/mes) peor=$-10.24
+
+=== Level Sweep 60m SL1.5 RR3 (margen $300) ===
+    SIN TOPE             n= 12189 WR= 28.5% PnL=$  5654.43 ($  708.32/mes) peor=$-63.54
+    TOPE -$5             n= 15016 WR= 22.5% PnL=$  6086.56 ($  762.45/mes) peor=$-5.24
+    TOPE -$10            n= 13007 WR= 27.0% PnL=$  6734.28 ($  843.59/mes) peor=$-10.24
+
+=== Level Sweep 60m SL2 RR1.5 (margen $300) ===
+    SIN TOPE             n= 12869 WR= 43.5% PnL=$  5651.80 ($  707.99/mes) peor=$-84.64
+    TOPE -$5             n= 17128 WR= 31.4% PnL=$  5159.38 ($  646.30/mes) peor=$-5.24
+    TOPE -$10            n= 14076 WR= 39.9% PnL=$  5171.09 ($  647.77/mes) peor=$-10.24
+
+=== Level Sweep 15m SL3 RR3 (margen $300) ===
+    SIN TOPE             n= 15347 WR= 27.8% PnL=$  5164.47 ($  646.94/mes) peor=$-92.49
+    TOPE -$5             n= 22349 WR= 20.1% PnL=$  4210.66 ($  527.46/mes) peor=$-5.24
+    TOPE -$10            n= 17229 WR= 25.5% PnL=$  6123.87 ($  767.12/mes) peor=$-10.24
+
+=== Band Touch 15m (margen $300) ===
+    SIN TOPE             n= 16138 WR= 27.6% PnL=$  6088.07 ($  762.64/mes) peor=$-81.71
+    TOPE -$5             n= 23018 WR= 20.6% PnL=$  4789.56 ($  599.98/mes) peor=$-5.24
+    TOPE -$10            n= 18068 WR= 25.6% PnL=$  6673.33 ($  835.95/mes) peor=$-10.24
+
+=== Death Cross (SMA50/200 4h, margen $300) ===
+    SIN TOPE             n=   143 WR= 39.9% PnL=$  1244.11 ($  155.85/mes) peor=$-43.40
+    TOPE -$5             n=   145 WR= 20.7% PnL=$   549.04 ($   68.78/mes) peor=$-5.24
+    TOPE -$10            n=   144 WR= 35.4% PnL=$  1171.10 ($  146.70/mes) peor=$-10.24

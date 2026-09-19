@@ -1,0 +1,510 @@
+{
+ "generated_at_utc": "2026-09-08T01:38:58.159706+00:00",
+ "criterion": {
+  "tier0": "BTC/ETH/SOL obligatorio",
+  "tier1": "top 60 perps por mediana de dollar-volume 5m sobre 30d locales",
+  "min_coverage": 0.95,
+  "data_source": "binance_vision_clean.db / klines_5m (perps Binance Futures)",
+  "window_utc": [
+   "2026-07-18T23:55:00",
+   "2026-08-17T23:55:00"
+  ],
+  "note": "seleccion EX-ANTE por liquidez/disponibilidad; NO usa resultados de H13"
+ },
+ "tier0": [
+  {
+   "symbol": "BTCUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 14231577,
+   "bars": 8641
+  },
+  {
+   "symbol": "ETHUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 10724899,
+   "bars": 8641
+  },
+  {
+   "symbol": "SOLUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 2201808,
+   "bars": 8641
+  }
+ ],
+ "tier1": [
+  {
+   "symbol": "XRPUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 889407,
+   "bars": 8641
+  },
+  {
+   "symbol": "ZECUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 840283,
+   "bars": 8641
+  },
+  {
+   "symbol": "HYPEUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 792361,
+   "bars": 8641
+  },
+  {
+   "symbol": "BANKUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 706730,
+   "bars": 8641
+  },
+  {
+   "symbol": "DOGEUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 509151,
+   "bars": 8641
+  },
+  {
+   "symbol": "BNBUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 439222,
+   "bars": 8641
+  },
+  {
+   "symbol": "AKEUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 400000,
+   "bars": 8641
+  },
+  {
+   "symbol": "DRAMUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 375892,
+   "bars": 8641
+  },
+  {
+   "symbol": "ADAUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 279316,
+   "bars": 8641
+  },
+  {
+   "symbol": "1000PEPEUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 270276,
+   "bars": 8641
+  },
+  {
+   "symbol": "SAMSUNGUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 224195,
+   "bars": 8641
+  },
+  {
+   "symbol": "WLDUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 213347,
+   "bars": 8641
+  },
+  {
+   "symbol": "PUMPUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 199923,
+   "bars": 8641
+  },
+  {
+   "symbol": "LINKUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 189438,
+   "bars": 8641
+  },
+  {
+   "symbol": "BEATUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 186004,
+   "bars": 8641
+  },
+  {
+   "symbol": "SUIUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 180849,
+   "bars": 8641
+  },
+  {
+   "symbol": "NEARUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 169335,
+   "bars": 8641
+  },
+  {
+   "symbol": "KAITOUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 164591,
+   "bars": 8641
+  },
+  {
+   "symbol": "ENAUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 152686,
+   "bars": 8641
+  },
+  {
+   "symbol": "UNIUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 148400,
+   "bars": 8641
+  },
+  {
+   "symbol": "ONDOUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 139958,
+   "bars": 8641
+  },
+  {
+   "symbol": "AAVEUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 137204,
+   "bars": 8641
+  },
+  {
+   "symbol": "PAXGUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 135459,
+   "bars": 8641
+  },
+  {
+   "symbol": "BTWUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 134986,
+   "bars": 8641
+  },
+  {
+   "symbol": "AVAXUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 132451,
+   "bars": 8641
+  },
+  {
+   "symbol": "TAOUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 124303,
+   "bars": 8641
+  },
+  {
+   "symbol": "DEXEUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 118315,
+   "bars": 8641
+  },
+  {
+   "symbol": "MRVLUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 114680,
+   "bars": 8641
+  },
+  {
+   "symbol": "ONUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 102851,
+   "bars": 8641
+  },
+  {
+   "symbol": "HOMEUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 95039,
+   "bars": 8641
+  },
+  {
+   "symbol": "LTCUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 85442,
+   "bars": 8641
+  },
+  {
+   "symbol": "BCHUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 77285,
+   "bars": 8641
+  },
+  {
+   "symbol": "XLMUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 75699,
+   "bars": 8641
+  },
+  {
+   "symbol": "FILUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 74819,
+   "bars": 8641
+  },
+  {
+   "symbol": "DOTUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 71580,
+   "bars": 8641
+  },
+  {
+   "symbol": "ALLOUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 71222,
+   "bars": 8641
+  },
+  {
+   "symbol": "1000SHIBUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 69632,
+   "bars": 8641
+  },
+  {
+   "symbol": "REUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 68402,
+   "bars": 8641
+  },
+  {
+   "symbol": "LABUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 68380,
+   "bars": 8641
+  },
+  {
+   "symbol": "XMRUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 66896,
+   "bars": 8641
+  },
+  {
+   "symbol": "COTIUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 65540,
+   "bars": 8641
+  },
+  {
+   "symbol": "TRUMPUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 58683,
+   "bars": 8641
+  },
+  {
+   "symbol": "ACEUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 58461,
+   "bars": 8641
+  },
+  {
+   "symbol": "TRXUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 58325,
+   "bars": 8641
+  },
+  {
+   "symbol": "XAUTUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 57657,
+   "bars": 8641
+  },
+  {
+   "symbol": "CAPUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 57115,
+   "bars": 8641
+  },
+  {
+   "symbol": "LITUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 54937,
+   "bars": 8641
+  },
+  {
+   "symbol": "ESPORTSUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 54853,
+   "bars": 8641
+  },
+  {
+   "symbol": "EPICUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 54273,
+   "bars": 8641
+  },
+  {
+   "symbol": "PENGUUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 54059,
+   "bars": 8641
+  },
+  {
+   "symbol": "INJUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 52520,
+   "bars": 8641
+  },
+  {
+   "symbol": "UBUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 51158,
+   "bars": 8641
+  },
+  {
+   "symbol": "USUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 49046,
+   "bars": 8641
+  },
+  {
+   "symbol": "BLESSUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 46466,
+   "bars": 8641
+  },
+  {
+   "symbol": "RIFUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 46295,
+   "bars": 8641
+  },
+  {
+   "symbol": "1000BONKUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 46038,
+   "bars": 8641
+  },
+  {
+   "symbol": "ZAMAUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 44405,
+   "bars": 8641
+  },
+  {
+   "symbol": "ARBUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 43941,
+   "bars": 8641
+  },
+  {
+   "symbol": "FETUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 43379,
+   "bars": 8641
+  },
+  {
+   "symbol": "GIGGLEUSDT",
+   "coverage": 1.0,
+   "median_5m_dollar_vol": 39784,
+   "bars": 8641
+  }
+ ],
+ "universe": [
+  "BTCUSDT",
+  "ETHUSDT",
+  "SOLUSDT",
+  "XRPUSDT",
+  "ZECUSDT",
+  "HYPEUSDT",
+  "BANKUSDT",
+  "DOGEUSDT",
+  "BNBUSDT",
+  "AKEUSDT",
+  "DRAMUSDT",
+  "ADAUSDT",
+  "1000PEPEUSDT",
+  "SAMSUNGUSDT",
+  "WLDUSDT",
+  "PUMPUSDT",
+  "LINKUSDT",
+  "BEATUSDT",
+  "SUIUSDT",
+  "NEARUSDT",
+  "KAITOUSDT",
+  "ENAUSDT",
+  "UNIUSDT",
+  "ONDOUSDT",
+  "AAVEUSDT",
+  "PAXGUSDT",
+  "BTWUSDT",
+  "AVAXUSDT",
+  "TAOUSDT",
+  "DEXEUSDT",
+  "MRVLUSDT",
+  "ONUSDT",
+  "HOMEUSDT",
+  "LTCUSDT",
+  "BCHUSDT",
+  "XLMUSDT",
+  "FILUSDT",
+  "DOTUSDT",
+  "ALLOUSDT",
+  "1000SHIBUSDT",
+  "REUSDT",
+  "LABUSDT",
+  "XMRUSDT",
+  "COTIUSDT",
+  "TRUMPUSDT",
+  "ACEUSDT",
+  "TRXUSDT",
+  "XAUTUSDT",
+  "CAPUSDT",
+  "LITUSDT",
+  "ESPORTSUSDT",
+  "EPICUSDT",
+  "PENGUUSDT",
+  "INJUSDT",
+  "UBUSDT",
+  "USUSDT",
+  "BLESSUSDT",
+  "RIFUSDT",
+  "1000BONKUSDT",
+  "ZAMAUSDT",
+  "ARBUSDT",
+  "FETUSDT",
+  "GIGGLEUSDT"
+ ],
+ "n": 63,
+ "excluded_equity_commodity": [
+  "AAPLUSDT",
+  "AMDUSDT",
+  "AMZNUSDT",
+  "ARMUSDT",
+  "ASTSUSDT",
+  "AVGOUSDT",
+  "BABAUSDT",
+  "BZUSDT",
+  "CLUSDT",
+  "COINUSDT",
+  "CRCLUSDT",
+  "EWYUSDT",
+  "GOOGLUSDT",
+  "HOODUSDT",
+  "INTCUSDT",
+  "KORUUSDT",
+  "METAUSDT",
+  "MSFTUSDT",
+  "MSTRUSDT",
+  "MUUSDT",
+  "NBISUSDT",
+  "NVDAUSDT",
+  "ONDSUSDT",
+  "ORCLUSDT",
+  "PLTRUSDT",
+  "QCOMUSDT",
+  "QQQUSDT",
+  "RKLBUSDT",
+  "SKHYNIXUSDT",
+  "SKHYUSDT",
+  "SMCIUSDT",
+  "SNDKUSDT",
+  "SOXLUSDT",
+  "SPCXUSDT",
+  "SPYUSDT",
+  "TSLAUSDT",
+  "TSMUSDT",
+  "UBERUSDT",
+  "XAGUSDT",
+  "XAUUSDT",
+  "XPDUSDT"
+ ],
+ "known_limitations": [
+  "La presencia en klines_5m es PROXY de disponibilidad en openInterestHist; un simbolo listado puede no tener OI historico -> se detecta como coverage baja en el monitor.",
+  "binance_vision_clean.db se congelo el 2026-08-17; simbolos listados despues no aparecen aca. Revisar y regenerar cuando haya klines mas nuevas.",
+  "El colector de liquidaciones usa Bybit; los nombres coinciden en su mayoria pero algunos perps de Binance no existen en Bybit -> se registran como 'no disponible' en su monitor."
+ ]
+}

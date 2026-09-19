@@ -1,0 +1,6 @@
+{
+ "generated_utc": "2026-09-12T04:58:30.603829+00:00",
+ "n_events": 67045,
+ "best_net_mo": 150.0978530666175,
+ "best_cfg": "TAKER cap=$450 slots=5 score-select"
+}

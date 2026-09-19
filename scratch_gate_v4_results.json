@@ -1,0 +1,821 @@
+{
+ "MA Slope Caso 3": {
+  "real": {
+   "n": 70,
+   "net": 65.14,
+   "pf": 1.851793545933966,
+   "exp": 0.9305415663653749,
+   "wr": 42.857142857142854,
+   "dur": 16.73222833333333,
+   "mdd": -19.54,
+   "expo": 2.66,
+   "cls": "WINNER"
+  },
+  "window": [
+   1783735597547,
+   1786752000000
+  ],
+  "coverage": 0.879,
+  "missing_syms": [
+   "ADBEUSDT",
+   "ETHBTCUSDT",
+   "RSRUSDT",
+   "SUNUSDT",
+   "VRTUSDT",
+   "XLEUSDT",
+   "ZHIPUUSDT"
+  ],
+  "replay_median_pf": 0.812,
+  "replay_median_exp": -0.341,
+  "replay_cls": "LOSER",
+  "pct_seeds_correct": 29.714285714285715,
+  "pf_dist": {
+   "5": 0.334,
+   "25": 0.542,
+   "50": 0.812,
+   "75": 1.052,
+   "95": 1.613
+  },
+  "net_dist": {
+   "5": -50.5,
+   "25": -32.9,
+   "50": -12.0,
+   "75": 3.0,
+   "95": 33.5
+  },
+  "exp_dist": {
+   "5": -1.328,
+   "25": -0.835,
+   "50": -0.341,
+   "75": 0.09,
+   "95": 0.964
+  },
+  "jitter_by_level": {
+   "0": [
+    "L",
+    0.7,
+    0.35,
+    1.32
+   ],
+   "1": [
+    "L",
+    0.69,
+    0.23,
+    1.56
+   ],
+   "2": [
+    "L",
+    0.69,
+    0.23,
+    1.56
+   ],
+   "5": [
+    "L",
+    0.69,
+    0.23,
+    1.56
+   ],
+   "10": [
+    "L",
+    0.69,
+    0.23,
+    1.56
+   ]
+  },
+  "cost_by_bp": {
+   "0": [
+    -8.1,
+    "neg"
+   ],
+   "2": [
+    -10.1,
+    "neg"
+   ],
+   "5": [
+    -12.9,
+    "neg"
+   ]
+  },
+  "n_mc": 350,
+  "fam": "MaGeometry",
+  "gt_cls": "WINNER",
+  "baseline_trades": [
+   {
+    "symbol": "NVDAUSDT",
+    "open_time": 1783735800000,
+    "close_time": 1784047800000,
+    "pnl": -0.1486,
+    "close_reason": "zombie_timeout"
+   },
+   {
+    "symbol": "POLUSDT",
+    "open_time": 1783735800000,
+    "close_time": 1783901100000,
+    "pnl": -3.0688,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "SAMSUNGUSDT",
+    "open_time": 1783735800000,
+    "close_time": 1783901100000,
+    "pnl": -2.547,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "BZUSDT",
+    "open_time": 1783901100000,
+    "close_time": 1783961400000,
+    "pnl": -2.1786,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "LINKUSDT",
+    "open_time": 1783901100000,
+    "close_time": 1784034300000,
+    "pnl": -2.5391,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "POLUSDT",
+    "open_time": 1783969200000,
+    "close_time": 1784013300000,
+    "pnl": -3.0424,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "ASTERUSDT",
+    "open_time": 1784023200000,
+    "close_time": 1784044500000,
+    "pnl": -3.1449,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "AXSUSDT",
+    "open_time": 1784062800000,
+    "close_time": 1784845200000,
+    "pnl": 14.886,
+    "close_reason": "TP"
+   },
+   {
+    "symbol": "CAKEUSDT",
+    "open_time": 1784062800000,
+    "close_time": 1784073900000,
+    "pnl": -2.4315,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "WIFUSDT",
+    "open_time": 1784062800000,
+    "close_time": 1784079900000,
+    "pnl": -3.1084,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "MEGAUSDT",
+    "open_time": 1784084400000,
+    "close_time": 1784161800000,
+    "pnl": -2.3,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "SANDUSDT",
+    "open_time": 1784084400000,
+    "close_time": 1784900100000,
+    "pnl": 14.886,
+    "close_reason": "TP"
+   },
+   {
+    "symbol": "BZUSDT",
+    "open_time": 1784167200000,
+    "close_time": 1784293500000,
+    "pnl": -2.8496,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "DASHUSDT",
+    "open_time": 1784329200000,
+    "close_time": 1784435700000,
+    "pnl": -2.7269,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "CAKEUSDT",
+    "open_time": 1784435700000,
+    "close_time": 1784613300000,
+    "pnl": -0.1413,
+    "close_reason": "zombie_timeout"
+   },
+   {
+    "symbol": "MSFTUSDT",
+    "open_time": 1784617200000,
+    "close_time": 1785252600000,
+    "pnl": -0.2958,
+    "close_reason": "zombie_timeout"
+   },
+   {
+    "symbol": "VANAUSDT",
+    "open_time": 1784845200000,
+    "close_time": 1784853600000,
+    "pnl": -3.1053,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "ENSOUSDT",
+    "open_time": 1784853600000,
+    "close_time": 1784858700000,
+    "pnl": -2.6457,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "GPSUSDT",
+    "open_time": 1784858700000,
+    "close_time": 1784933100000,
+    "pnl": -2.8873,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "TRXUSDT",
+    "open_time": 1784901600000,
+    "close_time": 1785074400000,
+    "pnl": -0.9917,
+    "close_reason": "zombie_timeout"
+   },
+   {
+    "symbol": "ELSAUSDT",
+    "open_time": 1784937600000,
+    "close_time": 1785076500000,
+    "pnl": -3.1402,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "DOTUSDT",
+    "open_time": 1785078000000,
+    "close_time": 1785764700000,
+    "pnl": -0.1564,
+    "close_reason": "zombie_timeout"
+   },
+   {
+    "symbol": "RENDERUSDT",
+    "open_time": 1785078000000,
+    "close_time": 1785891900000,
+    "pnl": 14.886,
+    "close_reason": "TP"
+   },
+   {
+    "symbol": "RUNEUSDT",
+    "open_time": 1785265200000,
+    "close_time": 1785413400000,
+    "pnl": -2.9959,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "CRVUSDT",
+    "open_time": 1785430800000,
+    "close_time": 1785438600000,
+    "pnl": -2.4077,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "CFGUSDT",
+    "open_time": 1785438600000,
+    "close_time": 1785454800000,
+    "pnl": -2.3684,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "PAXGUSDT",
+    "open_time": 1785454800000,
+    "close_time": 1785897300000,
+    "pnl": -0.1903,
+    "close_reason": "zombie_timeout"
+   },
+   {
+    "symbol": "DASHUSDT",
+    "open_time": 1785787200000,
+    "close_time": 1785962400000,
+    "pnl": -0.2161,
+    "close_reason": "zombie_timeout"
+   },
+   {
+    "symbol": "EIGENUSDT",
+    "open_time": 1785891900000,
+    "close_time": 1786569900000,
+    "pnl": 14.886,
+    "close_reason": "TP"
+   },
+   {
+    "symbol": "ENSUSDT",
+    "open_time": 1785897300000,
+    "close_time": 1786083300000,
+    "pnl": -0.226,
+    "close_reason": "zombie_timeout"
+   },
+   {
+    "symbol": "MOVEUSDT",
+    "open_time": 1785962400000,
+    "close_time": 1786007400000,
+    "pnl": -2.6324,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "1000FLOKIUSDT",
+    "open_time": 1786014000000,
+    "close_time": 1786034700000,
+    "pnl": -2.872,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "ATHUSDT",
+    "open_time": 1786042800000,
+    "close_time": 1786151700000,
+    "pnl": -3.1459,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "ENAUSDT",
+    "open_time": 1786083300000,
+    "close_time": 1786092300000,
+    "pnl": -2.8096,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "BABAUSDT",
+    "open_time": 1786151700000,
+    "close_time": 1786211100000,
+    "pnl": -2.1047,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "EWTUSDT",
+    "open_time": 1786211100000,
+    "close_time": 1786446600000,
+    "pnl": -0.7827,
+    "close_reason": "zombie_timeout"
+   },
+   {
+    "symbol": "SAMSUNGUSDT",
+    "open_time": 1786446600000,
+    "close_time": 1786480800000,
+    "pnl": -3.1284,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "EWTUSDT",
+    "open_time": 1786480800000,
+    "close_time": 1786526700000,
+    "pnl": -2.3623,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "AKTUSDT",
+    "open_time": 1786526700000,
+    "close_time": 1786529400000,
+    "pnl": -2.8299,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "XMRUSDT",
+    "open_time": 1786543200000,
+    "close_time": 1786611300000,
+    "pnl": -3.0958,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "EWTUSDT",
+    "open_time": 1786569900000,
+    "close_time": 1786629300000,
+    "pnl": -2.3191,
+    "close_reason": "SL"
+   },
+   {
+    "symbol": "NVDAUSDT",
+    "open_time": 1786611300000,
+    "close_time": 1786628400000,
+    "pnl": -2.2021,
+    "close_reason": "SL"
+   }
+  ],
+  "real_trades": [
+   {
+    "open": 1783735597547,
+    "close": 1783908851242,
+    "pnl": 4.153616882209,
+    "reason": "timeout"
+   },
+   {
+    "open": 1783736120507,
+    "close": 1783909327050,
+    "pnl": 0.649925490383,
+    "reason": "timeout"
+   },
+   {
+    "open": 1783736597930,
+    "close": 1783909813178,
+    "pnl": 7.811929958543,
+    "reason": "timeout"
+   },
+   {
+    "open": 1783909310346,
+    "close": 1784082211422,
+    "pnl": 2.360553811794,
+    "reason": "timeout"
+   },
+   {
+    "open": 1783909792966,
+    "close": 1784082796992,
+    "pnl": 3.27758490566,
+    "reason": "timeout"
+   },
+   {
+    "open": 1783911209255,
+    "close": 1783935597398,
+    "pnl": 5.347485804417,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1783957534553,
+    "close": 1783987953645,
+    "pnl": -4.448653846154,
+    "reason": "sl_hit"
+   },
+   {
+    "open": 1783988467512,
+    "close": 1784026960940,
+    "pnl": 2.364205250076,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784032879232,
+    "close": 1784099863645,
+    "pnl": -2.949655006378,
+    "reason": "sl_hit"
+   },
+   {
+    "open": 1784082428526,
+    "close": 1784086936663,
+    "pnl": 4.37087571145,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784083028164,
+    "close": 1784120157665,
+    "pnl": -3.266770538243,
+    "reason": "sl_hit"
+   },
+   {
+    "open": 1784087354592,
+    "close": 1784189786688,
+    "pnl": 3.2666495183439315,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784100033420,
+    "close": 1784254209221,
+    "pnl": 2.9098137057844156,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784120532158,
+    "close": 1784187380664,
+    "pnl": 3.6242758576710408,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784187801690,
+    "close": 1784217027622,
+    "pnl": -1.9362196099986386,
+    "reason": "sl_hit"
+   },
+   {
+    "open": 1784190060932,
+    "close": 1784231061921,
+    "pnl": 3.133347602336,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784217042856,
+    "close": 1784301507887,
+    "pnl": 3.461379134352326,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784239783319,
+    "close": 1784246863045,
+    "pnl": -2.7460549450548792,
+    "reason": "sl_hit"
+   },
+   {
+    "open": 1784247724818,
+    "close": 1784277030240,
+    "pnl": 3.5132165334468333,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784259132225,
+    "close": 1784395437463,
+    "pnl": -2.4505686204225587,
+    "reason": "sl_hit"
+   },
+   {
+    "open": 1784299277357,
+    "close": 1784301151302,
+    "pnl": 5.592977476493,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784329840103,
+    "close": 1784502830766,
+    "pnl": 1.485217669654,
+    "reason": "timeout"
+   },
+   {
+    "open": 1784330647647,
+    "close": 1784333627797,
+    "pnl": -1.933222374876947,
+    "reason": "sl_hit"
+   },
+   {
+    "open": 1784337174293,
+    "close": 1784498425076,
+    "pnl": 1.6435387826093915,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784412167536,
+    "close": 1784426813939,
+    "pnl": 1.6800270430325002,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784426964204,
+    "close": 1784478427417,
+    "pnl": 2.468341068351,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784478661102,
+    "close": 1784539453732,
+    "pnl": 4.782422545281965,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784498749167,
+    "close": 1784524281590,
+    "pnl": 2.8334409498673985,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784503022115,
+    "close": 1784553646435,
+    "pnl": 2.8349972001864665,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784524369054,
+    "close": 1784560539474,
+    "pnl": 3.7862083845214776,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784539560632,
+    "close": 1784611539601,
+    "pnl": -3.211510814136987,
+    "reason": "sl_hit"
+   },
+   {
+    "open": 1784556548042,
+    "close": 1784616550792,
+    "pnl": -3.0308755421354068,
+    "reason": "sl_hit"
+   },
+   {
+    "open": 1784560803886,
+    "close": 1784616576198,
+    "pnl": -2.665898624424031,
+    "reason": "sl_hit"
+   },
+   {
+    "open": 1784611579556,
+    "close": 1784784924295,
+    "pnl": 0.232240287162,
+    "reason": "timeout"
+   },
+   {
+    "open": 1784616607760,
+    "close": 1784628280574,
+    "pnl": 1.130323997185,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784617745277,
+    "close": 1784727110777,
+    "pnl": 1.6777975319134226,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784628569412,
+    "close": 1784742148200,
+    "pnl": -3.246600000000097,
+    "reason": "sl_hit"
+   },
+   {
+    "open": 1784729425127,
+    "close": 1784790559575,
+    "pnl": 5.826173482678432,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784743204422,
+    "close": 1784756077652,
+    "pnl": -2.935374235523,
+    "reason": "sl_hit"
+   },
+   {
+    "open": 1784756279128,
+    "close": 1784792744250,
+    "pnl": 0.871926413433997,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784785738746,
+    "close": 1784810051551,
+    "pnl": 2.35324654966804,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784790713333,
+    "close": 1784812998719,
+    "pnl": 2.818329309934831,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784794112309,
+    "close": 1784851580659,
+    "pnl": 4.245824999999487,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784814586868,
+    "close": 1784814934450,
+    "pnl": -0.473855384913,
+    "reason": "sl_hit"
+   },
+   {
+    "open": 1784817246541,
+    "close": 1784829528753,
+    "pnl": 5.851225989381478,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784823525968,
+    "close": 1785054939650,
+    "pnl": 2.734416916917803,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784844769548,
+    "close": 1784901113283,
+    "pnl": 3.60152823730784,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784863903366,
+    "close": 1784913612477,
+    "pnl": -3.081280978417,
+    "reason": "sl_hit"
+   },
+   {
+    "open": 1784905803699,
+    "close": 1785078621164,
+    "pnl": -1.07292951142,
+    "reason": "timeout"
+   },
+   {
+    "open": 1784916980642,
+    "close": 1784930371018,
+    "pnl": 3.6548869026547965,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1784942218406,
+    "close": 1785115961996,
+    "pnl": -1.45608996077,
+    "reason": "timeout"
+   },
+   {
+    "open": 1785196312637,
+    "close": 1785419174334,
+    "pnl": -0.656641251446,
+    "reason": "timeout"
+   },
+   {
+    "open": 1785199350716,
+    "close": 1785282924972,
+    "pnl": -2.4119303356941715,
+    "reason": "sl_hit"
+   },
+   {
+    "open": 1785209983673,
+    "close": 1785251806742,
+    "pnl": -3.1098189300657864,
+    "reason": "sl_hit"
+   },
+   {
+    "open": 1785280191815,
+    "close": 1785504677315,
+    "pnl": 14.729398449243062,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1785283483587,
+    "close": 1785663067621,
+    "pnl": -0.339371885852,
+    "reason": "timeout"
+   },
+   {
+    "open": 1785429321582,
+    "close": 1785542799625,
+    "pnl": -3.2595878107453795,
+    "reason": "sl_hit"
+   },
+   {
+    "open": 1785505293210,
+    "close": 1785678587511,
+    "pnl": -0.710980921179,
+    "reason": "timeout"
+   },
+   {
+    "open": 1785543310314,
+    "close": 1785716393868,
+    "pnl": -2.383148134466,
+    "reason": "timeout"
+   },
+   {
+    "open": 1785663894864,
+    "close": 1786409194095,
+    "pnl": -0.505260472611,
+    "reason": "timeout"
+   },
+   {
+    "open": 1785679461167,
+    "close": 1785708967660,
+    "pnl": -2.651876490727265,
+    "reason": "sl_hit"
+   },
+   {
+    "open": 1785709163709,
+    "close": 1786460280852,
+    "pnl": 14.530035222052067,
+    "reason": "tp_hit"
+   },
+   {
+    "open": 1785717309694,
+    "close": 1785765078179,
+    "pnl": -2.7470759532420743,
+    "reason": "sl_hit"
+   },
+   {
+    "open": 1785765329297,
+    "close": 1785767339239,
+    "pnl": -1.445385433526,
+    "reason": "sl_hit"
+   },
+   {
+    "open": 1785769992450,
+    "close": 1785830461744,
+    "pnl": -3.310929727508528,
+    "reason": "sl_hit"
+   },
+   {
+    "open": 1785830752583,
+    "close": 1785856792950,
+    "pnl": -3.4283865491114094,
+    "reason": "sl_hit"
+   },
+   {
+    "open": 1785857327680,
+    "close": 1786237654270,
+    "pnl": -0.308190762504,
+    "reason": "timeout"
+   },
+   {
+    "open": 1786238588677,
+    "close": 1786356399246,
+    "pnl": -3.0759096674086344,
+    "reason": "sl_hit"
+   },
+   {
+    "open": 1786409925198,
+    "close": 1786587794397,
+    "pnl": -1.655614566135,
+    "reason": "timeout"
+   },
+   {
+    "open": 1786461108759,
+    "close": 1786468419705,
+    "pnl": -3.56580704533,
+    "reason": "sl_hit"
+   }
+  ]
+ }
+}

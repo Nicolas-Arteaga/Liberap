@@ -1,0 +1,14 @@
+{
+ "generated_utc": "2026-09-11T01:57:19.525681+00:00",
+ "n_symbols": 45,
+ "n_rebalances": 56,
+ "results_econ": {
+  "betting-against-beta_lev1": -16.00326264942846,
+  "betting-against-beta_lev2": -32.00652529885692,
+  "betting-against-beta_lev3": -48.0097879482854,
+  "residual-momentum_lev1": -10.507867442544967,
+  "residual-momentum_lev2": -21.015734885089934,
+  "residual-momentum_lev3": -31.523602327634915
+ },
+ "best_usd_mo": -10.507867442544967
+}

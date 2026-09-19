@@ -133,6 +133,7 @@ export class StrategyEditorComponent implements OnInit {
     strategyType: 'Generic',
     patternParamsJson: undefined,
     broadcastToBinance: false,
+    useTrailStop: false,
   };
 
   /**

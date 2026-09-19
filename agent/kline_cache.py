@@ -146,6 +146,60 @@ class KlineCache:
 
             CREATE INDEX IF NOT EXISTS idx_liquidations_lookup
                 ON liquidations (symbol, timestamp DESC);
+
+            -- ── RESEARCH DATASET de liquidaciones (2026-09-07) ────────────────
+            -- APPEND-ONLY. `prune_old_liquidations` NUNCA toca esta tabla (solo
+            -- toca `liquidations`, que es el LIVE CACHE de retencion corta que
+            -- usa el agente). Esta serie es para investigacion historica (H14) y
+            -- debe sobrevivir restarts, reconexiones y el prune de produccion.
+            -- Dedup: PRIMARY KEY sobre la tupla natural del evento (un resubscribe
+            -- de Bybit reenvia el mismo snapshot -> ON CONFLICT DO NOTHING).
+            CREATE TABLE IF NOT EXISTS liquidations_research (
+                venue       TEXT    NOT NULL DEFAULT 'bybit',
+                symbol      TEXT    NOT NULL,
+                timestamp   INTEGER NOT NULL,   -- ms UTC del evento (campo T de Bybit)
+                side        TEXT    NOT NULL,    -- 'Sell'=long liquidado | 'Buy'=short liquidado
+                qty         REAL    NOT NULL,
+                price       REAL    NOT NULL,
+                ingested_at INTEGER NOT NULL,   -- wall-clock de escritura (audita lag), NUNCA eje temporal
+                PRIMARY KEY (venue, symbol, timestamp, side, price, qty)
+            );
+            CREATE INDEX IF NOT EXISTS idx_liq_research_lookup
+                ON liquidations_research (symbol, timestamp DESC);
+
+            -- Salud del colector de liquidaciones: una fila por "sesion" de
+            -- conexion (o por reporte periodico). Permite auditar uptime/gaps sin
+            -- inferirlos de la ausencia de eventos (que puede ser mercado quieto).
+            CREATE TABLE IF NOT EXISTS liq_collector_health (
+                ts            INTEGER NOT NULL,   -- wall-clock del reporte (ms)
+                event         TEXT    NOT NULL,   -- 'connect' | 'disconnect' | 'heartbeat'
+                symbols_subscribed INTEGER,
+                events_since_last  INTEGER,
+                note          TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_liq_health_ts ON liq_collector_health (ts DESC);
+
+            -- Open Interest (2026-09-02, TRACK A del research post-H9).
+            -- SOLO recoleccion de datos: nada de produccion lee esta tabla todavia.
+            -- Se guardan los campos CRUDOS tal cual los devuelve el exchange
+            -- (open_interest en unidades base + open_interest_value en USDT).
+            -- Derivados (dOI, %dOI, OI/volumen) se calculan al LEER, de forma
+            -- causal, nunca se persisten -- asi no hay riesgo de que un bug de
+            -- calculo contamine la serie historica ni de introducir lookahead.
+            -- timestamp = ms UTC, alineado al bucket del `period` del endpoint.
+            CREATE TABLE IF NOT EXISTS open_interest (
+                exchange             TEXT    NOT NULL DEFAULT 'binance',
+                symbol               TEXT    NOT NULL,
+                timestamp            INTEGER NOT NULL,   -- ms UTC, inicio del bucket
+                period               TEXT    NOT NULL DEFAULT '5m',
+                open_interest        REAL    NOT NULL,   -- unidades base (contratos/coin)
+                open_interest_value  REAL,               -- notional USDT (sumOpenInterestValue de Binance)
+                updated_at           INTEGER NOT NULL,
+                PRIMARY KEY (exchange, symbol, period, timestamp)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_oi_lookup
+                ON open_interest (exchange, symbol, period, timestamp DESC);
         """)
         conn.commit()
         # Safe migration: add 'source' column to existing databases
@@ -548,6 +602,111 @@ class KlineCache:
         ).fetchone()
         return row["c"]
 
+    # ──────────────────────────────────────────────────────────
+    # Open Interest (TRACK A — solo recolección, sin consumo en producción)
+    # ──────────────────────────────────────────────────────────
+    def bulk_upsert_open_interest(self, symbol: str, records: list,
+                                   exchange: str = "binance", period: str = "5m"):
+        """
+        `records`: lista de {timestamp, open_interest, open_interest_value?}.
+        UPSERT idempotente por (exchange, symbol, period, timestamp) — re-backfillear
+        el mismo período no duplica (mismo criterio que bulk_upsert_funding).
+        Se guarda el dato CRUDO; nada de derivados.
+        """
+        if not records:
+            return
+        now = int(time.time())
+        conn = self._conn()
+        conn.executemany("""
+            INSERT INTO open_interest
+                (exchange, symbol, timestamp, period, open_interest, open_interest_value, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(exchange, symbol, period, timestamp) DO UPDATE SET
+                open_interest       = excluded.open_interest,
+                open_interest_value = excluded.open_interest_value,
+                updated_at          = excluded.updated_at
+        """, [
+            (exchange, symbol, int(r["timestamp"]), period,
+             float(r["open_interest"]),
+             (float(r["open_interest_value"]) if r.get("open_interest_value") is not None else None),
+             now)
+            for r in records
+        ])
+        conn.commit()
+
+    def get_latest_open_interest(self, symbol: str, exchange: str = "binance",
+                                  period: str = "5m") -> Optional[dict]:
+        conn = self._conn()
+        row = conn.execute("""
+            SELECT timestamp, open_interest, open_interest_value FROM open_interest
+            WHERE exchange = ? AND symbol = ? AND period = ?
+            ORDER BY timestamp DESC LIMIT 1
+        """, (exchange, symbol, period)).fetchone()
+        if row is None:
+            return None
+        return {"symbol": symbol, "timestamp": row["timestamp"],
+                "open_interest": row["open_interest"],
+                "open_interest_value": row["open_interest_value"]}
+
+    def get_open_interest_history(self, symbol: str, exchange: str = "binance",
+                                   period: str = "5m", limit: int = 500,
+                                   before_ms: Optional[int] = None) -> list:
+        """
+        Serie ascendente de OI cruda. `before_ms` acota a datos <= ese ts
+        (causal, para backtest — nunca futuro). Los derivados (ΔOI, %ΔOI,
+        OI/volumen) los calcula el consumidor a partir de esta serie.
+        """
+        conn = self._conn()
+        if before_ms is not None:
+            rows = conn.execute("""
+                SELECT timestamp, open_interest, open_interest_value FROM open_interest
+                WHERE exchange=? AND symbol=? AND period=? AND timestamp<=?
+                ORDER BY timestamp DESC LIMIT ?
+            """, (exchange, symbol, period, before_ms, limit)).fetchall()
+        else:
+            rows = conn.execute("""
+                SELECT timestamp, open_interest, open_interest_value FROM open_interest
+                WHERE exchange=? AND symbol=? AND period=?
+                ORDER BY timestamp DESC LIMIT ?
+            """, (exchange, symbol, period, limit)).fetchall()
+        return [dict(r) for r in reversed(rows)]
+
+    def count_open_interest(self, symbol: str, exchange: str = "binance",
+                             period: str = "5m") -> int:
+        conn = self._conn()
+        return conn.execute(
+            "SELECT COUNT(*) c FROM open_interest WHERE exchange=? AND symbol=? AND period=?",
+            (exchange, symbol, period)).fetchone()["c"]
+
+    def open_interest_gaps(self, symbol: str, exchange: str = "binance",
+                            period: str = "5m", period_ms: int = 300_000) -> dict:
+        """
+        Detección de huecos: cuenta cuántos intervalos consecutivos faltan
+        entre el primer y último timestamp para ese símbolo. Para monitoreo
+        de calidad del collector, no para lógica de trading.
+        """
+        conn = self._conn()
+        rows = conn.execute("""
+            SELECT timestamp FROM open_interest
+            WHERE exchange=? AND symbol=? AND period=? ORDER BY timestamp ASC
+        """, (exchange, symbol, period)).fetchall()
+        if len(rows) < 2:
+            return {"rows": len(rows), "expected": 0, "missing": 0, "coverage_pct": None}
+        ts = [r["timestamp"] for r in rows]
+        expected = (ts[-1] - ts[0]) // period_ms + 1
+        missing = expected - len(ts)
+        return {"rows": len(ts), "expected": int(expected), "missing": int(missing),
+                "coverage_pct": round(100.0 * len(ts) / expected, 2),
+                "first": ts[0], "last": ts[-1]}
+
+    def prune_old_open_interest(self, keep_days: int = 400):
+        """OI 5m para ~100 símbolos ~ 400d ≈ 11.5M filas — con índice, manejable.
+        keep_days alto a propósito: el objetivo de TRACK A es acumular historia."""
+        conn = self._conn()
+        cutoff = int(time.time() * 1000) - keep_days * 86_400_000
+        conn.execute("DELETE FROM open_interest WHERE timestamp < ?", (cutoff,))
+        conn.commit()
+
     def get_funding_before(self, symbol: str, timestamp_ms: int) -> Optional[float]:
         """Último funding rate vigente antes o en timestamp_ms — sin lookahead, para backtest."""
         conn = self._conn()
@@ -715,10 +874,45 @@ class KlineCache:
         return [dict(r) for r in rows]
 
     def prune_old_liquidations(self, keep_hours: int = 24 * 7):
+        """LIVE CACHE only. NUNCA toca `liquidations_research` (append-only,
+        dataset historico para H14). Ver test_data_integrity.py::test_prune_isolation."""
         conn = self._conn()
         cutoff = int(time.time() * 1000) - keep_hours * 3_600_000
         conn.execute("DELETE FROM liquidations WHERE timestamp < ?", (cutoff,))
         conn.commit()
+
+    # ── RESEARCH DATASET de liquidaciones (append-only, sin prune) ──────────
+    def insert_liquidation_research(self, symbol: str, side: str, qty: float,
+                                     price: float, timestamp_ms: int,
+                                     venue: str = "bybit") -> bool:
+        """Idempotente. Devuelve True si inserto fila nueva, False si era duplicado."""
+        conn = self._conn()
+        cur = conn.execute("""
+            INSERT INTO liquidations_research (venue, symbol, timestamp, side, qty, price, ingested_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(venue, symbol, timestamp, side, price, qty) DO NOTHING
+        """, (venue, symbol, int(timestamp_ms), side, float(qty), float(price),
+              int(time.time() * 1000)))
+        conn.commit()
+        return cur.rowcount > 0
+
+    def record_liq_health(self, event: str, symbols_subscribed: int = None,
+                           events_since_last: int = None, note: str = None):
+        conn = self._conn()
+        conn.execute("""
+            INSERT INTO liq_collector_health (ts, event, symbols_subscribed, events_since_last, note)
+            VALUES (?, ?, ?, ?, ?)
+        """, (int(time.time() * 1000), event, symbols_subscribed, events_since_last, note))
+        conn.commit()
+
+    def liquidation_research_stats(self) -> dict:
+        conn = self._conn()
+        r = conn.execute("""SELECT COUNT(*) n, COUNT(DISTINCT symbol) syms,
+                                   MIN(timestamp) lo, MAX(timestamp) hi,
+                                   SUM(qty*price) notional
+                            FROM liquidations_research""").fetchone()
+        return {"rows": r["n"], "symbols": r["syms"], "first_ms": r["lo"],
+                "last_ms": r["hi"], "total_notional_usd": r["notional"]}
 
     def prune_old_ofi(self, keep_hours: int = 24 * 30):
         """

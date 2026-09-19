@@ -1,4 +1,4 @@
-import { ApplicationConfig, importProvidersFrom, LOCALE_ID } from '@angular/core';
+import { ApplicationConfig, importProvidersFrom, LOCALE_ID, inject, provideAppInitializer } from '@angular/core';
 import localeEs from '@angular/common/locales/es';
 import { registerLocaleData } from '@angular/common';
 
@@ -10,7 +10,8 @@ import { APP_ROUTES } from './app.routes';
 import { APP_ROUTE_PROVIDER } from './route.provider';
 import { provideAbpCore, withOptions } from '@abp/ng.core';
 import { provideAbpOAuth } from '@abp/ng.oauth';
-import { provideSettingManagementConfig } from '@abp/ng.setting-management/config';
+import { provideSettingManagementConfig, SettingTabsService } from '@abp/ng.setting-management/config';
+import { TrailStopSettingTabComponent } from './settings/trail-stop-setting-tab.component';
 import { provideAccountConfig } from '@abp/ng.account/config';
 import { OAuthStorage } from 'angular-oauth2-oidc';
 
@@ -140,7 +141,15 @@ import {
   trophy,
   listOutline,
   starOutline,
-  ellipse
+  star,
+  ellipse,
+  // Laboratorio de estrategias:
+  planetOutline,
+  flaskOutline,
+  trophyOutline,
+  removeOutline,
+  hourglassOutline,
+  caretUpOutline,
 } from 'ionicons/icons';
 
 addIcons({
@@ -242,7 +251,17 @@ addIcons({
   'trophy': trophy,
   'list-outline': listOutline,
   'star-outline': starOutline,
-  'ellipse': ellipse
+  'star': star,
+  'ellipse': ellipse,
+  // Laboratorio de estrategias:
+  'planet-outline': planetOutline,
+  'flask-outline': flaskOutline,
+  'trophy-outline': trophyOutline,
+  'remove-outline': removeOutline,
+  'hourglass-outline': hourglassOutline,
+  'caret-up-outline': caretUpOutline,
+  'caret-up': caretUpOutline,
+  'caret-down': caretDownOutline,
 });
 
 export const appConfig: ApplicationConfig = {
@@ -262,6 +281,17 @@ export const appConfig: ApplicationConfig = {
     provideAbpOAuth(), // Re-habilitado para silenciar advertencia de ABP
     { provide: OAuthStorage, useFactory: storageFactory },
     provideSettingManagementConfig(),
+    provideAppInitializer(() => {
+      // ROUND 43 -- tab custom en Administración → Configuración para el
+      // interruptor maestro global de Trail-1 (Verge.TrailStop.Enabled).
+      inject(SettingTabsService).add([
+        {
+          name: 'Trail-1 (global)',
+          order: 200,
+          component: TrailStopSettingTabComponent,
+        },
+      ]);
+    }),
     provideAccountConfig(),
     provideIdentityConfig(),
     provideTenantManagementConfig(),

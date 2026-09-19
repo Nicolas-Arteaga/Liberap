@@ -37,6 +37,13 @@ def _is_direct_injection_candidate(candidate: dict) -> bool:
         or candidate.get("golden_uturn_mode")
         or candidate.get("fvg_mode")
         or candidate.get("meme_short_top_mode")
+        or candidate.get("pdh_sweep_mode")
+        or candidate.get("death_cross_mode")
+        or candidate.get("level_sweep_1h_mode")
+        or candidate.get("band_touch_mode")
+        or candidate.get("rsi_extreme_mode")
+        or candidate.get("ma_pullback_mode")
+        or candidate.get("order_block_mode")
     )
 
 
@@ -658,7 +665,8 @@ def validate_lse_setup(
             if dm == "aggressive":
                 min_rr = float(getattr(config, "MIN_RR_AGGRESSIVE_LSE", 2.0))
 
-        if rr < min_rr:
+        # Misma tolerancia de punto flotante que el path nexus (ver más abajo).
+        if rr < min_rr * (1 - 1e-6):
             logger.info("[SKIP] low_rr rr=%s min_rr=%s", rr, min_rr)
             return False, "low_rr", metrics
 
@@ -1058,7 +1066,15 @@ def validate_nexus_confluence_setup(
     metrics["reward_abs"] = reward_w
 
     min_rr = float(profile.get("minRR", getattr(config, "MIN_RR_NEXUS", 1.5))) if profile else float(getattr(config, "MIN_RR_NEXUS", 1.5))
-    if rr < min_rr:
+    # 2026-09-12: bug real encontrado -- rr calculado por division de floats
+    # (ej. 0.000861/0.000287) da 2.9999999999999907 en vez de 3.0 exacto por
+    # ruido de punto flotante. Con MinRR=3.0 (FVG-15m, MA Slope Caso 3 -- el
+    # RR "de diseño" de sus TpMultiplier/SlMultiplier coincide EXACTO con su
+    # propio MinRR) el "<" estricto vetaba el 100% de los candidatos en
+    # silencio (agent.log real: cientos de "[SKIP] nexus low_rr" seguidos,
+    # 0 trades ejecutados desde el reset de Docker). Tolerancia relativa
+    # 1e-6 -- no afloja el veto real, solo absorbe el ruido de float.
+    if rr < min_rr * (1 - 1e-6):
         logger.info("[SKIP] nexus low_rr rr=%s min=%s", rr, min_rr)
         return False, "low_rr", metrics
 
@@ -1188,7 +1204,23 @@ def validate_pre_trade(
 
     # ── VETO GLOBAL: Agotamiento Diario (MAX_DAILY_PUMP/DUMP) ──
     # Si ya subió más del 25% en el día, vetamos LONG. Si cayó más del 30%, vetamos SHORT.
-    daily_change_pct = _fetch_24h_price_change_percent(symbol)
+    # 2026-08-18: bug real encontrado auditando por qué un backtest offline no
+    # reproducía (mismos parametros exactos, $104.73/mes anoche -> -$4.84/mes
+    # ahora) -- _fetch_24h_price_change_percent pegaba SIEMPRE a la API de
+    # Binance en vivo pidiendo el cambio de las ultimas 24h REALES de este
+    # instante, sin importar que el candidato fuera de un trade historico de
+    # hace semanas. Todo backtest que pasa por validate_pre_trade (grid
+    # search, laboratorio evolutivo, engine.py) quedaba contaminado por el
+    # estado del mercado real en el momento exacto de correr el script, no
+    # por el momento historico simulado. Fix: si el caller (backtest offline)
+    # precalculo el cambio historico real de las velas y lo puso en
+    # candidate["historical_daily_change_pct"], se usa ese -- produccion real
+    # nunca setea ese campo, asi que sigue usando el fetch en vivo como antes.
+    historical_override = candidate.get("historical_daily_change_pct")
+    if historical_override is not None:
+        daily_change_pct = float(historical_override)
+    else:
+        daily_change_pct = _fetch_24h_price_change_percent(symbol)
     max_daily_pump = float(getattr(config, "MAX_DAILY_PUMP_LONG_LIMIT", 25.0))  # Bajado a 25% para ser más estrictos
     max_daily_dump = float(getattr(config, "MAX_DAILY_DUMP_SHORT_LIMIT", -30.0))
 

@@ -5,6 +5,7 @@ from typing import Optional
 import sys
 import json
 import copy
+import hashlib
 import config
 import bucket_calibrator
 import requests
@@ -161,13 +162,29 @@ class _ResilientTimedRotatingFileHandler(TimedRotatingFileHandler):
     (sigue escribiendo en el mismo agent.log) y reintenta a la proxima
     medianoche -- nunca bloquea ni ensucia la salida.
     """
+    _last_failed_attempt = 0.0
+    _RETRY_COOLDOWN_SEC = 300  # 5 min
+
     def doRollover(self):
+        # 2026-08-19: bug real encontrado por el usuario -- el fix de
+        # 2026-08-03 atrapaba el PermissionError pero NUNCA avanzaba
+        # self.rolloverAt (eso solo pasa dentro de super().doRollover(),
+        # que aborta antes de llegar ahi). Resultado: shouldRollover()
+        # seguia devolviendo True en CADA linea de log posterior a la
+        # medianoche fallida, no solo "a la proxima medianoche" como decia
+        # el comentario -- reintentaba y fallaba miles de veces por hora,
+        # inundando la consola. Fix real: cooldown explicito entre
+        # reintentos (5 min) en vez de re-intentar en cada emit.
+        now = time.time()
+        if now - self._last_failed_attempt < self._RETRY_COOLDOWN_SEC:
+            return
         try:
             super().doRollover()
         except (PermissionError, OSError) as e:
+            self._last_failed_attempt = now
             logging.getLogger("VergeAgent").warning(
                 f"[LOG-ROTATE] No se pudo rotar agent.log (archivo en uso por otro proceso) — "
-                f"se sigue escribiendo en el mismo archivo, reintenta a la proxima medianoche: {e}"
+                f"se sigue escribiendo en el mismo archivo, reintenta en {self._RETRY_COOLDOWN_SEC}s: {e}"
             )
 
 
@@ -1465,6 +1482,40 @@ class VergeAgent:
             if fvg_injected:
                 logger.info(f"[FVG-INJECT] {fvg_injected} nuevos (total candidates={len(candidates)})")
 
+        # ── ORDER BLOCK: Inyección directa (por perfil, mismo criterio que FVG) ──
+        # SMC/ICT: última vela opuesta antes de un quiebre de estructura (BOS),
+        # TP de liquidez real + filtro POC/HVN. Solo bearish/SHORT (único lado
+        # validado, ver /orderblock/scan only_validated=true).
+        if getattr(config, "ORDER_BLOCK_STRATEGY_ENABLED", True):
+            ob_injected = 0
+            for oc in self._run_order_block_scan():
+                symbol = oc.get("symbol")
+                if not symbol or self._should_skip(symbol):
+                    continue
+
+                oc_px = oc.get("price_at_signal") or self.fetcher.get_current_price(symbol)
+                if not oc_px or oc_px <= 0:
+                    continue
+                try:
+                    v_ok, v_code, _ = validate_pre_trade(
+                        oc, oc_px, btc_filter=self.btc_filter, btc_corr=self.btc_corr
+                    )
+                    if not v_ok:
+                        logger.info(f"[ORDER-BLOCK-INJECT] VETO {symbol} ({oc.get('source')}): {v_code}")
+                        continue
+                except Exception as e:
+                    logger.warning(f"[ORDER-BLOCK-INJECT] Error validando {symbol}: {e}")
+                    continue
+
+                candidates.append(oc)
+                ob_injected += 1
+                logger.warning(
+                    f"[ORDER-BLOCK-INJECT] {symbol} | Score={oc['confluence_score']} | {oc['reasons'][0]}"
+                )
+
+            if ob_injected:
+                logger.info(f"[ORDER-BLOCK-INJECT] {ob_injected} nuevos (total candidates={len(candidates)})")
+
         # ── PUMP REAPER: Inyección directa (por perfil, mismo criterio que FVG/ADN) ──
         # Short del blow-off top en memecoins de alta beta -- minado y validado
         # 2026-08-02 (mineria cross-symbol + robustez temporal + out-of-sample +
@@ -1496,6 +1547,171 @@ class VergeAgent:
                 logger.warning(
                     f"[PUMP-REAPER-INJECT] {symbol} | Score={rc['confluence_score']} | {rc['reasons'][0]}"
                 )
+
+        # ── PDH SWEEP: Inyección directa (por perfil, mismo criterio) ──────
+        # "Barrer el maximo del dia anterior" -- SHORT unicamente, ver
+        # _run_pdh_sweep_scan. Cada perfil Generic con
+        # AllowedSources="pdh_sweep" es dueño exclusivo de sus candidatos.
+        if getattr(config, "PDH_SWEEP_ENABLED", True):
+            pdh_injected = 0
+            for pc in self._run_pdh_sweep_scan():
+                symbol = pc.get("symbol")
+                if not symbol or self._should_skip(symbol):
+                    continue
+                try:
+                    v_ok, v_code, _ = validate_pre_trade(
+                        pc, pc["price_at_signal"], btc_filter=self.btc_filter, btc_corr=self.btc_corr
+                    )
+                    if not v_ok:
+                        logger.info(f"[PDH-SWEEP-INJECT] VETO {symbol} ({pc.get('source')}): {v_code}")
+                        continue
+                except Exception as e:
+                    logger.warning(f"[PDH-SWEEP-INJECT] Error validando {symbol}: {e}")
+                    continue
+
+                candidates.append(pc)
+                pdh_injected += 1
+                logger.warning(
+                    f"[PDH-SWEEP-INJECT] {symbol} | Score={pc['confluence_score']} | {pc['reasons'][0]}"
+                )
+
+            if pdh_injected:
+                logger.info(f"[PDH-SWEEP-INJECT] {pdh_injected} nuevos (total candidates={len(candidates)})")
+
+        # ── DEATH CROSS: Inyección directa (por perfil, mismo criterio) ────
+        if getattr(config, "DEATH_CROSS_ENABLED", True):
+            dc_injected = 0
+            for dc in self._run_death_cross_scan():
+                symbol = dc.get("symbol")
+                if not symbol or self._should_skip(symbol):
+                    continue
+                try:
+                    v_ok, v_code, _ = validate_pre_trade(
+                        dc, dc["price_at_signal"], btc_filter=self.btc_filter, btc_corr=self.btc_corr
+                    )
+                    if not v_ok:
+                        logger.info(f"[DEATH-CROSS-INJECT] VETO {symbol} ({dc.get('source')}): {v_code}")
+                        continue
+                except Exception as e:
+                    logger.warning(f"[DEATH-CROSS-INJECT] Error validando {symbol}: {e}")
+                    continue
+
+                candidates.append(dc)
+                dc_injected += 1
+                logger.warning(
+                    f"[DEATH-CROSS-INJECT] {symbol} | Score={dc['confluence_score']} | {dc['reasons'][0]}"
+                )
+
+            if dc_injected:
+                logger.info(f"[DEATH-CROSS-INJECT] {dc_injected} nuevos (total candidates={len(candidates)})")
+
+        # ── LEVEL SWEEP 1H: Inyección directa (por perfil, mismo criterio) ──
+        if getattr(config, "LEVEL_SWEEP_1H_ENABLED", True):
+            ls_injected = 0
+            for lc in self._run_level_sweep_1h_scan():
+                symbol = lc.get("symbol")
+                if not symbol or self._should_skip(symbol):
+                    continue
+                try:
+                    v_ok, v_code, _ = validate_pre_trade(
+                        lc, lc["price_at_signal"], btc_filter=self.btc_filter, btc_corr=self.btc_corr
+                    )
+                    if not v_ok:
+                        logger.info(f"[LEVEL-SWEEP-1H-INJECT] VETO {symbol} ({lc.get('source')}): {v_code}")
+                        continue
+                except Exception as e:
+                    logger.warning(f"[LEVEL-SWEEP-1H-INJECT] Error validando {symbol}: {e}")
+                    continue
+
+                candidates.append(lc)
+                ls_injected += 1
+                logger.warning(
+                    f"[LEVEL-SWEEP-1H-INJECT] {symbol} | Score={lc['confluence_score']} | {lc['reasons'][0]}"
+                )
+
+            if ls_injected:
+                logger.info(f"[LEVEL-SWEEP-1H-INJECT] {ls_injected} nuevos (total candidates={len(candidates)})")
+
+        # ── BAND TOUCH: Inyección directa (por perfil, mismo criterio) ─────
+        if getattr(config, "BAND_TOUCH_ENABLED", True):
+            bt_injected = 0
+            for bc in self._run_band_touch_scan():
+                symbol = bc.get("symbol")
+                if not symbol or self._should_skip(symbol):
+                    continue
+                try:
+                    v_ok, v_code, _ = validate_pre_trade(
+                        bc, bc["price_at_signal"], btc_filter=self.btc_filter, btc_corr=self.btc_corr
+                    )
+                    if not v_ok:
+                        logger.info(f"[BAND-TOUCH-INJECT] VETO {symbol} ({bc.get('source')}): {v_code}")
+                        continue
+                except Exception as e:
+                    logger.warning(f"[BAND-TOUCH-INJECT] Error validando {symbol}: {e}")
+                    continue
+
+                candidates.append(bc)
+                bt_injected += 1
+                logger.warning(
+                    f"[BAND-TOUCH-INJECT] {symbol} | Score={bc['confluence_score']} | {bc['reasons'][0]}"
+                )
+
+            if bt_injected:
+                logger.info(f"[BAND-TOUCH-INJECT] {bt_injected} nuevos (total candidates={len(candidates)})")
+
+        # ── RSI EXTREME: Inyección directa (por perfil, mismo criterio) ────
+        if getattr(config, "RSI_EXTREME_ENABLED", True):
+            re_injected = 0
+            for rc in self._run_rsi_extreme_scan():
+                symbol = rc.get("symbol")
+                if not symbol or self._should_skip(symbol):
+                    continue
+                try:
+                    v_ok, v_code, _ = validate_pre_trade(
+                        rc, rc["price_at_signal"], btc_filter=self.btc_filter, btc_corr=self.btc_corr
+                    )
+                    if not v_ok:
+                        logger.info(f"[RSI-EXTREME-INJECT] VETO {symbol} ({rc.get('source')}): {v_code}")
+                        continue
+                except Exception as e:
+                    logger.warning(f"[RSI-EXTREME-INJECT] Error validando {symbol}: {e}")
+                    continue
+
+                candidates.append(rc)
+                re_injected += 1
+                logger.warning(
+                    f"[RSI-EXTREME-INJECT] {symbol} | Score={rc['confluence_score']} | {rc['reasons'][0]}"
+                )
+
+            if re_injected:
+                logger.info(f"[RSI-EXTREME-INJECT] {re_injected} nuevos (total candidates={len(candidates)})")
+
+        # ── MA PULLBACK: Inyección directa (por perfil, mismo criterio) ────
+        if getattr(config, "MA_PULLBACK_ENABLED", True):
+            mp_injected = 0
+            for mc2 in self._run_ma_pullback_scan():
+                symbol = mc2.get("symbol")
+                if not symbol or self._should_skip(symbol):
+                    continue
+                try:
+                    v_ok, v_code, _ = validate_pre_trade(
+                        mc2, mc2["price_at_signal"], btc_filter=self.btc_filter, btc_corr=self.btc_corr
+                    )
+                    if not v_ok:
+                        logger.info(f"[MA-PULLBACK-INJECT] VETO {symbol} ({mc2.get('source')}): {v_code}")
+                        continue
+                except Exception as e:
+                    logger.warning(f"[MA-PULLBACK-INJECT] Error validando {symbol}: {e}")
+                    continue
+
+                candidates.append(mc2)
+                mp_injected += 1
+                logger.warning(
+                    f"[MA-PULLBACK-INJECT] {symbol} | Score={mc2['confluence_score']} | {mc2['reasons'][0]}"
+                )
+
+            if mp_injected:
+                logger.info(f"[MA-PULLBACK-INJECT] {mp_injected} nuevos (total candidates={len(candidates)})")
 
             if reaper_injected:
                 logger.info(f"[PUMP-REAPER-INJECT] {reaper_injected} nuevos (total candidates={len(candidates)})")
@@ -2010,6 +2226,50 @@ class VergeAgent:
                 # (source=f"meme_short_top:{profile_id}").
                 if raw_src.startswith("meme_short_top:"):
                     if raw_src != f"meme_short_top:{profile.get('id')}":
+                        continue
+                    allow_short = profile.get("allowShort", True)
+                    cand_side = int(c.get("side", 0))
+                    if cand_side == 1 and not allow_short:
+                        continue
+                    p_candidates.append(c)
+                    continue
+
+                # PDH SWEEP: mismo criterio (source=f"pdh_sweep:{profile_id}").
+                if raw_src.startswith("pdh_sweep:"):
+                    if raw_src != f"pdh_sweep:{profile.get('id')}":
+                        continue
+                    allow_short = profile.get("allowShort", True)
+                    cand_side = int(c.get("side", 0))
+                    if cand_side == 1 and not allow_short:
+                        continue
+                    p_candidates.append(c)
+                    continue
+
+                # DEATH CROSS: mismo criterio (source=f"death_cross:{profile_id}").
+                if raw_src.startswith("death_cross:"):
+                    if raw_src != f"death_cross:{profile.get('id')}":
+                        continue
+                    allow_short = profile.get("allowShort", True)
+                    cand_side = int(c.get("side", 0))
+                    if cand_side == 1 and not allow_short:
+                        continue
+                    p_candidates.append(c)
+                    continue
+
+                # LEVEL SWEEP 1H: mismo criterio (source=f"level_sweep_1h:{profile_id}").
+                if raw_src.startswith("level_sweep_1h:"):
+                    if raw_src != f"level_sweep_1h:{profile.get('id')}":
+                        continue
+                    allow_short = profile.get("allowShort", True)
+                    cand_side = int(c.get("side", 0))
+                    if cand_side == 1 and not allow_short:
+                        continue
+                    p_candidates.append(c)
+                    continue
+
+                # BAND TOUCH: mismo criterio (source=f"band_touch:{profile_id}").
+                if raw_src.startswith("band_touch:"):
+                    if raw_src != f"band_touch:{profile.get('id')}":
                         continue
                     allow_short = profile.get("allowShort", True)
                     cand_side = int(c.get("side", 0))
@@ -4010,6 +4270,725 @@ class VergeAgent:
 
         return found
 
+    def _run_pdh_sweep_scan(self) -> list:
+        """
+        [PDH SWEEP] "Barrer el maximo del dia anterior" -- SHORT unicamente
+        (2026-08-11, pedido explicito del usuario, ejemplo propio de stop
+        hunt: trazar high/low del dia previo, el precio SIEMPRE va a buscar
+        esos stops). Minado sobre TOP_40_SYMBOLS/13 meses de klines reales
+        (agent/backtest/pdh_pdl_sweep_mining.py): el lado SHORT (mecha
+        arriba del maximo del dia previo, cierra de vuelta adentro) tuvo
+        WR=35.2%/+489R sobre 5869 trades, validado con split temporal
+        (ambas mitades positivas: +189R y +300R) -- el lado LONG (sweep de
+        minimos) dio NEGATIVO (-537R) y se descarta, mismo patron de
+        asimetria LONG/SHORT que se repitio con FVG y LSE toda la sesion.
+        SL/TP por ATR (SL=1.5xATR, TP=3xATR, R:R 2:1).
+        """
+        pdh_profiles = [p for p in self.active_profiles if p.get("allowedSources") == "pdh_sweep"]
+        if not pdh_profiles:
+            return []
+
+        basket = getattr(config, "PDH_SWEEP_BASKET", None) or config.WATCHLIST
+        found = []
+        for symbol in basket:
+            try:
+                candles = self.fetcher.get_klines_for_nexus(symbol, interval="15m", limit=200)
+            except Exception as e:
+                logger.debug(f"[PDH-SWEEP] {symbol}: error trayendo klines ({e})")
+                continue
+            if not candles or len(candles) < 100:
+                continue
+
+            closes = [float(c["close"]) for c in candles]
+            highs = [float(c["high"]) for c in candles]
+            lows = [float(c["low"]) for c in candles]
+            opens_times = [c.get("open_time") or c.get("openTime") for c in candles]
+
+            last = candles[-1]
+            h, c_price = float(last["high"]), float(last["close"])
+            last_ts = opens_times[-1]
+            if not last_ts:
+                continue
+            last_day = datetime.fromtimestamp(int(last_ts) / 1000, tz=timezone.utc).date()
+
+            prev_high = None
+            for i in range(len(candles) - 1, -1, -1):
+                ts_i = opens_times[i]
+                if ts_i is None:
+                    continue
+                day_i = datetime.fromtimestamp(int(ts_i) / 1000, tz=timezone.utc).date()
+                if day_i == last_day:
+                    continue
+                if (last_day - day_i).days > 1:
+                    break
+                prev_high = max(prev_high or highs[i], highs[i])
+            if prev_high is None or prev_high <= 0:
+                continue
+
+            wick_pct = (h - prev_high) / prev_high * 100
+            if not (h > prev_high and c_price < prev_high and wick_pct >= 0.05):
+                continue
+
+            # ATR(14) simple sobre las velas cerradas
+            trs = []
+            for i in range(1, len(candles)):
+                trs.append(max(highs[i] - lows[i], abs(highs[i] - closes[i - 1]), abs(lows[i] - closes[i - 1])))
+            if len(trs) < 14:
+                continue
+            atr = sum(trs[-14:]) / 14
+            if atr <= 0:
+                continue
+
+            sl = c_price + 1.5 * atr
+            tp = c_price - 3.0 * atr
+
+            for profile in pdh_profiles:
+                if not profile.get("allowShort", True):
+                    continue
+                score = float(profile.get("minConfluenceScore", 50.0))
+                found.append({
+                    "symbol": symbol,
+                    "confluence_score": score,
+                    "nexus_confidence": score,
+                    "trade_direction": "SHORT",
+                    "side": 1,
+                    "source": f"pdh_sweep:{profile.get('id')}",
+                    "pdh_sweep_mode": True,
+                    "price_at_signal": c_price,
+                    "custom_sl_price": sl,
+                    "custom_tp_price": tp,
+                    "reasons": [f"[{profile.get('name', 'PDH Sweep')}] Sweep del máximo del día previo ({prev_high:.6g}), reclaim bajista"],
+                    "agent_audit_context": {
+                        "pdh_sweep": {
+                            "prev_high": prev_high,
+                            "wick_pct": round(wick_pct, 4),
+                            "atr": atr,
+                            "sl_price": sl,
+                            "tp_price": tp,
+                        },
+                        "scar": {},
+                        "nexus15": {},
+                    },
+                })
+
+        return found
+
+    def _run_death_cross_scan(self) -> list:
+        """
+        [DEATH CROSS] SHORT unicamente -- SMA50 cruza abajo de SMA200 en 4h
+        (2026-08-11, investigado por fuera del sistema del usuario a pedido
+        explicito, "traeme algo nuevo, no uses nada de lo que yo ya hice").
+        Minado sobre TOP_40_SYMBOLS/8 meses reales
+        (agent/backtest/golden_cross_mining.py): el lado SHORT (Death
+        Cross) dio WR=44.2%/avg=+3.55% por trade sobre 129 trades,
+        validado con split temporal (ambas mitades positivas: WR 50%->
+        38.5%, avg 5.15%->1.97% -- decae pero se mantiene arriba de cero).
+        El lado LONG (Golden Cross) dio NEGATIVO y se descarta -- mismo
+        patron de asimetria SHORT>LONG que broto de forma independiente en
+        FVG, LSE y PDH Sweep toda la sesion (evidencia de un sesgo real del
+        mercado en este periodo, no casualidad de una sola estrategia).
+        SL/TP por ATR (SL=2xATR, TP=6xATR, R:R 3:1, deja correr la
+        tendencia) o cierre por cruce contrario (lo que pase primero).
+        """
+        dc_profiles = [p for p in self.active_profiles if p.get("allowedSources") == "death_cross"]
+        if not dc_profiles:
+            return []
+
+        basket = getattr(config, "DEATH_CROSS_BASKET", None) or config.WATCHLIST
+        found = []
+        for symbol in basket:
+            try:
+                candles = self.fetcher.get_klines_for_nexus(symbol, interval="15m", limit=3300)
+            except Exception as e:
+                logger.debug(f"[DEATH-CROSS] {symbol}: error trayendo klines ({e})")
+                continue
+            if not candles or len(candles) < 3300:
+                continue
+
+            bucket_ms = 4 * 3600 * 1000
+            buckets: dict = {}
+            for c in candles:
+                ts = c.get("open_time")
+                if ts is None:
+                    continue
+                b = int(ts) - (int(ts) % bucket_ms)
+                buckets.setdefault(b, []).append(c)
+            keys = sorted(buckets.keys())
+            closes_4h = []
+            for b in keys:
+                g = sorted(buckets[b], key=lambda x: x.get("open_time"))
+                if len(g) < 16:
+                    continue
+                closes_4h.append(float(g[-1]["close"]))
+            if len(closes_4h) < 202:
+                continue
+
+            def sma_at(vals, period, idx):
+                if idx + 1 < period:
+                    return None
+                return sum(vals[idx + 1 - period:idx + 1]) / period
+
+            fast_now = sma_at(closes_4h, 50, len(closes_4h) - 1)
+            slow_now = sma_at(closes_4h, 200, len(closes_4h) - 1)
+            fast_prev = sma_at(closes_4h, 50, len(closes_4h) - 2)
+            slow_prev = sma_at(closes_4h, 200, len(closes_4h) - 2)
+            if None in (fast_now, slow_now, fast_prev, slow_prev):
+                continue
+
+            diff_now = fast_now - slow_now
+            diff_prev = fast_prev - slow_prev
+            death_cross = diff_prev >= 0 and diff_now < 0
+            if not death_cross:
+                continue
+
+            recent_15m = candles[-15:]
+            highs = [float(c["high"]) for c in recent_15m]
+            lows = [float(c["low"]) for c in recent_15m]
+            closes = [float(c["close"]) for c in recent_15m]
+            trs = [max(highs[i] - lows[i], abs(highs[i] - closes[i - 1]), abs(lows[i] - closes[i - 1])) for i in range(1, len(recent_15m))]
+            atr = sum(trs) / len(trs) if trs else 0.0
+            if atr <= 0:
+                continue
+
+            cp = closes[-1]
+
+            for profile in dc_profiles:
+                if not profile.get("allowShort", True):
+                    continue
+                score = float(profile.get("minConfluenceScore", 50.0))
+                margin = float(profile.get("marginPerTrade", 150))
+                try:
+                    dc_params = json.loads(profile.get("patternParamsJson") or "{}")
+                except Exception:
+                    dc_params = {}
+                sl_dist, tp_dist = self._capped_sl_tp_dist(cp, margin, 2.0 * atr, 3.0, enabled=bool(dc_params.get("capSlLoss", False)))
+                sl = cp + sl_dist
+                tp = cp - tp_dist
+                found.append({
+                    "symbol": symbol,
+                    "confluence_score": score,
+                    "nexus_confidence": score,
+                    "trade_direction": "SHORT",
+                    "side": 1,
+                    "source": f"death_cross:{profile.get('id')}",
+                    "death_cross_mode": True,
+                    "price_at_signal": cp,
+                    "custom_sl_price": sl,
+                    "custom_tp_price": tp,
+                    "reasons": [f"[{profile.get('name', 'Death Cross')}] SMA50 cruza abajo de SMA200 (4h)"],
+                    "agent_audit_context": {
+                        "death_cross": {"sma50": fast_now, "sma200": slow_now, "atr": atr, "sl_price": sl, "tp_price": tp},
+                        "scar": {},
+                        "nexus15": {},
+                    },
+                })
+
+        return found
+
+    MAX_SL_LOSS_USD = 5.0
+
+    @staticmethod
+    def _capped_sl_tp_dist(entry_price: float, margin: float, sl_dist_orig: float, rr_mult: float, enabled: bool = True) -> tuple:
+        """
+        Tope de perdida en DOLARES sobre el SL, con el TP siempre calculado
+        sobre la distancia ORIGINAL del SL (nunca se toca) -- pedido
+        explicito del usuario 2026-08-14 tras ver perdidas reales de
+        -$18.79/-$14.33 en "Level Sweep 60m SL1.5 RR3": el SL a 1.5xATR/etc
+        ejecutaba exacto donde debia (no era un bug), pero el margen fijo
+        de $150 sobre simbolos de alta volatilidad ATR% producia perdidas
+        en dolares muy dispares entre simbolos (confirmado en DB:
+        ExitReason=sl_hit, ClosePrice=SlPrice exacto).
+
+        Validado re-simulando vela por vela (no editando el resultado
+        despues, eso habria sido el mismo error de hindsight bias de
+        siempre) sobre "Level Sweep 60m SL1.5 RR3": $354.16/mes ->
+        $421.79/mes (+19% real), peor mitad cronologica igual estable,
+        peor perdida individual paso de -$31.77 a -$5.12 (agent/backtest/
+        strategy_lab.py + agent/backtest/api.py conservan el script real
+        usado, no versionado aparte).
+
+        Devuelve (sl_dist_final, tp_dist) -- tp_dist SIEMPRE = sl_dist_orig
+        * rr_mult, sl_dist_final se achica solo si la perdida implicada
+        supera MAX_SL_LOSS_USD.
+        """
+        tp_dist = sl_dist_orig * rr_mult
+        if not enabled:
+            return sl_dist_orig, tp_dist
+        qty_est = margin / entry_price if entry_price > 0 else 0
+        if qty_est <= 0:
+            return sl_dist_orig, tp_dist
+        loss_if_full_sl = qty_est * sl_dist_orig
+        if loss_if_full_sl > VergeAgent.MAX_SL_LOSS_USD:
+            sl_dist = VergeAgent.MAX_SL_LOSS_USD / qty_est
+        else:
+            sl_dist = sl_dist_orig
+        return sl_dist, tp_dist
+
+    def _run_level_sweep_1h_scan(self) -> list:
+        """
+        [LEVEL SWEEP] SHORT unicamente -- barrido del maximo de las
+        ultimas N velas, cierra de vuelta adentro. Generalizado 2026-08-12
+        para soportar las top-5 variantes reales del laboratorio de
+        estrategias (agent/backtest/strategy_lab.py) de una sola vez, cada
+        perfil con sus propios timeframe/SL/RR/lookback via
+        PatternParamsJson (`tfMin`, `atrSlMult`, `rrMult`, `lookback`) --
+        antes estaba fijo a 1h/10/2x/4x (la campeona #1), ahora cada perfil
+        trae su propia config, todas comparten el mismo flag
+        `level_sweep_1h_mode` (el mecanismo -- SL/TP por ATR -- es
+        identico, solo cambian los numeros). Sin estos params, usa los
+        default de la campeona original.
+        """
+        ls_profiles = [p for p in self.active_profiles if p.get("allowedSources") == "level_sweep_1h"]
+        if not ls_profiles:
+            return []
+
+        found = []
+        basket = getattr(config, "LEVEL_SWEEP_1H_BASKET", None) or config.WATCHLIST
+
+        for profile in ls_profiles:
+            if not profile.get("allowShort", True):
+                continue
+            try:
+                params = json.loads(profile.get("patternParamsJson") or "{}")
+            except Exception:
+                params = {}
+            tf_min = int(params.get("tfMin", 60))
+            atr_sl_mult = float(params.get("atrSlMult", 2.0))
+            rr_mult = float(params.get("rrMult", 2.0))
+            lookback = int(params.get("lookback", 10))
+            bucket_ms = tf_min * 60_000
+            score = float(profile.get("minConfluenceScore", 50.0))
+            margin = float(profile.get("marginPerTrade", 150))
+
+            for symbol in basket:
+                try:
+                    candles = self.fetcher.get_klines_for_nexus(symbol, interval="15m", limit=(lookback + 20) * max(1, tf_min // 15) + 250)
+                except Exception as e:
+                    logger.debug(f"[LEVEL-SWEEP] {symbol}: error trayendo klines ({e})")
+                    continue
+                if not candles:
+                    continue
+
+                buckets: dict = {}
+                for c in candles:
+                    ts = c.get("open_time")
+                    if ts is None:
+                        continue
+                    b = int(ts) - (int(ts) % bucket_ms)
+                    buckets.setdefault(b, []).append(c)
+                keys = sorted(buckets.keys())
+                min_bars = max(1, tf_min // 15)
+                highs_tf, lows_tf, closes_tf = [], [], []
+                for b in keys:
+                    g = sorted(buckets[b], key=lambda x: x.get("open_time"))
+                    if len(g) < min_bars:
+                        continue
+                    highs_tf.append(max(float(x["high"]) for x in g))
+                    lows_tf.append(min(float(x["low"]) for x in g))
+                    closes_tf.append(float(g[-1]["close"]))
+                if len(highs_tf) < lookback + 15:
+                    continue
+
+                i = len(highs_tf) - 1
+                level_high = max(highs_tf[i - lookback:i])
+                h, c_price = highs_tf[i], closes_tf[i]
+                if not (h > level_high and c_price < level_high):
+                    continue
+
+                trs = []
+                for k in range(max(1, i - 13), i + 1):
+                    trs.append(max(highs_tf[k] - lows_tf[k], abs(highs_tf[k] - closes_tf[k - 1]), abs(lows_tf[k] - closes_tf[k - 1])))
+                atr = sum(trs) / len(trs) if trs else 0.0
+                if atr <= 0:
+                    continue
+
+                sl_dist, tp_dist = self._capped_sl_tp_dist(c_price, margin, atr_sl_mult * atr, rr_mult, enabled=bool(params.get("capSlLoss", False)))
+                sl = c_price + sl_dist
+                tp = c_price - tp_dist
+
+                found.append({
+                    "symbol": symbol,
+                    "confluence_score": score,
+                    "nexus_confidence": score,
+                    "trade_direction": "SHORT",
+                    "side": 1,
+                    "source": f"level_sweep_1h:{profile.get('id')}",
+                    "level_sweep_1h_mode": True,
+                    "price_at_signal": c_price,
+                    "custom_sl_price": sl,
+                    "custom_tp_price": tp,
+                    "reasons": [f"[{profile.get('name', 'Level Sweep')}] Barrido del máximo de {lookback} velas de {tf_min}m ({level_high:.6g})"],
+                    "agent_audit_context": {
+                        "level_sweep_1h": {"level_high": level_high, "atr": atr, "sl_price": sl, "tp_price": tp},
+                        "scar": {},
+                        "nexus15": {},
+                    },
+                })
+
+        return found
+
+    def _run_band_touch_scan(self) -> list:
+        """
+        [BAND TOUCH] SHORT unicamente -- toque/cierre por encima de la
+        banda de Bollinger superior (SMA20 + 2*desviacion estandar de las
+        ultimas 20 velas), reversion a la media. Encontrado por el
+        laboratorio (agent/backtest/strategy_lab.py, entry_type=
+        "band_touch") -- variante ganadora real: 15min, SHORT, SL=3xATR,
+        RR=3x, n=16138, WR=27.6%, $381.33/mes, estable en ambas mitades
+        cronologicas ($1458.91 / $1585.13). Mismo patron de flag/perfil que
+        Level Sweep, params en PatternParamsJson (`tfMin`, `atrSlMult`,
+        `rrMult`) con default 15m/3x/3x (la config ganadora real).
+        """
+        bt_profiles = [p for p in self.active_profiles if p.get("allowedSources") == "band_touch"]
+        if not bt_profiles:
+            return []
+
+        found = []
+        basket = getattr(config, "BAND_TOUCH_BASKET", None) or config.WATCHLIST
+        BAND_PERIOD = 20
+
+        for profile in bt_profiles:
+            if not profile.get("allowShort", True):
+                continue
+            try:
+                params = json.loads(profile.get("patternParamsJson") or "{}")
+            except Exception:
+                params = {}
+            tf_min = int(params.get("tfMin", 15))
+            atr_sl_mult = float(params.get("atrSlMult", 3.0))
+            rr_mult = float(params.get("rrMult", 3.0))
+            bucket_ms = tf_min * 60_000
+            score = float(profile.get("minConfluenceScore", 50.0))
+            margin = float(profile.get("marginPerTrade", 150))
+
+            for symbol in basket:
+                try:
+                    candles = self.fetcher.get_klines_for_nexus(symbol, interval="15m", limit=(BAND_PERIOD + 20) * max(1, tf_min // 15) + 250)
+                except Exception as e:
+                    logger.debug(f"[BAND-TOUCH] {symbol}: error trayendo klines ({e})")
+                    continue
+                if not candles:
+                    continue
+
+                if tf_min == 15:
+                    highs_tf = [float(c["high"]) for c in candles]
+                    lows_tf = [float(c["low"]) for c in candles]
+                    closes_tf = [float(c["close"]) for c in candles]
+                else:
+                    buckets: dict = {}
+                    for c in candles:
+                        ts = c.get("open_time")
+                        if ts is None:
+                            continue
+                        b = int(ts) - (int(ts) % bucket_ms)
+                        buckets.setdefault(b, []).append(c)
+                    keys = sorted(buckets.keys())
+                    min_bars = max(1, tf_min // 15)
+                    highs_tf, lows_tf, closes_tf = [], [], []
+                    for b in keys:
+                        g = sorted(buckets[b], key=lambda x: x.get("open_time"))
+                        if len(g) < min_bars:
+                            continue
+                        highs_tf.append(max(float(x["high"]) for x in g))
+                        lows_tf.append(min(float(x["low"]) for x in g))
+                        closes_tf.append(float(g[-1]["close"]))
+
+                if len(closes_tf) < BAND_PERIOD + 15:
+                    continue
+
+                i = len(closes_tf) - 1
+                window = closes_tf[i + 1 - BAND_PERIOD:i + 1]
+                mean = sum(window) / BAND_PERIOD
+                std = (sum((x - mean) ** 2 for x in window) / BAND_PERIOD) ** 0.5
+                upper = mean + 2 * std
+                c_price = closes_tf[i]
+                if not (c_price > upper):
+                    continue
+
+                trs = []
+                for k in range(max(1, i - 13), i + 1):
+                    trs.append(max(highs_tf[k] - lows_tf[k], abs(highs_tf[k] - closes_tf[k - 1]), abs(lows_tf[k] - closes_tf[k - 1])))
+                atr = sum(trs) / len(trs) if trs else 0.0
+                if atr <= 0:
+                    continue
+
+                sl_dist, tp_dist = self._capped_sl_tp_dist(c_price, margin, atr_sl_mult * atr, rr_mult, enabled=bool(params.get("capSlLoss", False)))
+                sl = c_price + sl_dist
+                tp = c_price - tp_dist
+
+                found.append({
+                    "symbol": symbol,
+                    "confluence_score": score,
+                    "nexus_confidence": score,
+                    "trade_direction": "SHORT",
+                    "side": 1,
+                    "source": f"band_touch:{profile.get('id')}",
+                    "band_touch_mode": True,
+                    "price_at_signal": c_price,
+                    "custom_sl_price": sl,
+                    "custom_tp_price": tp,
+                    "reasons": [f"[{profile.get('name', 'Band Touch')}] Cierre sobre banda superior de Bollinger ({upper:.6g})"],
+                    "agent_audit_context": {
+                        "band_touch": {"upper_band": upper, "atr": atr, "sl_price": sl, "tp_price": tp},
+                        "scar": {},
+                        "nexus15": {},
+                    },
+                })
+
+        return found
+
+    def _run_rsi_extreme_scan(self) -> list:
+        """
+        [RSI EXTREME] Reversion tras lectura extrema de RSI(14): cruce
+        HACIA ABAJO de un umbral alto (SHORT, agotamiento de suba) o cruce
+        HACIA ARRIBA de un umbral bajo (LONG, agotamiento de baja). Igual
+        patron que Level Sweep -- cada perfil trae su propia config via
+        PatternParamsJson (`tfMin`, `atrSlMult`, `rrMult`, `rsiHi`,
+        `rsiLo`), todos comparten el flag `rsi_extreme_mode`. Soporta
+        LONG y SHORT (a diferencia de Level Sweep/Band Touch/Death Cross,
+        SHORT-unicamente) porque el barrido de 2026-08-18 encontro que la
+        variante LONG es la que mejor rinde para este patron ($104.73/mes
+        con el motor honesto, vetos+3 cupos reales).
+        """
+        rsi_profiles = [p for p in self.active_profiles if p.get("allowedSources") == "rsi_extreme"]
+        if not rsi_profiles:
+            return []
+
+        found = []
+        basket = getattr(config, "RSI_EXTREME_BASKET", None) or config.WATCHLIST
+
+        for profile in rsi_profiles:
+            allow_long = profile.get("allowLong", True)
+            allow_short = profile.get("allowShort", True)
+            try:
+                params = json.loads(profile.get("patternParamsJson") or "{}")
+            except Exception:
+                params = {}
+            tf_min = int(params.get("tfMin", 60))
+            atr_sl_mult = float(params.get("atrSlMult", 2.0))
+            rr_mult = float(params.get("rrMult", 4.0))
+            rsi_hi = float(params.get("rsiHi", 75))
+            rsi_lo = float(params.get("rsiLo", 25))
+            bucket_ms = tf_min * 60_000
+            score = float(profile.get("minConfluenceScore", 50.0))
+            margin = float(profile.get("marginPerTrade", 150))
+
+            for symbol in basket:
+                try:
+                    candles = self.fetcher.get_klines_for_nexus(symbol, interval="15m", limit=max(1, tf_min // 15) * 40 + 250)
+                except Exception as e:
+                    logger.debug(f"[RSI-EXTREME] {symbol}: error trayendo klines ({e})")
+                    continue
+                if not candles:
+                    continue
+
+                buckets: dict = {}
+                for c in candles:
+                    ts = c.get("open_time")
+                    if ts is None:
+                        continue
+                    b = int(ts) - (int(ts) % bucket_ms)
+                    buckets.setdefault(b, []).append(c)
+                keys = sorted(buckets.keys())
+                min_bars = max(1, tf_min // 15)
+                highs_tf, lows_tf, closes_tf = [], [], []
+                for b in keys:
+                    g = sorted(buckets[b], key=lambda x: x.get("open_time"))
+                    if len(g) < min_bars:
+                        continue
+                    highs_tf.append(max(float(x["high"]) for x in g))
+                    lows_tf.append(min(float(x["low"]) for x in g))
+                    closes_tf.append(float(g[-1]["close"]))
+                if len(closes_tf) < 20:
+                    continue
+
+                i = len(closes_tf) - 1
+
+                def _rsi_at(idx):
+                    if idx + 1 < 15:
+                        return None
+                    gains, losses = 0.0, 0.0
+                    for k in range(idx - 13, idx + 1):
+                        d = closes_tf[k] - closes_tf[k - 1]
+                        if d > 0:
+                            gains += d
+                        else:
+                            losses -= d
+                    avg_g, avg_l = gains / 14, losses / 14
+                    if avg_l == 0:
+                        return 100.0
+                    return 100 - (100 / (1 + avg_g / avg_l))
+
+                r_now, r_prev = _rsi_at(i), _rsi_at(i - 1)
+                if r_now is None or r_prev is None:
+                    continue
+
+                side = None
+                if r_prev >= rsi_hi and r_now < rsi_hi and allow_short:
+                    side = 1
+                elif r_prev <= rsi_lo and r_now > rsi_lo and allow_long:
+                    side = 0
+                if side is None:
+                    continue
+
+                trs = []
+                for k in range(max(1, i - 13), i + 1):
+                    trs.append(max(highs_tf[k] - lows_tf[k], abs(highs_tf[k] - closes_tf[k - 1]), abs(lows_tf[k] - closes_tf[k - 1])))
+                atr = sum(trs) / len(trs) if trs else 0.0
+                if atr <= 0:
+                    continue
+
+                c_price = closes_tf[i]
+                sl_dist, tp_dist = self._capped_sl_tp_dist(c_price, margin, atr_sl_mult * atr, rr_mult, enabled=bool(params.get("capSlLoss", False)))
+                sl = c_price + sl_dist if side == 1 else c_price - sl_dist
+                tp = c_price - tp_dist if side == 1 else c_price + tp_dist
+
+                found.append({
+                    "symbol": symbol,
+                    "confluence_score": score,
+                    "nexus_confidence": score,
+                    "trade_direction": "SHORT" if side == 1 else "LONG",
+                    "side": side,
+                    "source": f"rsi_extreme:{profile.get('id')}",
+                    "rsi_extreme_mode": True,
+                    "price_at_signal": c_price,
+                    "custom_sl_price": sl,
+                    "custom_tp_price": tp,
+                    "reasons": [f"[{profile.get('name', 'RSI Extreme')}] RSI({tf_min}m) cruzo {rsi_hi if side==1 else rsi_lo} ({r_prev:.1f}->{r_now:.1f})"],
+                    "agent_audit_context": {
+                        "rsi_extreme": {"rsi_now": r_now, "rsi_prev": r_prev, "atr": atr, "sl_price": sl, "tp_price": tp},
+                        "scar": {},
+                        "nexus15": {},
+                    },
+                })
+
+        return found
+
+    def _run_ma_pullback_scan(self) -> list:
+        """
+        [MA PULLBACK] "Pullback a zona de valor": MA7 con pendiente
+        definida marca la tendencia; el precio, tras estar afuera de la
+        zona MA25-MA99, vuelve a meterse adentro (continuacion, no
+        reversion como el resto de los patrones del laboratorio). Mismo
+        patron que RSI Extreme -- cada perfil trae su propia config via
+        PatternParamsJson (`tfMin`, `atrSlMult`, `rrMult`, `lookback`,
+        `slopeMinPct`), flag `ma_pullback_mode`. Soporta LONG y SHORT --
+        el barrido de 2026-08-18 encontro LONG como la mejor variante
+        ($100.32/mes con el motor honesto).
+        """
+        mp_profiles = [p for p in self.active_profiles if p.get("allowedSources") == "ma_pullback"]
+        if not mp_profiles:
+            return []
+
+        found = []
+        basket = getattr(config, "MA_PULLBACK_BASKET", None) or config.WATCHLIST
+
+        for profile in mp_profiles:
+            allow_long = profile.get("allowLong", True)
+            allow_short = profile.get("allowShort", True)
+            try:
+                params = json.loads(profile.get("patternParamsJson") or "{}")
+            except Exception:
+                params = {}
+            tf_min = int(params.get("tfMin", 15))
+            atr_sl_mult = float(params.get("atrSlMult", 3.0))
+            rr_mult = float(params.get("rrMult", 6.0))
+            lookback = int(params.get("lookback", 10))
+            slope_min_pct = float(params.get("slopeMinPct", 1.0))
+            bucket_ms = tf_min * 60_000
+            score = float(profile.get("minConfluenceScore", 50.0))
+            margin = float(profile.get("marginPerTrade", 150))
+
+            for symbol in basket:
+                try:
+                    candles = self.fetcher.get_klines_for_nexus(symbol, interval="15m", limit=max(1, tf_min // 15) * (99 + lookback + 20) + 250)
+                except Exception as e:
+                    logger.debug(f"[MA-PULLBACK] {symbol}: error trayendo klines ({e})")
+                    continue
+                if not candles:
+                    continue
+
+                buckets: dict = {}
+                for c in candles:
+                    ts = c.get("open_time")
+                    if ts is None:
+                        continue
+                    b = int(ts) - (int(ts) % bucket_ms)
+                    buckets.setdefault(b, []).append(c)
+                keys = sorted(buckets.keys())
+                min_bars = max(1, tf_min // 15)
+                highs_tf, lows_tf, closes_tf = [], [], []
+                for b in keys:
+                    g = sorted(buckets[b], key=lambda x: x.get("open_time"))
+                    if len(g) < min_bars:
+                        continue
+                    highs_tf.append(max(float(x["high"]) for x in g))
+                    lows_tf.append(min(float(x["low"]) for x in g))
+                    closes_tf.append(float(g[-1]["close"]))
+                if len(closes_tf) < 99 + lookback + 5:
+                    continue
+
+                i = len(closes_tf) - 1
+
+                def _sma(period, idx):
+                    if idx + 1 < period:
+                        return None
+                    return sum(closes_tf[idx + 1 - period:idx + 1]) / period
+
+                ma7_now, ma25_now, ma99_now = _sma(7, i), _sma(25, i), _sma(99, i)
+                ma7_prev = _sma(7, i - lookback) if i - lookback >= 0 else None
+                c_now, c_prev = closes_tf[i], closes_tf[i - 1]
+                if None in (ma7_now, ma25_now, ma99_now, ma7_prev):
+                    continue
+
+                slope_pct = (ma7_now - ma7_prev) / ma7_prev * 100 if ma7_prev else 0
+                zone_lo, zone_hi = min(ma25_now, ma99_now), max(ma25_now, ma99_now)
+                was_inside = zone_lo <= c_prev <= zone_hi
+                now_inside = zone_lo <= c_now <= zone_hi
+                if was_inside or not now_inside:
+                    continue
+
+                side = None
+                if slope_pct >= slope_min_pct and c_prev > zone_hi and allow_long:
+                    side = 0
+                elif slope_pct <= -slope_min_pct and c_prev < zone_lo and allow_short:
+                    side = 1
+                if side is None:
+                    continue
+
+                trs = []
+                for k in range(max(1, i - 13), i + 1):
+                    trs.append(max(highs_tf[k] - lows_tf[k], abs(highs_tf[k] - closes_tf[k - 1]), abs(lows_tf[k] - closes_tf[k - 1])))
+                atr = sum(trs) / len(trs) if trs else 0.0
+                if atr <= 0:
+                    continue
+
+                c_price = c_now
+                sl_dist, tp_dist = self._capped_sl_tp_dist(c_price, margin, atr_sl_mult * atr, rr_mult, enabled=bool(params.get("capSlLoss", False)))
+                sl = c_price - sl_dist if side == 0 else c_price + sl_dist
+                tp = c_price + tp_dist if side == 0 else c_price - tp_dist
+
+                found.append({
+                    "symbol": symbol,
+                    "confluence_score": score,
+                    "nexus_confidence": score,
+                    "trade_direction": "LONG" if side == 0 else "SHORT",
+                    "side": side,
+                    "source": f"ma_pullback:{profile.get('id')}",
+                    "ma_pullback_mode": True,
+                    "price_at_signal": c_price,
+                    "custom_sl_price": sl,
+                    "custom_tp_price": tp,
+                    "reasons": [f"[{profile.get('name', 'MA Pullback')}] Pullback a zona MA25-MA99 ({tf_min}m, pendiente MA7={slope_pct:.2f}%)"],
+                    "agent_audit_context": {
+                        "ma_pullback": {"ma7": ma7_now, "ma25": ma25_now, "ma99": ma99_now, "slope_pct": slope_pct, "atr": atr, "sl_price": sl, "tp_price": tp},
+                        "scar": {},
+                        "nexus15": {},
+                    },
+                })
+
+        return found
+
     def _run_fvg_scan(self) -> list:
         """
         [FVG] Para cada perfil activo StrategyType=FVG, pide el mismo scan
@@ -4071,6 +5050,128 @@ class VergeAgent:
         return found
 
     _FVG_SHADOW_V2_LOG = _os.path.join(_os.path.dirname(__file__), "logs", "fvg_shadow_v2.jsonl")
+    _FVG_EV_MODEL_PATH = _os.path.join(_os.path.dirname(__file__), "models", "fvg_ev_model.joblib")
+    _fvg_ev_model_cache = None
+
+    def _fvg_ml_ev_sizing(self, item: dict, symbol: str, side_int: int) -> float:
+        """
+        Meta-labeling real (Lopez de Prado) para FVG-15m -- 2026-08-09.
+        Hallazgo que motiva esto: un modelo de CLASIFICACION (prob. de
+        ganar) entrenado sobre 1657 trades reales de todas las variantes
+        de FVG separa bien el win rate, pero en la direccion CONTRARIA al
+        dinero (el 20% que el modelo cree "mejor" perdio -$49.67, el 20%
+        que cree "peor" gano +$84.19) -- la ganancia de esta estrategia
+        vive en pocos outliers grandes, no en acertar seguido, asi que
+        optimizar por acierto apunta mal. Este modelo en cambio hace
+        REGRESION directa sobre el PnL esperado en dolares (no clasifica
+        ganador/perdedor) -- un GradientBoostingRegressor (agent/backtest/
+        ev_regression_fvg.py) entrenado sobre esos mismos 1657 trades,
+        validado con walk-forward real (mitad vieja entrena, mitad nunca
+        vista se prueba): ahi el top-30% de EV predicho gano +$70.97 y el
+        bottom-30% perdio -$56.64, out-of-sample, en la direccion correcta.
+        Reduce el tamaño de la apuesta segun el EV esperado (nunca a cero)
+        en vez de filtrar binario -- filtrar binario ya fallo 4 veces en
+        produccion por la misma razon (corta ganadores grandes junto con
+        perdedores, ver PROGRESS_LOG 2026-08-09).
+        """
+        try:
+            if VergeAgent._fvg_ev_model_cache is None:
+                import joblib
+                VergeAgent._fvg_ev_model_cache = joblib.load(self._FVG_EV_MODEL_PATH)
+            bundle = VergeAgent._fvg_ev_model_cache
+
+            gap_pct = item.get("gap_pct")
+            tp_distance_pct = item.get("tp_distance_pct")
+            snapshot = self._compute_compression_snapshot(symbol, {})
+            btc_ctx = {
+                "pct_15m": self.btc_filter.get_dump_pct(15),
+                "pct_1h": self.btc_filter.get_dump_pct(60),
+            }
+            feat_map = {
+                "gap_pct": gap_pct or 0.0,
+                "tp_distance_pct": tp_distance_pct or 0.0,
+                "u_shape_count": snapshot.get("u_shape_count") or 0.0,
+                "side": side_int,
+                "slope_ema50": snapshot.get("slope_ema50_deg") or 0.0,
+                "caida_pct": snapshot.get("caida_pct") or 0.0,
+                "noise_pct": snapshot.get("noise_pct") or 0.0,
+                "ma99_cluster_dist_pct": snapshot.get("ma99_cluster_dist_pct") or 0.0,
+                "btc_pct_1h": btc_ctx["pct_1h"] or 0.0,
+                "btc_pct_15m": btc_ctx["pct_15m"] or 0.0,
+            }
+            vec = [[feat_map[f] for f in bundle["features"]]]
+            pred = bundle["model"].predict(vec)[0]
+            lo, hi = bundle["lo"], bundle["hi"]
+            norm = 0.0 if hi <= lo else max(0.0, min(1.0, (pred - lo) / (hi - lo)))
+            multiplier = 0.2 + norm * 0.8  # floor=0.2, cap=1.0
+            logger.info(f"[FVG-ML-EV] {symbol}: EV_pred={pred:.3f} -> multiplicador={multiplier:.2f}")
+            return multiplier
+        except Exception as e:
+            logger.warning(f"[FVG-ML-EV] Error prediciendo para {symbol}, uso margen normal: {e}")
+            return 1.0
+
+    _EQUITY_CURVE_PARAMS = {"pause_pct": 25.0, "half_pct": 15.0, "cooldown_trades": 10}
+    _equity_curve_state: dict = {}  # profile_id -> {"pause_left": int, "just_resumed": bool}
+
+    def _equity_curve_multiplier(self, profile_id: str) -> float:
+        """
+        Consulta (solo lectura) la curva real de PnL cerrado del perfil en
+        Postgres, calcula drawdown % desde el pico historico, y devuelve
+        0.0 (pausado), 0.5 (mitad) o 1.0 (normal) segun los umbrales de
+        _EQUITY_CURVE_PARAMS. Estado del cooldown en memoria del proceso
+        (se resetea si el agente se reinicia -- aceptable, es un mecanismo
+        de proteccion, no de precision).
+        """
+        try:
+            import psycopg2
+            conn = psycopg2.connect(
+                host="localhost", port=5433, dbname="Verge", user="postgres", password="postgres"
+            )
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT "RealizedPnl" FROM "SimulatedTrades"
+                WHERE "StrategyProfileId" = %s::uuid AND "RealizedPnl" IS NOT NULL
+                ORDER BY "OpenedAt" ASC
+                """,
+                (profile_id,),
+            )
+            pnls = [float(row[0]) for row in cur.fetchall()]
+            cur.close()
+            conn.close()
+        except Exception as e:
+            logger.warning(f"[EQUITY-CURVE] Error consultando PnL de {profile_id}, sin frenar: {e}")
+            return 1.0
+
+        if not pnls:
+            return 1.0
+
+        equity = 0.0
+        peak = 0.0
+        for p in pnls:
+            equity += p
+            peak = max(peak, equity)
+        dd_pct = ((peak - equity) / peak * 100) if peak > 5 else 0.0
+
+        state = VergeAgent._equity_curve_state.setdefault(profile_id, {"pause_left": 0, "just_resumed": False})
+        params = self._EQUITY_CURVE_PARAMS
+
+        if state["pause_left"] > 0:
+            state["pause_left"] -= 1
+            if state["pause_left"] == 0:
+                state["just_resumed"] = True
+            logger.info(f"[EQUITY-CURVE] {profile_id}: pausado por drawdown ({dd_pct:.1f}%), quedan {state['pause_left']} ciclos")
+            return 0.0
+        if state["just_resumed"]:
+            state["just_resumed"] = False
+            return 1.0
+        if dd_pct >= params["pause_pct"]:
+            state["pause_left"] = params["cooldown_trades"]
+            logger.warning(f"[EQUITY-CURVE] {profile_id}: drawdown {dd_pct:.1f}% >= {params['pause_pct']}% -> PAUSA {params['cooldown_trades']} ciclos")
+            return 0.0
+        if dd_pct >= params["half_pct"]:
+            return 0.5
+        return 1.0
 
     def _log_fvg_shadow_v2(self, fc: dict) -> None:
         """
@@ -4126,6 +5227,28 @@ class VergeAgent:
             return None
 
         side_int = 0 if direction == "bullish" else 1
+
+        # ── TP acortado (config-only, opt-in via tpDistanceMult) ─────────────
+        # 2026-08-23, pedido del usuario: clon de "FVG - 15m" con el MISMO SL
+        # estructural del gap, pero el TP recorta un % de la DISTANCIA precio→TP
+        # original (no del nivel de precio) -- ej. tpDistanceMult=0.5 == la
+        # mitad del camino hasta el nivel de liquidez real que ya calcula
+        # python-service. Hipotesis del usuario: un TP mas cerca se alcanza mas
+        # seguido y mas rapido, a costa de resignar el resto del recorrido. No
+        # toca el perfil original "FVG - 15m" (SL/TP intactos si el campo no
+        # esta en el PatternParamsJson del perfil).
+        try:
+            _tp_params_probe = json.loads(profile.get("patternParamsJson") or "{}")
+        except Exception:
+            _tp_params_probe = {}
+        _tp_dist_mult = _tp_params_probe.get("tpDistanceMult")
+        if _tp_dist_mult is not None and tp_price_struct > 0:
+            _tp_dist_mult = float(_tp_dist_mult)
+            if side_int == 0:
+                tp_price_struct = price + (tp_price_struct - price) * _tp_dist_mult
+            else:
+                tp_price_struct = price - (price - tp_price_struct) * _tp_dist_mult
+            tp_distance_pct = tp_distance_pct * _tp_dist_mult
 
         # 2026-07-14: el "current_price" que manda python-service es un
         # snapshot tomado en el momento del scan (última vela cerrada ahí)
@@ -4240,6 +5363,72 @@ class VergeAgent:
             if u_count is not None and u_count >= max_u:
                 return None
 
+        # ── Veto por funding extremo (2026-08-10, opt-in) ────────────────────
+        # Auditoria real sobre 238/316 trades de FVG-15m con dato de funding
+        # (kline_cache.py, ya recolectado por funding_rates.py, sin uso hasta
+        # hoy): con funding neutro (|funding|<0.03%) WR=17.3% PnL=+$156.13
+        # (173 trades); con funding extremo WR se derrumba a 3.8-6.1% y pierde
+        # -$45 a -$53. Validado con split temporal (ambas mitades cronologicas
+        # por separado, misma direccion: 1ra mitad neutro +$42.97 vs extremo
+        # -$13.87 | 2da mitad neutro +$113.16 vs extremo -$35.00) -- se
+        # sostiene, no es ruido. Con ese WR (6-9%) y el R:R de esta estrategia
+        # (~3.75:1, breakeven ~21%), un trade con funding extremo es
+        # matematicamente perdedor de antemano -- veto directo, no solo
+        # reduccion de tamaño. Sin dato de funding -> fail-open (no bloquea).
+        if fvg_params.get("maxAbsFundingPct") is not None:
+            try:
+                from kline_cache import get_cache
+                import time as _time
+                funding = get_cache().get_funding_before(symbol, int(_time.time() * 1000))
+            except Exception:
+                funding = None
+            if funding is not None and abs(funding) >= float(fvg_params.get("maxAbsFundingPct")) / 100.0:
+                logger.info(f"[FVG-FUNDING-VETO] {symbol}: funding={funding*100:.3f}% extremo — candidato rechazado.")
+                return None
+
+        # ── Margen dinamico (2026-08-09, opt-in via dynamicMarginMode) ──────
+        # No excluye nada -- reduce el margen a la mitad en señales "dudosas"
+        # (mismos 3 criterios que ya se probaron como filtro binario y
+        # fallaron en vivo: gap>2.5%, TP muy lejos>25%, patron en U muy
+        # repetido>=9). Auditoria real: esas 96 señales "dudosas" de FVG-15m
+        # tuvieron 9 ganadoras que solas sumaron +$115.74 -- cortarlas de
+        # raiz (como hizo v2) tira esa plata a la basura junto con los
+        # perdedores. A mitad de margen, el daño de las perdedoras se
+        # reduce a la mitad sin renunciar del todo a las ganadoras.
+        if fvg_params.get("dynamicMarginMode"):
+            gap_pct = item.get("gap_pct")
+            snapshot_dyn = self._compute_compression_snapshot(symbol, {})
+            u_count_dyn = snapshot_dyn.get("u_shape_count")
+            es_dudosa = (
+                (gap_pct is not None and gap_pct > 2.5)
+                or (tp_distance_pct is not None and tp_distance_pct > 25)
+                or (u_count_dyn is not None and u_count_dyn >= 9)
+            )
+            margin_multiplier = 0.5 if es_dudosa else 1.0
+        elif fvg_params.get("mlEvSizingMode"):
+            margin_multiplier = self._fvg_ml_ev_sizing(item, symbol, side_int)
+        else:
+            margin_multiplier = None
+
+        # ── Circuit breaker de curva de equity (2026-08-10, opt-in) ─────────
+        # "Trading the equity curve" -- tecnica real de gestion de riesgo
+        # institucional (CTAs/prop firms): no mira el trade individual, mira
+        # la curva de ganancia ACUMULADA del propio perfil y reduce/pausa
+        # exposicion cuando cae desde su pico. Nace de la queja real del
+        # usuario: FVG-15m llego a ~$175 acumulados y volvio a ~$130 sin que
+        # nada la frenara. Validado retroactivo sobre los 316 trades reales
+        # de FVG-15m (pausa=-25% del pico, mitad de margen=-15%, cooldown=10
+        # trades): PnL total casi igual ($124 vs $135, -8%) pero la peor
+        # caida desde el pico baja a la MITAD ($38.59 vs $79.71). No busca
+        # maximizar ganancia -- busca no devolver lo ganado.
+        if fvg_params.get("equityCurveBreaker") and margin_multiplier is None:
+            margin_multiplier = 1.0
+        if fvg_params.get("equityCurveBreaker"):
+            ec_mult = self._equity_curve_multiplier(profile.get("id"))
+            margin_multiplier = min(margin_multiplier if margin_multiplier is not None else 1.0, ec_mult)
+            if margin_multiplier <= 0.0:
+                return None  # pausado por drawdown del propio perfil, no se abre nada
+
         return {
             "symbol": symbol,
             "confluence_score": score,
@@ -4251,6 +5440,7 @@ class VergeAgent:
             "price_at_signal": price,
             "custom_sl_price": sl_price,
             "custom_tp_price": tp_price_struct if tp_price_struct > 0 else None,
+            "margin_multiplier": margin_multiplier,
             "reasons": [f"[{profile_name}] Gap FVG {direction} — mayor rango a TP ({tp_distance_pct:.2f}%)"],
             "agent_audit_context": {
                 "fvg": {
@@ -4261,6 +5451,116 @@ class VergeAgent:
                     "entry_status": item.get("entry_status"),
                     "sl_price": sl_price,
                     "tp_price": item.get("tp_price"),
+                },
+                "scar": {},
+                "nexus15": {},
+            },
+        }
+
+    def _run_order_block_scan(self) -> list:
+        """
+        [ORDER BLOCK] Mismo patrón que _run_fvg_scan: pide /orderblock/scan
+        (competencia real top-5 contra TODO el watchlist, only_validated=true
+        = solo bearish/SHORT, único lado validado) en vez de re-implementar
+        la detección acá. Un mismo scan por temporalidad se reusa entre
+        perfiles que compartan esa temporalidad.
+        """
+        if not getattr(config, "ORDER_BLOCK_STRATEGY_ENABLED", True):
+            return []
+
+        ob_profiles = [p for p in self.active_profiles if p.get("strategyType") == "OrderBlock"]
+        if not ob_profiles:
+            return []
+
+        base_py = config.PYTHON_SERVICE_URL.rstrip("/")
+        url = f"{base_py}/orderblock/scan"
+        timeout = int(getattr(config, "ORDER_BLOCK_STRATEGY_HTTP_TIMEOUT_SEC", 90))
+
+        found = []
+        scan_cache: dict = {}
+        for profile in ob_profiles:
+            try:
+                params = json.loads(profile.get("patternParamsJson") or "{}")
+            except Exception:
+                continue
+            timeframe = params.get("timeframe") or "15m"
+
+            if timeframe not in scan_cache:
+                try:
+                    resp = requests.post(
+                        url,
+                        json={"symbols": config.WATCHLIST, "interval": timeframe, "only_validated": True},
+                        timeout=timeout,
+                    )
+                    if resp.status_code != 200:
+                        logger.warning(f"[ORDER-BLOCK-STRATEGY] Scan failed @ {timeframe}: HTTP {resp.status_code}")
+                        scan_cache[timeframe] = []
+                    else:
+                        resp_json = resp.json()
+                        scan_cache[timeframe] = resp_json.get("top_5", [])
+                        logger.info(
+                            f"[ORDER-BLOCK-STRATEGY] {timeframe}: {resp_json.get('actionable_count', 0)} "
+                            f"accionables (de {len(config.WATCHLIST)} escaneados)"
+                        )
+                except Exception as e:
+                    logger.warning(f"[ORDER-BLOCK-STRATEGY] Scan error @ {timeframe}: {e}")
+                    scan_cache[timeframe] = []
+
+            for item in scan_cache[timeframe]:
+                cand = self._build_order_block_candidate(item, profile)
+                if cand:
+                    found.append(cand)
+
+        return found
+
+    def _build_order_block_candidate(self, item: dict, profile: dict) -> Optional[dict]:
+        """
+        [ORDER BLOCK] Concepto SMC/ICT (2026-08-22, ver PROGRESS_LOG): última
+        vela opuesta antes de un quiebre de estructura (BOS). SL/TP salen del
+        propio detector (SL = fuera de la zona OB + buffer, TP = próximo
+        nivel de liquidez real) — mismo patrón que fvg_mode, no un cálculo
+        RR×SL genérico. Solo bearish (SHORT) está validado por backtest real
+        (ver orderblock_backtest.py) — bullish/LONG se descarta acá, no
+        llega ni a candidato.
+        """
+        symbol = item.get("symbol")
+        direction = item.get("direction")
+        if direction != "bearish":
+            return None  # LONG no validado, no se opera todavía
+
+        price = float(item.get("current_price") or 0)
+        sl_price = float(item.get("sl_price") or 0)
+        tp_price_struct = float(item.get("tp_price") or 0)
+        tp_distance_pct = float(item.get("tp_distance_pct") or 0)
+        if not symbol or price <= 0 or sl_price <= 0:
+            return None
+
+        fresh_price = self.fetcher.get_current_price(symbol) or price
+        if fresh_price <= 0 or sl_price <= fresh_price:
+            return None
+
+        score = float(item.get("confluence_score") or profile.get("minConfluenceScore", 60.0))
+        profile_name = profile.get("name", "Order Block")
+
+        return {
+            "symbol": symbol,
+            "confluence_score": score,
+            "nexus_confidence": score,
+            "trade_direction": "SHORT",
+            "side": 1,
+            "source": f"order_block:{profile.get('id')}",
+            "order_block_mode": True,  # bypass de riesgo propio: SL/TP estructurales, TP como objetivo directo (no RR×SL)
+            "price_at_signal": price,
+            "custom_sl_price": sl_price,
+            "custom_tp_price": tp_price_struct if tp_price_struct > 0 else None,
+            "reasons": [f"[{profile_name}] Order Block bearish + BOS — liquidez a {tp_distance_pct:.2f}%"],
+            "agent_audit_context": {
+                "order_block": {
+                    "profile_name": profile_name,
+                    "entry_status": item.get("entry_status"),
+                    "poc_confluence": item.get("poc_confluence"),
+                    "sl_price": sl_price,
+                    "tp_price": tp_price_struct,
                 },
                 "scar": {},
                 "nexus15": {},
@@ -4616,6 +5916,24 @@ class VergeAgent:
             return False
 
         setup_skip = "ok"
+
+        # ── Circuit breaker de curva de equity, universal (2026-08-11) ──────
+        # Mismo mecanismo ya validado en FVG v3, ahora disponible para
+        # CUALQUIER perfil via `equityCurveBreaker` en PatternParamsJson —
+        # pedido del usuario tras notar el mismo patron de "arranca bien,
+        # se da vuelta" en Standard Scalping y MA Cross Momentum (no
+        # exclusivo de FVG). Opt-in, no cambia nada si el perfil no lo trae.
+        try:
+            profile_params = json.loads((profile or {}).get("patternParamsJson") or "{}")
+        except Exception:
+            profile_params = {}
+        if profile_params.get("equityCurveBreaker") and profile:
+            ec_mult = self._equity_curve_multiplier(profile.get("id"))
+            existing_mult = candidate.get("margin_multiplier")
+            candidate["margin_multiplier"] = ec_mult if existing_mult is None else min(existing_mult, ec_mult)
+            if candidate["margin_multiplier"] <= 0.0:
+                logger.info(f"[EQUITY-CURVE] {symbol}: perfil {profile.get('name')} pausado por drawdown propio — no se abre.")
+                return False
 
         pos_details = self.risk.calculate_position(symbol, candidate, available_balance=balance, profile=profile)
 
@@ -5030,6 +6348,16 @@ class VergeAgent:
                         logger.error(f"[BINANCE REAL] Exception placing entry order for {symbol}: {ex}")
 
             trade_id = trade_result.get("id")
+            # Immutable identity snapshot for every auxiliary event.  The DB
+            # relation is authoritative; this snapshot keeps JSONL/CSV audit
+            # evidence intelligible even if the profile is renamed later.
+            profile_snapshot = {
+                "strategy_profile_id": profile.get("id") if profile else None,
+                "strategy_name": profile.get("name") if profile else "Standard Scalping",
+            }
+            profile_snapshot["strategy_version"] = hashlib.sha256(
+                json.dumps(profile or {}, sort_keys=True, default=str, separators=(",", ":")).encode("utf-8")
+            ).hexdigest()[:12]
             local_pos = {
                 "trade_id": trade_id,
                 "symbol": symbol,
@@ -5037,6 +6365,7 @@ class VergeAgent:
                 "entry_reason": entry_reason,
                 "nexus_group": nexus_group,
                 "tier": self._get_tier_for_symbol(symbol),
+                **profile_snapshot,
                 **candidate,
                 **pos_details,
             }
@@ -5051,6 +6380,7 @@ class VergeAgent:
                     "trade_id": str(trade_id) if trade_id else None,
                     "symbol": symbol,
                     "source": candidate.get("source"),
+                    **profile_snapshot,
                     **setup_metrics,
                     "entry_price_exec": pos_details.get("entry_price"),
                     "tp_price": pos_details.get("tp_price"),

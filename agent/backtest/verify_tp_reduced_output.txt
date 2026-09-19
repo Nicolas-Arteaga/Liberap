@@ -1,0 +1,34 @@
+[Config] v11.8: Open positions cache DISABLED - forcing Binance sync only
+[Config] Watchlist loaded from cache (400 symbols, age=143min).
+[Config] Volatile symbols fetched: 150 symbols (top volatile).
+[Config] Tiers: T1=30 | T2=70 | T3=317 | Total=417
+
+=== Level Sweep 1H (TP -11%) ===
+    SIN TOPE     n= 11714 WR= 40.0% PnL=$  3465.25 ($  434.08/mes)
+    TOPE -$5     n= 12998 WR= 36.4% PnL=$  3479.37 ($  435.85/mes)
+    TOPE -$10    n= 12059 WR= 39.1% PnL=$  2909.54 ($  364.47/mes)
+
+=== Level Sweep 60m SL1.5 RR3 (TP -11%) ===
+    SIN TOPE     n= 13009 WR= 30.6% PnL=$  2616.21 ($  327.73/mes)
+    TOPE -$5     n= 13776 WR= 29.1% PnL=$  2869.26 ($  359.42/mes)
+    TOPE -$10    n= 13290 WR= 30.3% PnL=$  2627.78 ($  329.18/mes)
+
+=== Level Sweep 60m SL2 RR1.5 (TP -11%) ===
+    SIN TOPE     n= 13699 WR= 46.3% PnL=$  2622.20 ($  328.48/mes)
+    TOPE -$5     n= 14876 WR= 42.6% PnL=$  2395.78 ($  300.11/mes)
+    TOPE -$10    n= 14012 WR= 45.5% PnL=$  2185.28 ($  273.74/mes)
+
+=== Level Sweep 15m SL3 RR3 (TP -11%) ===
+    SIN TOPE     n= 17145 WR= 29.9% PnL=$  2591.03 ($  324.57/mes)
+    TOPE -$5     n= 19199 WR= 27.6% PnL=$  3117.48 ($  390.52/mes)
+    TOPE -$10    n= 17708 WR= 29.3% PnL=$  2411.01 ($  302.02/mes)
+
+=== Band Touch 15m (TP -11%) ===
+    SIN TOPE     n= 18201 WR= 29.8% PnL=$  3242.84 ($  406.22/mes)
+    TOPE -$5     n= 19959 WR= 27.8% PnL=$  2945.65 ($  368.99/mes)
+    TOPE -$10    n= 18565 WR= 29.4% PnL=$  3044.05 ($  381.32/mes)
+
+=== Death Cross (TP -11%) ===
+    SIN TOPE     n=   143 WR= 42.0% PnL=$   589.28 ($   73.82/mes)
+    TOPE -$5     n=   144 WR= 36.8% PnL=$   535.78 ($   67.12/mes)
+    TOPE -$10    n=   143 WR= 42.0% PnL=$   618.37 ($   77.46/mes)

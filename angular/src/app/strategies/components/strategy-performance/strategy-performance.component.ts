@@ -104,9 +104,9 @@ export class StrategyPerformanceComponent implements OnInit, AfterViewInit, OnDe
     if (this.performance.allTrades && this.performance.allTrades.length > 0) {
       // Sort trades by date ASC for chart
       const sorted = [...this.performance.allTrades].sort((a,b) => new Date(a.openedAt!).getTime() - new Date(b.openedAt!).getTime());
-      let cumulative = 100;
+      let cumulative = 0;
       const chartData = sorted.map(t => {
-        cumulative += (t.roiPercentage || 0);
+        cumulative += (t.realizedPnl || 0);
         return {
           time: Math.floor(new Date(t.openedAt!).getTime() / 1000),
           value: cumulative
@@ -127,7 +127,7 @@ export class StrategyPerformanceComponent implements OnInit, AfterViewInit, OnDe
     this.performance.profitFactor = grossLoss === 0 ? grossProfit : (grossProfit / grossLoss);
 
     // Distribution
-    const pnlValues = trades.map((t: any) => t.roiPercentage || 0);
+    const pnlValues = trades.map((t: any) => t.realizedPnl || 0);
     this.performance.maxGain = Math.max(...pnlValues);
     this.performance.maxLoss = Math.min(...pnlValues);
     

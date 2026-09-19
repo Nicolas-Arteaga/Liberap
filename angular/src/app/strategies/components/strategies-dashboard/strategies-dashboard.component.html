@@ -28,9 +28,9 @@
   <!-- ══════════════ PORTFOLIO STATS BAR ══════════════ -->
   <div class="stats-bar" *ngIf="profiles.length > 0">
     <div class="stat-item">
-      <span class="stat-label">Portfolio PnL</span>
+      <span class="stat-label">PnL realizado</span>
       <span class="stat-value" [class.positive]="totalNetPnL > 0" [class.negative]="totalNetPnL < 0">
-        {{ totalNetPnL > 0 ? '+' : '' }}{{ totalNetPnL | number:'1.2-2' }}%
+        {{ totalNetPnL > 0 ? '+' : '' }}{{ totalNetPnL | number:'1.2-2' }} USDT
       </span>
     </div>
     <div class="stat-divider"></div>
@@ -130,7 +130,7 @@
         <div class="card-identity">
           <div class="card-dot" [style.background]="profile.color || '#00C47D'"></div>
           <div>
-            <h3 class="card-name">{{ profile.name }}</h3>
+            <h3 class="card-name">{{ profileIdentity(profile) }}</h3>
             <p class="card-desc">{{ profile.description || 'Sin descripción definida.' }}</p>
           </div>
         </div>
@@ -159,9 +159,9 @@
           <span class="m-val">{{ profile.totalTrades || 0 }}</span>
         </div>
         <div class="metric">
-          <span class="m-label">NET PnL</span>
+          <span class="m-label">PnL REALIZADO</span>
           <span class="m-val" [class.positive]="(profile.netPnL || 0) > 0" [class.negative]="(profile.netPnL || 0) < 0">
-            {{ (profile.netPnL || 0) > 0 ? '+' : '' }}{{ (profile.netPnL || 0) | number:'1.2-2' }}%
+            {{ (profile.netPnL || 0) > 0 ? '+' : '' }}{{ (profile.netPnL || 0) | number:'1.2-2' }} USDT
           </span>
         </div>
         <div class="metric">
@@ -188,6 +188,10 @@
         <div class="param-chip">
           <ion-icon name="time-outline"></ion-icon>
           {{ profile.maxTradeDurationCandles * 15 }}m timeout
+        </div>
+        <div class="param-chip">
+          <ion-icon name="analytics-outline"></ion-icon>
+          Evidencia: {{ profileEvidenceDays(profile) }} día{{ profileEvidenceDays(profile) === 1 ? '' : 's' }}
         </div>
       </div>
 

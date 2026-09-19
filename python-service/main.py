@@ -22,6 +22,7 @@ from lse.router import router as lse_router
 from scar import proxies
 from fvg import router as fvg_router
 from adn_compression import router as adn_compression_router
+from orderblock import router as orderblock_router
 
 
 # Initialize logging
@@ -64,6 +65,7 @@ app.include_router(scar_router)
 app.include_router(lse_router)
 app.include_router(fvg_router)
 app.include_router(adn_compression_router)
+app.include_router(orderblock_router)
 
 @app.on_event("startup")
 async def _startup():

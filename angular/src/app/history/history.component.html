@@ -74,8 +74,12 @@
           *ngFor="let opt of strategyChipOptions; trackBy: trackByStrategyId"
           class="strategy-chip"
           [class.active]="strategyFilter === opt.value"
+          [class.is-favorite]="favoritesService.isFavorite(opt.value)"
           [style.--chip-color]="opt.color"
           (click)="setStrategyFilter(opt.value)">
+          <span class="chip-star-hit" (click)="toggleFavoriteStrategy(opt.value, $event)">
+            <ion-icon class="chip-star" [name]="favoritesService.isFavorite(opt.value) ? 'star' : 'star-outline'"></ion-icon>
+          </span>
           <span class="chip-dot"></span>
           {{ opt.label }}
         </button>
@@ -91,7 +95,8 @@
         
         <div *ngIf="filteredTrades.length > 0; else noTrades">
           <div *ngFor="let trade of paginatedTrades; trackBy: trackByTradeId; let last = last"
-               class="payment-item d-flex align-items-start position-relative">
+               class="payment-item d-flex align-items-start position-relative"
+               [class.trade-pinned-open]="trade.status === 0">
             
             <!-- Contenedor de círculo -->
             <div class="payment-circle-container">

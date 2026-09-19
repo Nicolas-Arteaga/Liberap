@@ -275,6 +275,7 @@ tempkey.jwk
 
 # User Secrets
 *appsettings.secrets.json
+*appsettings.secrets.json.bak
 
 # Environment variables
 .env
@@ -299,3 +300,11 @@ scratch/create_agent_profile.*
 # Marcador interno del hook de progress-log (bookkeeping, no aporta valor versionado)
 .claude/.progress_log_marker
 agent/backtest_api_log*.txt
+
+# Recoverable local state snapshots. These can contain multi-GB market data and
+# database dumps; version the manifest and scripts, not the raw snapshot.
+/backups/
+agent/backtest/*.pid
+agent/backtest/*.pkl
+
+.codegraph/

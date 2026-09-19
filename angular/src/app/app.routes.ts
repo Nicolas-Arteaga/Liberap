@@ -80,6 +80,16 @@ export const APP_ROUTES: Routes = [
           .then(c => c.BacktestingComponent),
       },
       {
+        path: 'strategy-lab',
+        loadComponent: () => import('./strategy-lab/strategy-lab.component')
+          .then(c => c.StrategyLabComponent),
+      },
+      {
+        path: 'invariant-research',
+        loadComponent: () => import('./invariant-research/invariant-research.component')
+          .then(c => c.InvariantResearchComponent),
+      },
+      {
         path: 'nexus-15',
         loadComponent: () => import('./nexus15/nexus15.component').then(c => c.Nexus15Component),
       },
@@ -90,6 +100,10 @@ export const APP_ROUTES: Routes = [
       {
         path: 'fvg',
         loadComponent: () => import('./fvg/fvg.component').then(c => c.FvgComponent),
+      },
+      {
+        path: 'order-block',
+        loadComponent: () => import('./order-block/order-block.component').then(c => c.OrderBlockComponent),
       },
       {
         path: 'adn-compression',

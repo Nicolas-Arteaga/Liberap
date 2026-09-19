@@ -59,6 +59,24 @@ public class StrategyProfile : FullAuditedAggregateRoot<Guid>
     // Momentum"), ver agent/verge_agent.py.
     public bool BroadcastToBinance { get; set; } = false;
 
+    /// <summary>
+    /// ROUND 42 — activa la gestión de salida "Trail-1" (validada R36-R41,
+    /// ver TRAIL1_FINAL_VALIDATION_ROUND37.md / DISCREPANCY_AUDIT_ROUND39.md
+    /// / CANARY_PRECHECK_ROUND41.md) para TODAS las posiciones abiertas bajo
+    /// este perfil: al alcanzar +100/+150/+200bp de excursión favorable, el
+    /// SL se mueve a breakeven/+50bp/+100bp respectivamente (nunca lo
+    /// empeora). No afecta la lógica de entrada, señales, scoring ni
+    /// tamaño — solo la gestión de la posición ya abierta
+    /// (SimulationMarkPriceWorker). Reemplaza al canary por hash de trade.Id
+    /// de R40 -- activar/desactivar Trail-1 para un perfil puntual (el
+    /// "canary" real) es ahora una decisión explícita por perfil, con el
+    /// mismo flujo de configuración que ya usa BroadcastToBinance, en vez
+    /// de un porcentaje ciego de appsettings. También requiere que
+    /// "TrailStop:Enabled" esté en true en appsettings (interruptor
+    /// maestro global) -- ambos deben estar activos para que aplique.
+    /// </summary>
+    public bool UseTrailStop { get; set; } = false;
+
     protected StrategyProfile() { }
 
     public StrategyProfile(Guid id, Guid userId, string name) : base(id)

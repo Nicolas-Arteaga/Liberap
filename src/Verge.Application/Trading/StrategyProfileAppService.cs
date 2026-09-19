@@ -112,6 +112,7 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
         p.StrategyType = string.IsNullOrWhiteSpace(i.StrategyType) ? "Generic" : i.StrategyType;
         p.PatternParamsJson = i.PatternParamsJson;
         p.BroadcastToBinance = i.BroadcastToBinance;
+        p.UseTrailStop = i.UseTrailStop;
     }
 
     private static StrategyProfileDto MapToDto(StrategyProfile p) => new()
@@ -147,6 +148,7 @@ public class StrategyProfileAppService : ApplicationService, IStrategyProfileApp
         NexusMaxPriceDriftPct = p.NexusMaxPriceDriftPct,
         StrategyType = p.StrategyType,
         PatternParamsJson = p.PatternParamsJson,
-        BroadcastToBinance = p.BroadcastToBinance
+        BroadcastToBinance = p.BroadcastToBinance,
+        UseTrailStop = p.UseTrailStop
     };
 }

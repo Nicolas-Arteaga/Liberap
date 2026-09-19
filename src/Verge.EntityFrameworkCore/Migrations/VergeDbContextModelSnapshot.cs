@@ -692,6 +692,9 @@ namespace Verge.Migrations
                     b.Property<decimal>("Amount")
                         .HasColumnType("numeric");
 
+                    b.Property<bool>("BreakevenLocked")
+                        .HasColumnType("boolean");
+
                     b.Property<decimal?>("BtcPriceAtClose")
                         .HasColumnType("numeric");
 
@@ -801,6 +804,9 @@ namespace Verge.Migrations
                     b.Property<DateTime>("OpenedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<decimal?>("OriginalSlPrice")
+                        .HasColumnType("numeric");
+
                     b.Property<decimal>("ROIPercentage")
                         .HasColumnType("numeric");
 
@@ -838,6 +844,15 @@ namespace Verge.Migrations
 
                     b.Property<Guid?>("TradingSignalId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("TrailAuditJson")
+                        .HasColumnType("text");
+
+                    b.Property<int>("TrailLevelApplied")
+                        .HasColumnType("integer");
+
+                    b.Property<bool?>("TrailStopCanary")
+                        .HasColumnType("boolean");
 
                     b.Property<decimal>("UnrealizedPnl")
                         .HasColumnType("numeric");
@@ -999,6 +1014,9 @@ namespace Verge.Migrations
 
                     b.Property<float>("TpMultiplier")
                         .HasColumnType("real");
+
+                    b.Property<bool>("UseTrailStop")
+                        .HasColumnType("boolean");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");

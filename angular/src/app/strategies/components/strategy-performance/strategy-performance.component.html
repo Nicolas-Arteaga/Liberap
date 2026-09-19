@@ -54,7 +54,7 @@
       <div class="q-stat">
         <span class="label">Net PnL</span>
         <span class="value" [class.success]="performance.netPnL >= 0" [class.danger]="performance.netPnL < 0">
-          {{ performance.netPnL >= 0 ? '+' : '' }}{{ performance.netPnL | number:'1.2-2' }}<small>ROI%</small>
+          {{ performance.netPnL >= 0 ? '+' : '' }}{{ performance.netPnL | number:'1.2-2' }}<small>USDT</small>
         </span>
       </div>
       <div class="q-stat">
@@ -63,9 +63,9 @@
         <span class="sub success" *ngIf="performance.profitFactor >= 2">SALUDABLE</span>
       </div>
       <div class="q-stat">
-        <span class="label">Avg ROI</span>
+        <span class="label">PnL promedio</span>
         <span class="value" [class.success]="performance.avgRR >= 0">
-          {{ performance.avgRR | number:'1.2-2' }}<small>%</small>
+          {{ performance.avgRR | number:'1.2-2' }}<small>USDT</small>
         </span>
       </div>
     </div>
@@ -141,11 +141,11 @@
         </div>
         <div class="stat-row highlight">
           <span class="label">Net PnL</span>
-          <span class="value">+{{ performance.netPnL | number:'1.2-2' }}%</span>
+          <span class="value">{{ performance.netPnL >= 0 ? '+' : '' }}{{ performance.netPnL | number:'1.2-2' }} USDT</span>
         </div>
         <div class="stat-row">
           <span class="label">PnL Promedio</span>
-          <span class="value success">+{{ (performance.netPnL / performance.totalTrades) | number:'1.2-2' }}%</span>
+          <span class="value" [class.success]="performance.netPnL >= 0" [class.danger]="performance.netPnL < 0">{{ performance.netPnL >= 0 ? '+' : '' }}{{ (performance.netPnL / performance.totalTrades) | number:'1.2-2' }} USDT</span>
         </div>
         <div class="stat-row">
           <span class="label">Mayor Ganancia</span>

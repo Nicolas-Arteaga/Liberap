@@ -21,7 +21,8 @@ import {
   radioOutline,
   flashOutline,
   layersOutline,
-  gitNetworkOutline
+  gitNetworkOutline,
+  cubeOutline
 } from 'ionicons/icons';
 import { Subscription, Observable } from 'rxjs';
 import { map, filter } from 'rxjs/operators';
@@ -95,7 +96,7 @@ export class MobileLayoutComponent implements OnInit, OnDestroy {
       homeOutline, pulseOutline, hardwareChipOutline, gridOutline,
       briefcaseOutline, listOutline, analyticsOutline,
       notificationsOutline, settingsOutline, personOutline,
-      radioOutline, flashOutline, layersOutline, gitNetworkOutline
+      radioOutline, flashOutline, layersOutline, gitNetworkOutline, cubeOutline
     });
   }
 
@@ -148,9 +149,12 @@ export class MobileLayoutComponent implements OnInit, OnDestroy {
     else if (url === '/dashboard-advanced')       this.currentRouteName = 'POSICIONES ABIERTAS';
     else if (url === '/history')                  this.currentRouteName = 'HISTORIAL DE OPERACIONES';
     else if (url === '/backtesting')              this.currentRouteName = 'BACKTESTING SIMULADO';
+    else if (url === '/strategy-lab')             this.currentRouteName = 'LABORATORIO CUÁNTICO DE ESTRATEGIAS';
+    else if (url === '/invariant-research')       this.currentRouteName = 'INVARIANT RESEARCH ENGINE';
     else if (url === '/alerts')                   this.currentRouteName = 'ALERTAS DEL MERCADO';
     else if (url === '/profile')                  this.currentRouteName = 'CONFIGURACIÓN DEL SISTEMA';
     else if (url.startsWith('/admin'))            this.currentRouteName = 'PANEL DE ADMINISTRACIÓN';
+    else if (url === '/order-block')              this.currentRouteName = 'ORDER BLOCK + BOS + LIQUIDEZ';
     else                                          this.currentRouteName = 'VERGE INTELLIGENCE';
   }
 

@@ -95,6 +95,44 @@
     ion-icon { opacity: 1; color: #00C47D; }
   }
 
+  // Estrella de favorito -- click independiente del chip (stopPropagation
+  // en el handler), apagada por default, dorada cuando esta marcada.
+  // Favoritos ordenan primero en el chip list (FavoriteStrategiesService).
+  //
+  // 2026-08-16: el icono solo (0.85rem, ~14px) era un hitbox invisible
+  // dentro de un chip ya chico -- el usuario clickeaba y le pegaba al
+  // boton padre en vez de a la estrella (seleccionaba el filtro pero
+  // nunca togglaba el favorito). .chip-star-hit agranda el area clickeable
+  // a un circulo de 22px con fondo en hover, sin agrandar el icono visual.
+  .chip-star-hit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    margin: -3px -2px -3px -6px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background 0.15s;
+    &:hover { background: rgba(255, 200, 0, 0.15); }
+  }
+  .chip-star {
+    font-size: 0.85rem !important;
+    opacity: 0.6 !important;
+    color: #6b7280;
+    pointer-events: none; // el click lo maneja .chip-star-hit (hitbox mas grande)
+    transition: color 0.15s, transform 0.15s;
+  }
+  .chip-star-hit:hover .chip-star { transform: scale(1.2); color: #d1a900; }
+  &.is-favorite {
+    border-color: rgba(255, 200, 0, 0.35);
+    .chip-star {
+      opacity: 1 !important;
+      color: #ffc800;
+      filter: drop-shadow(0 0 4px rgba(255, 200, 0, 0.5));
+    }
+  }
+
   // Chip "Todas" no tiene --chip-color, lo sobreescribimos
   &:first-child.active {
     border-color: #00C47D;
@@ -108,5 +146,26 @@
 // ── Hover sobre símbolo del trade ───────────────────────────────────────────
 .hover-text-primary:hover {
   color: #00C47D !important;
+}
+
+// ── Trades abiertos, fijados arriba de todo (pedido 2026-08-16) ────────────
+// Se distinguen con un borde lateral + fondo sutil para que quede claro por
+// que estan primero aunque no sean los mas recientes cronologicamente --
+// una vez que cierran, pierden esta marca y vuelven a su lugar por fecha.
+.trade-pinned-open {
+  position: relative;
+  padding-left: 10px;
+  background: linear-gradient(90deg, rgba(0, 196, 125, 0.07), transparent 60%);
+  border-radius: 6px;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 4px; bottom: 4px;
+    width: 3px;
+    border-radius: 3px;
+    background: #00C47D;
+    box-shadow: 0 0 8px rgba(0, 196, 125, 0.6);
+  }
 }
 

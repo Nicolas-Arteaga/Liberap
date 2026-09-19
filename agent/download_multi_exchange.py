@@ -18,6 +18,7 @@ import os
 import sqlite3
 import time
 import requests
+import argparse
 from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -27,6 +28,8 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "data", "binance_vision_clean.
 START_MS = int(datetime(2025, 12, 1, tzinfo=timezone.utc).timestamp() * 1000)
 END_MS = int(datetime(2026, 7, 26, tzinfo=timezone.utc).timestamp() * 1000)
 INTERVAL = "15m"
+COMMON_LIQUID_UNIVERSE = ("BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","DOGEUSDT",
+                         "ADAUSDT","AVAXUSDT","LINKUSDT","DOTUSDT","SUIUSDT")
 
 
 def init_db(conn):
@@ -124,12 +127,22 @@ FETCHERS = {"bybit": fetch_bybit, "okx": fetch_okx, "bitget": fetch_bitget}
 
 
 def main():
-    wl = config.WATCHLIST
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--common-liquid", action="store_true",
+                        help="backfill the same liquid symbols on every venue for cross-venue research")
+    args = parser.parse_args()
+    wl = list(COMMON_LIQUID_UNIVERSE) if args.common_liquid else config.WATCHLIST
     by_ex = {"bybit": [], "okx": [], "bitget": []}
-    for s in wl:
-        ex = config.get_primary_exchange_for_symbol(s)
-        if ex in by_ex:
-            by_ex[ex].append(s)
+    if args.common_liquid:
+        # This is intentionally redundant across venues: research needs the
+        # same contract/time grid to measure a dislocation, unlike production
+        # where each symbol has one preferred data source.
+        by_ex = {exchange: list(wl) for exchange in by_ex}
+    else:
+        for s in wl:
+            ex = config.get_primary_exchange_for_symbol(s)
+            if ex in by_ex:
+                by_ex[ex].append(s)
 
     conn = sqlite3.connect(DB_PATH)
     init_db(conn)

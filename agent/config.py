@@ -73,6 +73,12 @@ MIN_STOP_PCT_OF_PRICE = float(os.getenv("MIN_STOP_PCT_OF_PRICE", "0.002"))
 MAX_ENTRY_SLIPPAGE_PCT = float(os.getenv("MAX_ENTRY_SLIPPAGE_PCT", "0.002"))
 LSE_MAX_ENTRY_SLIPPAGE_PCT = float(os.getenv("LSE_MAX_ENTRY_SLIPPAGE_PCT", "0.20"))
 MAX_MARGIN_PER_TRADE_USD = float(os.getenv("MAX_MARGIN_PER_TRADE_USD", "150"))
+# Tope universal de pérdida por trade (2026-09-13, pedido explícito del
+# usuario): ninguna estrategia puede perder más de esto si toca SL — el
+# SL se ajusta más cerca del precio de entrada cuando el original superaría
+# este monto, nunca al revés. Ver risk_manager.py::_calculate_position_lse /
+# _calculate_position_nexus_style.
+MAX_SL_LOSS_USD = float(os.getenv("MAX_SL_LOSS_USD", "5.0"))
 MAX_NOTIONAL_PER_TRADE_USD = float(os.getenv("MAX_NOTIONAL_PER_TRADE_USD", "50000"))
 TICK_SIZE_MIN_RELATIVE_OF_PRICE = float(os.getenv("TICK_SIZE_MIN_RELATIVE_OF_PRICE", "1e-7"))
 TICK_SIZE_MIN_ABSOLUTE = float(os.getenv("TICK_SIZE_MIN_ABSOLUTE", "1e-10"))
@@ -327,12 +333,32 @@ ADN_COMPRESSION_HTTP_TIMEOUT_SEC = int(os.getenv("ADN_COMPRESSION_HTTP_TIMEOUT_S
 # cálculo de ATR/perfil genérico.
 FVG_STRATEGY_ENABLED = os.getenv("FVG_STRATEGY_ENABLED", "true").lower() in ("1", "true", "yes")
 FVG_STRATEGY_HTTP_TIMEOUT_SEC = int(os.getenv("FVG_STRATEGY_HTTP_TIMEOUT_SEC", "90"))
+
+# ==========================================
+# ORDER BLOCK — SMC/ICT, BOS + liquidez (StrategyType=OrderBlock)
+# ==========================================
+# Mismo patron que FVG: pide /orderblock/scan (top-5 por confluence_score,
+# only_validated=true = solo bearish/SHORT) en vez de re-implementar la
+# deteccion. SL/TP vienen del propio detector (estructural), no de un
+# calculo de ATR/perfil generico. 2026-08-23: el backtest real via
+# backtest/engine.py::run_order_block (metodo _run_generic, sin competencia
+# top-5) dio negativo -- el usuario pidio productivizarlo igual con el
+# mismo mecanismo de scan competitivo que SI valida a FVG, para juzgarlo en
+# vivo en vez de seguir iterando el backtest offline.
+ORDER_BLOCK_STRATEGY_ENABLED = os.getenv("ORDER_BLOCK_STRATEGY_ENABLED", "true").lower() in ("1", "true", "yes")
+ORDER_BLOCK_STRATEGY_HTTP_TIMEOUT_SEC = int(os.getenv("ORDER_BLOCK_STRATEGY_HTTP_TIMEOUT_SEC", "90"))
 # Pump Reaper (2026-08-02, ver memoria verge_meme_short_top): short del
 # blow-off top en memecoins de alta beta. El switch real de "opera o no" es
 # el IsActive del StrategyProfile (creado en false) -- este flag es la
 # válvula de emergencia a nivel código, no hace falta tocarlo para
 # activar/desactivar el uso normal.
 PUMP_REAPER_ENABLED = os.getenv("PUMP_REAPER_ENABLED", "true").lower() in ("1", "true", "yes")
+PDH_SWEEP_ENABLED = os.getenv("PDH_SWEEP_ENABLED", "true").lower() in ("1", "true", "yes")
+DEATH_CROSS_ENABLED = os.getenv("DEATH_CROSS_ENABLED", "true").lower() in ("1", "true", "yes")
+LEVEL_SWEEP_1H_ENABLED = os.getenv("LEVEL_SWEEP_1H_ENABLED", "true").lower() in ("1", "true", "yes")
+BAND_TOUCH_ENABLED = os.getenv("BAND_TOUCH_ENABLED", "true").lower() in ("1", "true", "yes")
+RSI_EXTREME_ENABLED = os.getenv("RSI_EXTREME_ENABLED", "true").lower() in ("1", "true", "yes")
+MA_PULLBACK_ENABLED = os.getenv("MA_PULLBACK_ENABLED", "true").lower() in ("1", "true", "yes")
 # 2026-07-13: SL estructural (borde del gap + buffer) puede quedar
 # desproporcionado cuando la zona ya está agotada/vieja (ej. LRCUSDT, SL a
 # ~78% de distancia) — un scalp de gap de 3 velas nunca debería tener un SL

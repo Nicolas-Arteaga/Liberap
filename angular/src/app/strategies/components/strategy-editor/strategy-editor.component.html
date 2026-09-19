@@ -127,6 +127,22 @@
         </div>
 
         <div class="field-group">
+          <label class="field-label">Trailing stop (Trail-1)</label>
+          <div class="toggle-card" [class.on]="model.useTrailStop"
+               (click)="model.useTrailStop = !model.useTrailStop"
+               style="border-color: rgb(0 196 125 / 40%);"
+               [style.background]="model.useTrailStop ? 'rgb(0 196 125 / 12%)' : ''">
+            <div class="toggle-dot"></div>
+            <span>{{ model.useTrailStop ? 'Activo: +100/+150/+200bp mueve el SL a favor' : 'Desactivado: SL fijo (comportamiento actual)' }}</span>
+          </div>
+          <p class="field-hint">Al alcanzar +100bp de ganancia el SL sube a breakeven, a +150bp asegura +50bp y a
+            +200bp asegura +100bp — nunca empeora el stop existente. Validado sobre 2.985 trades reales
+            (ver TRAIL1_FINAL_VALIDATION_ROUND37.md). Requiere además que el interruptor maestro global
+            "Trailing stop (Trail-1)" esté activado en Configuración → administrable ahí, sin editar archivos —
+            sin eso, este toggle no tiene efecto aunque esté prendido.</p>
+        </div>
+
+        <div class="field-group">
           <label class="field-label">Tipo de Estrategia</label>
           <div class="direction-selector">
             <button class="dir-btn" [class.active-auto]="!isPatternStrategy" (click)="onStrategyTypeChange('Generic')">

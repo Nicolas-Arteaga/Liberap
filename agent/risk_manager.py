@@ -184,6 +184,23 @@ class RiskManager:
         tp_price = tp2_b
         sl_price = sl_b
 
+        # ── TOPE UNIVERSAL DE PÉRDIDA: máximo -$5 por trade (2026-09-13) ────
+        # Pedido explícito del usuario tras ver pérdidas reales de -$12/-$19
+        # en SL de estrategias reconstruidas post-wipe: "el máximo será -5,
+        # si no lo excede se deja como lo plantea el agente". Aplica a TODAS
+        # las estrategias por igual, sin importar el modo — se ajusta el SL
+        # (nunca el TP) para que la pérdida máxima real (qty * distancia)
+        # nunca supere $5, dejándolo más cerca si el original ya perdía menos.
+        max_loss = float(getattr(config, "MAX_SL_LOSS_USD", 5.0))
+        potential_loss = qty * abs(cp - sl_price)
+        if potential_loss > max_loss and qty > 0:
+            capped_dist = max_loss / qty
+            sl_price = (cp - capped_dist) if side == 0 else (cp + capped_dist)
+            logger.warning(
+                f"[SL-CAP-5USD] {symbol} (LSE): pérdida potencial ${potential_loss:.2f} > ${max_loss:.2f} "
+                f"— SL ajustado a {sl_price:.8f}"
+            )
+
         return {
             "symbol": symbol,
             "side": side,
@@ -249,10 +266,24 @@ class RiskManager:
         # verge_meme_short_top): SL/TP por ATR calculados en el detector,
         # esta rama solo los respeta -- mismo patron que fvg_mode/arrow_peak_mode.
         meme_short_top_mode = signal_data.get("meme_short_top_mode", False)
+        # PDH Sweep (2026-08-11): "barrer el maximo del dia anterior", SHORT
+        # unicamente, SL/TP por ATR calculados en el detector -- mismo
+        # patron que meme_short_top_mode (no recalcular con RR×SL generico).
+        pdh_sweep_mode = signal_data.get("pdh_sweep_mode", False)
+        death_cross_mode = signal_data.get("death_cross_mode", False)
+        level_sweep_1h_mode = signal_data.get("level_sweep_1h_mode", False)
+        band_touch_mode = signal_data.get("band_touch_mode", False)
+        rsi_extreme_mode = signal_data.get("rsi_extreme_mode", False)
+        ma_pullback_mode = signal_data.get("ma_pullback_mode", False)
+        # Order Block + BOS + Liquidez (2026-08-22, ver PROGRESS_LOG): SL/TP
+        # estructurales calculados en el detector (SL = fuera de la zona OB
+        # + buffer, TP = nivel de liquidez real) -- mismo patron que
+        # fvg_mode/meme_short_top_mode, no recalcular con RR×SL generico.
+        order_block_mode = signal_data.get("order_block_mode", False)
         custom_sl_price = signal_data.get("custom_sl_price")
         side_for_custom_sl = int(signal_data.get("side", 0))
 
-        if (structural_sniper_mode or golden_uturn_mode or arrow_peak_mode or ma_slope_mode or fvg_mode or meme_short_top_mode) and custom_sl_price:
+        if (structural_sniper_mode or golden_uturn_mode or arrow_peak_mode or ma_slope_mode or fvg_mode or meme_short_top_mode or pdh_sweep_mode or death_cross_mode or level_sweep_1h_mode or band_touch_mode or rsi_extreme_mode or ma_pullback_mode or order_block_mode) and custom_sl_price:
             try:
                 custom_sl_f = float(custom_sl_price)
                 # LONG: el SL custom debe quedar debajo del precio actual.
@@ -318,7 +349,7 @@ class RiskManager:
 
         # 1. Distancia SL basada en volatilidad (atr o estimated_range)
         # Solo calcular si no hay custom SL de Sniper Mode
-        if not ((structural_sniper_mode or golden_uturn_mode or arrow_peak_mode or ma_slope_mode or fvg_mode or meme_short_top_mode) and custom_sl_price):
+        if not ((structural_sniper_mode or golden_uturn_mode or arrow_peak_mode or ma_slope_mode or fvg_mode or meme_short_top_mode or pdh_sweep_mode or death_cross_mode or level_sweep_1h_mode or band_touch_mode or rsi_extreme_mode or ma_pullback_mode or order_block_mode) and custom_sl_price):
             if profile:
                 sl_mult = float(profile.get("slMultiplier", 0.8))
             else:
@@ -339,7 +370,7 @@ class RiskManager:
 
         # Calcular base SL sin el multiplicador de Clone para el Take Profit
         # Para Sniper/Golden/Arrow Peak/MA Slope/FVG con custom SL, usar el mismo sl_distance_price calculado
-        if (structural_sniper_mode or golden_uturn_mode or arrow_peak_mode or ma_slope_mode or fvg_mode or meme_short_top_mode) and custom_sl_price:
+        if (structural_sniper_mode or golden_uturn_mode or arrow_peak_mode or ma_slope_mode or fvg_mode or meme_short_top_mode or pdh_sweep_mode or death_cross_mode or level_sweep_1h_mode or band_touch_mode or rsi_extreme_mode or ma_pullback_mode or order_block_mode) and custom_sl_price:
             base_sl_distance_price = sl_distance_price
         else:
             if profile and profile.get("name") == "Scalping Clone":
@@ -496,7 +527,7 @@ class RiskManager:
         # ATR (SL=2.0xATR, TP=4.0xATR, R:R 2:1 fijo -- ver memoria
         # verge_meme_short_top) directo en custom_tp_price, mismo criterio
         # que FVG/Arrow Peak: no recalcular con RR×SL genérico encima.
-        if meme_short_top_mode:
+        if meme_short_top_mode or pdh_sweep_mode or death_cross_mode or level_sweep_1h_mode or band_touch_mode or rsi_extreme_mode or ma_pullback_mode or order_block_mode:
             meme_custom_tp = signal_data.get("custom_tp_price")
             meme_custom_tp_f = None
             if meme_custom_tp:
@@ -545,7 +576,7 @@ class RiskManager:
         # activando el MIN-RR-VETO de más abajo en el 100% de los casos.
         # Caso real: AAPLUSDT con TP ya estirado a RR=5.73 según su piso
         # mínimo, el cap lo recortaba a RR=1.15 — vetaba una estrategia sana.
-        if not (fvg_mode or arrow_peak_mode or ma_slope_mode or meme_short_top_mode):
+        if not (fvg_mode or arrow_peak_mode or ma_slope_mode or meme_short_top_mode or pdh_sweep_mode or death_cross_mode or level_sweep_1h_mode or band_touch_mode or rsi_extreme_mode or ma_pullback_mode or order_block_mode):
             tp_price = self._apply_structural_tp_cap(symbol, side, cp, tp_price)
             tp_distance_price = abs(tp_price - cp)
 
@@ -560,11 +591,14 @@ class RiskManager:
         # rechaza el candidato (no abre nada, ni gana ni pierde), no cambia
         # el tamaño de la posición. Caso real: GWEIUSDT (R:R=2.98:1) terminó
         # en SL por -$6.11; con este piso en 4:1 nunca se hubiera abierto.
-        if fvg_mode or arrow_peak_mode or ma_slope_mode or golden_uturn_mode or structural_sniper_mode or meme_short_top_mode:
+        if fvg_mode or arrow_peak_mode or ma_slope_mode or golden_uturn_mode or structural_sniper_mode or meme_short_top_mode or pdh_sweep_mode or death_cross_mode or level_sweep_1h_mode or band_touch_mode or rsi_extreme_mode or ma_pullback_mode or order_block_mode:
             if stop_distance > 0:
                 actual_rr = tp_distance_price / stop_distance
                 min_rr_required = float(profile.get("minRR", 1.5)) if profile else 1.5
-                if actual_rr < min_rr_required:
+                # Misma tolerancia de punto flotante que setup_validator.py
+                # (2026-09-12) -- evita vetar por ruido de float cuando el RR
+                # de diseño coincide exacto con el MinRR del perfil.
+                if actual_rr < min_rr_required * (1 - 1e-6):
                     logger.info(
                         f"[MIN-RR-VETO] {symbol}: R:R real={actual_rr:.2f}:1 < mínimo del perfil "
                         f"({min_rr_required:.2f}:1) — candidato rechazado, no se abre."
@@ -579,11 +613,39 @@ class RiskManager:
             margin = float(profile.get("marginPerTrade", 150))
         else:
             margin = float(getattr(config, "MAX_MARGIN_PER_TRADE_USD", 150))
-        
+
+        # ── Margen dinamico por calidad de señal (2026-08-09, opt-in) ──────
+        # Nace de la discusion con el usuario: filtrar binario "esta señal
+        # entra o no" ya fallo 4 veces en produccion (Gap Chico, v2 minado,
+        # Pulido, Pulido V2) -- cada vez que se corta de raiz un grupo de
+        # señales "dudosas", el grupo SI tenia ganadores grandes adentro
+        # (auditoria real: 9 de 96 dudosas de FVG-15m ganaron +$115.74,
+        # pero el grupo entero neteaba -$113.46) y cortarlas de raiz corta
+        # tambien esos ganadores -- la matematica retroactiva de "cortar
+        # todo da el mejor numero" es la misma trampa de siempre (hindsight
+        # bias), no una prediccion real hacia adelante.
+        # En vez de excluir, este multiplicador (0.1-1.0, viene armado en
+        # el candidato por verge_agent.py segun cuan "dudosa" es la señal)
+        # reduce el tamaño sin nunca llegar a cero -- limita cuanto se
+        # pierde si la señal era mala, sin renunciar del todo a la ganancia
+        # si resulta ser una de las buenas. Solo afecta a candidatos que
+        # traen `margin_multiplier` explicito (hoy: FVG - 15m v3 unicamente,
+        # via `dynamicMarginMode` en PatternParamsJson) -- si el campo no
+        # esta, el multiplicador es 1.0 y no cambia nada para nadie mas.
+        margin_multiplier = signal_data.get("margin_multiplier")
+        if margin_multiplier is not None:
+            margin_multiplier = max(0.1, min(1.0, float(margin_multiplier)))
+            margin_before = margin
+            margin = margin * margin_multiplier
+            logger.info(
+                f"[DYNAMIC-MARGIN] {symbol}: margen {margin_before:.2f} -> {margin:.2f} "
+                f"(multiplicador={margin_multiplier:.2f})"
+            )
+
         lev = int(getattr(config, "DEFAULT_LEVERAGE", 1))
         notional = margin * lev
         qty = notional / cp
-        
+
         # Calcular SL y TP porcentuales para logs
         sl_pct = (sl_distance_price / cp) * 100 if cp > 0 else 0
         tp_pct = (tp_distance_price / cp) * 100 if cp > 0 else 0
@@ -613,6 +675,22 @@ class RiskManager:
         logger.info(
             f"[RISK-FINAL] {symbol} | Margin: ${margin:.2f} | Qty: {qty:.4f} | SL: {sl_pct:.2f}% | TP: {tp_pct:.2f}%"
         )
+
+        # ── TOPE UNIVERSAL DE PÉRDIDA: máximo -$5 por trade (2026-09-13) ────
+        # Mismo mecanismo que en _calculate_position_lse — pedido explícito
+        # del usuario, aplica a TODAS las estrategias (Nexus, MA Slope, FVG,
+        # Order Block, Level Sweep, etc.) sin excepción. Nunca toca el TP.
+        max_loss = float(getattr(config, "MAX_SL_LOSS_USD", 5.0))
+        potential_loss = qty * abs(cp - sl_price)
+        if potential_loss > max_loss and qty > 0:
+            capped_dist = max_loss / qty
+            sl_price = (cp - capped_dist) if side == 0 else (cp + capped_dist)
+            stop_distance = capped_dist
+            sl_pct = stop_distance / cp
+            logger.warning(
+                f"[SL-CAP-5USD] {symbol}: pérdida potencial ${potential_loss:.2f} > ${max_loss:.2f} "
+                f"— SL ajustado a {sl_price:.8f} ({sl_pct*100:.2f}%)"
+            )
 
         # ── Validación hard: niveles inválidos → bloquear trade ──
         if sl_price <= 0:

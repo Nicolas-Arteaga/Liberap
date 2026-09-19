@@ -1,0 +1,31 @@
+{
+ "B": {
+  "policy": "B. senales reales + lifecycle ACTUAL (sin slots, sin timeout)",
+  "n": 35,
+  "net": 45.9,
+  "pf": 1.81,
+  "wr": 49,
+  "dd": -16.4,
+  "tp": 17,
+  "sl": 18,
+  "dur_med": 22.1,
+  "dur_max": 703.9,
+  "ncens": 10,
+  "cens_dur_med": 711.2,
+  "cens_dur_max": 981.5,
+  "cens_mtm_sum": -9.5
+ },
+ "A": {
+  "policy": "A. REAL historico (trades.csv)",
+  "n": 45,
+  "net": 64.7,
+  "pf": 2.54,
+  "wr": 49,
+  "dd": "-",
+  "tp": 11,
+  "sl": 7,
+  "dur_med": 30.4,
+  "dur_max": 208.6,
+  "ncens": "(27 cerrados por timeout en la version vieja)"
+ }
+}

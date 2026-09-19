@@ -14,6 +14,7 @@ import { Subscription, debounceTime, Subject } from 'rxjs';
 import { PaginatorComponent } from '../shared/components/paginator/paginator.component';
 import { StrategyProfileService } from '../strategies/services/strategy-profile.service';
 import { StrategyProfileDto } from '../proxy/trading/dtos/models';
+import { FavoriteStrategiesService } from 'src/shared/services/favorite-strategies.service';
 
 interface ChartData {
   month: string;
@@ -62,6 +63,13 @@ export class HistoryComponent {
   private signalr      = inject(TradingSignalrService);
   private strategyService = inject(StrategyProfileService);
   private cdr          = inject(ChangeDetectorRef);
+  favoritesService      = inject(FavoriteStrategiesService);
+
+  // 2026-08-16: Standard Scalping (id all-zeros) se saca de la vista por
+  // pedido explicito -- ni del chip de filtro ni de la lista de trades.
+  private static readonly HIDDEN_STRATEGY_IDS = new Set<string>([
+    '00000000-0000-0000-0000-000000000000',
+  ]);
 
   // ── Chart data ────────────────────────────────────────────────────────────
   chartData: ChartData[] = [];
@@ -153,7 +161,14 @@ export class HistoryComponent {
     const scopedStrategyId = this.strategyFilter === 'all' ? undefined : this.strategyFilter;
     this.tradeService.getRecentTrades(1000, scopedStrategyId).subscribe({
       next: trades => {
+        // Trades abiertos (status 0) siempre arriba de todo -- pedido
+        // explicito 2026-08-16: mientras un trade sigue operando quiere
+        // verlo primero sin importar cuando abrio; una vez que cierra
+        // vuelve a su posicion cronologica normal entre los cerrados.
         this.realTrades = trades.sort((a, b) => {
+          const aOpen = a.status === 0 ? 1 : 0;
+          const bOpen = b.status === 0 ? 1 : 0;
+          if (aOpen !== bOpen) return bOpen - aOpen;
           const da = new Date(a.closedAt || a.openedAt || '').getTime();
           const db = new Date(b.closedAt || b.openedAt || '').getTime();
           return db - da;
@@ -222,7 +237,9 @@ export class HistoryComponent {
   private recomputeAll() {
     // 1. Filter
     const filtered = this.strategyFilter === 'all'
-      ? this.realTrades.filter(t => this.isStrategyActive(t.strategyProfileId))
+      ? this.realTrades.filter(t =>
+          this.isStrategyActive(t.strategyProfileId) &&
+          !HistoryComponent.HIDDEN_STRATEGY_IDS.has(this.effectiveStrategyId(t.strategyProfileId)))
       : this.realTrades.filter(t => {
           if (this.strategyFilter === '00000000-0000-0000-0000-000000000000') {
             return (!t.strategyProfileId || t.strategyProfileId === '00000000-0000-0000-0000-000000000000') && this.isStrategyActive(t.strategyProfileId);
@@ -251,8 +268,16 @@ export class HistoryComponent {
     // así que no hace falta pedirlos de nuevo ahí. loadStats() ahora se
     // llama solo en loadData() y setStrategyFilter().
 
-    // 5. Chip options (stable when strategies haven't changed)
-    this._strategyChipOptions = this.strategies.map(s => ({
+    // 5. Chip options (favoritos primero, Standard Scalping oculto, solo
+    // estrategias activas -- pedido del usuario: no mezclar en el filtro de
+    // Historial perfiles inactivos/retirados junto con los que realmente
+    // corren hoy. La lista completa (activas e inactivas) sigue disponible
+    // sin filtrar en /estrategias para gestión.)
+    const visibleStrategies = this.favoritesService.sortFavoritesFirst(
+      this.strategies.filter(s => s.isActive && !HistoryComponent.HIDDEN_STRATEGY_IDS.has(s.id)),
+      s => s.id
+    );
+    this._strategyChipOptions = visibleStrategies.map(s => ({
       value: s.id,
       label: s.name,
       color: s.color || '#00C47D'
@@ -287,6 +312,13 @@ export class HistoryComponent {
     // estrategia elegida, no solo recalcular sobre los que ya estaban en
     // memoria (esos podían faltarle los más viejos de esta estrategia).
     this.loadData();
+  }
+
+  toggleFavoriteStrategy(id: string, event: Event): void {
+    event.stopPropagation();
+    this.favoritesService.toggle(id);
+    this.recomputeAll();
+    this.cdr.markForCheck();
   }
 
   resetPage() {

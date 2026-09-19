@@ -242,6 +242,39 @@
       align-items: center;
       &.active { color: #00f3ff; border-bottom-color: var(--tab-accent, #00f3ff); }
       &:hover { color: white; background: rgba(0, 243, 255, 0.05); }
+      &.is-favorite { background: rgba(255, 200, 0, 0.05); }
+    }
+
+    // Estrellita de favorito -- click independiente del tab (stopPropagation
+    // en el handler), apagada por default, dorada y con brillo cuando esta
+    // marcada. Favoritos ordenan primero (FavoriteStrategiesService).
+    //
+    // 2026-08-16: el icono solo (12px) era un hitbox invisible dentro de
+    // un tab ya angosto -- el click le pegaba al tab entero (seleccionaba
+    // la estrategia) en vez de a la estrella. .tab-star-hit agranda el
+    // area clickeable a un circulo de 22px con fondo en hover.
+    .tab-star-hit {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      margin: -3px -1px -3px -5px;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: background 0.15s;
+      &:hover { background: rgba(255, 200, 0, 0.15); }
+    }
+    .tab-star {
+      font-size: 12px;
+      color: #4b5563;
+      pointer-events: none; // el click lo maneja .tab-star-hit (hitbox mas grande)
+      transition: color 0.15s, transform 0.15s;
+    }
+    .tab-star-hit:hover .tab-star { transform: scale(1.15); color: #d1a900; }
+    .tab-item.is-favorite .tab-star {
+      color: #ffc800;
+      filter: drop-shadow(0 0 4px rgba(255, 200, 0, 0.6));
     }
 
     // Standard Scalping / Historial — siempre visibles, nunca se recortan.

@@ -1,0 +1,309 @@
+<div class="lab-root">
+
+  <!-- Fondo: grid escaneando + particulas -->
+  <div class="scan-grid"></div>
+  <div class="scan-line"></div>
+
+  <!-- ═══════════ HEADER ═══════════ -->
+  <header class="lab-header">
+    <div class="header-title">
+      <div class="title-glow-icon">
+        <ion-icon name="planet-outline"></ion-icon>
+      </div>
+      <div>
+        <h1>LABORATORIO CUÁNTICO</h1>
+        <p class="subtitle">Generación y validación autónoma de estrategias — probabilidades infinitas</p>
+      </div>
+    </div>
+
+    <div class="header-controls">
+      <div class="status-pill" [class.running]="current?.isRunning === true" [class.stopped]="current?.isRunning === false">
+        <span class="dot"></span>
+        <span>{{ current?.isRunning ? 'CORRIENDO' : (current?.available ? 'DETENIDO' : 'SIN DATOS') }}</span>
+      </div>
+
+      <!-- Boton de arranque/parada -- pedido explicito 2026-08-18: "quiero
+           resolverlo con el boton de arranque y listo". Habla directo con
+           el servicio de control en el host (:8011), separado de la API
+           de solo-lectura en Docker (:8010). -->
+      <button *ngIf="controlAvailable && !controlRunning" class="lab-control-btn start" (click)="startLab()" [disabled]="controlBusy">
+        <ion-icon name="flask-outline"></ion-icon> {{ controlBusy ? 'Arrancando...' : 'Arrancar laboratorio' }}
+      </button>
+      <button *ngIf="controlAvailable && controlRunning" class="lab-control-btn stop" (click)="stopLab()" [disabled]="controlBusy">
+        <ion-icon name="warning-outline"></ion-icon> {{ controlBusy ? 'Deteniendo...' : 'Detener laboratorio' }}
+      </button>
+      <span *ngIf="controlAvailable === false" class="control-unavailable" title="El servicio de control (lab_control_server.py, puerto 8011) no responde. Revisar en el servidor.">
+        <ion-icon name="warning-outline"></ion-icon> Control no disponible
+      </span>
+    </div>
+  </header>
+
+  <div class="error-banner" *ngIf="error">
+    <ion-icon name="warning-outline"></ion-icon> {{ error }}
+  </div>
+
+  <div class="error-banner" *ngIf="current?.available && current?.isRunning === false">
+    <ion-icon name="warning-outline"></ion-icon>
+    El proceso del laboratorio no manda señal de vida hace {{ current?.heartbeatAgeSec | number:'1.0-0' }}s — probablemente se detuvo. Revisar en el servidor.
+  </div>
+
+  <!-- ═══════════ BARRA DE PROGRESO EN VIVO: que esta probando AHORA ═══════════ -->
+  <section class="live-progress-card" *ngIf="current?.available">
+    <div class="live-progress-header">
+      <span class="live-dot" [class.on]="current?.isRunning"></span>
+      <span class="live-title">PROBANDO AHORA</span>
+      <span class="live-count mono">#{{ current?.tried | number }}</span>
+    </div>
+    <div class="live-strat-name mono">{{ current?.currentLabel || '—' }}</div>
+    <div class="live-bar-track">
+      <div class="live-bar-fill" [class.stalled]="current?.isRunning === false"></div>
+    </div>
+    <div class="live-progress-footer mono">
+      <span>{{ current?.elapsedSec }}s en esta corrida</span>
+      <span>{{ current?.tried | number }} probadas · {{ current?.found | number }} encontradas</span>
+    </div>
+  </section>
+
+  <!-- ═══════════ STAT TILES ═══════════ -->
+  <section class="stat-grid" *ngIf="status">
+    <div class="stat-tile">
+      <div class="stat-icon tested"><ion-icon name="flask-outline"></ion-icon></div>
+      <div class="stat-value mono">{{ status.testedCount | number }}</div>
+      <div class="stat-label">Estrategias Probadas</div>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-icon found"><ion-icon name="trophy-outline"></ion-icon></div>
+      <div class="stat-value mono accent">{{ status.foundCount | number }}</div>
+      <div class="stat-label">Pasaron el Filtro</div>
+    </div>
+    <div class="stat-tile" *ngIf="best">
+      <div class="stat-icon money"><ion-icon name="trending-up-outline"></ion-icon></div>
+      <div class="stat-value mono accent">{{ fmtMoney(best.result.monthly) }}</div>
+      <div class="stat-label">Mejor $/mes</div>
+    </div>
+    <div class="stat-tile ratio-tile">
+      <div class="stat-icon ratio"><ion-icon name="pulse-outline"></ion-icon></div>
+      <div class="stat-value mono">{{ status.testedCount ? ((status.foundCount / status.testedCount) * 100).toFixed(2) : '0' }}%</div>
+      <div class="stat-label">Tasa de Éxito</div>
+    </div>
+  </section>
+
+  <div class="progress-line mono" *ngIf="status?.progressLine">
+    <ion-icon name="terminal-outline"></ion-icon> {{ status?.progressLine }}
+  </div>
+
+  <!-- ═══════════ HERO: MEJOR ESTRATEGIA ═══════════ -->
+  <section class="hero-card" *ngIf="best as b">
+    <div class="hero-glow"></div>
+    <div class="hero-label"><ion-icon name="star-outline"></ion-icon> CAMPEONA ACTUAL</div>
+    <div class="hero-body">
+      <div class="hero-main">
+        <div class="hero-name">{{ labelFor(b.strat) }}</div>
+        <div class="hero-tags">
+          <span class="tag" [class.short]="b.strat.side === 'SHORT'" [class.long]="b.strat.side === 'LONG'">{{ b.strat.side }}</span>
+          <span class="tag">{{ b.strat.tf_min }}min</span>
+          <span class="tag">SL {{ b.strat.atr_sl_mult }}x ATR</span>
+          <span class="tag">RR {{ b.strat.rr_mult }}x</span>
+          <span class="tag">lookback {{ b.strat.lookback }}</span>
+        </div>
+      </div>
+      <div class="hero-metrics">
+        <div class="hero-metric">
+          <span class="hm-value mono accent">{{ fmtMoney(b.result.monthly) }}</span>
+          <span class="hm-label">por mes</span>
+        </div>
+        <div class="hero-metric">
+          <span class="hm-value mono">{{ b.result.wr_pct }}%</span>
+          <span class="hm-label">win rate</span>
+        </div>
+        <div class="hero-metric">
+          <span class="hm-value mono">{{ b.result.n | number }}</span>
+          <span class="hm-label">trades</span>
+        </div>
+      </div>
+    </div>
+    <div class="hero-halves">
+      <div class="half-bar-wrap">
+        <span class="half-label">1ra mitad</span>
+        <div class="half-bar"><div class="half-fill" [style.width.%]="100"></div></div>
+        <span class="half-value mono">{{ fmtMoney(b.result.pnl_h1) }} · WR {{ b.result.wr_h1 }}%</span>
+      </div>
+      <div class="half-bar-wrap">
+        <span class="half-label">2da mitad</span>
+        <div class="half-bar"><div class="half-fill" [style.width.%]="(b.result.pnl_h2 / b.result.pnl_h1) * 100"></div></div>
+        <span class="half-value mono">{{ fmtMoney(b.result.pnl_h2) }} · WR {{ b.result.wr_h2 }}%</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ CONTROLES ═══════════ -->
+  <section class="controls">
+    <div class="view-switch">
+      <button [class.active]="viewMode === 'found'" (click)="viewMode = 'found'">
+        <ion-icon name="checkmark-circle-outline"></ion-icon> Ganadoras ({{ found.length }})
+      </button>
+      <button [class.active]="viewMode === 'all'" (click)="viewMode = 'all'">
+        <ion-icon name="list-outline"></ion-icon> Panorama completo
+      </button>
+    </div>
+
+    <button class="top10-btn" (click)="openTop10()">
+      <ion-icon name="trophy-outline"></ion-icon> Ver Top 10
+    </button>
+
+    <div class="filters">
+      <select [(ngModel)]="filterEntryType">
+        <option value="">Todos los tipos</option>
+        <option value="ma_cross">Cruce de Medias</option>
+        <option value="level_sweep">Barrido de Nivel</option>
+        <option value="band_touch">Toque de Banda</option>
+        <option value="rsi_extreme">RSI Extremo</option>
+      </select>
+      <select [(ngModel)]="filterSide">
+        <option value="">Ambos lados</option>
+        <option value="LONG">LONG</option>
+        <option value="SHORT">SHORT</option>
+        <option value="BOTH">BOTH</option>
+      </select>
+    </div>
+  </section>
+
+  <!-- ═══════════ TABLA ═══════════ -->
+  <section class="lab-table-wrap">
+    <table class="lab-table" *ngIf="activeList.length; else emptyState">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Tipo</th>
+          <th>TF</th>
+          <th>Lado</th>
+          <th>SL/RR</th>
+          <th class="sortable" (click)="setSort('n')">Trades <ion-icon [name]="sortKey==='n' ? (sortDir===-1?'caret-down':'caret-up') : 'remove-outline'"></ion-icon></th>
+          <th class="sortable" (click)="setSort('wr_pct')">WR% <ion-icon [name]="sortKey==='wr_pct' ? (sortDir===-1?'caret-down':'caret-up') : 'remove-outline'"></ion-icon></th>
+          <th class="sortable" (click)="setSort('monthly')">$/mes <ion-icon [name]="sortKey==='monthly' ? (sortDir===-1?'caret-down':'caret-up') : 'remove-outline'"></ion-icon></th>
+          <th>Estado</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <ng-container *ngFor="let row of activeList; let i = index; trackBy: trackByRow">
+          <tr class="data-row" (click)="toggleExpand(i)" [class.expanded]="expandedIndex === i">
+            <td class="expand-cell"><ion-icon [name]="expandedIndex === i ? 'chevron-down-outline' : 'chevron-forward-outline'"></ion-icon></td>
+            <td>{{ labelFor(row.strat) }}</td>
+            <td class="mono">{{ row.strat.tf_min }}m</td>
+            <td><span class="tag small" [class.short]="row.strat.side === 'SHORT'" [class.long]="row.strat.side === 'LONG'">{{ row.strat.side }}</span></td>
+            <td class="mono">{{ row.strat.atr_sl_mult }}x/{{ row.strat.rr_mult }}x</td>
+            <td class="mono">{{ row.result.n | number }}</td>
+            <td class="mono">{{ row.result.wr_pct }}%</td>
+            <td class="mono" [class.positive]="row.result.monthly > 0" [class.negative]="row.result.monthly <= 0">{{ fmtMoney(row.result.monthly) }}</td>
+            <td>
+              <span class="badge" [class.pass]="row.result.passes_bar">
+                {{ row.result.passes_bar ? 'VALIDADA' : 'DESCARTADA' }}
+              </span>
+            </td>
+            <td (click)="$event.stopPropagation()">
+              <button *ngIf="canDeploy(row)" class="deploy-btn" [disabled]="deployingKey === trackByRow(i, row)"
+                (click)="deployStrategy(row)" title="Crear esta estrategia en producción, activa">
+                <ion-icon name="flask-outline"></ion-icon> {{ deployingKey === trackByRow(i, row) ? '...' : 'Crear' }}
+              </button>
+            </td>
+          </tr>
+          <tr class="detail-row" *ngIf="expandedIndex === i">
+            <td [attr.colspan]="10">
+              <div class="detail-grid">
+                <div class="detail-block">
+                  <h4>Configuración completa</h4>
+                  <div class="detail-kv"><span>MAs</span><span class="mono">{{ row.strat.ma_pair[0] }} / {{ row.strat.ma_pair[1] }}</span></div>
+                  <div class="detail-kv"><span>Lookback</span><span class="mono">{{ row.strat.lookback }} velas</span></div>
+                  <div class="detail-kv"><span>RSI umbrales</span><span class="mono">{{ row.strat.rsi_thresh[0] }} / {{ row.strat.rsi_thresh[1] }}</span></div>
+                  <div class="detail-kv"><span>Probada</span><span class="mono">{{ row.ts | date:'dd/MM HH:mm' }}</span></div>
+                </div>
+                <div class="detail-block">
+                  <h4>Estabilidad entre mitades</h4>
+                  <div class="half-bar-wrap">
+                    <span class="half-label">1ra ({{ row.result.n_h1 }} tr)</span>
+                    <div class="half-bar"><div class="half-fill" [style.width.%]="100"></div></div>
+                    <span class="half-value mono">{{ fmtMoney(row.result.pnl_h1) }} · WR {{ row.result.wr_h1 }}%</span>
+                  </div>
+                  <div class="half-bar-wrap">
+                    <span class="half-label">2da ({{ row.result.n_h2 }} tr)</span>
+                    <div class="half-bar"><div class="half-fill" [style.width.%]="row.result.pnl_h1 ? (row.result.pnl_h2 / row.result.pnl_h1) * 100 : 0"></div></div>
+                    <span class="half-value mono">{{ fmtMoney(row.result.pnl_h2) }} · WR {{ row.result.wr_h2 }}%</span>
+                  </div>
+                  <div class="detail-kv">
+                    <span>Estable</span>
+                    <span [class.positive]="row.result.stable_between_halves" [class.negative]="!row.result.stable_between_halves">
+                      {{ row.result.stable_between_halves ? 'SÍ' : 'NO' }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </td>
+          </tr>
+        </ng-container>
+      </tbody>
+    </table>
+
+    <ng-template #emptyState>
+      <div class="empty-state">
+        <ion-icon name="hourglass-outline"></ion-icon>
+        <p *ngIf="loading">Conectando al laboratorio...</p>
+        <p *ngIf="!loading">Todavía no hay estrategias en esta vista. El laboratorio sigue corriendo, volvé en un rato.</p>
+      </div>
+    </ng-template>
+  </section>
+
+  <!-- ═══════════ MODAL TOP 10 ═══════════ -->
+  <div class="modal-backdrop" *ngIf="showTop10" (click)="closeTop10()">
+    <div class="modal-panel" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title"><ion-icon name="trophy-outline"></ion-icon> Top 10 por $/mes</div>
+        <button class="modal-close" (click)="closeTop10()">✕</button>
+      </div>
+      <div class="modal-body">
+        <table class="lab-table top10-table" *ngIf="top10.length; else emptyTop10">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Estrategia</th>
+              <th>Lado</th>
+              <th>$/mes</th>
+              <th>PnL total backtest</th>
+              <th>Período cubierto</th>
+              <th>Trades</th>
+              <th>WR%</th>
+              <th>Estado</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of top10; let i = index">
+              <td class="mono">{{ i + 1 }}</td>
+              <td>{{ labelFor(row.strat) }} · {{ row.strat.tf_min }}m · SL{{ row.strat.atr_sl_mult }}x/RR{{ row.strat.rr_mult }}x</td>
+              <td><span class="tag small" [class.short]="row.strat.side === 'SHORT'" [class.long]="row.strat.side === 'LONG'">{{ row.strat.side }}</span></td>
+              <td class="mono" [class.positive]="row.result.monthly > 0" [class.negative]="row.result.monthly <= 0">{{ fmtMoney(row.result.monthly) }}</td>
+              <td class="mono">{{ fmtMoney(row.result.pnl_total) }}</td>
+              <td class="mono">{{ current?.daysCovered ? (current!.daysCovered! | number:'1.0-0') + ' días' : '—' }}</td>
+              <td class="mono">{{ row.result.n | number }}</td>
+              <td class="mono">{{ row.result.wr_pct }}%</td>
+              <td><span class="badge" [class.pass]="row.result.passes_bar">{{ row.result.passes_bar ? 'VALIDADA' : 'DESCARTADA' }}</span></td>
+              <td>
+                <button *ngIf="canDeploy(row)" class="deploy-btn" [disabled]="deployingKey === trackByRow(i, row)"
+                  (click)="deployStrategy(row)" title="Crear esta estrategia en producción, activa">
+                  <ion-icon name="flask-outline"></ion-icon> {{ deployingKey === trackByRow(i, row) ? '...' : 'Crear' }}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <ng-template #emptyTop10>
+          <div class="empty-state">
+            <ion-icon name="hourglass-outline"></ion-icon>
+            <p>Todavía no hay suficientes estrategias probadas.</p>
+          </div>
+        </ng-template>
+      </div>
+    </div>
+  </div>
+
+</div>

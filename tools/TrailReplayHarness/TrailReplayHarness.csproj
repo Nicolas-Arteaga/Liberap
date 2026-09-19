@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Herramienta de investigacion standalone (ROUND 41). No forma parte de
+    la solucion de produccion, no se referencia desde ningun otro proyecto,
+    no se agrega al .sln. Su unico proposito es ejecutar el codigo REAL de
+    TrailingStopCalculator (compilado directo desde el archivo fuente de
+    Verge.Domain, no reimplementado) contra los trades historicos, para
+    una validacion de equivalencia autentica.
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql" Version="8.0.5" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Referencia directa al archivo fuente real, el mismo que compila
+         el worker de produccion, sin arrastrar toda la cadena ABP/EF. -->
+    <Compile Include="..\..\src\Verge.Domain\Trading\TrailingStopCalculator.cs" />
+  </ItemGroup>
+
+</Project>

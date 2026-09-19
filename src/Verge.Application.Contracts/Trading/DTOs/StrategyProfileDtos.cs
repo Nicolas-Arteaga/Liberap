@@ -55,6 +55,10 @@ public class StrategyProfileDto : EntityDto<Guid>
     // Ejecución real contra Binance (Testnet/Mainnet)
     public bool BroadcastToBinance { get; set; }
 
+    // Gestión de salida Trail-1 (ROUND 36-42) -- requiere ademas
+    // TrailStop:Enabled=true en appsettings (interruptor maestro global)
+    public bool UseTrailStop { get; set; }
+
     // Metrics (Calculated)
     public double WinRate { get; set; }
     public int TotalTrades { get; set; }
@@ -109,4 +113,8 @@ public class CreateUpdateStrategyProfileDto
 
     // Ejecución real contra Binance (Testnet/Mainnet)
     public bool BroadcastToBinance { get; set; } = false;
+
+    // Gestión de salida Trail-1 (ROUND 36-42) -- requiere ademas
+    // TrailStop:Enabled=true en appsettings (interruptor maestro global)
+    public bool UseTrailStop { get; set; } = false;
 }
