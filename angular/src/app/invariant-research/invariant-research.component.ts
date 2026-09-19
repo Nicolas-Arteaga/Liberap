@@ -13,7 +13,7 @@ interface Run { run_id: string; created_at: string; summary: { pairs_screened: n
 @Component({ selector: 'app-invariant-research', standalone: true, imports: [CommonModule, FormsModule, IonIcon], templateUrl: './invariant-research.component.html', styleUrls: ['./invariant-research.component.scss'] })
 export class InvariantResearchComponent implements OnInit, OnDestroy {
   private http = inject(HttpClient); private poll: ReturnType<typeof setInterval> | null = null; jobId = ''; running = false; error = '';
-  startDate = '2025-12-01'; endDate = new Date().toISOString().slice(0, 10); maxPairs = 80; minOosTrades = 8; runs: Run[] = []; researchStrategies: any[] = []; fundingRuns: any[] = []; oiRuns: any[] = []; forcedFlowRuns: any[] = []; crossVenueRuns: any[] = []; executionAudit: any = null; liquidationEligibility: any = null; selected: Run | null = null; inspectedCandidate: Candidate | null = null;
+  startDate = '2025-12-01'; endDate = new Date().toISOString().slice(0, 10); maxPairs = 80; minOosTrades = 8; runs: Run[] = []; researchStrategies: any[] = []; fundingRuns: any[] = []; oiRuns: any[] = []; forcedFlowRuns: any[] = []; crossVenueRuns: any[] = []; executionAudit: any = null; liquidationEligibility: any = null; selected: Run | null = null; inspectedCandidate: Candidate | null = null; inspectedResearchStrategy: any = null;
   ngOnInit() { this.loadRuns(); this.loadResearchStrategies(); this.loadFundingRuns(); this.loadOiRuns(); this.loadForcedFlowRuns(); this.loadCrossVenueRuns(); this.loadExecutionAudit(); this.loadLiquidationEligibility(); }
   ngOnDestroy() { if (this.poll) clearInterval(this.poll); }
   run() {
@@ -33,6 +33,7 @@ export class InvariantResearchComponent implements OnInit, OnDestroy {
   loadLiquidationEligibility() { this.http.get<any>(`${API}/research/liquidations/eligibility`).subscribe({ next: r => this.liquidationEligibility = r, error: () => {} }); }
   open(run: Run) { this.http.get<Run>(`${API}/research/invariants/runs/${run.run_id}`).subscribe({ next: r => { this.selected = r; this.inspectedCandidate = null; }, error: () => this.error = 'No se pudo cargar la corrida.' }); }
   inspect(candidate: Candidate) { this.inspectedCandidate = this.inspectedCandidate === candidate ? null : candidate; }
+  inspectResearch(strategy: any) { this.inspectedResearchStrategy = this.inspectedResearchStrategy === strategy ? null : strategy; }
   date(ms: number | null | undefined) { return ms ? new Date(ms).toLocaleString('es-AR') : '—'; }
   money(v: number) { return `${v >= 0 ? '+' : ''}$${(v || 0).toFixed(2)}`; }
 }

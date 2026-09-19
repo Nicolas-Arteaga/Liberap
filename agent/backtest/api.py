@@ -330,8 +330,32 @@ def invariant_research_run(run_id: str):
 
 @app.get("/research/strategies")
 def invariant_research_strategies(limit: int = 100):
-    """VIRE hypothesis registry; never exposes or changes execution profiles."""
-    return {"strategies": invariant_research.list_strategies(get_engine().conn, max(1, min(limit, 500)))}
+    """Unified VIRE hypothesis registry; never exposes execution profiles.
+
+    Each vertical keeps its immutable native ledger.  This endpoint projects
+    those ledgers into one audit registry without copying them into profiles
+    or treating a rejected experiment as a tradable strategy.
+    """
+    conn = get_engine().conn
+    strategies = invariant_research.list_strategies(conn, 500)
+    verticals = (
+        funding_research.list_runs(conn, 100),
+        oi_research.list_runs(conn, 100),
+        forced_flow_research.list_runs(conn, 100),
+        cross_venue_research.list_runs(conn, 100),
+    )
+    for runs in verticals:
+        for run in runs:
+            strategy = run.get("strategy")
+            if not strategy:
+                continue  # Old ledgers remain visible in their own vertical.
+            strategies.append({"strategy_id": strategy["id"], "name": strategy["name"],
+                               "family": strategy["family"], "version": strategy["version"],
+                               "thesis": strategy["thesis"], "first_seen": run["created_at"],
+                               "last_seen": run["created_at"], "status": run["status"], "candidate": run})
+    unique = {item["strategy_id"]: item for item in strategies}
+    ordered = sorted(unique.values(), key=lambda item: item["last_seen"], reverse=True)
+    return {"strategies": ordered[:max(1, min(limit, 500))]}
 
 
 def _run_funding_research(job_id: str, req: FundingResearchRequest):

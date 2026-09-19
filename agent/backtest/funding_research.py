@@ -6,6 +6,7 @@ legacy explorers.  It produces an auditable TRAIN/VAL/OOS experiment only.
 from __future__ import annotations
 
 import bisect
+import hashlib
 import json
 import sqlite3
 import uuid
@@ -43,9 +44,29 @@ def _at(times: list[int], values: list[float], timestamp: int) -> float | None:
 
 def _metrics(trades: list[dict], key: str = "pnl") -> dict:
     pnls = [t[key] for t in trades]
+    gross_profit = sum(p for p in pnls if p > 0)
+    gross_loss = abs(sum(p for p in pnls if p < 0))
+    curve = peak = max_drawdown = 0.0
+    for pnl in pnls:
+        curve += pnl; peak = max(peak, curve); max_drawdown = min(max_drawdown, curve - peak)
     return {"trades": len(pnls), "net_pnl": round(sum(pnls), 4),
             "win_rate": round(100 * sum(p > 0 for p in pnls) / len(pnls), 2) if pnls else 0.0,
-            "best_trade_share": round(max(pnls) / sum(pnls), 4) if pnls and sum(pnls) > 0 else 1.0}
+            "best_trade_share": round(max(pnls) / sum(pnls), 4) if pnls and sum(pnls) > 0 else 1.0,
+            "profit_factor": round(gross_profit / gross_loss, 4) if gross_loss else None,
+            "max_drawdown": round(max_drawdown, 4),
+            "avg_trade": round(sum(pnls) / len(pnls), 4) if pnls else 0.0}
+
+
+def _diagnostics(trades: list[dict]) -> dict:
+    """Per-trade evidence for the causal funding hypothesis, not a live signal."""
+    by_side: dict[str, dict] = {}
+    for trade in trades:
+        bucket = by_side.setdefault(trade["side"], {"trades": 0, "wins": 0, "losses": 0, "net_pnl": 0.0})
+        bucket["trades"] += 1; bucket["wins"] += int(trade["pnl"] > 0)
+        bucket["losses"] += int(trade["pnl"] <= 0); bucket["net_pnl"] += trade["pnl"]
+    return {"attribution_scope": "funding_signal_price_and_next_settlement_outcome",
+            "by_side": [{"side": side, **values, "net_pnl": round(values["net_pnl"], 4)} for side, values in sorted(by_side.items())],
+            "trades": trades}
 
 
 def init_ledger(conn: sqlite3.Connection) -> None:
@@ -90,7 +111,12 @@ def run(conn: sqlite3.Connection, config: FundingConfig) -> dict:
                 funding = -side * next_rate
                 cost = 2 * (config.fee_bps + config.slippage_bps) / 10000
                 edge = gross + funding
-                events.append({"timestamp": ts, "symbol": symbol, "percentile": percentile,
+                events.append({"entry_time_ms": ts + 5 * 60 * 1000, "exit_time_ms": ts + 5 * 60 * 1000 + config.hold_ms,
+                               "timestamp": ts, "symbol": symbol, "percentile": percentile,
+                               "side": "short" if side < 0 else "long", "reason": "time_exit_after_funding_crowding",
+                               "funding_rate": rate, "next_funding_rate": next_rate,
+                               "gross_price_return": round(config.capital * gross, 6),
+                               "funding_return": round(config.capital * funding, 6), "cost": round(config.capital * cost, 6),
                                "pnl": config.capital * (edge - cost),
                                "stress_pnl": config.capital * (edge - cost - 2 * config.stress_bps / 10000)})
     events.sort(key=lambda e: e["timestamp"])
@@ -100,10 +126,23 @@ def run(conn: sqlite3.Connection, config: FundingConfig) -> dict:
     policy = max(scores, key=lambda p: scores[p]["net_pnl"])
     val_m, oos_m = _metrics([e for e in val if e["percentile"] == policy]), _metrics([e for e in oos if e["percentile"] == policy])
     stressed_oos = _metrics([e for e in oos if e["percentile"] == policy], "stress_pnl")
+    strategy_payload = {"family": "funding_crowding_contrarian", "policy": policy,
+                        "hold_ms": config.hold_ms, "fee_bps": config.fee_bps,
+                        "slippage_bps": config.slippage_bps, "stress_bps": config.stress_bps}
+    version = hashlib.sha256(json.dumps(strategy_payload, sort_keys=True).encode()).hexdigest()[:12]
+    selected_val = [e for e in val if e["percentile"] == policy]
+    selected_oos = [e for e in oos if e["percentile"] == policy]
     result = {"run_id": str(uuid.uuid4()), "created_at": datetime.now(timezone.utc).isoformat(),
             "mode": "funding_crowding_contrarian_v2_causal_settlement", "coverage_symbols": len(symbols), "events": len(events),
             "policy": {"absolute_funding_percentile": policy, "hold_hours": config.hold_ms / 3600000},
+            "strategy": {"id": f"vire:funding-crowding-contrarian:p{int(policy * 100)}:h{config.hold_ms // 3600000}",
+                         "name": f"VIRE Funding Crowding Contrarian — p{int(policy * 100)} / {config.hold_ms // 3600000}h",
+                         "family": "funding_crowding_contrarian", "version": version,
+                         "thesis": "Las tasas de funding extremas señalan posicionamiento abarrotado; se toma la dirección contraria tras publicación y se mide precio más el próximo settlement.",
+                         "entry": {"absolute_funding_percentile": policy, "side": "contrarian"},
+                         "exit": {"time_exit_hours": config.hold_ms / 3600000}, "signal_sources": ["funding", "price"]},
             "train": scores[policy], "validation": val_m, "oos": oos_m, "stressed_oos": stressed_oos,
+            "trade_diagnostics": {"validation": _diagnostics(selected_val), "oos": _diagnostics(selected_oos)},
             "status": "REJECTED_PENDING_COMBINATION" if val_m["net_pnl"] > 0 and oos_m["net_pnl"] > 0 and stressed_oos["net_pnl"] > 0 and oos_m["trades"] >= config.min_oos_trades else "REJECTED"}
     conn.execute("INSERT INTO invariant_funding_runs VALUES (?,?,?,?)", (result["run_id"], result["created_at"], json.dumps(config.__dict__), json.dumps(result)))
     conn.commit()

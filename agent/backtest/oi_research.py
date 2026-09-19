@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import bisect
+import hashlib
 import json
 import sqlite3
 import uuid
@@ -30,7 +31,22 @@ def _at(times, values, ts):
 
 def _metrics(rows, key="pnl"):
     p = [r[key] for r in rows]
-    return {"trades": len(p), "net_pnl": round(sum(p), 4), "win_rate": round(100 * sum(v > 0 for v in p) / len(p), 2) if p else 0.0}
+    profit, loss = sum(v for v in p if v > 0), abs(sum(v for v in p if v < 0))
+    curve = peak = drawdown = 0.0
+    for value in p:
+        curve += value; peak = max(peak, curve); drawdown = min(drawdown, curve - peak)
+    return {"trades": len(p), "net_pnl": round(sum(p), 4), "win_rate": round(100 * sum(v > 0 for v in p) / len(p), 2) if p else 0.0,
+            "profit_factor": round(profit / loss, 4) if loss else None, "max_drawdown": round(drawdown, 4),
+            "avg_trade": round(sum(p) / len(p), 4) if p else 0.0}
+
+
+def _diagnostics(rows):
+    buckets = {}
+    for row in rows:
+        side = row["side"]; bucket = buckets.setdefault(side, {"trades": 0, "wins": 0, "losses": 0, "net_pnl": 0.0})
+        bucket["trades"] += 1; bucket["wins"] += int(row["pnl"] > 0); bucket["losses"] += int(row["pnl"] <= 0); bucket["net_pnl"] += row["pnl"]
+    return {"attribution_scope": "oi_expansion_and_price_momentum_signal_with_time_exit",
+            "by_side": [{"side": side, **data, "net_pnl": round(data["net_pnl"], 4)} for side, data in sorted(buckets.items())], "trades": rows}
 
 
 def init_ledger(conn):
@@ -64,11 +80,18 @@ def run(conn: sqlite3.Connection, config: OIConfig) -> dict:
             momentum=np.sign(np.log(entry)-np.log(before))
             if momentum == 0 or np.sign(oi_change) != momentum: continue
             edge=momentum*(np.log(exit_)-np.log(entry)); cost=2*(config.fee_bps+config.slippage_bps)/10000
-            events.append({"timestamp":ts,"pnl":config.capital*(edge-cost),"stress_pnl":config.capital*(edge-cost-2*config.stress_bps/10000)})
+            events.append({"timestamp":ts, "entry_time_ms":ts, "exit_time_ms":ts+config.hold_ms, "symbol":symbol,
+                           "side":"long" if momentum > 0 else "short", "reason":"time_exit_after_oi_expansion_momentum",
+                           "oi_change":round(oi_change, 8), "price_momentum":round(float(momentum), 2),
+                           "gross_price_return":round(config.capital*edge, 6), "cost":round(config.capital*cost, 6),
+                           "pnl":config.capital*(edge-cost),"stress_pnl":config.capital*(edge-cost-2*config.stress_bps/10000)})
     events.sort(key=lambda x:x["timestamp"]); a,b=int(len(events)*.5),int(len(events)*.75)
     train,val,oos=events[:a],events[a:b],events[b:]
     tm,vm,om,sm=_metrics(train),_metrics(val),_metrics(oos),_metrics(oos,"stress_pnl")
-    result={"run_id":str(uuid.uuid4()),"created_at":datetime.now(timezone.utc).isoformat(),"mode":"oi_expansion_momentum_v1","coverage_symbols":len(symbols),"events":len(events),"train":tm,"validation":vm,"oos":om,"stressed_oos":sm,"status":"REJECTED_PENDING_COMBINATION" if vm["net_pnl"]>0 and om["net_pnl"]>0 and sm["net_pnl"]>0 and om["trades"]>=config.min_oos_trades else "REJECTED"}
+    version = hashlib.sha256(json.dumps({"family":"oi_expansion_momentum","hold_ms":config.hold_ms,"fee_bps":config.fee_bps,"slippage_bps":config.slippage_bps,"stress_bps":config.stress_bps}, sort_keys=True).encode()).hexdigest()[:12]
+    result={"run_id":str(uuid.uuid4()),"created_at":datetime.now(timezone.utc).isoformat(),"mode":"oi_expansion_momentum_v1","coverage_symbols":len(symbols),"events":len(events),
+            "strategy":{"id":f"vire:oi-expansion-momentum:h{config.hold_ms//3600000}","name":f"VIRE OI Expansion Momentum — {config.hold_ms//3600000}h","family":"oi_expansion_momentum","version":version,"thesis":"Expansión extrema de OI alineada con momentum de precio puede persistir por un horizonte acotado.","entry":{"oi_absolute_percentile":0.95,"price_momentum_alignment":True},"exit":{"time_exit_hours":config.hold_ms/3600000},"signal_sources":["open_interest","price"]},
+            "train":tm,"validation":vm,"oos":om,"stressed_oos":sm,"trade_diagnostics":{"validation":_diagnostics(val),"oos":_diagnostics(oos)},"status":"REJECTED_PENDING_COMBINATION" if vm["net_pnl"]>0 and om["net_pnl"]>0 and sm["net_pnl"]>0 and om["trades"]>=config.min_oos_trades else "REJECTED"}
     conn.execute("INSERT INTO invariant_oi_runs VALUES (?,?,?,?)",(result["run_id"],result["created_at"],json.dumps(config.__dict__),json.dumps(result)))
     conn.commit()
     return result
