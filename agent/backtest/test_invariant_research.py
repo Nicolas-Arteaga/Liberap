@@ -7,6 +7,7 @@ import unittest
 import numpy as np
 
 from backtest import invariant_research as vire
+from backtest import liquidation_research
 
 
 class InvariantResearchE2E(unittest.TestCase):
@@ -84,6 +85,35 @@ class InvariantResearchE2E(unittest.TestCase):
         self.assertTrue(coverage["liquidations"]["available"])
         self.assertEqual(coverage["liquidations"]["symbols"], 1)
         os.unlink(live.name)
+
+    def test_liquidation_gate_requires_per_symbol_overlap_not_venue_wide_dates(self):
+        live = tempfile.NamedTemporaryFile(suffix=".db", delete=False); live.close()
+        canonical = tempfile.NamedTemporaryFile(suffix=".db", delete=False); canonical.close()
+        try:
+            events = sqlite3.connect(live.name)
+            events.execute("CREATE TABLE liquidations_research (symbol TEXT, timestamp INTEGER)")
+            # Each symbol has events spanning forty days, but their matching
+            # candles cover only one day.  A venue-wide min/max would wrongly
+            # join AAA's first candle to BBB's last candle and pass this gate.
+            events.executemany("INSERT INTO liquidations_research VALUES (?, ?)", [
+                ("AAAUSDT", 0), ("AAAUSDT", 40 * 86400000),
+                ("BBBUSDT", 0), ("BBBUSDT", 40 * 86400000),
+            ])
+            events.commit(); events.close()
+            prices = sqlite3.connect(canonical.name)
+            prices.execute("CREATE TABLE klines_multi_exchange (exchange TEXT, symbol TEXT, interval TEXT, open_time INTEGER)")
+            prices.executemany("INSERT INTO klines_multi_exchange VALUES ('bybit', ?, '5m', ?)", [
+                ("AAAUSDT", 0), ("AAAUSDT", 86400000),
+                ("BBBUSDT", 39 * 86400000), ("BBBUSDT", 40 * 86400000),
+            ])
+            prices.commit(); prices.close()
+            liquidation_research._CACHE.clear()
+            gate = liquidation_research.assess(self.conn, live.name, canonical.name, min_days=30, min_symbols=2)
+            self.assertEqual(gate["price_symbols"], 2)
+            self.assertEqual(gate["eligible_symbols"], 0)
+            self.assertEqual(gate["status"], "REJECTED_INSUFFICIENT_HISTORICAL_OVERLAP")
+        finally:
+            os.unlink(live.name); os.unlink(canonical.name)
 
 
 if __name__ == "__main__":
