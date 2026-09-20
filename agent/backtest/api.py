@@ -269,6 +269,7 @@ class ForcedFlowResearchRequest(BaseModel):
     endDate: str
     capitalPerTrade: float = 150.0
     minOosTrades: int = 30
+    holdHours: int = 1
 
 
 class CrossVenueResearchRequest(BaseModel):
@@ -545,6 +546,7 @@ def _run_forced_flow_research(job_id: str, req: ForcedFlowResearchRequest):
         cfg = forced_flow_research.ForcedFlowConfig(
             start_ms=invariant_research._ms(req.startDate), end_ms=invariant_research._ms(req.endDate),
             capital=req.capitalPerTrade, min_oos_trades=max(1, req.minOosTrades),
+            hold_ms=max(1, min(req.holdHours, 24)) * 60 * 60 * 1000,
         )
         _jobs[job_id]["result"] = forced_flow_research.run(get_engine().conn, cfg)
         _jobs[job_id].update({"done": 1, "status": "completed"})
