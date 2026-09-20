@@ -353,6 +353,19 @@ def invariant_research_strategies(limit: int = 100):
                                "family": strategy["family"], "version": strategy["version"],
                                "thesis": strategy["thesis"], "first_seen": run["created_at"],
                                "last_seen": run["created_at"], "status": run["status"], "candidate": run})
+    liquidation = liquidation_research.assess(conn, invariant_research.LIVE_RESEARCH_DB_PATH, os.getenv("VIRE_CANONICAL_DB"))
+    # A coverage gate is registered too, but deliberately has no entry/exit or
+    # paper promotion: it is evidence that liquidation research is blocked by
+    # data overlap, not a strategy masquerading as one.
+    strategies.append({"strategy_id": "vire:liquidation-event:coverage-gate",
+                       "name": "VIRE Liquidation Events — Coverage Gate",
+                       "family": "liquidation_event", "version": "coverage-v1",
+                       "thesis": "Los eventos de liquidación solo se investigan cuando precio y eventos comparten suficiente historia por venue.",
+                       "first_seen": datetime.now(timezone.utc).isoformat(),
+                       "last_seen": datetime.now(timezone.utc).isoformat(),
+                       "status": liquidation["status"], "candidate": {"mode": liquidation.get("mode"),
+                       "status": liquidation["status"], "liquidation_eligibility": liquidation,
+                       "strategy": {"signal_sources": ["liquidations", "bybit_price"], "entry": None, "exit": None}}})
     unique = {item["strategy_id"]: item for item in strategies}
     ordered = sorted(unique.values(), key=lambda item: item["last_seen"], reverse=True)
     return {"strategies": ordered[:max(1, min(limit, 500))]}
