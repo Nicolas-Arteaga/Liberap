@@ -366,8 +366,20 @@ def invariant_research_strategies(limit: int = 100):
         positive = sum(window["net_pnl"] > 0 for window in results)
         total_net = round(sum(window["net_pnl"] for window in results), 4)
         stable = total_net > 0 and positive >= max(2, (len(results) + 1) // 2)
+        cohorts: dict[str, list[dict]] = {}
+        for trade in ordered:
+            timestamp = trade.get("exit_time_ms", trade.get("timestamp"))
+            if not timestamp:
+                continue
+            key = datetime.fromtimestamp(int(timestamp) / 1000, timezone.utc).strftime("%Y-%m")
+            cohorts.setdefault(key, []).append(trade)
+        calendar_cohorts = [{"month": month, "trades": len(bucket),
+                             "net_pnl": round(sum(float(trade.get("pnl", 0)) for trade in bucket), 4),
+                             "win_rate": round(100 * sum(float(trade.get("pnl", 0)) > 0 for trade in bucket) / len(bucket), 2)}
+                            for month, bucket in sorted(cohorts.items())]
         return {"scope": "observed_oos_windows_only", "windows": results,
                 "positive_windows": positive, "total_windows": len(results), "total_net_pnl": total_net,
+                "calendar_cohorts": calendar_cohorts,
                 "status": "STABLE_OBSERVED_OOS" if stable else "UNSTABLE_OBSERVED_OOS"}
 
     conn = get_engine().conn
