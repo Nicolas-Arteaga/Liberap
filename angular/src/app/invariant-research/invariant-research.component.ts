@@ -33,7 +33,13 @@ export class InvariantResearchComponent implements OnInit, OnDestroy {
   loadLiquidationEligibility() { this.http.get<any>(`${API}/research/liquidations/eligibility`).subscribe({ next: r => this.liquidationEligibility = r, error: () => {} }); }
   open(run: Run) { this.http.get<Run>(`${API}/research/invariants/runs/${run.run_id}`).subscribe({ next: r => { this.selected = r; this.inspectedCandidate = null; }, error: () => this.error = 'No se pudo cargar la corrida.' }); }
   inspect(candidate: Candidate) { this.inspectedCandidate = this.inspectedCandidate === candidate ? null : candidate; }
-  inspectResearch(strategy: any) { this.inspectedResearchStrategy = this.inspectedResearchStrategy === strategy ? null : strategy; }
+  inspectResearch(strategy: any) {
+    if (this.inspectedResearchStrategy?.strategy_id === strategy.strategy_id) { this.inspectedResearchStrategy = null; return; }
+    this.http.get<any>(`${API}/research/strategies/${encodeURIComponent(strategy.strategy_id)}`).subscribe({
+      next: detail => this.inspectedResearchStrategy = detail,
+      error: () => this.error = 'No se pudo cargar la evidencia de esta hipótesis.'
+    });
+  }
   date(ms: number | null | undefined) { return ms ? new Date(ms).toLocaleString('es-AR') : '—'; }
   money(v: number) { return `${v >= 0 ? '+' : ''}$${(v || 0).toFixed(2)}`; }
 }

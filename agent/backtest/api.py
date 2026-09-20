@@ -329,7 +329,7 @@ def invariant_research_run(run_id: str):
 
 
 @app.get("/research/strategies")
-def invariant_research_strategies(limit: int = 100):
+def invariant_research_strategies(limit: int = 100, includeEvidence: bool = False):
     """Unified VIRE hypothesis registry; never exposes execution profiles.
 
     Each vertical keeps its immutable native ledger.  This endpoint projects
@@ -400,7 +400,11 @@ def invariant_research_strategies(limit: int = 100):
                                "family": strategy["family"], "version": strategy["version"],
                                "thesis": strategy["thesis"], "first_seen": run["created_at"],
                                "last_seen": run["created_at"], "status": run["status"], "candidate": candidate})
-    liquidation = liquidation_research.assess(conn, invariant_research.LIVE_RESEARCH_DB_PATH, os.getenv("VIRE_CANONICAL_DB"))
+    # Do not run the potentially multi-GB overlap scan on the list endpoint.
+    # The dedicated eligibility endpoint owns that bounded/cached inspection;
+    # the registry merely declares the gate and points the UI at its evidence.
+    liquidation = {"mode": "liquidation_event_v1", "status": "COVERAGE_GATE_SEPARATE_ENDPOINT",
+                   "detail_endpoint": "/research/liquidations/eligibility"}
     # A coverage gate is registered too, but deliberately has no entry/exit or
     # paper promotion: it is evidence that liquidation research is blocked by
     # data overlap, not a strategy masquerading as one.
@@ -415,7 +419,28 @@ def invariant_research_strategies(limit: int = 100):
                        "strategy": {"signal_sources": ["liquidations", "bybit_price"], "entry": None, "exit": None}}})
     unique = {item["strategy_id"]: item for item in strategies}
     ordered = sorted(unique.values(), key=lambda item: item["last_seen"], reverse=True)
+    if not includeEvidence:
+        # The registry is a list view. Returning every raw trade from every
+        # vertical made its JSON response unnecessarily large and could block
+        # the UI; detailed evidence is retained in the immutable native runs.
+        for item in ordered:
+            diagnostics = item["candidate"].get("trade_diagnostics")
+            if diagnostics:
+                item["candidate"] = {**item["candidate"], "trade_diagnostics": {
+                    split: {key: value for key, value in data.items() if key != "trades"}
+                    for split, data in diagnostics.items()
+                }}
     return {"strategies": ordered[:max(1, min(limit, 500))]}
+
+
+@app.get("/research/strategies/{strategy_id:path}")
+def invariant_research_strategy_detail(strategy_id: str):
+    """Load raw trade evidence only after the user opens one hypothesis."""
+    registry = invariant_research_strategies(limit=500, includeEvidence=True)["strategies"]
+    for item in registry:
+        if item["strategy_id"] == strategy_id:
+            return item
+    raise HTTPException(status_code=404, detail="Hipótesis VIRE no encontrada")
 
 
 def _run_funding_research(job_id: str, req: FundingResearchRequest):
