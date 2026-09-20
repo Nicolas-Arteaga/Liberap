@@ -336,6 +336,18 @@ def invariant_research_strategies(limit: int = 100):
     those ledgers into one audit registry without copying them into profiles
     or treating a rejected experiment as a tradable strategy.
     """
+    def rejection_reasons(run: dict) -> list[str]:
+        if run.get("status") == "PAPER_READY":
+            return []
+        reasons = []
+        for partition, label in (("validation", "validation"), ("oos", "oos"), ("stressed_oos", "stress")):
+            metrics = run.get(partition, {})
+            if metrics.get("net_pnl", 0) <= 0:
+                reasons.append(f"{label}_not_positive_after_costs")
+            if partition in ("oos", "stressed_oos") and metrics.get("profit_factor") is not None and metrics["profit_factor"] < 1:
+                reasons.append(f"{label}_profit_factor_below_one")
+        return list(dict.fromkeys(reasons)) or ["not_paper_ready"]
+
     conn = get_engine().conn
     strategies = invariant_research.list_strategies(conn, 500)
     verticals = (
@@ -349,10 +361,11 @@ def invariant_research_strategies(limit: int = 100):
             strategy = run.get("strategy")
             if not strategy:
                 continue  # Old ledgers remain visible in their own vertical.
+            candidate = {**run, "rejection_reasons": rejection_reasons(run)}
             strategies.append({"strategy_id": strategy["id"], "name": strategy["name"],
                                "family": strategy["family"], "version": strategy["version"],
                                "thesis": strategy["thesis"], "first_seen": run["created_at"],
-                               "last_seen": run["created_at"], "status": run["status"], "candidate": run})
+                               "last_seen": run["created_at"], "status": run["status"], "candidate": candidate})
     liquidation = liquidation_research.assess(conn, invariant_research.LIVE_RESEARCH_DB_PATH, os.getenv("VIRE_CANONICAL_DB"))
     # A coverage gate is registered too, but deliberately has no entry/exit or
     # paper promotion: it is evidence that liquidation research is blocked by
