@@ -348,6 +348,28 @@ def invariant_research_strategies(limit: int = 100):
                 reasons.append(f"{label}_profit_factor_below_one")
         return list(dict.fromkeys(reasons)) or ["not_paper_ready"]
 
+    def observed_stability(run: dict, windows: int = 4) -> dict:
+        """Rolling OOS evidence, not a claim about future strategy lifetime."""
+        trades = run.get("trade_diagnostics", {}).get("oos", {}).get("trades", [])
+        if len(trades) < windows:
+            return {"scope": "observed_oos_windows_only", "status": "INSUFFICIENT_OOS_TRADES", "windows": []}
+        ordered = sorted(trades, key=lambda trade: trade.get("exit_time_ms", trade.get("timestamp", 0)))
+        size = max(1, len(ordered) // windows)
+        results = []
+        for index in range(0, len(ordered), size):
+            bucket = ordered[index:index + size]
+            pnl = sum(float(trade.get("pnl", 0)) for trade in bucket)
+            results.append({"index": len(results) + 1, "trades": len(bucket), "net_pnl": round(pnl, 4),
+                            "win_rate": round(100 * sum(float(trade.get("pnl", 0)) > 0 for trade in bucket) / len(bucket), 2),
+                            "first_exit_ms": bucket[0].get("exit_time_ms", bucket[0].get("timestamp")),
+                            "last_exit_ms": bucket[-1].get("exit_time_ms", bucket[-1].get("timestamp"))})
+        positive = sum(window["net_pnl"] > 0 for window in results)
+        total_net = round(sum(window["net_pnl"] for window in results), 4)
+        stable = total_net > 0 and positive >= max(2, (len(results) + 1) // 2)
+        return {"scope": "observed_oos_windows_only", "windows": results,
+                "positive_windows": positive, "total_windows": len(results), "total_net_pnl": total_net,
+                "status": "STABLE_OBSERVED_OOS" if stable else "UNSTABLE_OBSERVED_OOS"}
+
     conn = get_engine().conn
     strategies = invariant_research.list_strategies(conn, 500)
     verticals = (
@@ -361,7 +383,7 @@ def invariant_research_strategies(limit: int = 100):
             strategy = run.get("strategy")
             if not strategy:
                 continue  # Old ledgers remain visible in their own vertical.
-            candidate = {**run, "rejection_reasons": rejection_reasons(run)}
+            candidate = {**run, "rejection_reasons": rejection_reasons(run), "observed_stability": observed_stability(run)}
             strategies.append({"strategy_id": strategy["id"], "name": strategy["name"],
                                "family": strategy["family"], "version": strategy["version"],
                                "thesis": strategy["thesis"], "first_seen": run["created_at"],
