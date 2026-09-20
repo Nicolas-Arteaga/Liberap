@@ -36,6 +36,7 @@ from backtest import invariant_research
 from backtest import funding_research
 from backtest import oi_research
 from backtest import liquidation_research
+from backtest import liquidation_event_research
 from backtest import forced_flow_research
 from backtest import cross_venue_research
 
@@ -277,6 +278,13 @@ class CrossVenueResearchRequest(BaseModel):
     minOosTrades: int = 30
 
 
+class LiquidationEventResearchRequest(BaseModel):
+    startDate: str
+    endDate: str
+    capitalPerTrade: float = 150.0
+    minOosTrades: int = 30
+
+
 def _run_invariant_research(job_id: str, req: InvariantResearchRequest, symbols: list[str]):
     job = _jobs[job_id]
     try:
@@ -389,6 +397,7 @@ def invariant_research_strategies(limit: int = 100, includeEvidence: bool = Fals
         oi_research.list_runs(conn, 100),
         forced_flow_research.list_runs(conn, 100),
         cross_venue_research.list_runs(conn, 100),
+        liquidation_event_research.list_runs(conn, 100),
     )
     for runs in verticals:
         for run in runs:
@@ -562,6 +571,41 @@ def forced_flow_research_result(job_id: str):
 @app.get("/research/forced-flow/runs")
 def forced_flow_research_runs(limit: int = 20):
     return {"runs": forced_flow_research.list_runs(get_engine().conn, max(1, min(limit, 100)))}
+
+
+def _run_liquidation_event_research(job_id: str, req: LiquidationEventResearchRequest):
+    try:
+        cfg = liquidation_event_research.LiquidationEventConfig(
+            start_ms=invariant_research._ms(req.startDate), end_ms=invariant_research._ms(req.endDate),
+            capital=req.capitalPerTrade, min_oos_trades=max(1, req.minOosTrades),
+        )
+        _jobs[job_id]["result"] = liquidation_event_research.run(
+            get_engine().conn, cfg, invariant_research.LIVE_RESEARCH_DB_PATH, os.getenv("VIRE_CANONICAL_DB")
+        )
+        _jobs[job_id].update({"done": 1, "status": "completed"})
+    except Exception as exc:
+        _jobs[job_id].update({"status": "failed", "error": str(exc)})
+
+
+@app.post("/research/liquidations/run")
+def run_liquidation_event_research(req: LiquidationEventResearchRequest):
+    job_id = str(uuid.uuid4())
+    _jobs[job_id] = {"status": "running", "done": 0, "total": 1, "kind": "liquidation_event_research", "created_at": time.time()}
+    threading.Thread(target=_run_liquidation_event_research, args=(job_id, req), daemon=True).start()
+    return {"jobId": job_id}
+
+
+@app.get("/research/liquidations/result/{job_id}")
+def liquidation_event_research_result(job_id: str):
+    job = _jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Corrida de liquidaciones no encontrada")
+    return job.get("result") if job["status"] == "completed" else {"status": job["status"], "error": job.get("error")}
+
+
+@app.get("/research/liquidations/runs")
+def liquidation_event_research_runs(limit: int = 20):
+    return {"runs": liquidation_event_research.list_runs(get_engine().conn, max(1, min(limit, 100)))}
 
 
 def _run_cross_venue_research(job_id: str, req: CrossVenueResearchRequest):
