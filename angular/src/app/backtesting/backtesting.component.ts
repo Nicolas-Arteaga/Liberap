@@ -9,7 +9,6 @@ import { GlassButtonComponent } from 'src/shared/components/glass-button/glass-b
 import { InputComponent } from 'src/shared/components/input/input.component';
 import { LabelComponent } from 'src/shared/components/label/label.component';
 import { SelectComponent } from 'src/shared/components/select/select.component';
-import { PaymentChartComponent } from 'src/shared/components/payment-chart/payment-chart.component';
 import { IconService } from 'src/shared/services/icon.service';
 import { IonIcon } from '@ionic/angular/standalone';
 import { StrategyProfileService } from 'src/app/proxy/trading/strategy-profile.service';
@@ -83,7 +82,6 @@ interface CoverageResponse {
     InputComponent,
     LabelComponent,
     SelectComponent,
-    PaymentChartComponent,
     IonIcon,
   ],
   templateUrl: './backtesting.component.html',
