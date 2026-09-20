@@ -4,7 +4,9 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { IonIcon } from '@ionic/angular/standalone';
 
-const API = 'http://localhost:8010';
+// La UI habla con el dev-server; éste reenvía /vire-api al backtest :8010.
+// Evita depender de CORS o de que el navegador permita un puerto local distinto.
+const API = '/vire-api';
 interface TradeDiagnostics { attribution_scope?: string; count?: number; by_exit?: Record<string, { trades?: number; wins?: number; losses?: number; pnl?: number }>; trades?: Array<{ entry_time_ms?: number; exit_time_ms?: number; side?: string; reason?: string; mfe?: number; mae?: number; pnl?: number }>; }
 interface Candidate { symbol_a: string; symbol_b: string; status: string; relationship: any; policy: any; train: any; validation: any; oos: any; stressed_oos: any; rejection_reasons: string[]; trade_diagnostics?: { validation?: TradeDiagnostics; oos?: TradeDiagnostics }; }
 interface Coverage { available: boolean; symbols?: number; rows?: number; role: string; universe_sufficient?: boolean; }

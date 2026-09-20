@@ -1,0 +1,10 @@
+{
+  "/vire-api": {
+    "target": "http://localhost:8010",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/vire-api": ""
+    }
+  }
+}
