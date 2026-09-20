@@ -59,7 +59,10 @@ def main():
         if done % 20 == 0 or done == total:
             print(f"  progreso: {done}/{total} simbolos | elapsed={((time.time()-t_start)/60):.1f}min", flush=True)
 
-    result = engine.run_ma_geometry(PROFILE, symbols, t0, t1, progress_cb=progress)
+    # El runner global evalúa la geometría únicamente en velas de 1h y aplica
+    # los tres cupos en un único reloj temporal de 5m. Evita el replay
+    # genérico que recalculaba la misma geometría por cada vela base.
+    result = engine.run_ma_geometry_global(PROFILE, symbols, t0, t1, progress_cb=progress)
 
     print(f"\n=== MA Slope Caso 3 | PERIODO COMPLETO (8 meses) | universo completo | con vetos reales ===")
     print(f"Señales: {result['total_signals']} | Aceptadas (3 cupos x $150): {result['accepted_trades']} | Rechazadas por cupo: {result['rejected_no_slot']}")

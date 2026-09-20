@@ -6,3 +6,5 @@ urllib3==2.6.3
 python-dotenv==1.2.2
 numpy==2.4.3
 pandas==3.0.1
+# Auditorías contrafactuales de perfiles reales: lectura de PostgreSQL.
+psycopg2-binary==2.9.11

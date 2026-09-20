@@ -16,13 +16,26 @@ import os, sys, math, numpy as np, sqlite3, collections, json
 import psycopg2
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-BV = os.path.join(HERE, "..", "data", "binance_vision_clean.db")
+# Los trades actuales de los perfiles viven después del corte de la base
+# histórica. Para su auditoría contrafactual se usa el almacén live, que es
+# sólo lectura y contiene las velas recientes. Puede sobreescribirse para
+# reproducir una corrida histórica explícita.
+BV = os.getenv("VIRE_AUDIT_DB", "/app/live-research/klines.db")
+KLINE_TABLE = os.getenv("VIRE_AUDIT_KLINE_TABLE", "klines")
 CAP_BARS = 2880   # 30 dias de 15m, limite generoso para la trayectoria contrafactual
 FEE_PER_TRADE = 0.12   # observado en DB (EntryFee+ExitFee ~ $0.06+$0.06 sobre notional $150)
 
 
 def load_trades():
-    conn = psycopg2.connect(host="localhost", port=5433, dbname="Verge", user="postgres", password="postgres")
+    # Dentro de Docker PostgreSQL vive en el servicio `db`; desde host se
+    # puede preservar localhost:5433 con variables de entorno.
+    conn = psycopg2.connect(
+        host=os.getenv("VERGE_DB_HOST", "db"),
+        port=int(os.getenv("VERGE_DB_PORT", "5432")),
+        dbname=os.getenv("VERGE_DB_NAME", "Verge"),
+        user=os.getenv("VERGE_DB_USER", "postgres"),
+        password=os.getenv("VERGE_DB_PASSWORD", "postgres"),
+    )
     cur = conn.cursor()
     cur.execute("""SELECT "Symbol","Side","EntryPrice","ClosePrice","SlPrice","TpPrice",
                    "OpenedAt","ClosedAt","ExitReason","RealizedPnl","StrategyProfileId","Amount"
@@ -33,7 +46,9 @@ def load_trades():
 
 
 def load_symbol_klines(con, symbol):
-    k = con.execute("SELECT open_time,open,high,low,close,volume FROM klines_clean "
+    # KLINE_TABLE sólo proviene de configuración controlada (klines o
+    # klines_clean), nunca de input de usuario.
+    k = con.execute(f"SELECT open_time,open,high,low,close,volume FROM {KLINE_TABLE} "
                      "WHERE symbol=? AND interval='15m' ORDER BY open_time", (symbol,)).fetchall()
     if len(k) < 3000:
         return None
@@ -157,6 +172,14 @@ RULES = {
 def main():
     print("=== ROUND 36 — SIMULACION CONTRAFACTUAL DE GESTION DE SALIDA ===\n")
     trades = load_trades()
+    # Permite auditar una o varias estrategias reales sin mezclar el resto
+    # del historial. Es investigación aislada: sólo filtra en memoria y no
+    # escribe perfiles ni trades. Ej.: PROFILE_IDS=uuid1,uuid2
+    profile_ids = {value.strip() for value in os.getenv("PROFILE_IDS", "").split(",") if value.strip()}
+    if profile_ids:
+        before = len(trades)
+        trades = [trade for trade in trades if str(trade[10]) in profile_ids]
+        print(f"filtro de perfiles: {len(trades)}/{before} trades seleccionados\n")
     con = sqlite3.connect(f"file:{BV}?mode=ro", uri=True)
     syms = sorted(set(t[0] for t in trades))
     kdata = {}
