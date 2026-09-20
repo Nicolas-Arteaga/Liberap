@@ -25,10 +25,11 @@ export class InvariantResearchComponent implements OnInit, OnDestroy {
   check() { this.http.get<any>(`${API}/backtest/status/${this.jobId}`).subscribe({ next: s => { if (s.status === 'completed') { if (this.poll) clearInterval(this.poll); this.running = false; this.loadRuns(true); this.loadResearchStrategies(); } if (s.status === 'failed') { if (this.poll) clearInterval(this.poll); this.running = false; this.error = s.error || 'La investigación falló.'; }}, error: () => { this.running = false; this.error = 'Se perdió conexión con VIRE.'; }}); }
   loadRuns(selectLatest = false) { this.http.get<{runs:Run[]}>(`${API}/research/invariants/runs`).subscribe({ next: r => { this.runs = r.runs; if (selectLatest && r.runs[0]) this.open(r.runs[0]); }, error: () => this.error = 'No se pudo leer el ledger de investigación.' }); }
   loadResearchStrategies() { this.http.get<{strategies:any[]}>(`${API}/research/strategies`).subscribe({ next: r => this.researchStrategies = r.strategies, error: () => {} }); }
-  loadFundingRuns() { this.http.get<{runs:any[]}>(`${API}/research/funding/runs`).subscribe({ next: r => this.fundingRuns = r.runs, error: () => {} }); }
-  loadOiRuns() { this.http.get<{runs:any[]}>(`${API}/research/oi/runs`).subscribe({ next: r => this.oiRuns = r.runs, error: () => {} }); }
-  loadForcedFlowRuns() { this.http.get<{runs:any[]}>(`${API}/research/forced-flow/runs`).subscribe({ next: r => this.forcedFlowRuns = r.runs, error: () => {} }); }
-  loadCrossVenueRuns() { this.http.get<{runs:any[]}>(`${API}/research/cross-venue/runs`).subscribe({ next: r => this.crossVenueRuns = r.runs, error: () => {} }); }
+  private versioned(runs: any[]) { return runs.filter(run => String(run.strategy?.id || '').startsWith('vire:')); }
+  loadFundingRuns() { this.http.get<{runs:any[]}>(`${API}/research/funding/runs`).subscribe({ next: r => this.fundingRuns = this.versioned(r.runs), error: () => {} }); }
+  loadOiRuns() { this.http.get<{runs:any[]}>(`${API}/research/oi/runs`).subscribe({ next: r => this.oiRuns = this.versioned(r.runs), error: () => {} }); }
+  loadForcedFlowRuns() { this.http.get<{runs:any[]}>(`${API}/research/forced-flow/runs`).subscribe({ next: r => this.forcedFlowRuns = this.versioned(r.runs), error: () => {} }); }
+  loadCrossVenueRuns() { this.http.get<{runs:any[]}>(`${API}/research/cross-venue/runs`).subscribe({ next: r => this.crossVenueRuns = this.versioned(r.runs), error: () => {} }); }
   loadExecutionAudit() { this.http.get<any>(`${API}/research/execution-audit`).subscribe({ next: r => this.executionAudit = r, error: () => {} }); }
   loadLiquidationEligibility() { this.http.get<any>(`${API}/research/liquidations/eligibility`).subscribe({ next: r => this.liquidationEligibility = r, error: () => {} }); }
   open(run: Run) { this.http.get<Run>(`${API}/research/invariants/runs/${run.run_id}`).subscribe({ next: r => { this.selected = r; this.inspectedCandidate = null; }, error: () => this.error = 'No se pudo cargar la corrida.' }); }

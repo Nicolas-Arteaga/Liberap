@@ -418,7 +418,28 @@ def invariant_research_strategies(limit: int = 100, includeEvidence: bool = Fals
                        "status": liquidation["status"], "liquidation_eligibility": liquidation,
                        "strategy": {"signal_sources": ["liquidations", "bybit_price"], "entry": None, "exit": None}}})
     unique = {item["strategy_id"]: item for item in strategies}
-    ordered = sorted(unique.values(), key=lambda item: item["last_seen"], reverse=True)
+
+    def oos_net(item: dict) -> float:
+        """Descriptive OOS ranking after costs; never a promotion decision."""
+        try:
+            return float(item.get("candidate", {}).get("oos", {}).get("net_pnl", float("-inf")))
+        except (TypeError, ValueError):
+            return float("-inf")
+
+    ordered = sorted(
+        unique.values(),
+        key=lambda item: (item.get("status") == "PAPER_READY", oos_net(item), item["last_seen"]),
+        reverse=True,
+    )
+    rank = 0
+    for item in ordered:
+        # Coverage gates are infrastructure evidence, not comparative strategies.
+        if item.get("candidate", {}).get("strategy", {}).get("entry") is None:
+            item["rank"] = None
+            continue
+        rank += 1
+        item["rank"] = rank
+        item["ranking_scope"] = "oos_net_pnl_after_costs_descriptive_only"
     if not includeEvidence:
         # The registry is a list view. Returning every raw trade from every
         # vertical made its JSON response unnecessarily large and could block
