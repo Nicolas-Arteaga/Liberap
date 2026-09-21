@@ -1,0 +1,10 @@
+{
+  "id": "f1b-2-conditional-timeout-20260920-2148",
+  "phase": "1B-2",
+  "status": "completed",
+  "started_at": "2026-09-20T21:49:27.0943156-03:00",
+  "finished_at": "2026-09-20T21:49:29.2581110-03:00",
+  "exit_code": 0,
+  "fill_model": "close",
+  "timeout_model": "conditional_negative_at_48h_hardcap_720h"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "f1b-1-fill-model-20260920-2145",
+  "phase": "1B-1",
+  "status": "completed",
+  "started_at": "2026-09-20T21:45:40.0812265-03:00",
+  "finished_at": "2026-09-20T21:45:50.3908747-03:00",
+  "exit_code": 0,
+  "models": [
+    {
+      "model": "level",
+      "exit_code": 0
+    },
+    {
+      "model": "close",
+      "exit_code": 0
+    },
+    {
+      "model": "next_open",
+      "exit_code": 0
+    },
+    {
+      "model": "worst",
+      "exit_code": 0
+    },
+    {
+      "model": "best",
+      "exit_code": 0
+    }
+  ]
+}

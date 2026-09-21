@@ -61,6 +61,27 @@
 - El fill no es una variante aplicable en 1B: por definición la entrada real (hora y precio) se fija como input. La brecha restante es salida real no reconstruible con velas 5m/timeout fijo, no selección.
 - Filtros deterministas confirmados en código: `validate_pre_trade` (incluye minRR y vetos configurables), una operación por símbolo por día en el slot simulator, y cap por perfil. `ma_precompute` ya aplica `validate_pre_trade` antes de generar el stream; el reporte causal previo confirma minRR inerte para esa geometría. `AgentDecisionJson` sólo contiene aprobados y no permite medir vetos históricos sin logs de rechazo.
 
+## 2026-09-20 21:30:00 -03:00 — Fase 1B-1, preregistro de fill
+
+- Una única variable: modelo de precio de fill al detectar TP/SL. Se medirán, sin cambiar entrada, SL, TP ni timeout: `level`, cierre de vela de cruce, open de vela siguiente, peor y mejor entre nivel/cierre.
+- Gate sin cambios: motivo ≥80% y ≥80% de retornos dentro de ±0,25 pp. Se informará error firmado por motivo y los TP individuales.
+- Los cinco desajustes ZAMA/EGLD/FIL/HU/GOOGL se anotan como candidatos de tick/redondeo; no se abre una iteración específica para ellos.
+
+## 2026-09-20 21:47:00 -03:00 — Fase 1B-2, preregistro de timeout causal
+
+- Se fija `fill=close` para esta iteración: empata como mejor modelo de fill con `next_open` (25/38 dentro de tolerancia), y es el que representa el precio observado en el ciclo que detecta el cruce. La única variable nueva es timeout.
+- Modelo a medir: al llegar a 192 velas de 15m (48h), cerrar sólo si el retorno de precio es negativo; si no, continuar hasta TP/SL o el tope duro de 720h. Es la semántica de `zombie_timeout_decision` del agente, no una optimización.
+- Gate sin cambios: motivo >=80% y >=80% de retornos dentro de +/-0,25 pp. Se conservarán las métricas por motivo y JUP se reportará por separado.
+
+## 2026-09-20 21:50:00 -03:00 — Fase 1B, resultados de fill y timeout
+
+- `f1b-1-fill-model-20260920-2145` terminó exit 0: todos los fills conservan 32/38 (84,2%) de motivos. Retornos dentro de tolerancia: nivel 21/38, cierre 25/38, próxima apertura 25/38, peor 23/38, mejor 23/38. El mejor resultado es 65,8%, por debajo del 80% fijado.
+- Con `fill=close`, errores firmados por motivo real: SL n=6, media +0,128 pp; TP n=10, media -0,840 pp; timeout n=22, media +0,215 pp. Los cuatro TP fuera de tolerancia en nivel eran COMP -0,286, MSFT -0,288, COMP -0,362 y JUP -7,402 pp; JUP no es un fill TP sino un timeout erróneo del replay.
+- Timeout de producción confirmado por `agent/verge_agent.py:6519-6558`: al llegar a `maxTradeDurationCandles`, cierra sólo con PnL negativo; positivos se dejan correr, con máximo duro de 720h (`agent/config.py:119`). La configuración MA3 versionada en `agent/backtest/verify_ma_slope_caso3_full_period.py:28` usa 192 velas de 15m (=48h).
+- De los 45 trades, 22 superaron 48h (20 timeout, 2 TP); sus retornos de precio se calcularon desde entrada/salida, sin usar PnL legado. JUP duró 208,644h y cerró TP +10,311 pp.
+- `f1b-2-conditional-timeout-20260920-2148` terminó exit 0: JUP se corrige a TP (diferencia de cierre +2 min; retorno replay +9,903 pp vs real +10,311 pp), pero el conjunto empeora a 29/38 motivos y 23/38 retornos. La aplicación retrospectiva de timeout condicional no reproduce 20 timeouts reales que ocurrieron aun después de 48h; falta el precio/ciclo exacto que el agente observó y/o la configuración histórica efectiva por posición.
+- Los cinco desajustes ZAMA/EGLD/FIL/HU/GOOGL quedan anotados como candidatos de tick/redondeo y no se persiguieron. No se abre Fase 2: Fase 1B falla el gate de fidelidad de salida.
+
 ## Propuesta (no implementada) — ledger de escaneo por ciclo
 
 - Ubicación propuesta: inmediatamente después de `VergeAgent._run_ma_geometry_scan` y antes/después del ranking/`_execute_trade` en `agent/verge_agent.py`.
