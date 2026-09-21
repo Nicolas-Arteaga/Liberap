@@ -82,6 +82,15 @@
 - `f1b-2-conditional-timeout-20260920-2148` terminó exit 0: JUP se corrige a TP (diferencia de cierre +2 min; retorno replay +9,903 pp vs real +10,311 pp), pero el conjunto empeora a 29/38 motivos y 23/38 retornos. La aplicación retrospectiva de timeout condicional no reproduce 20 timeouts reales que ocurrieron aun después de 48h; falta el precio/ciclo exacto que el agente observó y/o la configuración histórica efectiva por posición.
 - Los cinco desajustes ZAMA/EGLD/FIL/HU/GOOGL quedan anotados como candidatos de tick/redondeo y no se persiguieron. No se abre Fase 2: Fase 1B falla el gate de fidelidad de salida.
 
+## 2026-09-20 — ENMIENDA A LA MISIÓN (acordada entre el usuario y Claude)
+
+- Fase 2 se autoriza en MODO CONDICIONAL con Fase 1 en FAIL caracterizado.
+- Entradas: las reales (Caso 3: los 38 con klines; Band Touch: las de PostgreSQL con cierre) más la población amplia de candidatos del motor para Caso 3 (unos 1.225 sobre 243 días) para tener N suficiente para TRAIN/VAL/OOS temporal.
+- Primera entrega, independiente del motor y de los timeouts: MFE, MAE, giveback, tiempo hasta MFE y retorno a 6/12/24/48 h desde la entrada, calculados solo con velas. Por estrategia y por lado, con distribución por símbolo.
+- Matriz de variantes de salida (TP corto, giveback, break-even, trailing, SL por ATR, señal opuesta): reportá solo diferencias relativas contra el baseline. Cada resultado se corre con dos modelos de timeout (incondicional 48 h y condicional con tope 720 h) y con sesgo de fill en TP de ±2 pp. Una mejora solo cuenta si se sostiene en los cuatro casos.
+- Con N chico (38 a 57) usá tamaños de efecto e intervalos bootstrap, sin p-values. Todo hallazgo se etiqueta HIPÓTESIS hasta confirmarse con datos del ledger.
+- Sin PnL absoluto en dólares en ninguna tabla.
+
 ## Propuesta (no implementada) — ledger de escaneo por ciclo
 
 - Ubicación propuesta: inmediatamente después de `VergeAgent._run_ma_geometry_scan` y antes/después del ranking/`_execute_trade` en `agent/verge_agent.py`.
