@@ -11,6 +11,7 @@ sizing), así que este test es independiente del conflicto 3-vs-4.
 Salida: cuántos trades reales el motor "ve" como candidato Caso 3 en su bar,
 y por qué NO cuando no.
 """
+import argparse
 import os, sys, json, bisect
 from datetime import datetime, timezone
 
@@ -42,7 +43,13 @@ INTERVAL = "1h"
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--limit", type=int, default=None,
+                        help="Smoke-test control: procesa sólo los primeros N trades.")
+    args = parser.parse_args()
     J = json.load(open(os.path.join(ROOT, "scratch_caso3_gt.json")))
+    if args.limit is not None:
+        J = J[:args.limit]
     eng = BacktestEngine()
     avail = set(eng.available_symbols())
 

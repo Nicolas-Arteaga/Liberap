@@ -1,0 +1,13 @@
+{
+  "id": "f1b-exit-fidelity-20260920-2123",
+  "phase": "1B",
+  "status": "completed",
+  "started_at": "2026-09-20T21:23:05-03:00",
+  "finished_at": "2026-09-20T21:23:12-03:00",
+  "scope": "Fidelidad de salida con entrada, SL y TP reales fijados; timeout 48 h incondicional.",
+  "completed": 45,
+  "total": 45,
+  "exit_code": 0,
+  "result_path": "lab/runs/f1b-exit-fidelity-20260920-2123/result.json",
+  "result": "38 con klines; 32/38 motivos coinciden; 21/38 retornos dentro de ±0,25 pp"
+}

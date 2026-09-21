@@ -1,0 +1,14 @@
+{
+  "id": "f1-caso3-engine-replay-20260920-2032",
+  "phase": 1,
+  "status": "running",
+  "started_at": "2026-09-20T20:32:00-03:00",
+  "scope": "Iteración causal 1: sólo sustituir el generador cacheado por el evaluador MA de producción; cupos 3, margen 150, timeout 48h incondicional y costos sin cambios.",
+  "completed": 0,
+  "total": 450,
+  "current_step": "Replay autónomo y comparación posterior",
+  "stdout_path": "lab/runs/f1-caso3-engine-replay-20260920-2032/replay.stdout.log",
+  "result_path": "lab/runs/f1-caso3-engine-replay-20260920-2032/replay_compare.json",
+  "exit_code": -1,
+  "production_writes": false
+}

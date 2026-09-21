@@ -1,0 +1,15 @@
+{
+  "id": "f1-caso3-autonomous-replay-20260920-2024",
+  "phase": 1,
+  "status": "completed",
+  "started_at": "2026-09-20T20:24:00-03:00",
+  "scope": "Replay autónomo Caso 3: universo completo, 3 cupos de 150 USDT, timeout 48h incondicional. Los 45 trades se usan sólo tras ejecutar para comparación.",
+  "completed": 400,
+  "total": 400,
+  "current_step": "Completado: 1/45 match total; 1/38 sobre cobertura medible; shadow de klines faltantes 1/45",
+  "command": "docker compose exec -T backtest sh -lc 'python -u /app/backtest/fase1_caso3_replay_compare.py ...'",
+  "stdout_path": "lab/runs/f1-caso3-autonomous-replay-20260920-2024/replay.stdout.log",
+  "result_path": "lab/runs/f1-caso3-autonomous-replay-20260920-2024/replay_compare.json",
+  "exit_code": 0,
+  "production_writes": false
+}

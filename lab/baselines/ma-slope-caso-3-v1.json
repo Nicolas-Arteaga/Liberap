@@ -1,0 +1,53 @@
+{
+  "lab_name": "MA Slope Caso 3 · Lab v1",
+  "strategy_name": "MA Slope Caso 3",
+  "status": "frozen_for_phase_1",
+  "period_utc": {
+    "start": "2026-07-10T00:00:00Z",
+    "end": "2026-08-14T00:00:00Z"
+  },
+  "universe": "símbolos disponibles en el motor histórico, comparados contra los 45 trades de scratch_caso3_gt.json",
+  "side": "SHORT only",
+  "slots": 3,
+  "margin_per_trade_usdt": 150.0,
+  "timeout": {
+    "candles": 192,
+    "interval": "15m",
+    "hours": 48,
+    "mode": "unconditional"
+  },
+  "fee_rate_per_side": 0.0004,
+  "entry_model": "motor MA Geometry actual; la correspondencia temporal se mide, no se asume",
+  "pattern": {
+    "timeframe": "1h",
+    "order": {
+      "ma7VsMa25": "greater",
+      "ma7VsMa50": "greater",
+      "ma7VsMa99": "greater"
+    },
+    "slope": {
+      "targetMa": "ma7",
+      "windowCandles": 3,
+      "currentOp": "lte",
+      "currentDeg": -0.2,
+      "priorOp": "gte",
+      "priorDeg": 0.2
+    },
+    "peakProximity": {
+      "type": "recentHigh",
+      "lookbackCandles": 10,
+      "tolerancePct": 1.0
+    },
+    "exit": {
+      "slReference": "recentHigh",
+      "slLookbackCandles": 10,
+      "slBufferPct": 1.0,
+      "tpMinPct": 10.0
+    }
+  },
+  "provenance": {
+    "parameters": "reconstructed from diagnostic scripts after Docker reset; not a complete historical profile export",
+    "historical_intact": ["scratch signals, entry, exit, SL, TP and timestamps where present"],
+    "not_historical_intact": ["scratch trade side, size, fee fields", "stored PostgreSQL PnL"]
+  }
+}

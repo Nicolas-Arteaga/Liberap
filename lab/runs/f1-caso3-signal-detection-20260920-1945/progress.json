@@ -1,0 +1,15 @@
+﻿{
+    "id":  "f1-caso3-signal-detection-20260920-1945",
+    "phase":  1,
+    "status":  "failed",
+    "started_at":  "2026-09-20T19:46:47.2153608-03:00",
+    "updated_at":  "2026-09-20T19:49:00-03:00",
+    "scope":  "ComparaciÃ³n de detecciÃ³n del motor MA Geometry contra los 45 trades de scratch Caso 3.",
+    "completed":  0,
+    "total":  45,
+    "current_step":  "FAIL: el lanzador terminó sin crear stdout ni proceso hijo; corrida no ejecutada",
+    "command":  "docker compose exec -T backtest python /app/backtest/diag_caso3_detection.py",
+    "stdout_path":  "lab/runs/f1-caso3-signal-detection-20260920-1945/signal_detection.stdout.log",
+    "exit_code":  1,
+    "production_writes":  false
+}

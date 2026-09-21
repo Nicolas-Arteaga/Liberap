@@ -1,0 +1,12 @@
+{
+  "id": "f1-caso3-ground-truth-20260920-1937",
+  "phase": 1,
+  "status": "running",
+  "started_at": "2026-09-20T19:37:00-03:00",
+  "scope": "Normalizar ground truth de Caso 3 y Band Touch; recalcular PnL desde columnas objetivas; no usar pnl/result_csv heredados.",
+  "completed": 1,
+  "total": 2,
+  "current_step": "Baseline congelada; próximo paso: comparación señal por señal",
+  "production_writes": false,
+  "result_path": "lab/runs/f1-caso3-ground-truth-20260920-1937/ground_truth.json"
+}
