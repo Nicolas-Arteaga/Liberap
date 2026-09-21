@@ -1,0 +1,9 @@
+{
+  "id": "f2-path-metrics-20260920-2210",
+  "phase": "2 conditional path metrics",
+  "status": "completed",
+  "started_at": "2026-09-20T22:10:20.9192468-03:00",
+  "finished_at": "2026-09-20T22:10:23.7496405-03:00",
+  "exit_code": 0,
+  "method": "5m candles only; no PnL USD, no exit model"
+}

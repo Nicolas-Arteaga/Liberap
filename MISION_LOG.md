@@ -91,6 +91,20 @@
 - Con N chico (38 a 57) usá tamaños de efecto e intervalos bootstrap, sin p-values. Todo hallazgo se etiqueta HIPÓTESIS hasta confirmarse con datos del ledger.
 - Sin PnL absoluto en dólares en ninguna tabla.
 
+## 2026-09-20 22:03:00 -03:00 — Clasificación solicitada de `TIMEOUT`
+
+- Consulta ejecutada contra PostgreSQL `Verge`, tabla `SimulatedTrades` unida a `StrategyProfiles`, campos `ExitReason` y `AgentDecisionJson`/`exit_audit.close_reason_raw`; evidencia exportada en `lab/runs/f2-timeout-classification-20260920-2200/postgres_ma3_band.csv`.
+- No se puede clasificar causalmente los 27 `TIMEOUT` de `scratch_caso3_gt.json`: ninguno tiene identificador de trade y no hay correspondencia temporal utilizable con PostgreSQL. Las coincidencias sólo por símbolo están separadas por miles de minutos y representan posiciones distintas.
+- PostgreSQL actual sí conserva categorías normalizadas para su propio conjunto MA3/Band (`sl_hit`, `tp_hit`, `btc_dump`, `timeout`), y 9 filas timeout actuales; `close_reason_raw` no está presente en el JSON de entrada exportado para esas filas. Por ello esas 9 filas no explican ni reclasifican los 27 del scratch.
+- Veredicto: `TIMEOUT` del scratch permanece una etiqueta agregada/no desambiguable. Se requiere un ID común de posición o un ledger de salida por ciclo para asignar causa real; no se infiere desde duración o PnL.
+
+## 2026-09-20 22:10:00 -03:00 — Fase 2 condicional, primera entrega de trayectoria
+
+- Smoke y corrida `f2-path-metrics-20260920-2210` terminaron exit 0. Método: velas locales 5m, sin TP/SL, timeout, PnL USD ni decisión del motor. Calcula MFE, MAE, giveback hasta 48h, tiempo a MFE y retornos a 6/12/24/48h.
+- Cobertura: 103 entradas de fuente (MA3 45 + Band Touch PostgreSQL 58); 38 con velas, 65 sin cobertura (MA3 7; Band 58). Band Touch queda **NO MEDIDO** en esta primera entrega: sus operaciones PostgreSQL son de septiembre y el almacén local no contiene esas velas.
+- MA3 SHORT, n=38: MFE medio +3,369% (IC bootstrap 95% +2,630 a +4,219), MAE medio -2,656% (IC -4,039 a -1,529), giveback medio +2,681% (IC +1,779 a +3,699), tiempo a MFE medio 25,193h. Retorno medio: 6h +0,443%; 12h +0,820%; 24h +0,300%; 48h +0,688%. Todo es HIPÓTESIS descriptiva; no hay p-values ni PnL USD.
+- Evidencia: `lab/runs/f2-path-metrics-20260920-2210/result.json` y `progress.json`; script `agent/backtest/fase2_path_metrics.py`.
+
 ## Propuesta (no implementada) — ledger de escaneo por ciclo
 
 - Ubicación propuesta: inmediatamente después de `VergeAgent._run_ma_geometry_scan` y antes/después del ranking/`_execute_trade` en `agent/verge_agent.py`.
