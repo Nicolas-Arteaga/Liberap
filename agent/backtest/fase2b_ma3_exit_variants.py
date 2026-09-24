@@ -74,12 +74,12 @@ def exit_new(rows, opens, trade, variant, timeout_mode, tp_bias_pp, atr):
             if high >= sl:
                 return sl, "SL"
             if low <= tp:
-                return tp * (1 + tp_bias_pp / 100.0), "TP"
+                return tp * (1 - tp_bias_pp / 100.0), "TP"
         else:
             if low <= sl:
                 return sl, "SL"
             if high >= tp:
-                return tp * (1 - tp_bias_pp / 100.0), "TP"
+                return tp * (1 + tp_bias_pp / 100.0), "TP"
         if time_hours and age >= time_hours * HOUR:
             return close, "time_exit"
         if variant == "time_stop_24h_if_losing" and age >= 24 * HOUR and m.pct(side, entry, close) < 0:
@@ -106,6 +106,8 @@ def main():
     parser.add_argument("--output", required=True)
     parser.add_argument("--cache", required=True, help="raw_ma3_243d.pkl from Fase 2")
     parser.add_argument("--smoke", action="store_true")
+    parser.add_argument("--selftest", action="store_true",
+                        help="compare exit_new(baseline) against fase2 exit_trade(baseline) on 400 trades, all scenarios")
     args = parser.parse_args()
     causal.WIN_A, causal.WIN_B, causal.KL_END = m.START, m.END, m.END + 720 * HOUR
     causal.CACHE = args.cache
@@ -114,6 +116,19 @@ def main():
     if args.smoke:
         trades = trades[:40]
     conn = sqlite3.connect("file:/app/data/binance_vision_clean.db?mode=ro", uri=True)
+    if args.selftest:
+        bad, total, rc = 0, 0, {}
+        for trade in trades[::max(1, len(trades) // 400)][:400]:
+            rows = m.rows_for(conn, trade["symbol"], rc)
+            opens = [r[0] for r in rows]
+            for mode, bias in SCENARIOS:
+                old_px, old_reason, _ = m.exit_trade(rows, trade, "baseline", mode, bias)
+                new_px, new_reason = exit_new(rows, opens, trade, "baseline", mode, bias, None)
+                total += 1
+                if abs(old_px - new_px) > 1e-12 or old_reason != new_reason:
+                    bad += 1
+        print(json.dumps({"selftest_total": total, "selftest_mismatch": bad}))
+        return
     results = defaultdict(lambda: defaultdict(list))  # scenario -> variant -> [(split, net)]
     no_atr, cache = 0, {}
     for trade in trades:
