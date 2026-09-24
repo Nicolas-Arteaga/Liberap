@@ -136,3 +136,19 @@
   - Matriz vs baseline (OOS, 4 escenarios: timeout incondicional/condicional × sesgo fill TP ±2 pp): break_even_1r y giveback_50 empeoran en los 4; giveback_10, giveback_25 y trailing_2r cambian de signo según escenario (no robustos); tp_short_50 cambia de signo con el sesgo de fill (no usable sin calibrar fill real).
   - Baseline: media OOS pequeña positiva (0,06 a 0,51 %), mediana ≈ -1,3 % en todos los escenarios.
 - Ledger de escaneo (worktree `Verge-ledger`, rama `feat/scan-ledger-isolated`): diff revisado por Claude, cumple los tres pedidos (razón de cada rechazo, eventos de revisión/cierre de posición, flush por tiempo + fsync + rotación). Sin tocar lógica de decisión. NO desplegado. Falta verificar si la ruta `agent/data/scan_ledger.jsonl` es volumen persistente en el despliegue real del agente (no está en el docker-compose local).
+
+## 2026-09-23 — PREREGISTRO Fase 2b (escrito ANTES de correr; Claude)
+
+**Población y cortes: idénticos a Fase 2** (stream bruto MA3, 9.400 señales, TRAIN/VAL/OOS fijos, mismos 4 escenarios timeout×sesgo fill TP, costo base 0,08 %). Baseline se recomputa con el mismo código y se verifica contra `result.json` previo (OOS unconditional|tp_bias_-2 = 0,30710306548 %); si no coincide, la corrida se invalida.
+
+**Variantes nuevas (7, todas definidas aquí antes de ver resultados):**
+- SL por ATR, ATR = promedio simple de los últimos 14 True Range de velas 1h CERRADAS antes de la apertura (mismo criterio que producción, sin Wilder). SL_dist = min(distancia SL original, k·ATR) (solo "estricto": nunca más amplio que el original), TP original intacto. k ∈ {1,0; 1,5; 2,0} → `sl_atr_1.0`, `sl_atr_1.5`, `sl_atr_2.0`. Trades sin 15 velas 1h previas usan el SL original y se reportan aparte.
+- Salida por tiempo (motivada por MFE mediana a 22–32 h): cierre al cierre de vela a las T horas si no salió antes por SL/TP: `time_exit_12h`, `time_exit_24h`, `time_exit_36h`; y `time_stop_24h_if_losing` (a las 24 h cierra solo si el retorno es negativo). Orden intra-vela: SL, TP, luego reglas de tiempo (como el baseline).
+
+**Criterio de éxito (fijado ahora):** una variante solo se etiqueta HIPÓTESIS de mejora si, en LOS CUATRO escenarios: (a) Δ OOS vs baseline > 0; (b) Δ OOS sin los 3 mejores trades > 0; (c) Δ > 0 en al menos 2 de los 3 splits (TRAIN/VAL/OOS). Costos +50 % se reportan (el desplazamiento es constante para todas las variantes, por lo que no altera el ranking relativo).
+
+**Conteo de familia (anti-sobreajuste):** con estas 7 + las 6 no-baseline de Fase 2 (tp_short_50, giveback_10/25/50, break_even_1r, trailing_2r) = **13 variantes de salida probadas** sobre esta población. Un "ganador" entre 13 vale menos que uno entre 1: se reportará el conteo junto a cualquier hallazgo.
+
+**Band Touch:** las velas de septiembre SÍ existen en la base viva del agente (`agent/data/klines.db`, montada `:ro` en `/app/live-research/klines.db`; 15m con ~90 % de cobertura, 5m parcial). La conclusión previa "sin cobertura" solo miró `binance_vision_clean.db` (termina en agosto). Se hará trayectoria descriptiva de las entradas reales de Band Touch con velas 15m, sin descargar nada. N chico (≈58): HIPÓTESIS descriptiva, sin conclusiones.
+
+**Ledger:** el agente vivo corre en el HOST (no en Docker); `agent/data/` es disco local persistente (mismo directorio de `positions.json`). Desplegar el ledger exige reiniciar el agente en vivo (sin hot-reload): NO se hace sin OK explícito del usuario.
