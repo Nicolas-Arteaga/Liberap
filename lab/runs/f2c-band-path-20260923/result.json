@@ -1,0 +1,915 @@
+{
+  "summary": {
+    "n_input": 82,
+    "n_measured": 65,
+    "skipped": [
+      [
+        "POWERUSDT",
+        "life_lt_2_full_candles"
+      ],
+      [
+        "STARUSDT",
+        "life_lt_2_full_candles"
+      ],
+      [
+        "CTRUSDT",
+        "life_lt_2_full_candles"
+      ],
+      [
+        "TUTUSDT",
+        "life_lt_2_full_candles"
+      ],
+      [
+        "ARBUSDT",
+        "life_lt_2_full_candles"
+      ],
+      [
+        "AAPLUSDT",
+        "life_lt_2_full_candles"
+      ],
+      [
+        "COTIUSDT",
+        "life_lt_2_full_candles"
+      ],
+      [
+        "COTIUSDT",
+        "life_lt_2_full_candles"
+      ],
+      [
+        "PUMPUSDT",
+        "life_lt_2_full_candles"
+      ],
+      [
+        "BULLAUSDT",
+        "life_lt_2_full_candles"
+      ],
+      [
+        "GUSDT",
+        "life_lt_2_full_candles"
+      ],
+      [
+        "ARIAUSDT",
+        "life_lt_2_full_candles"
+      ],
+      [
+        "ZETAUSDT",
+        "life_lt_2_full_candles"
+      ],
+      [
+        "PHAUSDT",
+        "life_lt_2_full_candles"
+      ],
+      [
+        "MUBARAKUSDT",
+        "life_lt_2_full_candles"
+      ],
+      [
+        "CETUSUSDT",
+        "life_lt_2_full_candles"
+      ],
+      [
+        "CRWDUSDT",
+        "life_lt_2_full_candles"
+      ]
+    ],
+    "label": "HIPOTESIS descriptiva, N chico, sin PnL USD, velas 15m completas dentro de la vida del trade (cota inferior de MFE)",
+    "mean": {
+      "life_h": 10.502721534188034,
+      "mfe_pct": 5.2077519157485375,
+      "mae_pct": -2.3802980696860034,
+      "final_return_pct": 0.5848261618031438,
+      "giveback_pct": 4.6229257539453945,
+      "time_to_mfe_h": 5.912547850427351
+    },
+    "boot95_mean_mfe": [
+      3.7842713102873398,
+      6.978217747327716
+    ],
+    "boot95_mean_giveback": [
+      3.622697922610829,
+      5.566236699560573
+    ],
+    "censored_last10pct": 12,
+    "thresholds": {
+      "mfe>=2%": {
+        "n_reached": 36,
+        "gave_back_ge50pct": 24,
+        "of_which_censored": 12
+      },
+      "mfe>=5%": {
+        "n_reached": 22,
+        "gave_back_ge50pct": 12,
+        "of_which_censored": 10
+      },
+      "mfe>=10%": {
+        "n_reached": 10,
+        "gave_back_ge50pct": 3,
+        "of_which_censored": 6
+      }
+    },
+    "by_exit_reason": {
+      "unknown": {
+        "n": 4,
+        "mean_mfe": 21.468249666939773,
+        "mean_final": 18.583959059271194
+      },
+      "tp_hit": {
+        "n": 9,
+        "mean_mfe": 9.990273218703026,
+        "mean_final": 11.775489032781078
+      },
+      "sl_hit": {
+        "n": 41,
+        "mean_mfe": 2.3512966287575523,
+        "mean_final": -3.2376576556913874
+      },
+      "timeout": {
+        "n": 11,
+        "mean_mfe": 6.028659555318999,
+        "mean_final": -0.8688702846875678
+      }
+    }
+  },
+  "trades": [
+    {
+      "symbol": "我踏马来了USDT",
+      "life_h": 34.99265416666667,
+      "mfe_pct": 21.507956554685524,
+      "mae_pct": 0.884061631725169,
+      "final_return_pct": 17.043445314473352,
+      "giveback_pct": 4.464511240212172,
+      "time_to_mfe_h": 23.38067861111111,
+      "censored_last10pct": false,
+      "exit_reason": "unknown",
+      "coverage": 1.0072463768115942
+    },
+    {
+      "symbol": "KAVAUSDT",
+      "life_h": 1.2423655555555555,
+      "mfe_pct": 1.6713776576133714,
+      "mae_pct": -0.44242349760353844,
+      "final_return_pct": 11.316037851788128,
+      "giveback_pct": -9.644660194174756,
+      "time_to_mfe_h": 0.8137736111111111,
+      "censored_last10pct": false,
+      "exit_reason": "tp_hit",
+      "coverage": 1.3333333333333333
+    },
+    {
+      "symbol": "ALLOUSDT",
+      "life_h": 12.474515833333333,
+      "mfe_pct": 3.1272178850248404,
+      "mae_pct": -0.2750177430802029,
+      "final_return_pct": 3.3220768275372645,
+      "giveback_pct": -0.19485894251242408,
+      "time_to_mfe_h": 11.097708611111111,
+      "censored_last10pct": false,
+      "exit_reason": "tp_hit",
+      "coverage": 1.0208333333333333
+    },
+    {
+      "symbol": "PHAUSDT",
+      "life_h": 1.2845425,
+      "mfe_pct": 0.39912917271408727,
+      "mae_pct": -3.4833091436864985,
+      "final_return_pct": -4.659978229317853,
+      "giveback_pct": 5.05910740203194,
+      "time_to_mfe_h": 0.31874305555555554,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "VTHOUSDT",
+      "life_h": 20.987612777777777,
+      "mfe_pct": 30.621790168745417,
+      "mae_pct": -8.492296404988991,
+      "final_return_pct": 26.78833455612619,
+      "giveback_pct": 3.8334556126192254,
+      "time_to_mfe_h": 18.92862166666667,
+      "censored_last10pct": true,
+      "exit_reason": "unknown",
+      "coverage": 1.0121951219512195
+    },
+    {
+      "symbol": "POWERUSDT",
+      "life_h": 1.8831475,
+      "mfe_pct": 1.4625850340136048,
+      "mae_pct": -5.391156462585032,
+      "final_return_pct": -8.976556122448972,
+      "giveback_pct": 10.439141156462577,
+      "time_to_mfe_h": 0.7840280555555555,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.1666666666666667
+    },
+    {
+      "symbol": "HEMIUSDT",
+      "life_h": 17.41693,
+      "mfe_pct": 6.81465383421298,
+      "mae_pct": -1.009003415088481,
+      "final_return_pct": -1.785159888233476,
+      "giveback_pct": 8.599813722446456,
+      "time_to_mfe_h": 15.706553055555556,
+      "censored_last10pct": true,
+      "exit_reason": "timeout",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "IOTXUSDT",
+      "life_h": 1.2281119444444444,
+      "mfe_pct": 1.0459035444509008,
+      "mae_pct": -3.0214991284137107,
+      "final_return_pct": -3.1231841952353268,
+      "giveback_pct": 4.169087739686228,
+      "time_to_mfe_h": 0.3348116666666667,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.3333333333333333
+    },
+    {
+      "symbol": "REZUSDT",
+      "life_h": 9.71753388888889,
+      "mfe_pct": 15.405073649754506,
+      "mae_pct": -3.027823240589192,
+      "final_return_pct": 13.03191489361703,
+      "giveback_pct": 2.3731587561374763,
+      "time_to_mfe_h": 9.600097777777778,
+      "censored_last10pct": true,
+      "exit_reason": "unknown",
+      "coverage": 1.027027027027027
+    },
+    {
+      "symbol": "SKDDUSDT",
+      "life_h": 26.29976111111111,
+      "mfe_pct": 6.973848069738477,
+      "mae_pct": -0.7471980074719864,
+      "final_return_pct": -0.622665006226659,
+      "giveback_pct": 7.596513075965135,
+      "time_to_mfe_h": 24.26447027777778,
+      "censored_last10pct": true,
+      "exit_reason": "timeout",
+      "coverage": 1.0096153846153846
+    },
+    {
+      "symbol": "RONINUSDT",
+      "life_h": 1.9432158333333334,
+      "mfe_pct": 2.999657182036341,
+      "mae_pct": -1.371271854645175,
+      "final_return_pct": -3.3864758313335597,
+      "giveback_pct": 6.386133013369901,
+      "time_to_mfe_h": 1.3364752777777777,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.1666666666666667
+    },
+    {
+      "symbol": "CRWDUSDT",
+      "life_h": 22.640346944444445,
+      "mfe_pct": 2.860160540768898,
+      "mae_pct": -1.394169835234479,
+      "final_return_pct": -0.3971271651880008,
+      "giveback_pct": 3.257287705956899,
+      "time_to_mfe_h": 20.810675833333335,
+      "censored_last10pct": true,
+      "exit_reason": "timeout",
+      "coverage": 1.0112359550561798
+    },
+    {
+      "symbol": "ARCUSDT",
+      "life_h": 12.786809166666666,
+      "mfe_pct": 1.382614647501707,
+      "mae_pct": -1.9301848049281238,
+      "final_return_pct": -3.070308008213551,
+      "giveback_pct": 4.452922655715258,
+      "time_to_mfe_h": 1.8305108333333333,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "FFUSDT",
+      "life_h": 31.628598611111112,
+      "mfe_pct": 18.338178294573645,
+      "mae_pct": -1.2596899224806193,
+      "final_return_pct": 17.47214147286821,
+      "giveback_pct": 0.8660368217054355,
+      "time_to_mfe_h": 29.38466888888889,
+      "censored_last10pct": true,
+      "exit_reason": "unknown",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "TEMUSDT",
+      "life_h": 1.6326027777777778,
+      "mfe_pct": 1.7424826522744727,
+      "mae_pct": -1.0177332305320137,
+      "final_return_pct": -1.1219737856592285,
+      "giveback_pct": 2.8644564379337014,
+      "time_to_mfe_h": 0.43797416666666666,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "PHAROSUSDT",
+      "life_h": 24.18148138888889,
+      "mfe_pct": 5.0558495002939425,
+      "mae_pct": -0.9406231628453903,
+      "final_return_pct": -0.9014305310601702,
+      "giveback_pct": 5.957280031354113,
+      "time_to_mfe_h": 7.550020833333333,
+      "censored_last10pct": false,
+      "exit_reason": "timeout",
+      "coverage": 1.0105263157894737
+    },
+    {
+      "symbol": "ZROUSDT",
+      "life_h": 1.1220658333333333,
+      "mfe_pct": 0.042043304603748895,
+      "mae_pct": -1.9760353163758595,
+      "final_return_pct": -2.9490372083245666,
+      "giveback_pct": 2.9910805129283156,
+      "time_to_mfe_h": 0.49200194444444445,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "AVAAIUSDT",
+      "life_h": 8.108498611111111,
+      "mfe_pct": 11.799179527251423,
+      "mae_pct": -1.4651299081851834,
+      "final_return_pct": 12.316175034186367,
+      "giveback_pct": -0.5169955069349434,
+      "time_to_mfe_h": 7.877455277777778,
+      "censored_last10pct": true,
+      "exit_reason": "tp_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "SOXSUSDT",
+      "life_h": 4.12819,
+      "mfe_pct": 2.9612312487823806,
+      "mae_pct": -0.09740892265732372,
+      "final_return_pct": 3.2506749074615238,
+      "giveback_pct": -0.2894436586791431,
+      "time_to_mfe_h": 3.9840561111111112,
+      "censored_last10pct": true,
+      "exit_reason": "tp_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "EVAAUSDT",
+      "life_h": 7.915181111111111,
+      "mfe_pct": 8.053251855085113,
+      "mae_pct": -0.41466608467918226,
+      "final_return_pct": 7.970630728939332,
+      "giveback_pct": 0.08262112614578143,
+      "time_to_mfe_h": 7.512331944444444,
+      "censored_last10pct": true,
+      "exit_reason": "tp_hit",
+      "coverage": 1.0333333333333334
+    },
+    {
+      "symbol": "HOMEUSDT",
+      "life_h": 32.93331694444444,
+      "mfe_pct": 5.110148067894551,
+      "mae_pct": -1.0292524377031376,
+      "final_return_pct": -0.07222824124231968,
+      "giveback_pct": 5.18237630913687,
+      "time_to_mfe_h": 5.686276111111111,
+      "censored_last10pct": false,
+      "exit_reason": "timeout",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "ZECUSDT",
+      "life_h": 3.8156447222222223,
+      "mfe_pct": 0.7759667419850166,
+      "mae_pct": -2.5200826625710753,
+      "final_return_pct": -3.3482897910116516,
+      "giveback_pct": 4.124256532996668,
+      "time_to_mfe_h": 0.7114655555555556,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "ZHONGJIUSDT",
+      "life_h": 1.6122897222222223,
+      "mfe_pct": 0.5841200842219557,
+      "mae_pct": -0.027168376010337884,
+      "final_return_pct": -0.48320897235618393,
+      "giveback_pct": 1.0673290565781397,
+      "time_to_mfe_h": 1.2228575,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "NAORISUSDT",
+      "life_h": 1.60477,
+      "mfe_pct": 1.4479068303430975,
+      "mae_pct": -2.2662889518413545,
+      "final_return_pct": -3.040604343720496,
+      "giveback_pct": 4.488511174063594,
+      "time_to_mfe_h": 0.6227738888888888,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "LITUSDT",
+      "life_h": 0.6446897222222222,
+      "mfe_pct": 1.4056224899598528,
+      "mae_pct": -2.0972780008924454,
+      "final_return_pct": -2.827181838464966,
+      "giveback_pct": 4.232804328424819,
+      "time_to_mfe_h": 0.2686188888888889,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 2.0
+    },
+    {
+      "symbol": "NEARUSDT",
+      "life_h": 4.115440833333333,
+      "mfe_pct": 1.5760441292356024,
+      "mae_pct": -2.9156816390859057,
+      "final_return_pct": -3.2926189913317647,
+      "giveback_pct": 4.868663120567367,
+      "time_to_mfe_h": 0.4618511111111111,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "CYSUSDT",
+      "life_h": 20.950827222222223,
+      "mfe_pct": 4.67706013363029,
+      "mae_pct": -3.7119524870081704,
+      "final_return_pct": -3.4867631774313392,
+      "giveback_pct": 8.163823311061629,
+      "time_to_mfe_h": 9.676036388888889,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0121951219512195
+    },
+    {
+      "symbol": "AGLDUSDT",
+      "life_h": 24.608408611111113,
+      "mfe_pct": 1.5437392795883407,
+      "mae_pct": -1.4293882218410534,
+      "final_return_pct": -0.17152658662092324,
+      "giveback_pct": 1.715265866209264,
+      "time_to_mfe_h": 1.7721938888888888,
+      "censored_last10pct": false,
+      "exit_reason": "timeout",
+      "coverage": 1.0103092783505154
+    },
+    {
+      "symbol": "SNXXUSDT",
+      "life_h": 9.432160833333333,
+      "mfe_pct": 0.8849557522123827,
+      "mae_pct": -3.131381892443845,
+      "final_return_pct": -3.0778955752212416,
+      "giveback_pct": 3.9628513274336243,
+      "time_to_mfe_h": 5.9796869444444445,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "NEARUSDT",
+      "life_h": 1.8821825,
+      "mfe_pct": 2.6023484608060885,
+      "mae_pct": -2.6023484608061027,
+      "final_return_pct": -3.398920977467484,
+      "giveback_pct": 6.001269438273573,
+      "time_to_mfe_h": 0.8173419444444444,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.1666666666666667
+    },
+    {
+      "symbol": "BABYUSDT",
+      "life_h": 1.9075936111111111,
+      "mfe_pct": 7.522052927024856,
+      "mae_pct": -0.056134723336006914,
+      "final_return_pct": 12.094707297514029,
+      "giveback_pct": -4.572654370489173,
+      "time_to_mfe_h": 1.7353969444444444,
+      "censored_last10pct": true,
+      "exit_reason": "tp_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "UAIUSDT",
+      "life_h": 71.57954833333334,
+      "mfe_pct": 13.336452971455309,
+      "mae_pct": -1.7313991576977112,
+      "final_return_pct": -1.871782873186712,
+      "giveback_pct": 15.20823584464202,
+      "time_to_mfe_h": 43.845283333333334,
+      "censored_last10pct": false,
+      "exit_reason": "timeout",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "ARBUSDT",
+      "life_h": 0.6078227777777778,
+      "mfe_pct": 0.5329311211664179,
+      "mae_pct": -3.373554550025135,
+      "final_return_pct": -3.3748969331322294,
+      "giveback_pct": 3.907828054298647,
+      "time_to_mfe_h": 0.31649,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 2.0
+    },
+    {
+      "symbol": "NEARUSDT",
+      "life_h": 1.0006716666666666,
+      "mfe_pct": 0.9982384028185628,
+      "mae_pct": -3.0827950675278912,
+      "final_return_pct": -3.2726561949500876,
+      "giveback_pct": 4.270894597768651,
+      "time_to_mfe_h": 0.3664691666666667,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "RAYSOLUSDT",
+      "life_h": 2.2525805555555554,
+      "mfe_pct": 1.5868209072739385,
+      "mae_pct": -3.8701471746108695,
+      "final_return_pct": -3.721357276966865,
+      "giveback_pct": 5.308178184240804,
+      "time_to_mfe_h": 0.5335413888888889,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "METUSDT",
+      "life_h": 2.318041111111111,
+      "mfe_pct": 0.4885993485342046,
+      "mae_pct": -3.3794788273615644,
+      "final_return_pct": -3.3333346905537375,
+      "giveback_pct": 3.8219340390879424,
+      "time_to_mfe_h": 0.9553530555555556,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "MUBARAKUSDT",
+      "life_h": 0.5310355555555556,
+      "mfe_pct": 0.029976019184661452,
+      "mae_pct": -3.627098321342913,
+      "final_return_pct": -3.407673860911272,
+      "giveback_pct": 3.4376498800959334,
+      "time_to_mfe_h": 0.27977583333333333,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 2.0
+    },
+    {
+      "symbol": "AEROUSDT",
+      "life_h": 11.616498055555555,
+      "mfe_pct": 4.298395888490883,
+      "mae_pct": -3.16150132378134,
+      "final_return_pct": -3.301147796293417,
+      "giveback_pct": 7.599543684784299,
+      "time_to_mfe_h": 5.834504444444445,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0222222222222221
+    },
+    {
+      "symbol": "WLDUSDT",
+      "life_h": 4.579782222222223,
+      "mfe_pct": 1.3950244129272276,
+      "mae_pct": -3.3015577772611002,
+      "final_return_pct": -3.2372308765403424,
+      "giveback_pct": 4.63225528946757,
+      "time_to_mfe_h": 3.727845,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "APTUSDT",
+      "life_h": 6.065330833333333,
+      "mfe_pct": 1.720335244816945,
+      "mae_pct": -3.0289663284810984,
+      "final_return_pct": -3.1510072048228124,
+      "giveback_pct": 4.871342449639758,
+      "time_to_mfe_h": 3.5313233333333334,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0434782608695652
+    },
+    {
+      "symbol": "MMTUSDT",
+      "life_h": 15.27499,
+      "mfe_pct": 2.3343848580441695,
+      "mae_pct": -3.028391167192428,
+      "final_return_pct": -0.18927444794952347,
+      "giveback_pct": 2.523659305993693,
+      "time_to_mfe_h": 2.7130763888888887,
+      "censored_last10pct": false,
+      "exit_reason": "timeout",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "ZKUSDT",
+      "life_h": 3.3754944444444446,
+      "mfe_pct": 1.5343623667769086,
+      "mae_pct": -3.2432929070194865,
+      "final_return_pct": -3.314314590224183,
+      "giveback_pct": 4.848676957001091,
+      "time_to_mfe_h": 1.118411388888889,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0833333333333333
+    },
+    {
+      "symbol": "FUSDT",
+      "life_h": 28.443556666666666,
+      "mfe_pct": 29.526977087952698,
+      "mae_pct": -2.25424981522542,
+      "final_return_pct": 29.91759053954176,
+      "giveback_pct": -0.39061345158906136,
+      "time_to_mfe_h": 27.23467638888889,
+      "censored_last10pct": true,
+      "exit_reason": "tp_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "NILUSDT",
+      "life_h": 11.015783333333333,
+      "mfe_pct": 3.916027452563579,
+      "mae_pct": -3.895841744045218,
+      "final_return_pct": -3.6670771094065393,
+      "giveback_pct": 7.583104561970119,
+      "time_to_mfe_h": 2.0225380555555557,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "IMXUSDT",
+      "life_h": 27.415938611111113,
+      "mfe_pct": 6.843575418994416,
+      "mae_pct": -0.8379888268156471,
+      "final_return_pct": -0.6983240223463694,
+      "giveback_pct": 7.541899441340785,
+      "time_to_mfe_h": 13.736762777777777,
+      "censored_last10pct": false,
+      "exit_reason": "timeout",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "BUSDT",
+      "life_h": 2.6047941666666667,
+      "mfe_pct": 1.0115606936416273,
+      "mae_pct": -2.4084778420038555,
+      "final_return_pct": -2.9948603082851606,
+      "giveback_pct": 4.006421001926788,
+      "time_to_mfe_h": 0.2817861111111111,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.1111111111111112
+    },
+    {
+      "symbol": "AVAAIUSDT",
+      "life_h": 7.246528611111111,
+      "mfe_pct": 5.299714557564227,
+      "mae_pct": -3.472882968601323,
+      "final_return_pct": -3.3431969552806864,
+      "giveback_pct": 8.642911512844913,
+      "time_to_mfe_h": 5.0133986111111115,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.037037037037037
+    },
+    {
+      "symbol": "ZAMAUSDT",
+      "life_h": 15.283143888888889,
+      "mfe_pct": 11.090633130962708,
+      "mae_pct": -3.6318300086730178,
+      "final_return_pct": -2.2983521248915837,
+      "giveback_pct": 13.38898525585429,
+      "time_to_mfe_h": 2.7605844444444445,
+      "censored_last10pct": false,
+      "exit_reason": "timeout",
+      "coverage": 1.0166666666666666
+    },
+    {
+      "symbol": "VVVUSDT",
+      "life_h": 0.7779933333333333,
+      "mfe_pct": 0.0,
+      "mae_pct": -2.301929009729798,
+      "final_return_pct": -2.976008848357465,
+      "giveback_pct": 2.976008848357465,
+      "time_to_mfe_h": 0.4832786111111111,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "CLANKERUSDT",
+      "life_h": 8.243242222222221,
+      "mfe_pct": 5.174418604651161,
+      "mae_pct": -2.107558139534891,
+      "final_return_pct": -3.1606104651162843,
+      "giveback_pct": 8.335029069767446,
+      "time_to_mfe_h": 3.9380169444444446,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.032258064516129
+    },
+    {
+      "symbol": "UAIUSDT",
+      "life_h": 1.9694316666666667,
+      "mfe_pct": 6.456801470588227,
+      "mae_pct": -1.2867647058823644,
+      "final_return_pct": -1.6626171875000015,
+      "giveback_pct": 8.119418658088229,
+      "time_to_mfe_h": 1.06334,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.1666666666666667
+    },
+    {
+      "symbol": "STRKUSDT",
+      "life_h": 35.08171083333333,
+      "mfe_pct": 16.44221105527638,
+      "mae_pct": -1.1256281407035136,
+      "final_return_pct": 16.51256281407035,
+      "giveback_pct": -0.0703517587939686,
+      "time_to_mfe_h": 35.06500833333333,
+      "censored_last10pct": true,
+      "exit_reason": "tp_hit",
+      "coverage": 1.0071942446043165
+    },
+    {
+      "symbol": "SEIUSDT",
+      "life_h": 5.516713333333334,
+      "mfe_pct": 2.8770706190061004,
+      "mae_pct": -2.3190932868352307,
+      "final_return_pct": -2.693984306887541,
+      "giveback_pct": 5.571054925893641,
+      "time_to_mfe_h": 0.3368211111111111,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "SUIUSDT",
+      "life_h": 3.4663838888888887,
+      "mfe_pct": 3.8874126562346207,
+      "mae_pct": -2.7950004920775493,
+      "final_return_pct": -3.251976183446504,
+      "giveback_pct": 7.139388839681125,
+      "time_to_mfe_h": 0.6298622222222222,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0833333333333333
+    },
+    {
+      "symbol": "PTBUSDT",
+      "life_h": 0.8465930555555555,
+      "mfe_pct": 6.904174815066748,
+      "mae_pct": -0.7907490859620834,
+      "final_return_pct": -3.3951194626307357,
+      "giveback_pct": 10.299294277697484,
+      "time_to_mfe_h": 0.49476333333333333,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "DUSKUSDT",
+      "life_h": 20.111302777777777,
+      "mfe_pct": 4.351809436555197,
+      "mae_pct": -3.3783783783783883,
+      "final_return_pct": -0.5497022446175083,
+      "giveback_pct": 4.901511681172705,
+      "time_to_mfe_h": 3.0965366666666667,
+      "censored_last10pct": false,
+      "exit_reason": "timeout",
+      "coverage": 1.0126582278481013
+    },
+    {
+      "symbol": "MARSCOINUSDT",
+      "life_h": 1.2656155555555555,
+      "mfe_pct": 4.05256464603645,
+      "mae_pct": -1.6278083933870326,
+      "final_return_pct": -3.4910300974989434,
+      "giveback_pct": 7.543594743535394,
+      "time_to_mfe_h": 0.5582583333333333,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "FLOCKUSDT",
+      "life_h": 0.8528452777777777,
+      "mfe_pct": 1.761734631021314,
+      "mae_pct": -2.722680793396562,
+      "final_return_pct": -3.269680916594788,
+      "giveback_pct": 5.031415547616103,
+      "time_to_mfe_h": 0.4520827777777778,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "BBXUSDT",
+      "life_h": 27.016226666666668,
+      "mfe_pct": 8.808959724316171,
+      "mae_pct": -0.2692224854619896,
+      "final_return_pct": 9.278945293990953,
+      "giveback_pct": -0.46998556967478144,
+      "time_to_mfe_h": 4.303180555555556,
+      "censored_last10pct": false,
+      "exit_reason": "tp_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "BCHUSDT",
+      "life_h": 2.9445941666666666,
+      "mfe_pct": 1.5457937478443569,
+      "mae_pct": -3.94130373436177,
+      "final_return_pct": -4.0364134230081765,
+      "giveback_pct": 5.582207170852533,
+      "time_to_mfe_h": 0.41953111111111113,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.1
+    },
+    {
+      "symbol": "1000XECUSDT",
+      "life_h": 3.094746388888889,
+      "mfe_pct": 0.394910048266798,
+      "mae_pct": -2.248793330408058,
+      "final_return_pct": -2.392496709082918,
+      "giveback_pct": 2.787406757349716,
+      "time_to_mfe_h": 0.9206155555555555,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "CYPHUSDT",
+      "life_h": 3.6098222222222223,
+      "mfe_pct": 3.431251542828937,
+      "mae_pct": -2.6660083929893768,
+      "final_return_pct": -3.2313009133547164,
+      "giveback_pct": 6.662552456183653,
+      "time_to_mfe_h": 0.9138288888888889,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "NILUSDT",
+      "life_h": 2.1776677777777778,
+      "mfe_pct": 11.885681181809407,
+      "mae_pct": -2.703485565318153,
+      "final_return_pct": -3.4829873515496823,
+      "giveback_pct": 15.368668533359088,
+      "time_to_mfe_h": 0.42029777777777777,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.1428571428571428
+    },
+    {
+      "symbol": "ZESTUSDT",
+      "life_h": 6.765830833333333,
+      "mfe_pct": 0.3199634327505456,
+      "mae_pct": -9.758884698891546,
+      "final_return_pct": -3.085361672951656,
+      "giveback_pct": 3.4053251057022016,
+      "time_to_mfe_h": 1.2920897222222223,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 1.0
+    },
+    {
+      "symbol": "ACUUSDT",
+      "life_h": 0.6031486111111111,
+      "mfe_pct": 1.870957807206643,
+      "mae_pct": -2.68709578072066,
+      "final_return_pct": -2.2526255004619635,
+      "giveback_pct": 4.123583307668607,
+      "time_to_mfe_h": 0.25612194444444447,
+      "censored_last10pct": false,
+      "exit_reason": "sl_hit",
+      "coverage": 2.0
+    }
+  ]
+}
