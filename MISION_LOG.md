@@ -164,3 +164,11 @@
 
 - La primera corrida completa de `fase2b_ma3_exit_variants.py` devolvió `regression_ok: false`. Sus veredictos "NO pasa" NO se usan. Causa: error de transcripción propio en `exit_new`, el signo del sesgo de fill del TP estaba invertido respecto de `fase2_ma3_broad_matrix.exit_trade` (los escenarios `tp_bias_-2` y `tp_bias_+2` salían intercambiados; los valores del baseline coincidían con los de Fase 2 pero cruzados).
 - Corregido, y agregado `--selftest`: compara `exit_new(baseline)` contra `exit_trade(baseline)` en 400 trades × 4 escenarios = 1.600 comparaciones, 0 diferencias. El criterio de éxito preregistrado no se modificó. Se relanza la corrida completa.
+
+## 2026-09-23 — Fase 2b: RESULTADO válido (Claude; `lab/runs/f2b-ma3-exit-variants-20260923/result.json`)
+
+- Chequeo de regresión OK (baseline OOS unconditional|tp_bias_-2 = 0,30710306548 %, idéntico a Fase 2). 9.400 señales, 0 sin ATR. Criterio preregistrado (commit 841a4f0): Δ OOS > 0, Δ OOS sin top-3 > 0 y Δ > 0 en ≥2 de 3 splits, en LOS CUATRO escenarios.
+- **Ninguna de las 7 variantes pasa** (sl_atr_1.0/1.5/2.0, time_exit_12h/24h/36h, time_stop_24h_if_losing). Con las 6 de Fase 2, son **13 variantes de salida probadas y 0 hallazgos robustos** sobre esta población.
+- Patrón notable: casi todas mejoran en TRAIN y VAL y empeoran en OOS (p. ej. time_exit_24h, unconditional|-2: TRAIN +0,108, VAL +0,125, OOS −0,271 pp). Una búsqueda que mirara solo TRAIN habría "encontrado" salidas por tiempo que no sobreviven fuera de muestra; es la razón de preregistrar y reservar OOS. Excepción aislada: conditional|-2 time_exit_36h da OOS +0,113 pero falla en los otros tres escenarios.
+- Los SL por ATR (solo "estrictos") empeoran OOS en los cuatro escenarios: recortar el SL saca más operaciones que las que protege.
+- Lectura: NO hay evidencia de que una salida simple (SL por ATR, salida por tiempo, giveback, break-even, trailing, TP corto) corrija el giveback de MA3 en OOS. El giveback existe (Fase 2) pero estas reglas no lo convierten en mejora robusta. Es HIPÓTESIS sobre el stream bruto, no sobre la selección real de producción. Siguientes caminos honestos: (a) entradas más selectivas (filtro de régimen/símbolo) en vez de salidas; (b) esperar datos del ledger para calibrar timeout/selección reales.
