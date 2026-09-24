@@ -110,3 +110,29 @@
 - Ubicación propuesta: inmediatamente después de `VergeAgent._run_ma_geometry_scan` y antes/después del ranking/`_execute_trade` en `agent/verge_agent.py`.
 - Campos: ciclo/timestamp, perfil y hash de parámetros, símbolo, fuente, lado, precio de señal, score, ranking, cupos antes/después, candidatos simultáneos, cada veto con código/métricas, decisión final, motivo de no ejecución y versión del agente.
 - Riesgo: bajo si es append-only y asíncrono/batcheado; principal riesgo es I/O/crecimiento de DB. No tocar producción sin aprobación.
+
+## 2026-09-21 00:55:00 -03:00 — Fase 2, corrección interpretativa y preregistro N amplio
+
+- Corrección explícita solicitada: los resultados de `f2-censoring-metrics-v4-20260920-2232` para las 38 entradas MA3 con velas son **descriptivos**, no evidencia a favor ni en contra de una regla de salida. En vida real: 21/38 llegaron a MFE >=2% y 9 de esos devolvieron >=50%; 6/38 llegaron a >=5% y 3 de esos devolvieron >=50%. Con N=38 no se concluye nada.
+- Las ventanas fijas de 96 h y 208 h no se interpretarán como “oportunidad perdida”: el máximo favorable sólo puede crecer al prolongar una ventana. Se reportan únicamente como sensibilidad de horizonte y censura.
+- Población preregistrada para la medición amplia: se generará el **stream bruto de señales** de MA Slope Caso 3, sin cupos, sin cooldown, sin ranking ni salida, sobre 2025-12-01T00:00:00Z inclusivo a 2026-08-01T00:00:00Z exclusivo (243 días). Se elige el stream bruto, no los ~1.225 trades admitidos con slots ilimitados, porque la segunda cifra ya depende de una política de admisión/vida de posición; el stream es la población causal limpia de entradas. No representa la selección real de producción.
+- Cortes temporales fijados antes de calcular métricas: TRAIN 2025-12-01T00:00:00Z a 2026-04-26T00:00:00Z; VALIDATION 2026-04-26T00:00:00Z a 2026-06-14T00:00:00Z; OOS 2026-06-14T00:00:00Z a 2026-08-01T00:00:00Z. No se modificarán según resultados.
+- Matriz preregistrada: baseline y variantes TP corto, giveback 10/25/50%, break-even, trailing ATR, SL por ATR y timeout. Cada variante se evaluará con timeout incondicional 48 h y condicional con techo 720 h, y con sesgo de fill TP de -2 pp / +2 pp (cuatro escenarios). Se informan únicamente retornos porcentuales netos de costos modelados, diferencias contra baseline y conteos; nunca PnL USD. Una mejora sólo se etiqueta HIPÓTESIS si mejora OOS, resiste quitar los tres mejores trades y costos +50% en los cuatro escenarios.
+
+## 2026-09-21 01:00:00 -03:00 — Auditoría del supuesto “153 con +30 USDT flotantes”
+
+- Fuente inspeccionada: PostgreSQL `Verge`, tabla `SimulatedTrades`, columnas `MaxFavorablePrice`, `EntryPrice`, `Size`, `OpenedAt`, unida a `StrategyProfiles`. Comando: `docker compose exec -T db psql -U postgres -d Verge -At -F '|' -c <consulta de conteo por perfil>`.
+- El campo que podría representar el pico es `MaxFavorablePrice`, actualizado por `agent/position_manager.py:648`; no se encontró un campo/csv confiable que respalde el número exacto 153 ni el umbral textual “+30 USDT flotantes”.
+- Después del reset, MA Slope Caso 3 tiene 55/55 filas con `MaxFavorablePrice` y Band Touch 15m 64/64, únicamente entre 2026-09-13 y 2026-09-21. Aplicar ingenuamente `abs(MaxFavorablePrice-EntryPrice)*Size >= 30` da 5 MA3 y 3 Band, no 153. Los perfiles previos al reset tienen en general el campo nulo (por ejemplo Nexus 0/1.927).
+- Veredicto: el contador 153 no es reproducible ni confiable para giveback histórico grande. No se usará en Fase 2 ni para afirmar cobertura de ambas estrategias. El ledger nuevo es el mecanismo prospectivo para que ese dato quede trazable por ciclo/cierre.
+
+## 2026-09-23 — Fase 2 (población amplia) ejecutada por Claude tras corte de Codex por límite de uso
+
+- La corrida `f2-ma3-broad-20260921-0104` había fallado (exit 1). Causa: `split_for()` con `StopIteration`; 4 de 9.400 señales abren exactamente en END (2026-08-01T00:00:00Z) y el corte era exclusivo. Corrección de borde en `agent/backtest/fase2_ma3_broad_matrix.py` (solo `ts == END` va al último split); los cortes TRAIN/VAL/OOS preregistrados NO cambiaron.
+- Bug hallado en la variante `sl_atr_1r`: su fórmula `entry + (original_sl - entry) * 1.0` es un no-op (== SL original), por eso daba idéntico al baseline en los 4 escenarios. NO se redefinió post-hoc. Queda EXCLUIDA de la matriz (7 variantes) y pendiente de iteración aparte con preregistro y serie ATR real.
+- Omisión corregida: el resumen `path_metrics_48h` guardaba solo `n`; ahora agrega media/mediana de MFE, MAE, giveback, tiempo a MFE y retornos a 6/12/24/48 h por split.
+- Resultado (resultado en `agent/backtest/lab_artifacts/f2-ma3-broad-20260921-0104/result.json`; 9.400 señales brutas, 243 días; TRAIN 4.236 / VAL 2.536 / OOS 2.628; HIPÓTESIS, no es selección de producción):
+  - MFE mediana 2,41 / 2,10 / 2,43 %; giveback mediana 2,27 / 2,18 / 1,61 %; tiempo a MFE mediana 23,8 / 22,8 / 31,8 h. Estable entre splits.
+  - Matriz vs baseline (OOS, 4 escenarios: timeout incondicional/condicional × sesgo fill TP ±2 pp): break_even_1r y giveback_50 empeoran en los 4; giveback_10, giveback_25 y trailing_2r cambian de signo según escenario (no robustos); tp_short_50 cambia de signo con el sesgo de fill (no usable sin calibrar fill real).
+  - Baseline: media OOS pequeña positiva (0,06 a 0,51 %), mediana ≈ -1,3 % en todos los escenarios.
+- Ledger de escaneo (worktree `Verge-ledger`, rama `feat/scan-ledger-isolated`): diff revisado por Claude, cumple los tres pedidos (razón de cada rechazo, eventos de revisión/cierre de posición, flush por tiempo + fsync + rotación). Sin tocar lógica de decisión. NO desplegado. Falta verificar si la ruta `agent/data/scan_ledger.jsonl` es volumen persistente en el despliegue real del agente (no está en el docker-compose local).
