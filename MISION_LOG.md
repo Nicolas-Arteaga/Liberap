@@ -172,3 +172,19 @@
 - Patrón notable: casi todas mejoran en TRAIN y VAL y empeoran en OOS (p. ej. time_exit_24h, unconditional|-2: TRAIN +0,108, VAL +0,125, OOS −0,271 pp). Una búsqueda que mirara solo TRAIN habría "encontrado" salidas por tiempo que no sobreviven fuera de muestra; es la razón de preregistrar y reservar OOS. Excepción aislada: conditional|-2 time_exit_36h da OOS +0,113 pero falla en los otros tres escenarios.
 - Los SL por ATR (solo "estrictos") empeoran OOS en los cuatro escenarios: recortar el SL saca más operaciones que las que protege.
 - Lectura: NO hay evidencia de que una salida simple (SL por ATR, salida por tiempo, giveback, break-even, trailing, TP corto) corrija el giveback de MA3 en OOS. El giveback existe (Fase 2) pero estas reglas no lo convierten en mejora robusta. Es HIPÓTESIS sobre el stream bruto, no sobre la selección real de producción. Siguientes caminos honestos: (a) entradas más selectivas (filtro de régimen/símbolo) en vez de salidas; (b) esperar datos del ledger para calibrar timeout/selección reales.
+
+## 2026-09-25 11:40:00 -03:00 — Verificación independiente de Fase 2b (Codex)
+
+- Compilación previa: `python -m py_compile agent/backtest/fase2b_ma3_exit_variants.py` y la misma compilación dentro de `verge-backtest`; ambas exit 0.
+- Primer selftest inválido: se invocó sin los argumentos obligatorios `--output` y `--cache`; exit 2, sin comparaciones. Se registra, no se usa como evidencia.
+- Selftest repetido con cache congelado `/app/backtest/lab_artifacts/f2-ma3-broad-20260921-0104/raw_ma3_243d.pkl`: exit 0, `selftest_total=1600`, `selftest_mismatch=0`. Evidencia persistida: `agent/backtest/lab_artifacts/f2b-selftest-20260925.stdout.log` y `.exitcode` (no se agregan al commit: son artefactos locales).
+- Reproducción de un número del resultado: `lab/runs/f2b-ma3-exit-variants-20260923/result.json`, ruta `scenarios[unconditional|tp_bias_-2].baseline.oos.mean` = `0.30710306548436167`, consistente con el valor esperado `0.30710306548`.
+
+## PROPUESTA PREREGISTRADA, NO INICIADA — Fase 2d: diagnóstico de selección de entradas MA3
+
+- Objetivo: medir si el resultado del stream bruto congelado de 9.400 señales MA3 se concentra de forma reproducible por contexto de entrada; no modificar reglas de salida, perfiles ni producción.
+- Datos y cortes: exactamente el cache/stream de Fase 2; TRAIN 2025-12-01..2026-04-26, VALIDATION 2026-04-26..2026-06-14, OOS 2026-06-14..2026-08-01; cuatro escenarios existentes (`timeout` incondicional/condicional × fill TP -2/+2 pp), costo base 0,08 % y sensibilidad +50 %.
+- Cortes a probar, fijados antes de correr (15 vistas, sin búsqueda adicional): 4 bloques UTC de hora de entrada (00-05, 06-11, 12-17, 18-23); 3 regímenes BTC de retorno 24 h al ingreso (bajista < -2 %, plano [-2 %, +2 %], alcista > +2 %); 3 terciles de volatilidad realizada 24 h del símbolo, cuyos bordes se calculan sólo en TRAIN; y 5 símbolos con mayor cantidad de señales TRAIN (cada uno por separado). Las otras categorías se reportan agregadas, no se convierten en cortes adicionales.
+- Métrica: retorno porcentual neto baseline, media/mediana, N, concentración sin top-3 y distribución de MFE/MAE/giveback a 48 h. No PnL USD. Se reporta la superficie completa de las 15 vistas por TRAIN/VALIDATION/OOS y los cuatro escenarios.
+- Regla de selección antes de ver OOS: una vista queda “candidata de contexto” sólo si tiene N >= 50 en TRAIN y >= 25 en VALIDATION, media neta positiva en TRAIN y VALIDATION, y el mismo signo en los cuatro escenarios. OOS no participa en esa selección.
+- Gate diagnóstico: una candidata se etiqueta solamente **HIPÓTESIS de filtro de entrada** si además tiene media OOS positiva, OOS sin top-3 positiva y la misma dirección en los cuatro escenarios. Si ninguna pasa, veredicto: “no hay contexto simple robusto en estas 15 vistas”. Esta fase no habilita cambios de estrategia.
