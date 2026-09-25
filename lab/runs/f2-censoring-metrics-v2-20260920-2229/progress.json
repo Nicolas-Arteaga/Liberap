@@ -1,0 +1,8 @@
+{
+  "id": "f2-censoring-metrics-v2-20260920-2229",
+  "status": "failed",
+  "started_at": "2026-09-20T22:29:07.6583862-03:00",
+  "finished_at": "2026-09-20T22:29:08.6486426-03:00",
+  "exit_code": 1,
+  "replaces": "f2-censoring-metrics-20260920-2220"
+}
