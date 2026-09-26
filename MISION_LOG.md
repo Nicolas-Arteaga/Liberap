@@ -198,3 +198,10 @@
 - Anti-sobreajuste: todo hallazgo reportará 28 hipótesis: 13 variantes de salida + 15 vistas de contexto. No se agregan nuevos cortes.
 
 - Nota de auditoría: el primer intento de registrar esta enmienda no modificó el archivo porque la revisión automática devolvió `401 Unauthorized: Incorrect API key provided`; el reintento dejó esta enmienda completa antes de cualquier corrida de Fase 2d.
+
+## 2026-09-25 — Fase 2d: cierre
+
+- Smoke PASS: `python /app/backtest/fase2d_ma3_context.py --smoke ...`; 2 señales y 8 filas de escenario. Compilación previa host y contenedor con `python -m py_compile` exit 0.
+- Corrida: `f2d-ma3-context-20260925`, evidencia local `/app/backtest/lab_artifacts/f2d-ma3-context-20260925/{progress.json,result.json}`. Recorrió 9.400 señales; regresión baseline `unconditional|tp_bias_-2` = `0.30710306548436167`, igual al valor preregistrado, `regression_ok=true`.
+- HOLDOUT2: no se abrió. Cobertura local medida con `agent/backtest/inspect_local_coverage.py --probe-symbol BTCUSDT`: canónica 5m post 2026-08-01 termina en `1787010900000` (2026-08-17), mientras la viva llega a `1790261700000` (2026-09-25). El motor MA3 requiere además la tabla canónica 15m, ausente en la viva; no hay una fuente homogénea para evaluar los cuatro escenarios, por lo que se registra como limitación y no se usa un hold-out incompleto.
+- Resultado: 15 vistas fijas, 28 hipótesis contabilizadas (13 salidas + 15 contexto), y **0 candidatas antes de OOS**. En consecuencia no se inspeccionó OOS para candidatas ni HOLDOUT2. Veredicto: no hay filtro de contexto que cumpla el criterio preregistrado en TRAIN/VALIDATION bajo los cuatro escenarios. HIPÓTESIS sobre stream bruto, no selección real de producción.
