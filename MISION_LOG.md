@@ -216,3 +216,12 @@
 
 - Selftest reproducido: `python /app/backtest/lab_diagnose.py --strategy ma3 --selftest`, evidencia `agent/backtest/lab_artifacts/v3-selftest-20260926-rerun/stdout.log`; exit 0, 18.000 comparaciones y 0 diferencias contra los simuladores previos.
 - Pruebas unitarias agregadas: `agent/backtest/test_lab_core_audit.py`; primero revelaron que `forward_returns()` devolvía una vela vieja como retorno de un horizonte futuro cuando faltaban velas. Corregido en `lab_core.py`: un horizonte sin vela cerrada que lo alcance retorna `None`. Repetición: 4/4 PASS (`python -m unittest test_lab_core_audit -v`).
+
+## 2026-09-26 — ORDEN v4, HITO M1: auditoría MA3
+
+- Alcance aplicado: sólo los seis hallazgos de MA3. No se modificó producción, `StrategyProfiles`, VIRE ni el ledger.
+- Corrida: `docker compose exec -T backtest python /app/backtest/lab_m1_ma3_audit.py`; evidencia `/app/backtest/lab_artifacts/m1-ma3-20260926/{progress.json,result.json,informe.md}`. Exit code 0; 9.400/9.400 señales procesadas.
+- Retornos de entrada a 1/4/12/24/48 h: bootstrap por bloques de día UTC (1.000 remuestreos); `result.json` conserva media, IC 95 %, N y días efectivos para cada horizonte.
+- Puntaje de severidad preregistrado en `result.json`: ENTRADA=max(0,-media_24h*20); COSTOS=max(0,-edge_bruto*20); PAYOFF=max(0,win_equilibrio-win_real); SALIDA=porcentaje que alcanzó +2 % y terminó en pérdida; SL=porcentaje contrafactual que habría alcanzado TP; TIMEOUT=porcentaje_timeout*max(0,-retorno_timeout). Frecuencia sin daño no suma. Resultado: SALIDA 35/100; es el titular, no TIMEOUT (los timeout fueron rentables en este replay).
+- Verificación independiente: `docker compose exec -T backtest python /app/backtest/lab_m1_manual_check.py`; exit 0. Recalculó desde `manual_inputs.json` win rate 34,4787234043 %, equilibrio 33,5878040935 % y retorno medio 0,0418684644 %; los tres valores coinciden exactamente con `result.json`.
+- Estado: **M1 PASS** como informe descriptivo de replay. Confianza baja: población es el stream de señales, no la selección real de producción; fidelidad previa de salida 84 % por motivo y 66 % en retorno fino. No es autorización para cambiar estrategias.
