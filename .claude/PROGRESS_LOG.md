@@ -899,3 +899,7 @@ egister_oi_collector_task.ps1` → `Start-ScheduledTask -TaskName VergeOICollect
 ## 2026-09-25
 - Revisión de Codex/GPT (Fase 2b verificada: selftest 1.600/1.600, baseline reproducido) y respuesta a su Fase 2d: aprobada con 3 enmiendas (hold-out fresco post 2026-08-01, bootstrap por bloques de día, criterio relativo contra el complemento). Conteo de familia: 28 hipótesis (13 salidas + 15 contextos).
 - Sesión previa (23/09): Claude completó Fase 2 MA3 y Band Touch, corrigió 3 errores propios (borde de split, signo del sesgo de fill, velas de entrada/cierre inflando MFE) y dejó el ledger revisado, NO desplegado (exige reiniciar el agente vivo, pendiente OK del usuario).
+
+## 2026-09-26
+- Lab de diagnóstico: Fase 2 casi cerrada. A (dirección invertida) da DIRECCIÓN correcta (OOS −0,8 pp en los 4 escenarios; baseline reproducido). B (salida por señal opuesta) desbloqueada tras verificar en `verge_agent.py:3921-3944` que `peakProximity` con type≠recentHigh usa el mínimo de lows. Familia acumulada: 30 hipótesis.
+- Reparto acordado: Codex/GPT corre B, cierra Fase 2 y hace la UI/API; Claude construye el CLI `lab_diagnose` + adaptadores + prueba de falsos positivos en archivos nuevos (`agent/backtest/lab_diagnose.py`, `lab_adapters/`). Fase 3 aún NO iniciada al escribir esto. Ledger sigue sin desplegar (pendiente OK del usuario).
