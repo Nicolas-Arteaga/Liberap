@@ -188,3 +188,13 @@
 - Métrica: retorno porcentual neto baseline, media/mediana, N, concentración sin top-3 y distribución de MFE/MAE/giveback a 48 h. No PnL USD. Se reporta la superficie completa de las 15 vistas por TRAIN/VALIDATION/OOS y los cuatro escenarios.
 - Regla de selección antes de ver OOS: una vista queda “candidata de contexto” sólo si tiene N >= 50 en TRAIN y >= 25 en VALIDATION, media neta positiva en TRAIN y VALIDATION, y el mismo signo en los cuatro escenarios. OOS no participa en esa selección.
 - Gate diagnóstico: una candidata se etiqueta solamente **HIPÓTESIS de filtro de entrada** si además tiene media OOS positiva, OOS sin top-3 positiva y la misma dirección en los cuatro escenarios. Si ninguna pasa, veredicto: “no hay contexto simple robusto en estas 15 vistas”. Esta fase no habilita cambios de estrategia.
+
+## 2026-09-25 — ENMIENDA Fase 2d (aprobada antes de correr)
+
+- HOLDOUT2: antes de generar el stream se verificará, sólo con bases locales, la cobertura posterior a 2026-08-01T00:00:00Z en `binance_vision_clean.db` y `agent/data/klines.db` (montada read-only como `/app/live-research/klines.db`). Si permite señales MA3, se congelará como HOLDOUT2 y no se mirará hasta que TRAIN/VALIDATION/OOS seleccionen candidatas. Si no hay cobertura suficiente, se reportará como limitación.
+- Dependencia: todo IC de Fase 2d usará bootstrap por bloques de día UTC. Cada tabla reportará N de señales y N efectivo de días.
+- Criterio relativo: además de los criterios anteriores, una vista debe superar la media neta de todas las señales complementarias del mismo split (delta > 0) en TRAIN y VALIDATION. Se reportarán delta e IC bootstrap por días; OOS no participa en la selección.
+- HOLDOUT2 se observará una sola vez, al final y sólo para candidatas fijadas con TRAIN/VALIDATION/OOS. Debe conservar media positiva, ventaja relativa, OOS sin top-3 positiva y dirección consistente en cuatro escenarios.
+- Anti-sobreajuste: todo hallazgo reportará 28 hipótesis: 13 variantes de salida + 15 vistas de contexto. No se agregan nuevos cortes.
+
+- Nota de auditoría: el primer intento de registrar esta enmienda no modificó el archivo porque la revisión automática devolvió `401 Unauthorized: Incorrect API key provided`; el reintento dejó esta enmienda completa antes de cualquier corrida de Fase 2d.
