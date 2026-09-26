@@ -211,3 +211,8 @@
 - A, dirección invertida: sobre las mismas 9.400 entradas MA3 congeladas se invierte `side`; el SL y TP se reflejan alrededor de la entrada: `sl'=2*entry-sl`, `tp'=2*entry-tp`. No cambia hora, símbolo, distancia ni población. Se usan cuatro escenarios timeout×sesgo de fill y costo 0,08 %.
 - B, salida por señal opuesta: se define el patrón opuesto en velas 1h cerradas como la imagen especular exacta del perfil Caso 3: LONG, `ma7 < ma25`, `ma7 < ma50`, `ma7 < ma99`; pendiente actual de MA7 `>= +0,2°`, pendiente previa `<= -0,2°`; proximidad a mínimo reciente de 10 velas dentro de 1 %. Al ocurrir después de la entrada, cierra al cierre de esa vela 1h; SL/TP se evalúan antes en velas 5m. No se agregan condiciones.
 - Criterio para A y B, fijado antes de correr: Δ OOS > 0, Δ OOS sin los tres mejores > 0 y Δ > 0 en al menos 2/3 splits, en cada uno de los cuatro escenarios. Conteo acumulado: 13 salidas + 15 contextos + A + B = 30 familias/hipótesis.
+
+## 2026-09-26 — Misión v3, paso 1/2: núcleo del laboratorio
+
+- Selftest reproducido: `python /app/backtest/lab_diagnose.py --strategy ma3 --selftest`, evidencia `agent/backtest/lab_artifacts/v3-selftest-20260926-rerun/stdout.log`; exit 0, 18.000 comparaciones y 0 diferencias contra los simuladores previos.
+- Pruebas unitarias agregadas: `agent/backtest/test_lab_core_audit.py`; primero revelaron que `forward_returns()` devolvía una vela vieja como retorno de un horizonte futuro cuando faltaban velas. Corregido en `lab_core.py`: un horizonte sin vela cerrada que lo alcance retorna `None`. Repetición: 4/4 PASS (`python -m unittest test_lab_core_audit -v`).

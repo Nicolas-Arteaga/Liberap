@@ -902,4 +902,4 @@ egister_oi_collector_task.ps1` → `Start-ScheduledTask -TaskName VergeOICollect
 
 ## 2026-09-26
 - Lab de diagnóstico: Fase 2 casi cerrada. A (dirección invertida) da DIRECCIÓN correcta (OOS −0,8 pp en los 4 escenarios; baseline reproducido). B (salida por señal opuesta) desbloqueada tras verificar en `verge_agent.py:3921-3944` que `peakProximity` con type≠recentHigh usa el mínimo de lows. Familia acumulada: 30 hipótesis.
-- Reparto acordado: Codex/GPT corre B, cierra Fase 2 y hace la UI/API; Claude construye el CLI `lab_diagnose` + adaptadores + prueba de falsos positivos en archivos nuevos (`agent/backtest/lab_diagnose.py`, `lab_adapters/`). Fase 3 aún NO iniciada al escribir esto. Ledger sigue sin desplegar (pendiente OK del usuario).
+- Reparto reemplazado por orden de misión v3 (2026-09-26): Codex/GPT construye, prueba y mantiene todo el laboratorio: CLI `lab_diagnose`, adaptadores, auditoría, pruebas sintéticas y UI/API. Claude sólo revisa/audita. Ledger sigue sin desplegar (pendiente OK del usuario).
