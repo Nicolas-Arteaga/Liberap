@@ -1,0 +1,12 @@
+{
+  "id": "ma3-20260926T204835Z",
+  "strategy": "ma3",
+  "status": "completed",
+  "started_at_utc": "2026-09-26T20:48:35.542944+00:00",
+  "done": 9400,
+  "total": 9400,
+  "exit_code": 0,
+  "updated_at_utc": "2026-09-26T20:59:38.581365+00:00",
+  "finished_at_utc": "2026-09-26T20:59:40.048423+00:00",
+  "result": "/app/backtest/lab_artifacts/m1b-ma3-aligned-20260926/result.json"
+}

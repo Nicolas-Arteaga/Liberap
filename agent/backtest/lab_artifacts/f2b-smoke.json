@@ -1,0 +1,480 @@
+{
+  "label": "HIPOTESIS; raw population is not production selection; preregistered in commit 841a4f0",
+  "population": {
+    "raw_signals": 40,
+    "trades_without_atr_fallback_to_original_sl": 0
+  },
+  "families_tested_total_nonbaseline": 13,
+  "scenarios": {
+    "unconditional|tp_bias_-2": {
+      "baseline": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": 0.0,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "sl_atr_1.0": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": -0.6871504370354555,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "sl_atr_1.5": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": 0.16743524159749623,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "sl_atr_2.0": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": 0.04045347121645071,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "time_exit_12h": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": 0.19895508778892823,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "time_exit_24h": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": -0.37152033010495716,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "time_exit_36h": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": -0.23751467067148907,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "time_stop_24h_if_losing": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": 0.00821553599685343,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      }
+    },
+    "unconditional|tp_bias_+2": {
+      "baseline": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": 0.0,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "sl_atr_1.0": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": -0.41715043703545496,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "sl_atr_1.5": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": 0.16743524159749634,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "sl_atr_2.0": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": 0.04045347121645082,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "time_exit_12h": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": 0.4689550877889286,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "time_exit_24h": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": -0.1015203301049569,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "time_exit_36h": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": 0.032485329328511225,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "time_stop_24h_if_losing": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": 0.008215535996853485,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      }
+    },
+    "conditional|tp_bias_-2": {
+      "baseline": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": 0.0,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "sl_atr_1.0": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": -0.5363609460275023,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "sl_atr_1.5": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": 0.2637921104637238,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "sl_atr_2.0": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": 0.1258627343151592,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "time_exit_12h": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": 0.33093257866525666,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "time_exit_24h": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": -0.23954283922862873,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "time_exit_36h": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": -0.10553717979516064,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "time_stop_24h_if_losing": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": 0.13004868625215,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      }
+    },
+    "conditional|tp_bias_+2": {
+      "baseline": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": 0.0,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "sl_atr_1.0": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": -0.2663609460275017,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "sl_atr_1.5": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": 0.26379211046372386,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "sl_atr_2.0": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": 0.12586273431515926,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "time_exit_12h": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": 0.6909325786652575,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "time_exit_24h": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": 0.12045716077137197,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "time_exit_36h": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": 0.2544628202048401,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      },
+      "time_stop_24h_if_losing": {
+        "oos": {
+          "n": 0,
+          "mean": null,
+          "median": null
+        },
+        "delta_vs_baseline_pp": {
+          "TRAIN": 0.13004868625215005,
+          "VALIDATION": null,
+          "OOS": null
+        },
+        "oos_without_top3_delta_pp": null,
+        "oos_cost_plus_50_mean": null
+      }
+    }
+  },
+  "verdict_preregistered": {
+    "sl_atr_1.0": "NO pasa",
+    "sl_atr_1.5": "NO pasa",
+    "sl_atr_2.0": "NO pasa",
+    "time_exit_12h": "NO pasa",
+    "time_exit_24h": "NO pasa",
+    "time_exit_36h": "NO pasa",
+    "time_stop_24h_if_losing": "NO pasa"
+  },
+  "regression_check": {
+    "expected": 0.30710306548436167,
+    "got": null,
+    "ok": null
+  }
+}

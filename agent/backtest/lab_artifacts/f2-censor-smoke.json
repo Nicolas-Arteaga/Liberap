@@ -1,0 +1,103 @@
+{
+  "method": "5m candles only; no exit model or PnL USD",
+  "n_input": 1,
+  "n_with_klines": 1,
+  "missing_symbols": [],
+  "summary": {
+    "life": {
+      "2": 1,
+      "5": 0,
+      "10": 0,
+      "giveback_ge_50pct_mfe": 0,
+      "mfe_censored_last_10pct": 1,
+      "n": 1
+    },
+    "48": {
+      "2": 1,
+      "5": 0,
+      "10": 0,
+      "giveback_ge_50pct_mfe": 0,
+      "mfe_censored_last_10pct": 1,
+      "n": 1
+    },
+    "96": {
+      "2": 1,
+      "5": 1,
+      "10": 1,
+      "giveback_ge_50pct_mfe": 1,
+      "mfe_censored_last_10pct": 0,
+      "n": 1
+    },
+    "208": {
+      "2": 1,
+      "5": 1,
+      "10": 1,
+      "giveback_ge_50pct_mfe": 0,
+      "mfe_censored_last_10pct": 0,
+      "n": 1
+    }
+  },
+  "trades": [
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "CBRSUSDT",
+      "side": "short",
+      "opened_at": "2026-07-11T02:06:37+00:00",
+      "closed_at": "2026-07-13T02:14:11+00:00",
+      "windows": {
+        "life": {
+          "window_hours": 48.12611111111111,
+          "mfe_pct": 3.216770157336937,
+          "mae_pct": -1.624725710817494,
+          "giveback_pct": 0.24277510621410014,
+          "time_to_mfe_hours": 48.05638888888889,
+          "return_pct": 2.973995051122837,
+          "mfe_censored_last_10pct": true,
+          "mfe_ge_2": true,
+          "mfe_ge_5": false,
+          "mfe_ge_10": false,
+          "giveback_ge_50pct_mfe": false
+        },
+        "48": {
+          "window_hours": 48.0,
+          "mfe_pct": 3.076707596059575,
+          "mae_pct": -1.624725710817494,
+          "giveback_pct": 0.07470003268126257,
+          "time_to_mfe_hours": 47.973055555555554,
+          "return_pct": 3.0020075633783123,
+          "mfe_censored_last_10pct": true,
+          "mfe_ge_2": true,
+          "mfe_ge_5": false,
+          "mfe_ge_10": false,
+          "giveback_ge_50pct_mfe": false
+        },
+        "96": {
+          "window_hours": 96.0,
+          "mfe_pct": 12.362855408749237,
+          "mae_pct": -1.624725710817494,
+          "giveback_pct": 7.530697044679955,
+          "time_to_mfe_hours": 84.05638888888889,
+          "return_pct": 4.832158364069282,
+          "mfe_censored_last_10pct": false,
+          "mfe_ge_2": true,
+          "mfe_ge_5": true,
+          "mfe_ge_10": true,
+          "giveback_ge_50pct_mfe": true
+        },
+        "208": {
+          "window_hours": 208.0,
+          "mfe_pct": 24.137448060133522,
+          "mae_pct": -1.624725710817494,
+          "giveback_pct": 3.328820206358838,
+          "time_to_mfe_hours": 157.22305555555556,
+          "return_pct": 20.808627853774684,
+          "mfe_censored_last_10pct": false,
+          "mfe_ge_2": true,
+          "mfe_ge_5": true,
+          "mfe_ge_10": true,
+          "giveback_ge_50pct_mfe": false
+        }
+      }
+    }
+  ]
+}

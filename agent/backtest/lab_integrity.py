@@ -6,11 +6,13 @@ from statistics import variance
 
 def check_trade(adapter, trade, rows, audit_row):
     opens=[row[0] for row in rows]
-    i=bisect.bisect_right(opens, trade['open_ms'])-1
     tolerance=max(abs(trade['entry'])*0.001, 1e-12)
     if getattr(adapter, 'population', 'raw') == 'real':
+        i=bisect.bisect_right(opens, trade['open_ms'])-1
         price_ok=i >= 0 and rows[i][2]-tolerance <= trade['entry'] <= rows[i][1]+tolerance
     else:
+        # Replay: la señal se ejecuta al cierre de la vela que termina en open_ms.
+        i=bisect.bisect_left(opens, trade['open_ms'])-1
         expected=rows[i][3] if i >= 0 else None
         price_ok=expected is not None and abs(trade['entry']-expected)<=max(abs(trade['entry'])*1e-8,1e-12)
     start=bisect.bisect_right(opens, trade['open_ms'])

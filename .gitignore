@@ -308,3 +308,5 @@ agent/backtest/*.pid
 agent/backtest/*.pkl
 
 .codegraph/
+# La exportación cruda del chat se conserva sólo localmente: puede contener secretos.
+Conversacion-Verge-lab-diagnostico-2026-09-20_a_2026-09-27.md

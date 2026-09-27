@@ -1,0 +1,12 @@
+{
+  "id": "ma3-20260926T192928Z",
+  "strategy": "ma3",
+  "status": "completed",
+  "started_at_utc": "2026-09-26T19:29:28.726390+00:00",
+  "done": 9400,
+  "total": 9400,
+  "exit_code": 0,
+  "updated_at_utc": "2026-09-26T19:38:43.035256+00:00",
+  "finished_at_utc": "2026-09-26T19:38:44.206510+00:00",
+  "result": "/app/backtest/lab_artifacts/v3-cli-ma3-baseline-20260926/result.json"
+}

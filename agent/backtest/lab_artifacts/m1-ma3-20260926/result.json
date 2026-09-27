@@ -1,0 +1,128 @@
+{
+  "valid": true,
+  "integrity": {
+    "valid": true,
+    "checks": {
+      "entry_price_observable": {
+        "status": "PASS",
+        "pass_n": 9400,
+        "n": 9400
+      },
+      "no_pre_entry_candle": {
+        "status": "PASS",
+        "pass_n": 9400,
+        "n": 9400
+      },
+      "no_exit_before_entry": {
+        "status": "PASS",
+        "pass_n": 9400,
+        "n": 9400
+      },
+      "split_at_entry": {
+        "status": "PASS",
+        "pass_n": 9400,
+        "n": 9400
+      },
+      "forward_1h_variance": {
+        "status": "PASS",
+        "variance": 0.372897555882042,
+        "n": 9400
+      },
+      "sample_counts": {
+        "status": "PASS",
+        "n": 9400,
+        "n_days": 238,
+        "splits": {
+          "TRAIN": 4235,
+          "OOS": 2637,
+          "VALIDATION": 2528
+        }
+      }
+    }
+  },
+  "n": 9400,
+  "forward_return_pct_day_block_ci": {
+    "1": {
+      "mean": 0.025200550431871697,
+      "lo": 0.005565491450663262,
+      "hi": 0.045149866587322056,
+      "n_days": 238,
+      "n": 9400
+    },
+    "4": {
+      "mean": 0.027637344022375915,
+      "lo": -0.03801630540246012,
+      "hi": 0.0892716631135079,
+      "n_days": 238,
+      "n": 9400
+    },
+    "12": {
+      "mean": 0.04480310445361477,
+      "lo": -0.09388659836581106,
+      "hi": 0.20013196696730973,
+      "n_days": 238,
+      "n": 9400
+    },
+    "24": {
+      "mean": 0.057115776779451996,
+      "lo": -0.2201917037225316,
+      "hi": 0.3440040175657393,
+      "n_days": 238,
+      "n": 9400
+    },
+    "48": {
+      "mean": 0.15404732715724545,
+      "lo": -0.2504628360693392,
+      "hi": 0.5560911391790573,
+      "n_days": 238,
+      "n": 9400
+    }
+  },
+  "gross_edge_pct": 0.1339697581536291,
+  "cost_pct": 0.08,
+  "net_expectancy_pct": 0.05396975815362904,
+  "win_rate_pct": 34.148936170212764,
+  "break_even_win_rate_pct": 33.02016922420475,
+  "avg_win_pct": 3.2025080827579457,
+  "avg_loss_pct": 1.5787940579982054,
+  "reached_2pct_n": 3813,
+  "reached_2pct_ended_loss_pct": 33.91030684500394,
+  "sl_n": 5289,
+  "sl_cf_reaches_tp_pct": 2.8927963698241634,
+  "timeout_n": 3845,
+  "timeout_pct": 40.90425531914894,
+  "timeout_mean_return_pct": 1.8633914576529398,
+  "reasons": {
+    "SL": {
+      "n": 5289,
+      "pct": 56.265957446808514,
+      "mean_return": -1.7576374414882663
+    },
+    "TP": {
+      "n": 266,
+      "pct": 2.8297872340425534,
+      "mean_return": 9.920000000000002
+    },
+    "timeout_48": {
+      "n": 3845,
+      "pct": 40.90425531914894,
+      "mean_return": 1.8633914576529398
+    }
+  },
+  "severity": {
+    "ENTRADA": 0,
+    "COSTOS": 0,
+    "PAYOFF": 0,
+    "SALIDA": 34,
+    "SL": 3,
+    "TIMEOUT": 0
+  },
+  "severity_formula": "ENTRADA=max(0,-media_24h*20); COSTOS=max(0,-edge_bruto*20); PAYOFF=max(0,win_equilibrio-win_real); SALIDA=porcentaje que lleg\u00f3 a +2% y termin\u00f3 en p\u00e9rdida; SL=porcentaje contrafactual que habr\u00eda llegado al TP; TIMEOUT=porcentaje_timeout*max(0,-retorno_timeout). Frecuencia sin da\u00f1o no suma. Todo limitado a 0..100.",
+  "main_area": "SALIDA",
+  "fidelity": {
+    "detection": "37/38",
+    "exit_reason": "84%",
+    "return": "66%",
+    "selection": "no reproducible sin ledger"
+  }
+}

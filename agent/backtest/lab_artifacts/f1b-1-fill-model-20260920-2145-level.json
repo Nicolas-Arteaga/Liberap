@@ -1,0 +1,420 @@
+{
+  "tolerance_pp": 0.25,
+  "intrabar_priority": "SL_first",
+  "timeout_hours": 48,
+  "fill_model": "level",
+  "total": 45,
+  "valid": 38,
+  "reason_matches": 32,
+  "return_within_tolerance": 21,
+  "trades": [
+    {
+      "symbol": "CBRSUSDT",
+      "reason_real": "TIMEOUT",
+      "reason_replay": "TIMEOUT",
+      "reason_match": true,
+      "close_delta_min": -4.183333333333334,
+      "return_real_pct": 2.847938745973199,
+      "return_replay_pct": 2.973995051122837,
+      "return_delta_pp": 0.12605630514963817
+    },
+    {
+      "symbol": "NVDAUSDT",
+      "reason_real": "TIMEOUT",
+      "reason_replay": "TIMEOUT",
+      "reason_match": true,
+      "close_delta_min": -2.1166666666666667,
+      "return_real_pct": 0.5521706016755641,
+      "return_replay_pct": 0.6806930693069339,
+      "return_delta_pp": 0.12852246763136976
+    },
+    {
+      "symbol": "EWYUSDT",
+      "reason_real": "TIMEOUT",
+      "reason_replay": "TIMEOUT",
+      "reason_match": true,
+      "close_delta_min": -5.216666666666667,
+      "return_real_pct": 5.282957147530257,
+      "return_replay_pct": 5.288409115690759,
+      "return_delta_pp": 0.005451968160501863
+    },
+    {
+      "symbol": "TRXUSDT",
+      "reason_real": "TIMEOUT",
+      "reason_replay": "TIMEOUT",
+      "reason_match": true,
+      "close_delta_min": 1.4833333333333334,
+      "return_real_pct": 1.6935849056603787,
+      "return_replay_pct": 1.6784905660377387,
+      "return_delta_pp": -0.015094339622639952
+    },
+    {
+      "symbol": "SUNUSDT",
+      "missing": true
+    },
+    {
+      "symbol": "ZAMAUSDT",
+      "reason_real": "TIMEOUT",
+      "reason_replay": "TP",
+      "reason_match": false,
+      "close_delta_min": 0.05,
+      "return_real_pct": 4.07928756104567,
+      "return_replay_pct": 3.4774490089054964,
+      "return_delta_pp": -0.6018385521401739
+    },
+    {
+      "symbol": "EGLDUSDT",
+      "reason_real": "TIMEOUT",
+      "reason_replay": "SL",
+      "reason_match": false,
+      "close_delta_min": -7.55,
+      "return_real_pct": -2.4023062139654128,
+      "return_replay_pct": -1.744074311338889,
+      "return_delta_pp": 0.6582319026265238
+    },
+    {
+      "symbol": "ADBEUSDT",
+      "missing": true
+    },
+    {
+      "symbol": "ETHBTCUSDT",
+      "missing": true
+    },
+    {
+      "symbol": "SOLUSDT",
+      "reason_real": "TP",
+      "reason_replay": "TP",
+      "reason_match": true,
+      "close_delta_min": 3.6666666666666665,
+      "return_real_pct": 2.704081632653067,
+      "return_replay_pct": 2.502551020408167,
+      "return_delta_pp": -0.20153061224489965
+    },
+    {
+      "symbol": "AAPLUSDT",
+      "reason_real": "SL",
+      "reason_replay": "SL",
+      "reason_match": true,
+      "close_delta_min": -0.45,
+      "return_real_pct": -1.2295957284515553,
+      "return_replay_pct": -1.181815408085432,
+      "return_delta_pp": 0.04778032036612334
+    },
+    {
+      "symbol": "MSFTUSDT",
+      "reason_real": "TP",
+      "reason_replay": "TP",
+      "reason_match": true,
+      "close_delta_min": 1.55,
+      "return_real_pct": 2.482562064051603,
+      "return_replay_pct": 2.477311932798318,
+      "return_delta_pp": -0.005250131253284884
+    },
+    {
+      "symbol": "XMRUSDT",
+      "reason_real": "TP",
+      "reason_replay": "TP",
+      "reason_match": true,
+      "close_delta_min": -0.5,
+      "return_real_pct": 2.5049772679998665,
+      "return_replay_pct": 2.430986836240449,
+      "return_delta_pp": -0.07399043175941733
+    },
+    {
+      "symbol": "ETCUSDT",
+      "reason_real": "TIMEOUT",
+      "reason_replay": "TIMEOUT",
+      "reason_match": true,
+      "close_delta_min": 1.1666666666666667,
+      "return_real_pct": 1.1381419832124067,
+      "return_replay_pct": 1.1381419832124067,
+      "return_delta_pp": 0.0
+    },
+    {
+      "symbol": "INJUSDT",
+      "reason_real": "SL",
+      "reason_replay": "SL",
+      "reason_match": true,
+      "close_delta_min": 1.2166666666666666,
+      "return_real_pct": -1.3744354997054837,
+      "return_replay_pct": -1.2379736893775692,
+      "return_delta_pp": 0.1364618103279145
+    },
+    {
+      "symbol": "COMPUSDT",
+      "reason_real": "TP",
+      "reason_replay": "TP",
+      "reason_match": true,
+      "close_delta_min": -167.11666666666667,
+      "return_real_pct": 1.9765571133072928,
+      "return_replay_pct": 1.690990576878877,
+      "return_delta_pp": -0.2855665364284157
+    },
+    {
+      "symbol": "XAGUSDT",
+      "reason_real": "SL",
+      "reason_replay": "SL",
+      "reason_match": true,
+      "close_delta_min": 4.35,
+      "return_real_pct": -2.0917560203902226,
+      "return_replay_pct": -1.9941993320443008,
+      "return_delta_pp": 0.0975566883459218
+    },
+    {
+      "symbol": "LTCUSDT",
+      "reason_real": "TIMEOUT",
+      "reason_replay": "TIMEOUT",
+      "reason_match": true,
+      "close_delta_min": -5.4,
+      "return_real_pct": 0.2746092099704321,
+      "return_replay_pct": 0.21123785382340812,
+      "return_delta_pp": -0.06337135614702397
+    },
+    {
+      "symbol": "MSFTUSDT",
+      "reason_real": "TP",
+      "reason_replay": "TP",
+      "reason_match": true,
+      "close_delta_min": 3.1666666666666665,
+      "return_real_pct": 1.590075135418488,
+      "return_replay_pct": 1.3018896183320485,
+      "return_delta_pp": -0.2881855170864396
+    },
+    {
+      "symbol": "FILUSDT",
+      "reason_real": "TIMEOUT",
+      "reason_replay": "TP",
+      "reason_match": false,
+      "close_delta_min": 0.6833333333333333,
+      "return_real_pct": 4.805313191821858,
+      "return_replay_pct": 3.984893866388862,
+      "return_delta_pp": -0.8204193254329959
+    },
+    {
+      "symbol": "CFXUSDT",
+      "reason_real": "SL",
+      "reason_replay": "SL",
+      "reason_match": true,
+      "close_delta_min": 0.38333333333333336,
+      "return_real_pct": -4.415353893942752,
+      "return_replay_pct": -4.226980252939871,
+      "return_delta_pp": 0.18837364100288134
+    },
+    {
+      "symbol": "QCOMUSDT",
+      "reason_real": "TP",
+      "reason_replay": "TP",
+      "reason_match": true,
+      "close_delta_min": -4.183333333333334,
+      "return_real_pct": 2.0527360362914684,
+      "return_replay_pct": 1.8142897646725265,
+      "return_delta_pp": -0.23844627161894194
+    },
+    {
+      "symbol": "ORCLUSDT",
+      "reason_real": "TP",
+      "reason_replay": "TP",
+      "reason_match": true,
+      "close_delta_min": 1.7,
+      "return_real_pct": 2.0709354915496307,
+      "return_replay_pct": 2.0459414425136915,
+      "return_delta_pp": -0.02499404903593927
+    },
+    {
+      "symbol": "VRTUSDT",
+      "missing": true
+    },
+    {
+      "symbol": "XLEUSDT",
+      "missing": true
+    },
+    {
+      "symbol": "COMPUSDT",
+      "reason_real": "TP",
+      "reason_replay": "TP",
+      "reason_match": true,
+      "close_delta_min": -41.88333333333333,
+      "return_real_pct": 2.8522532800912717,
+      "return_replay_pct": 2.4900171135196936,
+      "return_delta_pp": -0.3622361665715781
+    },
+    {
+      "symbol": "XMRUSDT",
+      "reason_real": "SL",
+      "reason_replay": "SL",
+      "reason_match": true,
+      "close_delta_min": -0.2,
+      "return_real_pct": -2.1249013639950456,
+      "return_replay_pct": -1.9791455303798948,
+      "return_delta_pp": 0.14575583361515076
+    },
+    {
+      "symbol": "TRXUSDT",
+      "reason_real": "TIMEOUT",
+      "reason_replay": "TIMEOUT",
+      "reason_match": true,
+      "close_delta_min": 4.65,
+      "return_real_pct": -0.5929870208453143,
+      "return_replay_pct": -0.6111396847487435,
+      "return_delta_pp": -0.018152663903429178
+    },
+    {
+      "symbol": "SOONUSDT",
+      "reason_real": "TP",
+      "reason_replay": "TP",
+      "reason_match": true,
+      "close_delta_min": 0.48333333333333334,
+      "return_real_pct": 2.479338842975196,
+      "return_replay_pct": 2.467827626918538,
+      "return_delta_pp": -0.011511216056657947
+    },
+    {
+      "symbol": "ADBEUSDT",
+      "missing": true
+    },
+    {
+      "symbol": "XPDUSDT",
+      "reason_real": "TIMEOUT",
+      "reason_replay": "TIMEOUT",
+      "reason_match": true,
+      "close_delta_min": -831.2333333333333,
+      "return_real_pct": -0.30916679548616477,
+      "return_replay_pct": 1.1709692379038386,
+      "return_delta_pp": 1.4801360333900033
+    },
+    {
+      "symbol": "HUSDT",
+      "reason_real": "TIMEOUT",
+      "reason_replay": "SL",
+      "reason_match": false,
+      "close_delta_min": -65.4,
+      "return_real_pct": -1.9242610837438439,
+      "return_replay_pct": -1.466440886699504,
+      "return_delta_pp": 0.45782019704433985
+    },
+    {
+      "symbol": "GOOGLUSDT",
+      "reason_real": "TIMEOUT",
+      "reason_replay": "SL",
+      "reason_match": false,
+      "close_delta_min": 3.2333333333333334,
+      "return_real_pct": -2.361696239121746,
+      "return_replay_pct": -1.8851748208739534,
+      "return_delta_pp": 0.4765214182477928
+    },
+    {
+      "symbol": "COINUSDT",
+      "reason_real": "TIMEOUT",
+      "reason_replay": "TIMEOUT",
+      "reason_match": true,
+      "close_delta_min": -861.2833333333333,
+      "return_real_pct": 12.131955293834876,
+      "return_replay_pct": 6.549693546448731,
+      "return_delta_pp": -5.582261747386145
+    },
+    {
+      "symbol": "AVAXUSDT",
+      "reason_real": "TIMEOUT",
+      "reason_replay": "TIMEOUT",
+      "reason_match": true,
+      "close_delta_min": -3446.116666666667,
+      "return_real_pct": -0.045317220543808365,
+      "return_replay_pct": 2.7794561933534765,
+      "return_delta_pp": 2.824773413897285
+    },
+    {
+      "symbol": "TSLAUSDT",
+      "reason_real": "TIMEOUT",
+      "reason_replay": "TIMEOUT",
+      "reason_match": true,
+      "close_delta_min": -4.783333333333333,
+      "return_real_pct": -0.47272961152560694,
+      "return_replay_pct": -0.4148443529714499,
+      "return_delta_pp": 0.05788525855415705
+    },
+    {
+      "symbol": "AMZNUSDT",
+      "reason_real": "TIMEOUT",
+      "reason_replay": "TIMEOUT",
+      "reason_match": true,
+      "close_delta_min": 0.11666666666666667,
+      "return_real_pct": -1.4823303267780539,
+      "return_replay_pct": -1.5155995859825606,
+      "return_delta_pp": -0.03326925920450674
+    },
+    {
+      "symbol": "WLFIUSDT",
+      "reason_real": "TIMEOUT",
+      "reason_replay": "TIMEOUT",
+      "reason_match": true,
+      "close_delta_min": -9541.566666666668,
+      "return_real_pct": -0.03586157432311132,
+      "return_replay_pct": 2.097902097902093,
+      "return_delta_pp": 2.1337636722252045
+    },
+    {
+      "symbol": "JUPUSDT",
+      "reason_real": "TP",
+      "reason_replay": "TIMEOUT",
+      "reason_match": false,
+      "close_delta_min": -9638.0,
+      "return_real_pct": 10.311383358856558,
+      "return_replay_pct": 2.9096477794793176,
+      "return_delta_pp": -7.40173557937724
+    },
+    {
+      "symbol": "TRXUSDT",
+      "reason_real": "TIMEOUT",
+      "reason_replay": "TIMEOUT",
+      "reason_match": true,
+      "close_delta_min": -3457.5666666666666,
+      "return_real_pct": -0.012148823082776008,
+      "return_replay_pct": 0.5193621867881516,
+      "return_delta_pp": 0.5315110098709276
+    },
+    {
+      "symbol": "ETHUSDT",
+      "reason_real": "TIMEOUT",
+      "reason_replay": "TIMEOUT",
+      "reason_match": true,
+      "close_delta_min": -9454.066666666668,
+      "return_real_pct": -0.043261838367525195,
+      "return_replay_pct": 0.4003023116416077,
+      "return_delta_pp": 0.44356415000913285
+    },
+    {
+      "symbol": "ZHIPUUSDT",
+      "missing": true
+    },
+    {
+      "symbol": "GENIUSUSDT",
+      "reason_real": "SL",
+      "reason_replay": "SL",
+      "reason_match": true,
+      "close_delta_min": 1.35,
+      "return_real_pct": -2.4815925824924996,
+      "return_replay_pct": -2.1568039269157344,
+      "return_delta_pp": 0.3247886555767652
+    },
+    {
+      "symbol": "TRXUSDT",
+      "reason_real": "TIMEOUT",
+      "reason_replay": "TIMEOUT",
+      "reason_match": true,
+      "close_delta_min": -9588.333333333334,
+      "return_real_pct": -0.029877502240809376,
+      "return_replay_pct": 0.18822826411712562,
+      "return_delta_pp": 0.218105766357935
+    },
+    {
+      "symbol": "TSMUSDT",
+      "reason_real": "TIMEOUT",
+      "reason_replay": "TIMEOUT",
+      "reason_match": true,
+      "close_delta_min": -3230.65,
+      "return_real_pct": -0.016262806960479794,
+      "return_replay_pct": 1.0989010989011032,
+      "return_delta_pp": 1.115163905861583
+    }
+  ]
+}

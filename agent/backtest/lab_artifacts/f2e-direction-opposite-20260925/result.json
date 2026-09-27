@@ -1,0 +1,50 @@
+{
+  "a_inverted_direction": {
+    "pass": false,
+    "details": {
+      "unconditional|tp_bias_-2": {
+        "delta": {
+          "TRAIN": -0.07410053116025903,
+          "VALIDATION": -0.1570659472736276,
+          "OOS": -0.8147211387099256
+        },
+        "oos_without_top3_delta": -0.8154703024404786
+      },
+      "unconditional|tp_bias_+2": {
+        "delta": {
+          "TRAIN": 0.03232067470616475,
+          "VALIDATION": -0.11605648355123013,
+          "OOS": -0.8307028738697428
+        },
+        "oos_without_top3_delta": -0.8321093914398796
+      },
+      "conditional|tp_bias_-2": {
+        "delta": {
+          "TRAIN": 0.1645980334255581,
+          "VALIDATION": -0.24409753244453108,
+          "OOS": -0.7839462796948192
+        },
+        "oos_without_top3_delta": -0.7843850754430418
+      },
+      "conditional|tp_bias_+2": {
+        "delta": {
+          "TRAIN": 0.33541961700680734,
+          "VALIDATION": -0.22296188575683384,
+          "OOS": -0.9586799174421556
+        },
+        "oos_without_top3_delta": -0.960232694490661
+      }
+    }
+  },
+  "b_opposite_signal": {
+    "status": "BLOCKED_NOT_RUN",
+    "reason": "recentLow mirror must be verified against engine semantics before evaluation"
+  },
+  "regression": {
+    "expected": 0.30710306548436167,
+    "got": 0.30710306548436167,
+    "ok": true
+  },
+  "signals": 9400,
+  "families_total": 30
+}

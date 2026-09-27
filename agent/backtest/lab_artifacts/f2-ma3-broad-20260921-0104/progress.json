@@ -1,0 +1,8 @@
+{
+  "started_at_utc": "2026-09-21T04:04:00Z",
+  "id": "f2-ma3-broad-20260921-0104",
+  "status": "failed",
+  "result": "agent/backtest/lab_artifacts/f2-ma3-broad-20260921-0104/result.json",
+  "finished_at_utc": "2026-09-21T05:35:06.1739065Z",
+  "exit_code": 1
+}

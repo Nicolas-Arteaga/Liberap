@@ -1,0 +1,1220 @@
+{
+  "method": "velas 5m; sin TP/SL/timeout/PnL USD",
+  "input_count": 103,
+  "with_klines": 38,
+  "missing_klines": 65,
+  "trades": [
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "CBRSUSDT",
+      "opened_at": "2026-07-11T02:06:37+00:00",
+      "entry": 214.19,
+      "side": "short",
+      "mfe_pct": 3.216770157336937,
+      "mae_pct": -1.624725710817494,
+      "giveback_pct": 0.21476259395862485,
+      "time_to_mfe_hours": 48.05638888888889,
+      "returns_pct": {
+        "6": 0.13072505719221306,
+        "12": 1.648069471030394,
+        "24": 1.657406975115557,
+        "48": 3.0020075633783123
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "NVDAUSDT",
+      "opened_at": "2026-07-11T02:15:20+00:00",
+      "entry": 210.08,
+      "side": "short",
+      "mfe_pct": 1.0615003808073202,
+      "mae_pct": -1.389946686976384,
+      "giveback_pct": 0.3141660319878127,
+      "time_to_mfe_hours": 47.91111111111111,
+      "returns_pct": {
+        "6": -0.2284843869002236,
+        "12": 0.2570449352627668,
+        "24": 0.6949733434881987,
+        "48": 0.7473343488195076
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "EWYUSDT",
+      "opened_at": "2026-07-11T02:23:17+00:00",
+      "entry": 183.42,
+      "side": "short",
+      "mfe_pct": 6.553265728928133,
+      "mae_pct": -0.6651401155817244,
+      "giveback_pct": 1.0631337912986512,
+      "time_to_mfe_hours": 47.695277777777775,
+      "returns_pct": {
+        "6": 0.038163777123537884,
+        "12": 0.09813542688909521,
+        "24": 0.9104786828044856,
+        "48": 5.4901319376294815
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "TRXUSDT",
+      "opened_at": "2026-07-13T02:21:50+00:00",
+      "entry": 0.33125,
+      "side": "short",
+      "mfe_pct": 2.3486792452830216,
+      "mae_pct": -0.09358490566038716,
+      "giveback_pct": 0.7033962264150937,
+      "time_to_mfe_hours": 22.052777777777777,
+      "returns_pct": {
+        "6": 0.3864150943396237,
+        "12": 1.5758490566037744,
+        "24": 2.15245283018867,
+        "48": 1.645283018867928
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "ZAMAUSDT",
+      "opened_at": "2026-07-13T02:53:29+00:00",
+      "entry": 0.03481,
+      "side": "short",
+      "mfe_pct": 8.560758402757838,
+      "mae_pct": -1.4363688595231268,
+      "giveback_pct": 8.790577420281528,
+      "time_to_mfe_hours": 32.27527777777778,
+      "returns_pct": {
+        "6": 2.039643780522845,
+        "12": 5.745475438092507,
+        "24": 5.084745762711866,
+        "48": -0.22981901752369074
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "EGLDUSDT",
+      "opened_at": "2026-07-13T15:45:34+00:00",
+      "entry": 3.122,
+      "side": "short",
+      "mfe_pct": 3.2030749519538784,
+      "mae_pct": -16.655989750160156,
+      "giveback_pct": 5.989750160153756,
+      "time_to_mfe_hours": 2.9072222222222224,
+      "returns_pct": {
+        "6": 0.7367072389493814,
+        "12": -5.124919923126206,
+        "24": -14.28571428571429,
+        "48": -2.786675208199878
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "SOLUSDT",
+      "opened_at": "2026-07-15T13:02:12+00:00",
+      "entry": 78.4,
+      "side": "short",
+      "mfe_pct": 6.109693877551027,
+      "mae_pct": -0.7780612244897951,
+      "giveback_pct": 0.9311224489795968,
+      "time_to_mfe_hours": 48.13,
+      "returns_pct": {
+        "6": 1.0841836734693986,
+        "12": 1.9132653061224487,
+        "24": 3.227040816326532,
+        "48": 5.178571428571431
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "AAPLUSDT",
+      "opened_at": "2026-07-16T07:43:21+00:00",
+      "entry": 327.75,
+      "side": "short",
+      "mfe_pct": 0.5339435545385203,
+      "mae_pct": -3.3989321128909187,
+      "giveback_pct": 2.144927536231876,
+      "time_to_mfe_hours": 2.3608333333333333,
+      "returns_pct": {
+        "6": 0.08237986270022328,
+        "12": -1.4706331045003793,
+        "24": -2.7368421052631664,
+        "48": -1.6109839816933555
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "MSFTUSDT",
+      "opened_at": "2026-07-16T15:50:42+00:00",
+      "entry": 399.99,
+      "side": "short",
+      "mfe_pct": 2.5875646891172335,
+      "mae_pct": -1.5500387509687714,
+      "giveback_pct": 1.5500387509687712,
+      "time_to_mfe_hours": 23.571666666666665,
+      "returns_pct": {
+        "6": -0.08500212505312008,
+        "12": 1.135028375709398,
+        "24": 1.8550463761594078,
+        "48": 1.0375259381484623
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "XMRUSDT",
+      "opened_at": "2026-07-17T00:22:04+00:00",
+      "entry": 336.53,
+      "side": "short",
+      "mfe_pct": 4.397824859596457,
+      "mae_pct": -0.3268653611862309,
+      "giveback_pct": 4.353252310343797,
+      "time_to_mfe_hours": 12.965555555555556,
+      "returns_pct": {
+        "6": 1.717528897869424,
+        "12": 3.556889430362812,
+        "24": 1.6135262829465278,
+        "48": 0.044572549252660174
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "ETCUSDT",
+      "opened_at": "2026-07-17T23:10:40+00:00",
+      "entry": 7.029,
+      "side": "short",
+      "mfe_pct": 3.257931426945513,
+      "mae_pct": -0.7824726134585249,
+      "giveback_pct": 2.0344287949921727,
+      "time_to_mfe_hours": 41.90555555555556,
+      "returns_pct": {
+        "6": -0.1564945226917075,
+        "12": 0.1564945226917075,
+        "24": 0.4552567932849627,
+        "48": 1.2235026319533404
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "INJUSDT",
+      "opened_at": "2026-07-17T23:24:07+00:00",
+      "entry": 5.093,
+      "side": "short",
+      "mfe_pct": 1.4726094639701586,
+      "mae_pct": -2.5525230708816,
+      "giveback_pct": 1.6100530139406999,
+      "time_to_mfe_hours": 10.014722222222222,
+      "returns_pct": {
+        "6": 0.1767131356764253,
+        "12": 0.4712350284704501,
+        "24": -1.4922442568230831,
+        "48": -0.1374435499705414
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "COMPUSDT",
+      "opened_at": "2026-07-19T02:09:24+00:00",
+      "entry": 17.404,
+      "side": "short",
+      "mfe_pct": 4.849459894277184,
+      "mae_pct": 0.02298322224776681,
+      "giveback_pct": 1.4939094461043525,
+      "time_to_mfe_hours": 27.093333333333334,
+      "returns_pct": {
+        "6": 0.9423121121581332,
+        "12": 1.5168926683520993,
+        "24": 3.0682601700758387,
+        "48": 3.3555504481728318
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "XAGUSDT",
+      "opened_at": "2026-07-20T09:26:00+00:00",
+      "entry": 56.89,
+      "side": "short",
+      "mfe_pct": 1.1952891545087005,
+      "mae_pct": -5.589734575496571,
+      "giveback_pct": 5.958867990859555,
+      "time_to_mfe_hours": 13.483333333333333,
+      "returns_pct": {
+        "6": -0.3339778519950742,
+        "12": 0.562489013886448,
+        "24": -4.2362453858323015,
+        "48": -4.763578836350854
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "LTCUSDT",
+      "opened_at": "2026-07-21T05:26:19+00:00",
+      "entry": 47.34,
+      "side": "short",
+      "mfe_pct": 2.217997465145763,
+      "mae_pct": -1.668779045204899,
+      "giveback_pct": 1.901140684410643,
+      "time_to_mfe_hours": 24.978055555555557,
+      "returns_pct": {
+        "6": -0.08449514152936025,
+        "12": -0.3168567807351047,
+        "24": 1.8377693282636343,
+        "48": 0.31685678073511975
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "MSFTUSDT",
+      "opened_at": "2026-07-21T07:09:05+00:00",
+      "entry": 400.61,
+      "side": "short",
+      "mfe_pct": 3.5346097201767366,
+      "mae_pct": -0.269588876962628,
+      "giveback_pct": 0.5042310476523397,
+      "time_to_mfe_hours": 38.09861111111111,
+      "returns_pct": {
+        "6": 0.49674246773670383,
+        "12": 0.48426150121065314,
+        "24": 0.5067272409575471,
+        "48": 3.030378672524397
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "FILUSDT",
+      "opened_at": "2026-07-22T14:10:25+00:00",
+      "entry": 0.7679,
+      "side": "short",
+      "mfe_pct": 7.461909102747756,
+      "mae_pct": -0.8725094413334976,
+      "giveback_pct": 0.7162390936319776,
+      "time_to_mfe_hours": 47.74305555555556,
+      "returns_pct": {
+        "6": 0.8204193254329954,
+        "12": 1.7710639406172752,
+        "24": 4.492772496418801,
+        "48": 6.745670009115779
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "CFXUSDT",
+      "opened_at": "2026-07-22T18:00:04+00:00",
+      "entry": 0.04507,
+      "side": "short",
+      "mfe_pct": 1.4643887286443331,
+      "mae_pct": -6.0572442866651945,
+      "giveback_pct": 0.19968937208786297,
+      "time_to_mfe_hours": 46.74888888888889,
+      "returns_pct": {
+        "6": -4.171289105835366,
+        "12": -2.9065897492788966,
+        "24": -3.3947193254936843,
+        "48": 1.2646993565564701
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "QCOMUSDT",
+      "opened_at": "2026-07-23T05:48:58+00:00",
+      "entry": 176.35,
+      "side": "short",
+      "mfe_pct": 5.920045364332293,
+      "mae_pct": -0.34023249220300217,
+      "giveback_pct": 1.1000850581230504,
+      "time_to_mfe_hours": 38.10055555555556,
+      "returns_pct": {
+        "6": 1.2418485965409685,
+        "12": 3.980720158775153,
+        "24": 3.2038559682449708,
+        "48": 4.819960306209243
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "ORCLUSDT",
+      "opened_at": "2026-07-23T07:11:53+00:00",
+      "entry": 126.03,
+      "side": "short",
+      "mfe_pct": 9.196223121479015,
+      "mae_pct": -0.650638736808691,
+      "giveback_pct": 0.8648734428310743,
+      "time_to_mfe_hours": 43.71861111111111,
+      "returns_pct": {
+        "6": 1.5313814171229128,
+        "12": 4.855986669840517,
+        "24": 2.943743553122279,
+        "48": 8.33134967864794
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "COMPUSDT",
+      "opened_at": "2026-07-23T22:12:49+00:00",
+      "entry": 17.53,
+      "side": "short",
+      "mfe_pct": 3.1945236737022373,
+      "mae_pct": -0.45636052481459377,
+      "giveback_pct": 2.0536223616657123,
+      "time_to_mfe_hours": 14.953055555555556,
+      "returns_pct": {
+        "6": 0.1711351968054828,
+        "12": 1.5972618368511187,
+        "24": 2.395892755276678,
+        "48": 1.140901312036525
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "XMRUSDT",
+      "opened_at": "2026-07-24T03:31:43+00:00",
+      "entry": 354.84,
+      "side": "short",
+      "mfe_pct": 1.0004509074512329,
+      "mae_pct": -4.990981850975098,
+      "giveback_pct": 4.156803066170669,
+      "time_to_mfe_hours": 8.138055555555555,
+      "returns_pct": {
+        "6": -0.6228159170330393,
+        "12": -0.2761808138879546,
+        "24": -4.210348326006087,
+        "48": -3.156352158719436
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "TRXUSDT",
+      "opened_at": "2026-07-24T15:10:03+00:00",
+      "entry": 0.33053,
+      "side": "short",
+      "mfe_pct": 0.4114603818110224,
+      "mae_pct": -0.8440988715093984,
+      "giveback_pct": 1.0226000665597659,
+      "time_to_mfe_hours": 17.0825,
+      "returns_pct": {
+        "6": -0.1270686473240043,
+        "12": 0.21178107887331815,
+        "24": 0.19362841496988895,
+        "48": -0.6111396847487435
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "SOONUSDT",
+      "opened_at": "2026-07-24T18:16:20+00:00",
+      "entry": 0.1694,
+      "side": "short",
+      "mfe_pct": 3.3648170011806275,
+      "mae_pct": -17.768595041322325,
+      "giveback_pct": 17.178276269185353,
+      "time_to_mfe_hours": 5.144444444444445,
+      "returns_pct": {
+        "6": 0.9445100354191206,
+        "12": -0.8854781582054317,
+        "24": -0.41322314049587144,
+        "48": -13.813459268004724
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "XPDUSDT",
+      "opened_at": "2026-07-27T23:51:52+00:00",
+      "entry": 1293.8,
+      "side": "short",
+      "mfe_pct": 3.6296181790075774,
+      "mae_pct": -0.12753130313805,
+      "giveback_pct": 2.5467614778172862,
+      "time_to_mfe_hours": 36.635555555555555,
+      "returns_pct": {
+        "6": 1.3850672437780063,
+        "12": 2.7693615705673156,
+        "24": 1.8240840933683653,
+        "48": 1.0828567011902914
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "HUSDT",
+      "opened_at": "2026-07-28T00:42:30+00:00",
+      "entry": 0.06496,
+      "side": "short",
+      "mfe_pct": 5.003078817733994,
+      "mae_pct": -8.18965517241378,
+      "giveback_pct": 6.265394088669956,
+      "time_to_mfe_hours": 11.375,
+      "returns_pct": {
+        "6": 3.094211822660095,
+        "12": 3.263546798029573,
+        "24": -2.3706896551724133,
+        "48": -1.2623152709359626
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "GOOGLUSDT",
+      "opened_at": "2026-07-28T03:39:43+00:00",
+      "entry": 325.19,
+      "side": "short",
+      "mfe_pct": 0.43051754358989436,
+      "mae_pct": -5.442971801100891,
+      "giveback_pct": 3.6809249976936473,
+      "time_to_mfe_hours": 2.004722222222222,
+      "returns_pct": {
+        "6": -0.7072788216119842,
+        "12": -2.3893723669239466,
+        "24": -2.0142070789384703,
+        "48": -3.250407454103753
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "COINUSDT",
+      "opened_at": "2026-07-28T23:09:51+00:00",
+      "entry": 166.42,
+      "side": "short",
+      "mfe_pct": 8.845090734286744,
+      "mae_pct": -1.9829347434202689,
+      "giveback_pct": 2.409566157913723,
+      "time_to_mfe_hours": 46.2525,
+      "returns_pct": {
+        "6": 0.7090493931017777,
+        "12": -0.9373873332532161,
+        "24": 4.110082922725619,
+        "48": 6.435524576373021
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "AVAXUSDT",
+      "opened_at": "2026-07-29T00:04:43+00:00",
+      "entry": 6.62,
+      "side": "short",
+      "mfe_pct": 4.773413897280964,
+      "mae_pct": -0.2719033232628368,
+      "giveback_pct": 1.9033232628398702,
+      "time_to_mfe_hours": 4.254722222222222,
+      "returns_pct": {
+        "6": 3.036253776435053,
+        "12": 3.1419939577039298,
+        "24": 2.900302114803628,
+        "48": 2.8700906344410937
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "TSLAUSDT",
+      "opened_at": "2026-07-31T13:41:33+00:00",
+      "entry": 310.96,
+      "side": "short",
+      "mfe_pct": 2.6948803704656537,
+      "mae_pct": -0.8618471829174194,
+      "giveback_pct": 3.080782094160034,
+      "time_to_mfe_hours": 0.5575,
+      "returns_pct": {
+        "6": -0.20903010033445912,
+        "12": 0.24762027270387893,
+        "24": 0.5434782608695645,
+        "48": -0.3859017236943805
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "AMZNUSDT",
+      "opened_at": "2026-08-01T00:15:10+00:00",
+      "entry": 270.52,
+      "side": "short",
+      "mfe_pct": 0.5618808221203541,
+      "mae_pct": -2.003548720981819,
+      "giveback_pct": 2.1514120952240106,
+      "time_to_mfe_hours": 9.747222222222222,
+      "returns_pct": {
+        "6": 0.24027798314356694,
+        "12": 0.24027798314356694,
+        "24": 0.27354724234807376,
+        "48": -1.5895312731036566
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "WLFIUSDT",
+      "opened_at": "2026-08-02T09:44:54+00:00",
+      "entry": 0.05577,
+      "side": "short",
+      "mfe_pct": 2.6537564999103496,
+      "mae_pct": -0.9324009324009317,
+      "giveback_pct": 0.5020620405235827,
+      "time_to_mfe_hours": 25.585,
+      "returns_pct": {
+        "6": -0.2510310202617917,
+        "12": -0.21516944593868037,
+        "24": 1.5779092702169606,
+        "48": 2.151694459386767
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "JUPUSDT",
+      "opened_at": "2026-08-02T22:19:23+00:00",
+      "entry": 0.1959,
+      "side": "short",
+      "mfe_pct": 4.4920877998979085,
+      "mae_pct": -0.10209290454313719,
+      "giveback_pct": 1.6334864726901523,
+      "time_to_mfe_hours": 40.01027777777778,
+      "returns_pct": {
+        "6": 1.888718734047974,
+        "12": 2.246043899948947,
+        "24": 1.3782542113323022,
+        "48": 2.858601327207756
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "TRXUSDT",
+      "opened_at": "2026-08-04T15:28:47+00:00",
+      "entry": 0.32925,
+      "side": "short",
+      "mfe_pct": 1.1571753986332514,
+      "mae_pct": -0.5618830675778339,
+      "giveback_pct": 0.5892179195140462,
+      "time_to_mfe_hours": 38.603611111111114,
+      "returns_pct": {
+        "6": 0.5770690964312871,
+        "12": 0.8504176157934606,
+        "24": 0.5922551252847402,
+        "48": 0.5679574791192051
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "ETHUSDT",
+      "opened_at": "2026-08-10T10:13:39+00:00",
+      "entry": 1918.55,
+      "side": "short",
+      "mfe_pct": 3.457298480623384,
+      "mae_pct": -0.22360636939355052,
+      "giveback_pct": 2.988715436136662,
+      "time_to_mfe_hours": 29.5225,
+      "returns_pct": {
+        "6": 2.229808970316123,
+        "12": 2.300174611034369,
+        "24": 1.700242370540246,
+        "48": 0.4685830444867222
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "GENIUSUSDT",
+      "opened_at": "2026-08-11T15:11:48+00:00",
+      "entry": 0.3667,
+      "side": "short",
+      "mfe_pct": 1.4725934005999497,
+      "mae_pct": -6.953913280610845,
+      "giveback_pct": 6.790291791655298,
+      "time_to_mfe_hours": 0.5533333333333333,
+      "returns_pct": {
+        "6": -2.4815925824924996,
+        "12": 0.190891737114817,
+        "24": -3.8451049904554133,
+        "48": -5.317698391055348
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "TRXUSDT",
+      "opened_at": "2026-08-11T17:18:19+00:00",
+      "entry": 0.3347,
+      "side": "short",
+      "mfe_pct": 0.418285031371381,
+      "mae_pct": -1.1114430833582316,
+      "giveback_pct": 0.25993426949508136,
+      "time_to_mfe_hours": 10.028055555555556,
+      "returns_pct": {
+        "6": -0.05377950403346683,
+        "12": -0.020914251568573197,
+        "24": -0.373468778010167,
+        "48": 0.15835076187629965
+      }
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "TSMUSDT",
+      "opened_at": "2026-08-13T02:26:13+00:00",
+      "entry": 430.43,
+      "side": "short",
+      "mfe_pct": 1.3312269126222658,
+      "mae_pct": -1.4288037543851444,
+      "giveback_pct": 0.22535603930953418,
+      "time_to_mfe_hours": 37.06305555555556,
+      "returns_pct": {
+        "6": 0.634249471458778,
+        "12": -1.0872848082150424,
+        "24": -0.4065701740120345,
+        "48": 1.1058708733127316
+      }
+    }
+  ],
+  "missing": [
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "SUNUSDT",
+      "opened_at": "2026-07-13T02:29:52+00:00",
+      "entry": 0.018514,
+      "side": "short"
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "ADBEUSDT",
+      "opened_at": "2026-07-14T00:21:07+00:00",
+      "entry": 229.84,
+      "side": "short"
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "ETHBTCUSDT",
+      "opened_at": "2026-07-15T02:37:08+00:00",
+      "entry": 0.028946,
+      "side": "short"
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "VRTUSDT",
+      "opened_at": "2026-07-23T13:49:46+00:00",
+      "entry": 310.59,
+      "side": "short"
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "XLEUSDT",
+      "opened_at": "2026-07-23T16:18:45+00:00",
+      "entry": 59.94,
+      "side": "short"
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "ADBEUSDT",
+      "opened_at": "2026-07-25T01:16:58+00:00",
+      "entry": 224.09,
+      "side": "short"
+    },
+    {
+      "strategy": "MA Slope Caso 3",
+      "symbol": "ZHIPUUSDT",
+      "opened_at": "2026-08-11T00:58:45+00:00",
+      "entry": 163.49,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "COTIUSDT",
+      "opened_at": "2026-09-17 19:20:38.962856+00",
+      "entry": 0.021995,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "\u6211\u8e0f\u9a6c\u6765\u4e86USDT",
+      "opened_at": "2026-09-13 02:22:09.557367+00",
+      "entry": 0.015836,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "VTHOUSDT",
+      "opened_at": "2026-09-13 05:19:16.962416+00",
+      "entry": 0.0010904,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "POWERUSDT",
+      "opened_at": "2026-09-13 19:27:57.499052+00",
+      "entry": 0.1176,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "SNXXUSDT",
+      "opened_at": "2026-09-17 19:31:13.127918+00",
+      "entry": 14.69,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "KAVAUSDT",
+      "opened_at": "2026-09-13 02:41:10.415138+00",
+      "entry": 0.08137,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "SKDDUSDT",
+      "opened_at": "2026-09-14 13:29:07.907245+00",
+      "entry": 8.03,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "RONINUSDT",
+      "opened_at": "2026-09-14 13:39:48.689996+00",
+      "entry": 0.05834,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "AGLDUSDT",
+      "opened_at": "2026-09-16 23:28:40.102979+00",
+      "entry": 0.1749,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "ALLOUSDT",
+      "opened_at": "2026-09-13 02:54:08.249162+00",
+      "entry": 0.22544,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "HEMIUSDT",
+      "opened_at": "2026-09-13 21:32:36.409248+00",
+      "entry": 0.006442,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "IMXUSDT",
+      "opened_at": "2026-09-19 21:00:47.654062+00",
+      "entry": 0.1432,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "CRWDUSDT",
+      "opened_at": "2026-09-14 15:11:21.56727+00",
+      "entry": 236.7,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "ARCUSDT",
+      "opened_at": "2026-09-14 15:55:10.161146+00",
+      "entry": 0.07305,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "PHAUSDT",
+      "opened_at": "2026-09-13 03:55:52.525115+00",
+      "entry": 0.02756,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "BUSDT",
+      "opened_at": "2026-09-20 02:58:05.570413+00",
+      "entry": 0.2076,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "PUMPUSDT",
+      "opened_at": "2026-09-17 22:58:54.350009+00",
+      "entry": 0.004021,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "BULLAUSDT",
+      "opened_at": "2026-09-18 00:18:03.066241+00",
+      "entry": 0.09295,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "SOXSUSDT",
+      "opened_at": "2026-09-16 02:00:57.398117+00",
+      "entry": 51.33,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "BABYUSDT",
+      "opened_at": "2026-09-18 00:30:52.571032+00",
+      "entry": 0.01247,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "IOTXUSDT",
+      "opened_at": "2026-09-14 02:24:54.678123+00",
+      "entry": 0.003442,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "NEARUSDT",
+      "opened_at": "2026-09-17 23:40:57.56943+00",
+      "entry": 3.151,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "ARBUSDT",
+      "opened_at": "2026-09-18 02:26:00.636881+00",
+      "entry": 0.1989,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "REZUSDT",
+      "opened_at": "2026-09-14 03:38:59.648382+00",
+      "entry": 0.004888,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "EVAAUSDT",
+      "opened_at": "2026-09-16 06:14:15.605773+00",
+      "entry": 0.4582,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "NEARUSDT",
+      "opened_at": "2026-09-18 03:08:00.711382+00",
+      "entry": 3.406,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "POWERUSDT",
+      "opened_at": "2026-09-15 04:48:48.289764+00",
+      "entry": 0.17887,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "AVAAIUSDT",
+      "opened_at": "2026-09-20 05:44:11.765686+00",
+      "entry": 0.01051,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "METUSDT",
+      "opened_at": "2026-09-18 05:02:40.729683+00",
+      "entry": 0.2456,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "STARUSDT",
+      "opened_at": "2026-09-15 05:13:59.693141+00",
+      "entry": 0.05581,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "CTRUSDT",
+      "opened_at": "2026-09-15 05:26:21.154781+00",
+      "entry": 0.012356,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "RAYSOLUSDT",
+      "opened_at": "2026-09-18 04:12:59.25189+00",
+      "entry": 1.6511,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "FFUSDT",
+      "opened_at": "2026-09-15 05:51:55.192935+00",
+      "entry": 0.16512,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "MUBARAKUSDT",
+      "opened_at": "2026-09-18 06:28:12.807272+00",
+      "entry": 0.03336,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "AAPLUSDT",
+      "opened_at": "2026-09-16 13:31:26.771336+00",
+      "entry": 333.65,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "GUSDT",
+      "opened_at": "2026-09-18 07:02:59.100046+00",
+      "entry": 0.00638,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "AEROUSDT",
+      "opened_at": "2026-09-18 07:24:55.784621+00",
+      "entry": 0.6421,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "WLDUSDT",
+      "opened_at": "2026-09-18 07:31:19.758962+00",
+      "entry": 0.4301,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "HOMEUSDT",
+      "opened_at": "2026-09-16 13:48:49.406614+00",
+      "entry": 0.005538,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "ZECUSDT",
+      "opened_at": "2026-09-16 14:17:18.724338+00",
+      "entry": 1243.61,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "TEMUSDT",
+      "opened_at": "2026-09-15 14:03:43.293348+00",
+      "entry": 64.85,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "APTUSDT",
+      "opened_at": "2026-09-18 12:13:07.236429+00",
+      "entry": 0.6801,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "TUTUSDT",
+      "opened_at": "2026-09-15 15:46:53.091875+00",
+      "entry": 0.02161,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "ARBUSDT",
+      "opened_at": "2026-09-15 15:59:24.884046+00",
+      "entry": 0.1492,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "PHAROSUSDT",
+      "opened_at": "2026-09-15 16:11:59.925617+00",
+      "entry": 0.5103,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "ZROUSDT",
+      "opened_at": "2026-09-15 16:30:28.793717+00",
+      "entry": 0.9514,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "ZHONGJIUSDT",
+      "opened_at": "2026-09-16 16:31:37.713718+00",
+      "entry": 147.23,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "AVAAIUSDT",
+      "opened_at": "2026-09-15 17:52:21.161177+00",
+      "entry": 0.010238,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "COTIUSDT",
+      "opened_at": "2026-09-16 18:15:09.202901+00",
+      "entry": 0.019176,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "MMTUSDT",
+      "opened_at": "2026-09-18 18:17:12.925238+00",
+      "entry": 0.1585,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "NAORISUSDT",
+      "opened_at": "2026-09-16 18:22:38.014087+00",
+      "entry": 0.03177,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "LITUSDT",
+      "opened_at": "2026-09-16 18:28:52.972991+00",
+      "entry": 4.482,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "ZKUSDT",
+      "opened_at": "2026-09-18 19:07:53.719194+00",
+      "entry": 0.010884,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "NEARUSDT",
+      "opened_at": "2026-09-16 19:17:17.336177+00",
+      "entry": 2.538,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "CYSUSDT",
+      "opened_at": "2026-09-16 20:04:26.269833+00",
+      "entry": 0.1347,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "FUSDT",
+      "opened_at": "2026-09-18 22:30:55.165178+00",
+      "entry": 0.005412,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "ARIAUSDT",
+      "opened_at": "2026-09-19 09:46:21.603021+00",
+      "entry": 0.03343,
+      "side": "short"
+    },
+    {
+      "strategy": "Band Touch 15m",
+      "symbol": "NILUSDT",
+      "opened_at": "2026-09-19 09:58:38.863418+00",
+      "entry": 0.04954,
+      "side": "short"
+    }
+  ],
+  "summary_by_strategy_side": [
+    {
+      "strategy": "MA Slope Caso 3",
+      "side": "short",
+      "n": 38,
+      "metrics": {
+        "mfe_pct": {
+          "mean": 3.3693603984838583,
+          "median": 3.198799312828058,
+          "bootstrap_95_ci_mean": [
+            2.629697418612985,
+            4.219398850346482
+          ]
+        },
+        "mae_pct": {
+          "mean": -2.6561832979775786,
+          "median": -1.0219220078795817,
+          "bootstrap_95_ci_mean": [
+            -4.038614515532447,
+            -1.5287166959015561
+          ]
+        },
+        "giveback_pct": {
+          "mean": 2.6809782926967793,
+          "median": 1.7673135785503977,
+          "bootstrap_95_ci_mean": [
+            1.7793230203565926,
+            3.6985897571813005
+          ]
+        },
+        "time_to_mfe_hours": {
+          "mean": 25.19268274853801,
+          "median": 25.28152777777778,
+          "bootstrap_95_ci_mean": [
+            19.870826023391814,
+            30.39643274853801
+          ]
+        }
+      },
+      "returns_pct": {
+        "6": {
+          "mean": 0.44271516929831456,
+          "median": 0.3133465387415953,
+          "bootstrap_95_ci_mean": [
+            0.019700732716085637,
+            0.8342697149285917
+          ]
+        },
+        "12": {
+          "mean": 0.8199338307907463,
+          "median": 0.47774826484055166,
+          "bootstrap_95_ci_mean": [
+            0.1296734642722239,
+            1.4467812537748683
+          ]
+        },
+        "24": {
+          "mean": 0.30037778683232536,
+          "median": 0.8027260131463422,
+          "bootstrap_95_ci_mean": [
+            -0.8730463335434133,
+            1.2435277014284076
+          ]
+        },
+        "48": {
+          "mean": 0.6883821057870787,
+          "median": 0.892430143483985,
+          "bootstrap_95_ci_mean": [
+            -0.526617371936419,
+            1.880077576995403
+          ]
+        }
+      },
+      "symbols": {
+        "AAPLUSDT": 1,
+        "AMZNUSDT": 1,
+        "AVAXUSDT": 1,
+        "CBRSUSDT": 1,
+        "CFXUSDT": 1,
+        "COINUSDT": 1,
+        "COMPUSDT": 2,
+        "EGLDUSDT": 1,
+        "ETCUSDT": 1,
+        "ETHUSDT": 1,
+        "EWYUSDT": 1,
+        "FILUSDT": 1,
+        "GENIUSUSDT": 1,
+        "GOOGLUSDT": 1,
+        "HUSDT": 1,
+        "INJUSDT": 1,
+        "JUPUSDT": 1,
+        "LTCUSDT": 1,
+        "MSFTUSDT": 2,
+        "NVDAUSDT": 1,
+        "ORCLUSDT": 1,
+        "QCOMUSDT": 1,
+        "SOLUSDT": 1,
+        "SOONUSDT": 1,
+        "TRXUSDT": 4,
+        "TSLAUSDT": 1,
+        "TSMUSDT": 1,
+        "WLFIUSDT": 1,
+        "XAGUSDT": 1,
+        "XMRUSDT": 2,
+        "XPDUSDT": 1,
+        "ZAMAUSDT": 1
+      }
+    }
+  ]
+}

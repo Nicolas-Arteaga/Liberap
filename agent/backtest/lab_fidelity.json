@@ -1,0 +1,13 @@
+{
+  "default": {
+    "detection": "37/38 (97%)",
+    "exit_reason_match": "32/38 (84,2%)",
+    "return_within_tol": "25/38 (65,8%)",
+    "selection": "NO reproducible (1/45), falta ledger",
+    "evidence": [
+      "MISION_LOG.md: Fase 1 y Fase 1B",
+      "lab/runs/f1b-2-conditional-timeout-20260920-2148/FASE_1B_CLOSURE.md"
+    ],
+    "note": "Calibrado sobre MA Slope Caso 3 (45 trades reales). Aplica como referencia del motor; no se recalibró por estrategia."
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "tolerance_pp": 0.25,
+  "intrabar_priority": "SL_first",
+  "timeout_hours": 48,
+  "conditional_timeout": true,
+  "hard_timeout_hours": 720,
+  "fill_model": "close",
+  "total": 1,
+  "valid": 1,
+  "reason_matches": 0,
+  "return_within_tolerance": 0,
+  "trades": [
+    {
+      "symbol": "CBRSUSDT",
+      "reason_real": "TIMEOUT",
+      "reason_replay": "TP",
+      "reason_match": false,
+      "close_delta_min": 2125.8166666666666,
+      "return_real_pct": 2.847938745973199,
+      "return_replay_pct": 10.01447313133199,
+      "return_delta_pp": 7.166534385358791
+    }
+  ]
+}

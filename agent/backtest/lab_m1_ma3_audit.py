@@ -13,6 +13,18 @@ OUT=os.environ.get('LAB_AUDIT_OUT',f'/app/backtest/lab_artifacts/m1-{STRATEGY}-2
 def mean(x): return sum(x)/len(x) if x else None
 def pct(n,d): return 100*n/d if d else None
 def fmt(x): return 'n/a' if x is None else f'{x:.2f}'
+WHY = {
+ 'ENTRADA':'El intervalo incluye valores negativos y positivos: la señal no demuestra por sí sola que anticipe el movimiento.',
+ 'COSTOS':'La diferencia entre bruto y neto muestra cuánto margen pierde la estrategia antes de poder ejecutar un trade real.',
+ 'PAYOFF':'La comparación con el equilibrio muestra si el tamaño de ganadores compensa la frecuencia de pérdidas.',
+ 'SALIDA':'Una ganancia flotante que vuelve a pérdida no paga el resultado final; aquí se cuantifica ese desperdicio.',
+ 'SL':'El contrafactual separa un stop protector de uno que corta ganadores que habrían alcanzado el objetivo.',
+ 'TIMEOUT':'El retorno de las posiciones que expiran indica si el tiempo está cerrando riesgo útil o capital estancado.'}
+
+def headline(net, gross, cost, main, severity):
+ if net >= 0:
+  return f'La estrategia GANA {fmt(net)} % neto por trade, pero es frágil: el edge bruto ({fmt(gross)} %) apenas supera el costo ({fmt(cost)} %). ' + (f'El daño más alto medido es {main} ({severity[main]}/100).' if severity[main] >= 20 else 'Ninguna causa domina con el umbral de severidad actual.')
+ return f'La estrategia PIERDE {fmt(net)} % neto por trade. La causa de mayor severidad medida es {main} ({severity[main]}/100).'
 def write_progress(status, processed=0, total=0, **extra):
  payload={'id':'m1-ma3-20260926','status':status,'processed':processed,'total':total,
           'updated_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),**extra}
@@ -60,16 +72,16 @@ def main():
  severity={'ENTRADA':min(100,round(max(0,-(fwd[24]['mean'] or 0))*20)), 'COSTOS':min(100,round(max(0,-gross)*20 if gross else 0)), 'PAYOFF':min(100,round(max(0,(breakeven or 0)-(wr or 0)))), 'SALIDA':round(pct(gave,len(reached)) or 0), 'SL':round(pct(slcf,len(sl)) or 0), 'TIMEOUT':min(100,round((pct(len(timeout),len(rows)) or 0)*max(0,-(timeout_mean or 0))))}
  main_area=max(severity,key=severity.get)
  result={'valid':integrity_report['valid'],'integrity':integrity_report,'n':len(rows),'forward_return_pct_day_block_ci':fwd,'gross_edge_pct':gross,'cost_pct':a.cost_pct,'net_expectancy_pct':net,'win_rate_pct':wr,'break_even_win_rate_pct':breakeven,'avg_win_pct':aw,'avg_loss_pct':al,'reached_2pct_n':len(reached),'reached_2pct_ended_loss_pct':pct(gave,len(reached)),'sl_n':len(sl),'sl_cf_reaches_tp_pct':pct(slcf,len(sl)),'timeout_n':len(timeout),'timeout_pct':pct(len(timeout),len(rows)),'timeout_mean_return_pct':timeout_mean,'reasons':reasons,'severity':severity,'severity_formula':'ENTRADA=max(0,-media_24h*20); COSTOS=max(0,-edge_bruto*20); PAYOFF=max(0,win_equilibrio-win_real); SALIDA=porcentaje que llegó a +2% y terminó en pérdida; SL=porcentaje contrafactual que habría llegado al TP; TIMEOUT=porcentaje_timeout*max(0,-retorno_timeout). Frecuencia sin daño no suma. Todo limitado a 0..100.','main_area':main_area,'fidelity':{'detection':'37/38','exit_reason':'84%','return':'66%','selection':'no reproducible sin ledger'}}
- lines=[f'# Auditoría MA3 — {len(rows)} trades','## Chequeos de integridad']
+ label='MA Slope Caso 3' if STRATEGY=='ma3' else 'Band Touch 15m'
+ lines=[f'# Auditoría {label} — {len(rows)} trades','## Chequeos de integridad']
  lines += [f'- {name}: {data["status"]}.' for name,data in integrity_report['checks'].items()]
  if not integrity_report['valid']:
   lines += ['','**INFORME INVÁLIDO: falló un chequeo de integridad; no se publican veredictos.**']
  else:
-  lines += [f'## TITULAR',f'La estrategia GANA {fmt(net)} % neto por trade, pero es frágil: el edge bruto ({fmt(gross)} %) apenas supera el costo ({a.cost_pct:.2f} %). La mayor pérdida medida es SALIDA: {fmt(pct(gave,len(reached)))} % de las ganancias de +2 % se devuelven.', '## Resultado simple',f'- Win rate {fmt(wr)} %; equilibrio {fmt(breakeven)} %; ganancia media {fmt(aw)} % y pérdida media {fmt(al)} %.','## Hallazgos']
+  lines += ['## TITULAR',headline(net,gross,a.cost_pct,main_area,severity), '## Resultado simple',f'- Win rate {fmt(wr)} %; equilibrio {fmt(breakeven)} %; ganancia media {fmt(aw)} % y pérdida media {fmt(al)} %.','## Hallazgos']
  facts={'ENTRADA':f'Retorno medio 1/4/12/24/48h con IC bootstrap por día: '+', '.join(f'{h}h={fmt(fwd[h]["mean"])}% [{fmt(fwd[h]["lo"])}, {fmt(fwd[h]["hi"])}], n={fwd[h]["n"]}, días={fwd[h]["n_days"]}' for h in C.FWD_HOURS),'COSTOS':f'Bruto {fmt(gross)}% y costo {a.cost_pct:.2f}%','PAYOFF':f'Win rate {fmt(wr)}% vs equilibrio {fmt(breakeven)}%','SALIDA':f'{len(reached)} llegaron a +2%; {fmt(pct(gave,len(reached)))}% terminaron perdiendo','SL':f'{len(sl)} SL; {fmt(pct(slcf,len(sl)))}% habría llegado a TP sin SL','TIMEOUT':f'{len(timeout)} timeout ({fmt(pct(len(timeout),len(rows)))}%), retorno {fmt(mean([r["ret"] for r in timeout]))}%'}
  if integrity_report['valid']:
-  why={'ENTRADA':'El IC incluye cero: la señal sola no demuestra que anticipe el movimiento.','COSTOS':'Un margen pequeño puede desaparecer con fills peores o costos reales mayores.','PAYOFF':'La ventaja depende de que las ganancias mantengan su tamaño relativo.','SALIDA':'Hay beneficios observados que no se convierten en resultado realizado.','SL':'El contrafactual cuantifica si el stop bloquea ganadores potenciales.','TIMEOUT':'Mide si mantener posiciones consume tiempo para terminar con retorno adverso.'}
-  for k in severity: lines += [f'### [{k}] — severidad {severity[k]}/100',f'QUÉ PASA: {facts[k]}.',f'POR QUÉ IMPORTA: {why[k]}',f'EVIDENCIA: n={len(rows)}, `result.json`.', 'CONFIANZA: BAJA; no son selecciones reales de producción.', 'Qué NO se puede concluir: no prueba que cambiar solo esta regla mejore producción.']
+  for k in severity: lines += [f'### [{k}] — severidad {severity[k]}/100',f'QUÉ PASA: {facts[k]}.',f'POR QUÉ IMPORTA: {WHY[k]}',f'EVIDENCIA: n={len(rows)}, `result.json`.', 'CONFIANZA: BAJA; no son selecciones reales de producción.', 'Qué NO se puede concluir: no prueba que cambiar solo esta regla mejore producción.']
   lines += ['## Motivos de salida','| Motivo | N | % | Retorno medio |','|---|---:|---:|---:|']+[f'| {k} | {v["n"]} | {fmt(v["pct"])} | {fmt(v["mean_return"])} |' for k,v in reasons.items()]+['## Qué no se pudo evaluar', 'Fidelidad: detección 37/38, motivo 84%, retorno fino 66%; selección/timeouts de producción no reproducibles sin ledger.', '## Qué haría alguien no técnico con esto','- No cambiaría la estrategia en producción a partir de este informe.','- Vigilaría las ganancias que superan +2 % porque muchas terminan en pérdida.','- Esperaría la validación contra el ledger antes de modificar la salida.']
  os.makedirs(OUT,exist_ok=True)
  with open(OUT+'/result.json','w',encoding='utf8') as f: json.dump(result,f,indent=2)
