@@ -25,6 +25,15 @@ def headline(net, gross, cost, main, severity):
  if net >= 0:
   return f'La estrategia GANA {fmt(net)} % neto por trade, pero es frágil: el edge bruto ({fmt(gross)} %) apenas supera el costo ({fmt(cost)} %). ' + (f'El daño más alto medido es {main} ({severity[main]}/100).' if severity[main] >= 20 else 'Ninguna causa domina con el umbral de severidad actual.')
  return f'La estrategia PIERDE {fmt(net)} % neto por trade. La causa de mayor severidad medida es {main} ({severity[main]}/100).'
+
+def severity_scores(fwd24, gross, cost, breakeven, win_rate, gave_back_pct, sl_cf_pct, timeout_pct, timeout_mean):
+ """Escala fija 0..100; M3 considera grave un puntaje desde 20."""
+ cost_deficit=max(0.0, cost-(gross or 0.0))
+ return {'ENTRADA':min(100,round(max(0,-(fwd24 or 0))*20)),
+         'COSTOS':min(100,round(100*cost_deficit/max(cost,1e-12))),
+         'PAYOFF':min(100,round(max(0,(breakeven or 0)-(win_rate or 0)))),
+         'SALIDA':round(gave_back_pct or 0), 'SL':round(sl_cf_pct or 0),
+         'TIMEOUT':min(100,round((timeout_pct or 0)*max(0,-(timeout_mean or 0))))}
 def write_progress(status, processed=0, total=0, **extra):
  payload={'id':'m1-ma3-20260926','status':status,'processed':processed,'total':total,
           'updated_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),**extra}
@@ -69,7 +78,7 @@ def main():
  reasons={k:{'n':len(v),'pct':pct(len(v),len(rows)),'mean_return':mean([x['ret'] for x in v])} for k,v in ((k,[r for r in rows if r['reason']==k]) for k in sorted(set(r['reason'] for r in rows)))}
  timeout_mean=mean([r['ret'] for r in timeout])
  # Frecuencia sola no es daño: una causa suma severidad sólo si deteriora retorno.
- severity={'ENTRADA':min(100,round(max(0,-(fwd[24]['mean'] or 0))*20)), 'COSTOS':min(100,round(max(0,-gross)*20 if gross else 0)), 'PAYOFF':min(100,round(max(0,(breakeven or 0)-(wr or 0)))), 'SALIDA':round(pct(gave,len(reached)) or 0), 'SL':round(pct(slcf,len(sl)) or 0), 'TIMEOUT':min(100,round((pct(len(timeout),len(rows)) or 0)*max(0,-(timeout_mean or 0))))}
+ severity=severity_scores(fwd[24]['mean'],gross,a.cost_pct,breakeven,wr,pct(gave,len(reached)),pct(slcf,len(sl)),pct(len(timeout),len(rows)),timeout_mean)
  main_area=max(severity,key=severity.get)
  result={'valid':integrity_report['valid'],'integrity':integrity_report,'n':len(rows),'forward_return_pct_day_block_ci':fwd,'gross_edge_pct':gross,'cost_pct':a.cost_pct,'net_expectancy_pct':net,'win_rate_pct':wr,'break_even_win_rate_pct':breakeven,'avg_win_pct':aw,'avg_loss_pct':al,'reached_2pct_n':len(reached),'reached_2pct_ended_loss_pct':pct(gave,len(reached)),'sl_n':len(sl),'sl_cf_reaches_tp_pct':pct(slcf,len(sl)),'timeout_n':len(timeout),'timeout_pct':pct(len(timeout),len(rows)),'timeout_mean_return_pct':timeout_mean,'reasons':reasons,'severity':severity,'severity_formula':'ENTRADA=max(0,-media_24h*20); COSTOS=max(0,-edge_bruto*20); PAYOFF=max(0,win_equilibrio-win_real); SALIDA=porcentaje que llegó a +2% y terminó en pérdida; SL=porcentaje contrafactual que habría llegado al TP; TIMEOUT=porcentaje_timeout*max(0,-retorno_timeout). Frecuencia sin daño no suma. Todo limitado a 0..100.','main_area':main_area,'fidelity':{'detection':'37/38','exit_reason':'84%','return':'66%','selection':'no reproducible sin ledger'}}
  label='MA Slope Caso 3' if STRATEGY=='ma3' else 'Band Touch 15m'

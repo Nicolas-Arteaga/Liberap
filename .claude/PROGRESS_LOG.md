@@ -903,3 +903,9 @@ egister_oi_collector_task.ps1` → `Start-ScheduledTask -TaskName VergeOICollect
 ## 2026-09-26
 - Lab de diagnóstico: Fase 2 casi cerrada. A (dirección invertida) da DIRECCIÓN correcta (OOS −0,8 pp en los 4 escenarios; baseline reproducido). B (salida por señal opuesta) desbloqueada tras verificar en `verge_agent.py:3921-3944` que `peakProximity` con type≠recentHigh usa el mínimo de lows. Familia acumulada: 30 hipótesis.
 - Reparto reemplazado por orden de misión v3 (2026-09-26): Codex/GPT construye, prueba y mantiene todo el laboratorio: CLI `lab_diagnose`, adaptadores, auditoría, pruebas sintéticas y UI/API. Claude sólo revisa/audita. Ledger sigue sin desplegar (pendiente OK del usuario).
+## 2026-09-27 02:19 -03:00 — Laboratorio M1–M4
+
+- M1 regenerado y alineado: matriz MA3 v2 exit 0; OOS unconditional/tp_bias_-2 `0.31802370106778705`; auditoría 9.400/9.400 con seis integridades PASS.
+- M2 Band Touch: selftest exit 0; informe de 82 entradas reales exit 0 en `agent/backtest/lab_artifacts/m2-band-20260927/`.
+- M3: 30 NULL, FPR 0.0 en las seis categorías; control de entrada deliberadamente desalineada INVÁLIDO; evidencia en `m3-controls-v2-20260927/`.
+- M4: endpoint read-only y Angular `/diagnostic-lab` implementados; smoke de API PASS. Bloqueado únicamente el chequeo visual: `https://localhost:44396/.well-known/openid-configuration` falla TLS `SEC_E_NO_CREDENTIALS` y el host local no volvió a escuchar luego de reinicio. No marcar como completado hasta resolver host y tomar DOM/captura.

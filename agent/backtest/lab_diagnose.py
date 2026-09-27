@@ -65,7 +65,17 @@ def _write_json(path, obj):
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as h:
         json.dump(obj, h, ensure_ascii=False, indent=2)
-    os.replace(tmp, path)
+    # El directorio es un bind mount de Windows. Un lector de progress.json
+    # puede mantener el handle unos milisegundos y hacer que Replace falle.
+    # El estado nunca debe invalidar una corrida de sólo lectura.
+    for attempt in range(30):
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:
+            if attempt == 29:
+                raise
+            time.sleep(0.1)
 
 
 def _traj_summary(paths, split_names):

@@ -36,6 +36,16 @@ class MA3Adapter(Adapter):
         "conditional|tp_bias_-2": 0.058502362807107265,
         "conditional|tp_bias_+2": 0.5078174313002582,
     }
+    # Baseline activo tras el corrigendum M1b: entradas al cierre de la hora.
+    # Este mapa alimenta el gate de regresión de lab_diagnose.py; v1 queda sólo
+    # como evidencia histórica y no puede validar una corrida nueva.
+    expected_baseline = {
+        "unconditional|tp_bias_-2": 0.3180237011,
+        "unconditional|tp_bias_+2": 0.4504469093,
+        "conditional|tp_bias_-2": 0.0548301563,
+        "conditional|tp_bias_+2": 0.5053421017,
+    }
+    baseline_scenario_tol = 1e-8
 
     def entries(self):
         if not os.path.exists(STREAM_CACHE):

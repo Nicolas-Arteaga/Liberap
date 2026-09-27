@@ -1,0 +1,12 @@
+{
+  "id": "ma3-20260927T044108Z",
+  "strategy": "ma3",
+  "status": "completed",
+  "started_at_utc": "2026-09-27T04:41:08.652408+00:00",
+  "done": 9400,
+  "total": 9400,
+  "exit_code": 0,
+  "updated_at_utc": "2026-09-27T04:49:24.441499+00:00",
+  "finished_at_utc": "2026-09-27T04:49:25.685134+00:00",
+  "result": "/app/backtest/lab_artifacts/step1-ma3-v2-final-20260927/result.json"
+}

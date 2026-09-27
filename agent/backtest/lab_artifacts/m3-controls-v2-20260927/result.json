@@ -1,0 +1,543 @@
+{
+  "id": "m3-controls-20260927",
+  "created_at_utc": "2026-09-27T05:03:56.947510+00:00",
+  "source": "magnitudes de retornos de MA3 sobre velas locales; NULL con signo aleatorio y media bruta centrada en cero",
+  "n_null": 30,
+  "n_oos_each": 240,
+  "grave_threshold": 20,
+  "null_false_positive_rate": {
+    "ENTRADA": 0.0,
+    "COSTOS": 0.0,
+    "PAYOFF": 0.0,
+    "SALIDA": 0.0,
+    "SL": 0.0,
+    "TIMEOUT": 0.0
+  },
+  "null_pass": true,
+  "nulls": [
+    {
+      "id": "NULL-01",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-02",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-03",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-04",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-05",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-06",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-07",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-08",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-09",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-10",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-11",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-12",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-13",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-14",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-15",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-16",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-17",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-18",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-19",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-20",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-21",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-22",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-23",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-24",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-25",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-26",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-27",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-28",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-29",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    },
+    {
+      "id": "NULL-30",
+      "n_oos": 240,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "grave": []
+    }
+  ],
+  "controls": [
+    {
+      "population": "entrada_con_informacion",
+      "expected": "ENTRADA_FAVORABLE",
+      "detected": "ENTRADA_FAVORABLE",
+      "ok": true,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "n_oos": 240
+    },
+    {
+      "population": "entrada_sin_informacion",
+      "expected": "NINGUNA",
+      "detected": "NINGUNA",
+      "ok": true,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "n_oos": 240
+    },
+    {
+      "population": "senal_invertida",
+      "expected": "ENTRADA",
+      "detected": "ENTRADA",
+      "ok": true,
+      "scores": {
+        "ENTRADA": 20,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "n_oos": 240
+    },
+    {
+      "population": "giveback",
+      "expected": "SALIDA",
+      "detected": "SALIDA",
+      "ok": true,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 70,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "n_oos": 240
+    },
+    {
+      "population": "sl_ajustado",
+      "expected": "SL",
+      "detected": "SL",
+      "ok": true,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 70,
+        "TIMEOUT": 0
+      },
+      "n_oos": 240
+    },
+    {
+      "population": "edge_menor_que_costo",
+      "expected": "COSTOS",
+      "detected": "COSTOS",
+      "ok": true,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 50,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "n_oos": 240
+    },
+    {
+      "population": "zombis_por_tiempo",
+      "expected": "TIMEOUT",
+      "detected": "TIMEOUT",
+      "ok": true,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 0,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 80
+      },
+      "n_oos": 240
+    },
+    {
+      "population": "dependencia_pocos_trades",
+      "expected": "PAYOFF",
+      "detected": "PAYOFF",
+      "ok": true,
+      "scores": {
+        "ENTRADA": 0,
+        "COSTOS": 0,
+        "PAYOFF": 50,
+        "SALIDA": 0,
+        "SL": 0,
+        "TIMEOUT": 0
+      },
+      "n_oos": 240
+    }
+  ],
+  "controls_pass": true,
+  "misaligned_entry": {
+    "valid": false,
+    "checks": {
+      "entry_price_observable": false,
+      "no_pre_entry_candle": true,
+      "no_exit_before_entry": true,
+      "split_at_entry": true
+    },
+    "expected_invalid": true
+  },
+  "integrity_pass": true
+}

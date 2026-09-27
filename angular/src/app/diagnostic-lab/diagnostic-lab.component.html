@@ -1,0 +1,3 @@
+<section class="lab"><h1>Laboratorio de Diagnóstico</h1><p>Solo lectura · horarios America/Argentina/Buenos_Aires</p>
+<div class="tabs"><button [class.active]="selected==='ma3'" (click)="selected='ma3';load()">MA Slope Caso 3</button><button [class.active]="selected==='band_touch'" (click)="selected='band_touch';load()">Band Touch</button></div>
+<p *ngIf="error" class="error">{{error}}</p><ng-container *ngIf="data"><p>Generado: {{date(data.generated_at_utc)}}</p><h2>Chequeos de integridad</h2><pre>{{data.result.integrity | json}}</pre><h2>Titular e informe</h2><pre class="report">{{data.report_markdown}}</pre><h2>Resultado fuente</h2><pre>{{data.result | json}}</pre></ng-container></section>

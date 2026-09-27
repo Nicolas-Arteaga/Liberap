@@ -48,6 +48,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+LAB_ARTIFACTS = os.path.join(os.path.dirname(__file__), "lab_artifacts")
+
+
+@app.get("/research/laboratory/{strategy}")
+def laboratory_report(strategy: str):
+    """Sólo lectura: último informe diagnóstico publicado para MA3 o Band."""
+    prefixes = {"ma3": "step1-ma3-audit-", "band_touch": "m2-band-"}
+    prefix = prefixes.get(strategy)
+    if not prefix:
+        raise HTTPException(status_code=404, detail="estrategia de laboratorio desconocida")
+    try:
+        candidates = [os.path.join(LAB_ARTIFACTS, name) for name in os.listdir(LAB_ARTIFACTS)
+                      if name.startswith(prefix) and os.path.isdir(os.path.join(LAB_ARTIFACTS, name))]
+        folder = max(candidates, key=os.path.getmtime)
+        with open(os.path.join(folder, "result.json"), encoding="utf-8") as handle:
+            result = json.load(handle)
+        with open(os.path.join(folder, "informe.md"), encoding="utf-8") as handle:
+            report = handle.read()
+        return {"strategy": strategy, "generated_at_utc": os.path.getmtime(os.path.join(folder, "result.json")),
+                "result": result, "report_markdown": report}
+    except (FileNotFoundError, ValueError, OSError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=503, detail=f"laboratory report unavailable: {type(exc).__name__}")
+
 
 @app.get("/health")
 def health():

@@ -8,5 +8,7 @@ class ReportTextTests(unittest.TestCase):
         title=report.headline(.04,.12,.08,'SALIDA',{'SALIDA':35})
         self.assertIn('GANA', title)
         self.assertNotIn('PIERDE', title)
+    def test_cost_deficit_is_severe_when_gross_edge_cannot_pay_cost(self):
+        self.assertGreaterEqual(report.severity_scores(0,.04,.08,50,50,0,0,0,0)['COSTOS'],20)
 
 if __name__=='__main__': unittest.main()
