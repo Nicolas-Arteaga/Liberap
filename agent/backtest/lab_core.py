@@ -304,7 +304,10 @@ def forward_returns(rows, opens, bar_ms, trade):
         # No sustituir un horizonte faltante por el último cierre viejo: eso
         # convierte, por ejemplo, un retorno a 4h en uno falsamente etiquetado
         # como retorno a 12h cuando hay un hueco de datos.
-        out[h] = pct(side, entry, rows[i][3]) if i >= start and rows[i][0] + bar_ms >= target else None
+        # Las entradas reales pueden caer dentro de una vela. Aceptamos el
+        # último cierre disponible si queda como máximo una vela antes del
+        # horizonte; más atrás es un hueco real, no un retorno etiquetable.
+        out[h] = pct(side, entry, rows[i][3]) if i >= start and rows[i][0] + bar_ms > target - bar_ms else None
     return out
 
 

@@ -43,6 +43,16 @@ class AuditPrimitiveTests(unittest.TestCase):
         self.assertAlmostEqual(short[4], 4)
         self.assertIsNone(long[12])
 
+    def test_forward_return_accepts_real_fill_offset_but_rejects_gap(self):
+        # Entrada 17 min dentro de una vela 15m: el cierre más próximo previo
+        # al horizonte es válido; una vela ausente completa es un hueco.
+        q = 900_000
+        t = trade(open_ms=17 * 60_000)
+        rows = [(3*q, 101, 99, 101), (4*q, 102, 100, 102)]
+        self.assertIsNotNone(core.forward_returns(rows, [r[0] for r in rows], q, t)[1])
+        gap = [(q, 101, 99, 101)]
+        self.assertIsNone(core.forward_returns(gap, [r[0] for r in gap], q, t)[4])
+
     def test_timeout_at_48h(self):
         rows = [(48 * H, 102, 98, 101)]
         got = core.simulate_detail(rows, [r[0] for r in rows], H, trade(tp=120), "unconditional", None)
