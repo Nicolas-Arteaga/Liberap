@@ -57,7 +57,9 @@ def main():
     if args.progress:
         os.makedirs(os.path.dirname(args.progress), exist_ok=True)
     with open(args.cache,"rb") as h: stream=pickle.load(h)["stream"]
-    trades=[{"open_ms":x[0],"symbol":x[1],"entry":x[2],"sl":x[3],"tp":x[4],"side":x[5]} for x in stream]
+    # M1b: the hourly pattern is evaluated at b + HOUR; entry and every
+    # temporal split must use that aligned instant.
+    trades=[{"open_ms":x[0]+m.HOUR,"symbol":x[1],"entry":x[2],"sl":x[3],"tp":x[4],"side":x[5]} for x in stream]
     if args.smoke: trades=trades[:2]
     conn=sqlite3.connect("file:/app/data/binance_vision_clean.db?mode=ro",uri=True); cache={}; rows=[]
     btc=m.rows_for(conn,"BTCUSDT",{}); bo=[x[0] for x in btc]
@@ -74,7 +76,7 @@ def main():
         btc24=(bp[-1][3]/bp[0][3]-1)*100
         rets=[(prior[j][3]/prior[j-1][3]-1) for j in range(1,len(prior))]
         vol=statistics.pstdev(rets)*100
-        base={"split":m.split_for(trade["open_ms"]),"day":day(trade["open_ms"]),"symbol":sym,
+        base={"split":b.aligned_split(trade["open_ms"]),"day":day(trade["open_ms"]),"symbol":sym,
               "hour_bucket":f"{datetime.fromtimestamp(trade['open_ms']/1000,tz=timezone.utc).hour//6*6:02d}-{datetime.fromtimestamp(trade['open_ms']/1000,tz=timezone.utc).hour//6*6+5:02d}",
               "btc_regime":"bear" if btc24 < -2 else "bull" if btc24 > 2 else "flat","vol":vol}
         for mode,bias in SCENARIOS:

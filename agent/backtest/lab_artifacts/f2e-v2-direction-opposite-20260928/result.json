@@ -1,0 +1,83 @@
+{
+  "a_inverted_direction": {
+    "pass": false,
+    "details": {
+      "unconditional|tp_bias_-2": {
+        "delta": {
+          "TRAIN": -0.02354888114953191,
+          "VALIDATION": -0.12469912776959487,
+          "OOS": -0.796042234125683
+        },
+        "oos_without_top3_delta": -0.7964945973570794
+      },
+      "unconditional|tp_bias_+2": {
+        "delta": {
+          "TRAIN": 0.10065424235700202,
+          "VALIDATION": -0.07390800626564809,
+          "OOS": -0.7983175469812005
+        },
+        "oos_without_top3_delta": -0.7996823733445048
+      },
+      "conditional|tp_bias_-2": {
+        "delta": {
+          "TRAIN": 0.22033717695779,
+          "VALIDATION": -0.19910538918651108,
+          "OOS": -0.7508086299934812
+        },
+        "oos_without_top3_delta": -0.7512081842417654
+      },
+      "conditional|tp_bias_+2": {
+        "delta": {
+          "TRAIN": 0.41528410211721667,
+          "VALIDATION": -0.15464338160661495,
+          "OOS": -0.9109906550219227
+        },
+        "oos_without_top3_delta": -0.9124838106654554
+      }
+    }
+  },
+  "b_opposite_signal": {
+    "pass": false,
+    "details": {
+      "unconditional|tp_bias_-2": {
+        "delta": {
+          "TRAIN": 0.0703389620275702,
+          "VALIDATION": -0.010118761757552344,
+          "OOS": -0.12424560090201514
+        },
+        "oos_without_top3_delta": -0.127424970036319
+      },
+      "unconditional|tp_bias_+2": {
+        "delta": {
+          "TRAIN": -0.025717708574555027,
+          "VALIDATION": -0.08986559720059037,
+          "OOS": -0.2566688090931415
+        },
+        "oos_without_top3_delta": -0.256503177712159
+      },
+      "conditional|tp_bias_-2": {
+        "delta": {
+          "TRAIN": 0.3132942444694097,
+          "VALIDATION": 0.07896232848723642,
+          "OOS": 0.15994332489743257
+        },
+        "oos_without_top3_delta": 0.15648666665109384
+      },
+      "conditional|tp_bias_+2": {
+        "delta": {
+          "TRAIN": -0.02162901409021277,
+          "VALIDATION": -0.410911089234283,
+          "OOS": -0.2905686204950592
+        },
+        "oos_without_top3_delta": -0.2904381625060818
+      }
+    }
+  },
+  "regression": {
+    "expected": 0.31802370106778705,
+    "got": 0.31802370106778705,
+    "ok": true
+  },
+  "signals": 9400,
+  "families_total": 30
+}

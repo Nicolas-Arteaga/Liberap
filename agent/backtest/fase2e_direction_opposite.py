@@ -20,7 +20,7 @@ def verdict(vals,base):
         no3=sorted(vals[s]['OOS'],reverse=True)[3:]; bn=sorted(base[s]['OOS'],reverse=True)[3:]
         out[s]={'delta':d,'oos_without_top3_delta':mean(no3)-mean(bn)}
         ok &= d['OOS']>0 and out[s]['oos_without_top3_delta']>0 and sum(x>0 for x in d.values())>=2
- return ok,out
+    return ok,out
 
 def opposite_profile():
  p=dict(c.CASO3_PROFILE); p.update({'allowLong':True,'allowShort':False})
@@ -48,13 +48,15 @@ def opposite_exit(rows, opens, trade, mode, opp):
 def main():
  p=argparse.ArgumentParser();p.add_argument('--output',required=True);p.add_argument('--smoke',action='store_true');a=p.parse_args()
  with open(CACHE,'rb') as h: st=pickle.load(h)['stream']
- ts=[{'open_ms':x[0],'symbol':x[1],'entry':x[2],'sl':x[3],'tp':x[4],'side':x[5]} for x in st]
+ # M1b: raw bucket x[0] is the beginning of the pattern hour; entry occurs
+ # at its close and therefore every exit/split begins at x[0] + HOUR.
+ ts=[{'open_ms':x[0]+m.HOUR,'symbol':x[1],'entry':x[2],'sl':x[3],'tp':x[4],'side':x[5]} for x in st]
  if a.smoke: ts=ts[:20]
  eng=BacktestEngine(); pc=eng.ma_precompute(opposite_profile(),eng.available_symbols(),m.START,m.END,fidelity=None)
  opposite={s:sorted(fr) for s,fr in pc['ready'].items()}
  con=sqlite3.connect('file:/app/data/binance_vision_clean.db?mode=ro',uri=True); cache={}; raw=defaultdict(lambda:defaultdict(lambda:defaultdict(list))); inv=defaultdict(lambda:defaultdict(lambda:defaultdict(list))); sig=defaultdict(lambda:defaultdict(lambda:defaultdict(list)))
  for t in ts:
-  rows=m.rows_for(con,t['symbol'],cache); opens=[x[0] for x in rows]; split=m.split_for(t['open_ms'])
+  rows=m.rows_for(con,t['symbol'],cache); opens=[x[0] for x in rows]; split=b.aligned_split(t['open_ms'])
   for mode,bias in SC:
    key=f'{mode}|tp_bias_{bias:+.0f}'
    for target,trade in ((raw,t),(inv,mirror(t))):
@@ -68,5 +70,5 @@ def main():
  vb,db=verdict({s:sig[s]['baseline'] for s in sig},{s:raw[s]['baseline'] for s in raw})
  chk=mean(raw['unconditional|tp_bias_-2']['baseline']['OOS'])
  out={'a_inverted_direction':{'pass':va,'details':da},'b_opposite_signal':{'pass':vb,'details':db},'regression':{'expected':b.PRIOR_BASELINE_OOS_UNCOND_M2,'got':chk,'ok':abs(chk-b.PRIOR_BASELINE_OOS_UNCOND_M2)<1e-9},'signals':len(ts),'families_total':30}
- os.makedirs(os.path.dirname(a.output),exist_ok=True);json.dump(out,open(a.output,'w'),indent=2);print(json.dumps({'output':a.output,'a_pass':va,'b':out['b_opposite_signal']['status'],'regression_ok':out['regression']['ok']}))
+ os.makedirs(os.path.dirname(a.output),exist_ok=True);json.dump(out,open(a.output,'w'),indent=2);print(json.dumps({'output':a.output,'a_pass':va,'b_pass':vb,'regression_ok':out['regression']['ok']}))
 if __name__=='__main__':main()

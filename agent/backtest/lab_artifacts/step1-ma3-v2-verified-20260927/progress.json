@@ -1,0 +1,10 @@
+{
+  "id": "ma3-20260927T043134Z",
+  "strategy": "ma3",
+  "status": "running",
+  "started_at_utc": "2026-09-27T04:31:34.465999+00:00",
+  "done": 9217,
+  "total": 9400,
+  "exit_code": null,
+  "updated_at_utc": "2026-09-27T04:39:42.049773+00:00"
+}

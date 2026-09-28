@@ -1,4 +1,4 @@
-"""Fase 2b: ATR stop-loss and time-based exits on the frozen MA3 raw-signal population.
+"""Fase 2b v2: ATR stop-loss and time-based exits on aligned MA3 signals.
 
 Preregistered in MISION_LOG.md (commit 841a4f0) before this script was run.
 Diagnostic-only: no production selection, no sizing, no dollar PnL.
@@ -22,7 +22,20 @@ NEW_VARIANTS = ("sl_atr_1.0", "sl_atr_1.5", "sl_atr_2.0", "time_exit_12h", "time
                 "time_exit_36h", "time_stop_24h_if_losing")
 VARIANTS = ("baseline",) + NEW_VARIANTS
 SCENARIOS = (("unconditional", -2.0), ("unconditional", 2.0), ("conditional", -2.0), ("conditional", 2.0))
-PRIOR_BASELINE_OOS_UNCOND_M2 = 0.30710306548436167  # result.json of Fase 2, unconditional|tp_bias_-2
+PRIOR_BASELINE_OOS_UNCOND_M2 = 0.31802370106778705  # aligned M1b baseline, unconditional|tp_bias_-2
+
+
+def aligned_split(open_ms):
+    """Match MA3Adapter.split_of: aligned entries at/after END remain OOS.
+
+    The frozen stream has four last-hour observations whose actual entry is
+    END + HOUR.  This is not a cutoff change; it is the M1b entry instant.
+    """
+    if open_ms < m.SPLITS[1][1]:
+        return "TRAIN"
+    if open_ms < m.SPLITS[2][1]:
+        return "VALIDATION"
+    return "OOS"
 
 
 def hourly_series(rows):
@@ -112,7 +125,10 @@ def main():
     causal.WIN_A, causal.WIN_B, causal.KL_END = m.START, m.END, m.END + 720 * HOUR
     causal.CACHE = args.cache
     stream = causal.build_candstream()["stream"]
-    trades = [{"open_ms": b, "symbol": s, "entry": e, "sl": sl, "tp": tp, "side": side} for b, s, e, sl, tp, side, _ in stream]
+    # M1b corrigendum: engine evaluates the hourly pattern at b + HOUR and
+    # entry is the close of that hour's last 5m candle.  Every split and exit
+    # must therefore start at this aligned instant, never at raw bucket b.
+    trades = [{"open_ms": b + HOUR, "symbol": s, "entry": e, "sl": sl, "tp": tp, "side": side} for b, s, e, sl, tp, side, _ in stream]
     if args.smoke:
         trades = trades[:40]
     conn = sqlite3.connect("file:/app/data/binance_vision_clean.db?mode=ro", uri=True)
@@ -141,7 +157,7 @@ def main():
         atr = atr_before(hours, hour_starts, trade["open_ms"])
         if atr is None:
             no_atr += 1
-        split = m.split_for(trade["open_ms"])
+        split = aligned_split(trade["open_ms"])
         for variant in VARIANTS:
             for mode, bias in SCENARIOS:
                 px, _ = exit_new(rows, opens, trade, variant, mode, bias, atr)
@@ -149,7 +165,7 @@ def main():
                 results[f"{mode}|tp_bias_{bias:+.0f}"][variant].append((split, net))
     conn.close()
 
-    out = {"label": "HIPOTESIS; raw population is not production selection; preregistered in commit 841a4f0",
+    out = {"label": "HIPOTESIS; aligned-v2 raw population is not production selection; preregistered criterion from commit 841a4f0",
            "population": {"raw_signals": len(trades), "trades_without_atr_fallback_to_original_sl": no_atr},
            "families_tested_total_nonbaseline": 6 + len(NEW_VARIANTS), "scenarios": {}}
     for scen, byv in results.items():
