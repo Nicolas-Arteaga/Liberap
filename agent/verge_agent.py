@@ -8,6 +8,7 @@ import copy
 import hashlib
 import config
 import bucket_calibrator
+from scan_ledger import ScanLedger
 import requests
 import asyncio
 from datetime import datetime, timezone
@@ -251,6 +252,13 @@ class VergeAgent:
         self.signals   = SignalEngine(self.fetcher)
         self.risk      = RiskManager(self.fetcher)
         self.positions = PositionManager(self.auth)
+        self.scan_ledger = ScanLedger(
+            enabled=getattr(config, "SCAN_LEDGER_ENABLED", False),
+            path=getattr(config, "SCAN_LEDGER_PATH", "data/scan_ledger.jsonl"),
+            batch_size=getattr(config, "SCAN_LEDGER_BATCH_SIZE", 50),
+            flush_interval_seconds=getattr(config, "SCAN_LEDGER_FLUSH_INTERVAL_SECONDS", 15),
+            max_bytes=getattr(config, "SCAN_LEDGER_MAX_BYTES", 50 * 1024 * 1024),
+        )
 
         # Crea el cliente de Binance YA (no al primer trade real) para que el
         # precalentado del cache de precisión tenga tiempo de terminar antes
@@ -2418,10 +2426,21 @@ class VergeAgent:
             # Try ranked candidates in order (LSE + Nexus); AGENT_MAX_CANDIDATES_PER_CYCLE enables rank 2..N fallback.
             max_try = max(1, AGENT_MAX_CANDIDATES_PER_CYCLE)
             p_ranked = p_candidates[:max_try]
+            try:
+                self.scan_ledger.record_profile_scan(
+                    profile, p_candidates, cycle_rejected, p_active_count, p_max_pos, p_ranked
+                )
+            except Exception as exc:
+                logger.warning("[SCAN-LEDGER] observation skipped: %s", exc)
             
             for idx, cand in enumerate(p_ranked):
                 sym = cand.get("symbol", "")
-                if self._execute_trade(cand, profile=profile, cycle_rejected=cycle_rejected):
+                executed = self._execute_trade(cand, profile=profile, cycle_rejected=cycle_rejected)
+                try:
+                    self.scan_ledger.record_attempt(profile, cand, idx + 1, executed)
+                except Exception as exc:
+                    logger.warning("[SCAN-LEDGER] attempt observation skipped: %s", exc)
+                if executed:
                     logger.info(f"✅ Trade executed for profile {p_name} on {sym}")
                     # Update active_trades list for next profile in same cycle
                     active_trades = self.positions.get_active_trades() or []
@@ -5864,6 +5883,15 @@ class VergeAgent:
 
     def _execute_trade(self, candidate: dict, profile: dict = None, is_triggered_sniper: bool = False, cycle_rejected: list = None) -> bool:
         symbol = candidate["symbol"]
+
+        def reject(reason: str, **details) -> bool:
+            """Observation-only: preserve the existing False decision exactly."""
+            try:
+                self.scan_ledger.record_rejection(profile, candidate, reason, details)
+            except Exception:
+                pass
+            return False
+
         is_golden = self._is_golden_uturn_candidate(candidate)
         is_total_sweep = self._is_total_sweep_candidate(candidate)
         if is_golden:
@@ -5893,7 +5921,7 @@ class VergeAgent:
                 }
                 self.state.add_pending_sniper(sniper_data)
                 logger.info(f"[SNIPER] 🎯 Trap set for {symbol} at {trigger_price:.6f} (0.5% above MA99={ma99:.6f}). Score={confluence:.1f}%")
-                return False
+                return reject("sniper_queued", trigger_price=trigger_price)
             else:
                 logger.warning(f"[SNIPER] Could not set trap for {symbol}: failed to calculate MA99.")
 
@@ -5904,7 +5932,7 @@ class VergeAgent:
         market_px = self.fetcher.get_current_price(symbol)
         if market_px <= 0:
             logger.warning("[SKIP] %s invalid market price for setup validation", symbol)
-            return False
+            return reject("invalid_market_price", observed_price=market_px)
 
         # Update staleness metric for VETO #4
         if candidate.get("scored_at"):
@@ -5913,7 +5941,7 @@ class VergeAgent:
         ok, code, setup_metrics = validate_pre_trade(candidate, market_px, profile=profile, btc_filter=self.btc_filter, btc_corr=self.btc_corr)
         if not ok:
             logger.info("[SKIP] %s — %s | profile=%s | metrics=%s", code, symbol, profile.get("name") if profile else "Legacy", setup_metrics)
-            return False
+            return reject(f"pre_trade:{code}", setup_metrics=setup_metrics)
 
         setup_skip = "ok"
 
@@ -5933,12 +5961,12 @@ class VergeAgent:
             candidate["margin_multiplier"] = ec_mult if existing_mult is None else min(existing_mult, ec_mult)
             if candidate["margin_multiplier"] <= 0.0:
                 logger.info(f"[EQUITY-CURVE] {symbol}: perfil {profile.get('name')} pausado por drawdown propio — no se abre.")
-                return False
+                return reject("equity_curve_breaker", multiplier=candidate["margin_multiplier"])
 
         pos_details = self.risk.calculate_position(symbol, candidate, available_balance=balance, profile=profile)
 
         if not pos_details:
-            return False
+            return reject("risk_position_unavailable")
         
         # ── AI-GRADE AUDIT: Capture MA7 distance for Sniper filter validation ──
         try:
@@ -6149,7 +6177,7 @@ class VergeAgent:
         active_trades = self.positions.get_active_trades()
         if active_trades is None:
             logger.error("[LIMIT] No se pudo conectar al backend para verificar posiciones activas. Abortando trade.")
-            return False
+            return reject("active_positions_unavailable")
 
         # Evitar duplicar margen en el mismo símbolo dentro del mismo perfil
         # (Permite que distintos perfiles abran el mismo símbolo de forma independiente)
@@ -6162,7 +6190,7 @@ class VergeAgent:
             for t in active_trades
         ):
             logger.info(f"[SKIP] Ya existe una posición activa para {symbol} en el perfil '{profile.get('name', 'Legacy') if profile else 'Standard Scalping'}'. Evitando duplicar margen.")
-            return False
+            return reject("duplicate_symbol_profile")
 
         # El límite se calcula por perfil para que las 5 estrategias operen de forma independiente
         p_max_pos = int(profile.get("maxOpenPositions", config.MAX_OPEN_POSITIONS)) if profile else config.MAX_OPEN_POSITIONS
@@ -6204,12 +6232,12 @@ class VergeAgent:
                 closed_worst = self._close_worst_position(profile_id=p_id)
                 if not closed_worst:
                     logger.info("No se pudo cerrar la peor posición. Upgrade abortado.")
-                    return False
+                    return reject("slot_upgrade_close_failed", active_count=p_active_count, max_positions=p_max_pos)
             else:
                 logger.info(
                     f"[LIMIT] Slots llenos. {gate_desc} — no alcanza para reemplazar posición existente."
                 )
-                return False
+                return reject("profile_slots_full", active_count=p_active_count, max_positions=p_max_pos, gate=gate_desc)
 
         # Slot libre: mínimo de calidad según fuente
         # Golden U-Turn VIP: la geometría MA99 reemplaza la confianza Nexus-15
@@ -6227,7 +6255,7 @@ class VergeAgent:
                     f"[THE-BARRIER] {symbol} RECHAZADO: Golden U-Turn con BearTrend + Wait "
                     f"(Score=99 bypass DESACTIVADO por FIX B v11.0)"
                 )
-                return False
+                return reject("golden_beartrend_wait")
             
             logger.info(
                 f"[GOLDEN-VIP] {symbol}: bypass MIN_ENTRY_NEXUS — "
@@ -6245,7 +6273,7 @@ class VergeAgent:
                 logger.info(
                     f"[SKIP] Nexus={nexus_conf_pct:.1f}% < {min_entry_nexus}% mínimo para slot libre."
                 )
-                return False
+                return reject("min_entry_nexus", observed=nexus_conf_pct, required=min_entry_nexus)
 
         # ── BTC INTELLIGENT BLOCKING (Capa C) ──
         # Bloquear LONGs cuando BTC está en DUMPING, excepto si hay desacople institucional real
@@ -6282,7 +6310,7 @@ class VergeAgent:
                 else:
                     logger.warning(f"[BTC-BLOCK] {symbol} LONG bloqueado — DUMPING sin desacople institucional (regime={btc_regime})")
                     self.report.record_btc_trade_blocked()
-                    return False
+                    return reject("btc_dumping_no_decouple", regime=btc_regime)
             
             # Scalping Clone: bloqueo adicional en NEUTRAL + tendencia 1h DOWN (sin excepción decouple)
             profile_name = profile.get("name", "") if profile else ""
@@ -6290,7 +6318,7 @@ class VergeAgent:
                 if self.btc_filter.get_btc_trend_1h() == "DOWN" and not btc_decouple:
                     logger.warning(f"[BTC-BLOCK-CLONE] {symbol} Clone bloqueado — 1h DOWN + régimen {btc_regime}")
                     self.report.record_btc_trade_blocked()
-                    return False
+                    return reject("clone_btc_trend_gate", regime=btc_regime)
         elif side == 1:  # SHORT
             # SHORTs: no bloquear, el dump de BTC los favorece. Solo loggear contexto.
             logger.info(f"[BTC-INFO] {symbol} SHORT con régimen BTC={btc_regime}")
@@ -6305,7 +6333,7 @@ class VergeAgent:
             from position_manager import is_symbol_invalid_for_current_env
             if is_symbol_invalid_for_current_env(symbol):
                 logger.warning(f"[BINANCE REAL] {symbol} inválido en este entorno — se salta el candidato completo (ni simulación interna).")
-                return False
+                return reject("binance_symbol_invalid")
 
         # ── NEXUS-5 AUTO-EXECUTION GATE ────────────────────────────────────────────
         # If NEXUS5_ONLY_AUTO_EXECUTE is True: only trades from NEXUS-5 (total_sweep) execute automatically.
@@ -6318,7 +6346,7 @@ class VergeAgent:
                 f" | Score={confluence:.1f} | Nexus={nexus_conf_pct:.1f}% | "
                 f"Margin={pos_details.get('margin')} | Entry={market_px}"
             )
-            return False
+            return reject("nexus5_manual_confirmation")
 
         logger.info(f"Opening {candidate['trade_direction']} on {symbol}. Margin: {pos_details['margin']}")
         trade_result = self.positions.open_trade(pos_details)
@@ -6369,6 +6397,10 @@ class VergeAgent:
                 **candidate,
                 **pos_details,
             }
+            try:
+                self.scan_ledger.record_acceptance(profile, candidate, pos_details, trade_id)
+            except Exception as exc:
+                logger.warning("[SCAN-LEDGER] acceptance observation skipped: %s", exc)
             self.state.add_position(local_pos)
             self.state.record_trade_action(symbol, source=candidate.get("source"))
             if candidate.get("source") == "LSE":
@@ -6391,7 +6423,7 @@ class VergeAgent:
 
             return True
 
-        return False
+        return reject("open_trade_failed")
 
     # ─────────────────────────────────────────────────────────
     # Position management
@@ -6556,6 +6588,24 @@ class VergeAgent:
             # v9.8 Diamond Hands: Desactivado para Golden U-Turn
             if hours_open >= config.MAX_POSITION_DURATION_HOURS and not is_diamond:
                 should_close, close_reason = True, "Max duration exceeded"
+
+            # Observation only.  This snapshot is deliberately after every close
+            # rule has run and before any backend mutation; it cannot alter a
+            # decision or a position.
+            try:
+                current_return_pct = None
+                if entry_price > 0:
+                    current_return_pct = ((current_price - entry_price) / entry_price * 100) if side == 0 else ((entry_price - current_price) / entry_price * 100)
+                decision_rule = close_reason if should_close else "hold"
+                self.scan_ledger.record_position_review(
+                    pos, current_price, hours_open, current_return_pct, decision_rule
+                )
+                if should_close:
+                    self.scan_ledger.record_position_close(
+                        pos, current_price, hours_open, current_return_pct, close_reason
+                    )
+            except Exception:
+                pass
 
             if not should_close:
                 # Use pre-fetched backend_ids (fetched once before the loop)
