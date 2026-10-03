@@ -14,9 +14,8 @@ from __future__ import annotations
 
 import csv
 import os
-import sqlite3
 
-from . import Adapter
+from . import Adapter, AdapterDefinition, EntryDefinition, SQLiteCandleSource, TemporalQuantileSplits
 
 HOUR = 3_600_000
 CSV_PATH = os.environ.get(
@@ -32,35 +31,39 @@ class BandTouchAdapter(Adapter):
     bar_ms = 900_000
     expected_baseline = None  # sin baseline histórico congelado: el chequeo de regresión no aplica
     require_coverage = True   # entradas fuera de la cobertura de velas se descartan (y se cuentan)
+    definition = AdapterDefinition(
+        name=name, display_name="Band Touch 15m", aliases=aliases,
+        population=population, bar_ms=bar_ms, require_coverage=require_coverage,
+    )
+    entry_definition = EntryDefinition(
+        source="CSV congelado de trades reales cerrados",
+        condition="toque de banda que ya pasó la selección de producción",
+        execution_time="instante OpenedAt del trade real",
+    )
+    candle_source = SQLiteCandleSource(
+        key="live", db_path=LIVE_DB, table="klines", interval="15m", timeout=10,
+    )
 
     def __init__(self):
-        self._cuts = None
+        self.split_policy = TemporalQuantileSplits()
 
-    def entries(self):
+    def build_entries(self):
         out = []
-        for row in csv.DictReader(open(CSV_PATH, encoding="utf8")):
-            try:
-                out.append({"open_ms": int(float(row["open_ms"])), "symbol": row["symbol"], "entry": float(row["entry"]),
-                            "side": int(row["side"]), "sl": float(row["sl"]), "tp": float(row["tp"])})
-            except (ValueError, KeyError):
-                continue  # fila sin SL/TP/entrada válidos
+        with open(CSV_PATH, encoding="utf8") as handle:
+            for row in csv.DictReader(handle):
+                try:
+                    out.append({"open_ms": int(float(row["open_ms"])), "symbol": row["symbol"], "entry": float(row["entry"]),
+                                "side": int(row["side"]), "sl": float(row["sl"]), "tp": float(row["tp"])})
+                except (ValueError, KeyError):
+                    continue  # fila sin SL/TP/entrada válidos
         out.sort(key=lambda t: t["open_ms"])
-        n = len(out)
-        if n:
-            self._cuts = (out[int(n * 0.50)]["open_ms"], out[min(n - 1, int(n * 0.75))]["open_ms"])
+        self.split_policy.fit(out)
         return out
 
     def candles(self, symbol):
-        conn = self._pid_conn("live", lambda: sqlite3.connect(f"file:{LIVE_DB}?mode=ro", uri=True, timeout=10))
-        return conn.execute(
-            "SELECT open_time, high, low, close FROM klines WHERE symbol=? AND interval='15m' "
-            "ORDER BY open_time", (symbol,)).fetchall()
+        return self.candle_source.rows(self, symbol)
 
     def split_of(self, open_ms):
-        if self._cuts is None:
+        if self.split_policy._cuts is None:
             self.entries()
-        if open_ms < self._cuts[0]:
-            return "TRAIN"
-        if open_ms < self._cuts[1]:
-            return "VALIDATION"
-        return "OOS"
+        return self.split_policy.split_of(open_ms)

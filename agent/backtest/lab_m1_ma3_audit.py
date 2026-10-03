@@ -5,8 +5,7 @@ from collections import Counter, defaultdict
 sys.path.insert(0, os.path.dirname(__file__))
 import lab_core as C
 import lab_integrity as I
-from lab_adapters.ma3 import MA3Adapter
-from lab_adapters.band_touch import BandTouchAdapter
+from lab_adapters import get_adapter
 
 STRATEGY=os.environ.get('LAB_AUDIT_STRATEGY','ma3')
 OUT=os.environ.get('LAB_AUDIT_OUT',f'/app/backtest/lab_artifacts/m1-{STRATEGY}-20260926')
@@ -35,7 +34,7 @@ def severity_scores(fwd24, gross, cost, breakeven, win_rate, gave_back_pct, sl_c
          'SALIDA':round(gave_back_pct or 0), 'SL':round(sl_cf_pct or 0),
          'TIMEOUT':min(100,round((timeout_pct or 0)*max(0,-(timeout_mean or 0))))}
 def write_progress(status, processed=0, total=0, **extra):
- payload={'id':'m1-ma3-20260926','status':status,'processed':processed,'total':total,
+ payload={'id':f'm1-{STRATEGY}-20260926','status':status,'processed':processed,'total':total,
           'updated_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),**extra}
  os.makedirs(OUT,exist_ok=True)
  with open(OUT+'/progress.json','w',encoding='utf8') as f: json.dump(payload,f,indent=2)
@@ -58,7 +57,7 @@ def day_block_ci(rows, horizon, rounds=1000):
          'n_days':len(days),'n':sum(map(len,by_day.values()))}
 
 def main():
- a=MA3Adapter() if STRATEGY=='ma3' else BandTouchAdapter(); entries=a.entries(); by=defaultdict(list)
+ a=get_adapter(STRATEGY); entries=a.entries(); by=defaultdict(list)
  for t in entries: by[t['symbol']].append(t)
  rows=[]; integrity=[]; write_progress('running',0,len(entries),started_at_utc=datetime.datetime.now(datetime.timezone.utc).isoformat())
  for symbol_index,(sym,ts) in enumerate(by.items(),1):
@@ -80,8 +79,8 @@ def main():
  # Frecuencia sola no es daño: una causa suma severidad sólo si deteriora retorno.
  severity=severity_scores(fwd[24]['mean'],gross,a.cost_pct,breakeven,wr,pct(gave,len(reached)),pct(slcf,len(sl)),pct(len(timeout),len(rows)),timeout_mean)
  main_area=max(severity,key=severity.get)
- result={'valid':integrity_report['valid'],'integrity':integrity_report,'n':len(rows),'forward_return_pct_day_block_ci':fwd,'gross_edge_pct':gross,'cost_pct':a.cost_pct,'net_expectancy_pct':net,'win_rate_pct':wr,'break_even_win_rate_pct':breakeven,'avg_win_pct':aw,'avg_loss_pct':al,'reached_2pct_n':len(reached),'reached_2pct_ended_loss_pct':pct(gave,len(reached)),'sl_n':len(sl),'sl_cf_reaches_tp_pct':pct(slcf,len(sl)),'timeout_n':len(timeout),'timeout_pct':pct(len(timeout),len(rows)),'timeout_mean_return_pct':timeout_mean,'reasons':reasons,'severity':severity,'severity_formula':'ENTRADA=max(0,-media_24h*20); COSTOS=max(0,-edge_bruto*20); PAYOFF=max(0,win_equilibrio-win_real); SALIDA=porcentaje que llegó a +2% y terminó en pérdida; SL=porcentaje contrafactual que habría llegado al TP; TIMEOUT=porcentaje_timeout*max(0,-retorno_timeout). Frecuencia sin daño no suma. Todo limitado a 0..100.','main_area':main_area,'fidelity':{'detection':'37/38','exit_reason':'84%','return':'66%','selection':'no reproducible sin ledger'}}
- label='MA Slope Caso 3' if STRATEGY=='ma3' else 'Band Touch 15m'
+ result={'valid':integrity_report['valid'],'integrity':integrity_report,'n':len(rows),'forward_return_pct_day_block_ci':fwd,'gross_edge_pct':gross,'cost_pct':a.cost_pct,'net_expectancy_pct':net,'win_rate_pct':wr,'break_even_win_rate_pct':breakeven,'avg_win_pct':aw,'avg_loss_pct':al,'reached_2pct_n':len(reached),'reached_2pct_ended_loss_pct':pct(gave,len(reached)),'sl_n':len(sl),'sl_cf_reaches_tp_pct':pct(slcf,len(sl)),'timeout_n':len(timeout),'timeout_pct':pct(len(timeout),len(rows)),'timeout_mean_return_pct':timeout_mean,'reasons':reasons,'severity':severity,'severity_formula':'ENTRADA=max(0,-media_24h*20); COSTOS=max(0,-edge_bruto*20); PAYOFF=max(0,win_equilibrio-win_real); SALIDA=porcentaje que llegó a +2% y terminó en pérdida; SL=porcentaje contrafactual que habría llegado al TP; TIMEOUT=porcentaje_timeout*max(0,-retorno_timeout). Frecuencia sin daño no suma. Todo limitado a 0..100.','main_area':main_area,'fidelity':a.fidelity_result}
+ label=a.definition.display_name
  lines=[f'# Auditoría {label} — {len(rows)} trades','## Chequeos de integridad']
  lines += [f'- {name}: {data["status"]}.' for name,data in integrity_report['checks'].items()]
  if not integrity_report['valid']:
@@ -91,7 +90,7 @@ def main():
  facts={'ENTRADA':f'Retorno medio 1/4/12/24/48h con IC bootstrap por día: '+', '.join(f'{h}h={fmt(fwd[h]["mean"])}% [{fmt(fwd[h]["lo"])}, {fmt(fwd[h]["hi"])}], n={fwd[h]["n"]}, días={fwd[h]["n_days"]}' for h in C.FWD_HOURS),'COSTOS':f'Bruto {fmt(gross)}% y costo {a.cost_pct:.2f}%','PAYOFF':f'Win rate {fmt(wr)}% vs equilibrio {fmt(breakeven)}%','SALIDA':f'{len(reached)} llegaron a +2%; {fmt(pct(gave,len(reached)))}% terminaron perdiendo','SL':f'{len(sl)} SL; {fmt(pct(slcf,len(sl)))}% habría llegado a TP sin SL','TIMEOUT':f'{len(timeout)} timeout ({fmt(pct(len(timeout),len(rows)))}%), retorno {fmt(mean([r["ret"] for r in timeout]))}%'}
  if integrity_report['valid']:
   for k in severity: lines += [f'### [{k}] — severidad {severity[k]}/100',f'QUÉ PASA: {facts[k]}.',f'POR QUÉ IMPORTA: {WHY[k]}',f'EVIDENCIA: n={len(rows)}, `result.json`.', 'CONFIANZA: BAJA; no son selecciones reales de producción.', 'Qué NO se puede concluir: no prueba que cambiar solo esta regla mejore producción.']
-  lines += ['## Motivos de salida','| Motivo | N | % | Retorno medio |','|---|---:|---:|---:|']+[f'| {k} | {v["n"]} | {fmt(v["pct"])} | {fmt(v["mean_return"])} |' for k,v in reasons.items()]+['## Qué no se pudo evaluar', 'Fidelidad: detección 37/38, motivo 84%, retorno fino 66%; selección/timeouts de producción no reproducibles sin ledger.', '## Qué haría alguien no técnico con esto','- No cambiaría la estrategia en producción a partir de este informe.','- Vigilaría las ganancias que superan +2 % porque muchas terminan en pérdida.','- Esperaría la validación contra el ledger antes de modificar la salida.']
+  lines += ['## Motivos de salida','| Motivo | N | % | Retorno medio |','|---|---:|---:|---:|']+[f'| {k} | {v["n"]} | {fmt(v["pct"])} | {fmt(v["mean_return"])} |' for k,v in reasons.items()]+['## Qué no se pudo evaluar', a.fidelity_note, '## Qué haría alguien no técnico con esto','- No cambiaría la estrategia en producción a partir de este informe.','- Vigilaría las ganancias que superan +2 % porque muchas terminan en pérdida.','- Esperaría la validación contra el ledger antes de modificar la salida.']
  os.makedirs(OUT,exist_ok=True)
  with open(OUT+'/result.json','w',encoding='utf8') as f: json.dump(result,f,indent=2)
  with open(OUT+'/manual_inputs.json','w',encoding='utf8') as f: json.dump({'returns_pct':[r['ret'] for r in rows]},f)

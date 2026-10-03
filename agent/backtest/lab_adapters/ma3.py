@@ -7,10 +7,9 @@ from __future__ import annotations
 
 import os
 import pickle
-import sqlite3
 from datetime import datetime, timezone
 
-from . import Adapter
+from . import Adapter, AdapterDefinition, EntryDefinition, FixedTimeSplits, SQLiteCandleSource
 
 HOUR = 3_600_000
 START = int(datetime(2025, 12, 1, tzinfo=timezone.utc).timestamp() * 1000)
@@ -28,6 +27,20 @@ class MA3Adapter(Adapter):
     aliases = ("MA Slope Caso 3", "ma_slope_caso_3", "caso3")
     population = "raw"
     bar_ms = 300_000
+    definition = AdapterDefinition(
+        name=name, display_name="MA Slope Caso 3", aliases=aliases,
+        population=population, bar_ms=bar_ms,
+    )
+    entry_definition = EntryDefinition(
+        source="stream pickle congelado de Fase 2",
+        condition="señal MA Slope Caso 3 ya evaluada por engine.py",
+        execution_time="cierre de la hora: b + interval_ms",
+    )
+    candle_source = SQLiteCandleSource(
+        key="canon", db_path=CANONICAL_DB, table="klines_5m", interval="5m",
+        start_ms=START, end_ms=END + 720 * HOUR,
+    )
+    split_policy = FixedTimeSplits(CUT_TRAIN_VAL, CUT_VAL_OOS)
     # Referencia histórica: calculada antes de corregir `b` -> instante real
     # de entrada. Se conserva como evidencia, pero no valida corridas nuevas.
     expected_baseline_v1_desalineado = {
@@ -47,28 +60,21 @@ class MA3Adapter(Adapter):
     }
     baseline_scenario_tol = 1e-8
 
-    def entries(self):
+    def build_entries(self):
         if not os.path.exists(STREAM_CACHE):
             raise SystemExit(
                 f"falta el stream congelado {STREAM_CACHE}. Regeneralo con "
                 "fase2_ma3_broad_matrix.py (≈1,5 h) o fijá LAB_MA3_STREAM.")
-        stream = pickle.load(open(STREAM_CACHE, "rb"))["stream"]
+        with open(STREAM_CACHE, "rb") as handle:
+            stream = pickle.load(handle)["stream"]
         # engine.py evalúa al cierre de la hora: now_ms=b+interval_ms. El
         # precio del stream coincide con ese cierre, no con el comienzo `b`.
         return [{"open_ms": b + HOUR, "symbol": s, "entry": e, "sl": sl, "tp": tp, "side": side}
                 for b, s, e, sl, tp, side, _ in stream]
 
     def candles(self, symbol):
-        conn = self._pid_conn("canon", lambda: sqlite3.connect(f"file:{CANONICAL_DB}?mode=ro", uri=True))
-        return conn.execute(
-            "SELECT open_time, high, low, close FROM klines_5m WHERE symbol=? AND interval='5m' "
-            "AND open_time>=? AND open_time<? ORDER BY open_time",
-            (symbol, START, END + 720 * HOUR)).fetchall()
+        return self.candle_source.rows(self, symbol)
 
     def split_of(self, open_ms):
         # END es inclusivo solo para el último split (4 señales caen exactamente en END; ver MISION_LOG.md).
-        if open_ms < CUT_TRAIN_VAL:
-            return "TRAIN"
-        if open_ms < CUT_VAL_OOS:
-            return "VALIDATION"
-        return "OOS"
+        return self.split_policy.split_of(open_ms)
