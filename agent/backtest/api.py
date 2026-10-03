@@ -53,8 +53,12 @@ LAB_ARTIFACTS = os.path.join(os.path.dirname(__file__), "lab_artifacts")
 
 @app.get("/research/laboratory/{strategy}")
 def laboratory_report(strategy: str):
-    """Sólo lectura: último informe diagnóstico publicado para MA3 o Band."""
-    prefixes = {"ma3": "step1-ma3-audit-", "band_touch": "m2-band-"}
+    """Sólo lectura: último informe diagnóstico publicado por estrategia."""
+    prefixes = {
+        "ma3": "step1-ma3-audit-",
+        "band_touch": "m2-band-",
+        "level_sweep": "m5-level-sweep-",
+    }
     prefix = prefixes.get(strategy)
     if not prefix:
         raise HTTPException(status_code=404, detail="estrategia de laboratorio desconocida")

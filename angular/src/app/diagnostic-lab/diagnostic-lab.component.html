@@ -1,5 +1,5 @@
 <section class="lab"><h1>Laboratorio de Diagnóstico</h1><p class="subtitle">Solo lectura · horarios America/Argentina/Buenos_Aires</p>
-<div class="tabs"><button [class.active]="selected==='ma3'" (click)="selected='ma3';load()">MA Slope Caso 3</button><button [class.active]="selected==='band_touch'" (click)="selected='band_touch';load()">Band Touch</button></div>
+<div class="tabs"><button [class.active]="selected==='ma3'" (click)="selected='ma3';load()">MA Slope Caso 3</button><button [class.active]="selected==='band_touch'" (click)="selected='band_touch';load()">Band Touch</button><button [class.active]="selected==='level_sweep'" (click)="selected='level_sweep';load()">Level Sweep</button></div>
 <p *ngIf="error" class="error">{{error}}</p><ng-container *ngIf="data"><p class="generated">Generado: {{date(data.generated_at_utc)}}</p>
 <section *ngIf="invalid()" class="invalid"><strong>INFORME INVÁLIDO</strong><span>Uno o más chequeos de integridad fallaron. No uses los hallazgos ni el titular para decidir.</span></section>
 <ng-container *ngIf="!invalid()"><section class="panel integrity"><h2>Chequeos de integridad</h2><ul><li *ngFor="let check of integrity()" [class.fail]="check.status!=='PASS'"><b>{{check.status==='PASS'?'✓':'✗'}}</b><span>{{check.label}}: <strong>{{check.status}}</strong> {{check.detail}}</span></li></ul></section>
