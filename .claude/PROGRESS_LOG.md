@@ -909,3 +909,7 @@ egister_oi_collector_task.ps1` → `Start-ScheduledTask -TaskName VergeOICollect
 - M2 Band Touch: selftest exit 0; informe de 82 entradas reales exit 0 en `agent/backtest/lab_artifacts/m2-band-20260927/`.
 - M3: 30 NULL, FPR 0.0 en las seis categorías; control de entrada deliberadamente desalineada INVÁLIDO; evidencia en `m3-controls-v2-20260927/`.
 - M4: endpoint read-only y Angular `/diagnostic-lab` implementados; smoke de API PASS. Bloqueado únicamente el chequeo visual: `https://localhost:44396/.well-known/openid-configuration` falla TLS `SEC_E_NO_CREDENTIALS` y el host local no volvió a escuchar luego de reinicio. No marcar como completado hasta resolver host y tomar DOM/captura.
+
+## 2026-10-03
+- Investigación solo-lectura: VIRE (Codex, 19-20/09, `agent/backtest/invariant_research.py` + `*_research.py`) es un buscador de hipótesis que NO usa el scan ledger ni comparte código con `lab_*`; "Execution Audit" solo sirve `auto_tuner_recommendations.json` (`api.py:81`).
+- Confirmado: `/strategy-lab` (puerto 4300) es la UI del `evolutionary_lab.py`; `lab_current.json` marca 60.718 probadas, 0 encontradas (gen 2530, ~10 días activo). Pendiente verificar si `scan_ledger.py` llegó a `main`.
