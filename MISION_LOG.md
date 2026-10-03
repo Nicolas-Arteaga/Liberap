@@ -318,3 +318,9 @@
 - **Cierre:** se detuvo el proceso exacto `python.exe -u -m backtest.evolutionary_lab`, PID 14936, iniciado el `2026-09-23T09:55:36-03:00`. La última instantánea de `agent/backtest/lab_current.json` antes de detenerlo registró **60.776 estrategias probadas, 0 encontradas y generación 2.533**. Se documenta como cierre por resultado nulo, no como trabajo interrumpido.
 - **Prevención de reinicio automático:** se deshabilitó la tarea Windows `Verge-LabControl-AutoStart`. Esa tarea arrancaba `backtest.lab_control_server` al iniciar sesión y `lab_control_server.py` inicia `backtest.evolutionary_lab` durante su evento de arranque. Tras el cierre, la tarea quedó `Disabled` y `Get-CimInstance` no devolvió procesos con `backtest.evolutionary_lab`. `docker-compose.yml` no contiene un servicio ni una política de reinicio para este proceso.
 - Alcance: no se modificaron VIRE, Research, el agente vivo, el Scan Ledger, StrategyProfiles ni lógica de estrategias. La decisión sólo apaga el buscador evolutivo sin preregistro y su UI `strategy-lab` asociada.
+
+## 2026-10-03 — Cierre de seguridad del Lab Control Server
+
+- Se verificó que el endpoint de control no está expuesto: `netstat -ano` no devolvió listener en el puerto 8011 y `Get-CimInstance Win32_Process` no devolvió procesos `lab_control_server.py`/`backtest.lab_control_server`. Por tanto no hubo exposición activa que medir en esta inspección.
+- El único relanzador identificado, tarea Windows `\\Verge-LabControl-AutoStart`, permanece en estado `Disabled`. No se hallaron servicios Windows ni referencias de ejecución en `docker-compose.yml`, `agent/Dockerfile.backtest` o `agent/Dockerfile.market-ws`; la única coincidencia restante en compose es un comentario histórico.
+- No se modificó ningún `StrategyProfile` ni se investigó uso histórico del endpoint. La puerta que podía crear perfiles activos mediante `POST /control/deploy` permanece cerrada.
