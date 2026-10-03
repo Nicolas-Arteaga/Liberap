@@ -161,3 +161,107 @@ Los filtros de ENTRADA/COSTOS pueden materializarse como una población nueva.
 Las familias que cambian ejecución deberán conservar la misma población de
 entradas y declarar su receta en ese anexo. En todos los casos, la nueva
 revisión vuelve a la Máquina para un diagnóstico completo y nunca a producción.
+
+## Anexo B1 — `execution_recipe` declarativo
+
+Este anexo habilita la representación de las familias PAYOFF, SALIDA, SL y
+TIMEOUT sin convertir el manifiesto de Research en código ejecutable. Es parte
+del contrato de Fase B y no es una autorización para implementar el motor aún.
+
+### Forma exacta en la revisión hija
+
+Una revisión que modifica la ejecución agrega una única clave
+`execution_recipe` al nivel superior de su `candidate.json`:
+
+```json
+{
+  "execution_recipe": {
+    "recipe_version": "1.0",
+    "area": "SL",
+    "variant_id": "sl_atr_1_5",
+    "parent_revision": 4,
+    "catalog_sha256": "sha256-canonico-del-catalogo-aprobado"
+  }
+}
+```
+
+Los cinco campos son obligatorios y no admite campos adicionales:
+
+| Campo | Tipo | Regla |
+| --- | --- | --- |
+| `recipe_version` | texto | Debe ser exactamente `1.0`. |
+| `area` | texto | Uno de `PAYOFF`, `SALIDA`, `SL`, `TIMEOUT`. Debe coincidir con la categoría de la variante. |
+| `variant_id` | texto | Un ID de las tablas de estas cuatro categorías y de ninguna otra. |
+| `parent_revision` | entero positivo | Debe señalar la revisión inmutable de la cual deriva ésta. |
+| `catalog_sha256` | texto hex SHA-256 | Huella del catálogo canónico con el que se seleccionó el ID. Impide redefinir silenciosamente una receta. |
+
+El hash del catálogo se calcula como el SHA-256 de la sección de tabla que
+contiene el `variant_id`, codificada UTF-8 y normalizada con LF, sin espacios
+terminales. La implementación futura guardará además esa sección exacta en el
+artefacto de la revisión. Si el hash no coincide, la Máquina responde
+`INVALID` y no simula nada.
+
+### Lista permitida y resolución cerrada
+
+La Máquina resuelve el par `area` + `variant_id` exclusivamente contra estas
+listas cerradas:
+
+```text
+PAYOFF:  payoff_tp_short_50, payoff_break_even_1r, payoff_trailing_2r
+SALIDA:  exit_giveback_10, exit_giveback_25, exit_giveback_50,
+          exit_opposite_ma_profile, exit_opposite_ma_or_close_below_ma7,
+          exit_opposite_ma_or_giveback_25,
+          exit_close_below_ma7_or_giveback_25, exit_all_three_confirmation
+SL:      sl_atr_1_0, sl_atr_1_5, sl_atr_2_0
+TIMEOUT: timeout_12h, timeout_24h, timeout_36h, timeout_24h_if_losing
+```
+
+Cada ID toma sus números, velas, condiciones y orden intravela de la tabla de
+este documento. El JSON no puede aportar multiplicadores, períodos, umbrales,
+operadores, nombres de indicadores, rutas, SQL, Python, URLs, expresiones o
+plantillas. No existe una forma `custom`, `params`, `script` ni `code`.
+
+### Semántica de una revisión con receta
+
+1. `entries.jsonl` conserva exactamente las entradas de la revisión padre: el
+   hash, conteo, `open_ms`, símbolo, lado, `entry`, SL y TP originales no se
+   mutan. El cambio de ejecución se aplica sólo durante la simulación.
+2. La receta se evalúa después de la entrada y sólo con velas causalmente
+   disponibles. SL y TP base conservan prioridad; después se evalúa la receta,
+   salvo las reglas PAYOFF cuyo orden específico ya está fijado en su tabla.
+3. El resultado de cada trade debe incluir `exit_reason` con el ID de la
+   receta cuando ésta cierre/modifique el trade. Si la receta no actúa, se
+   mantiene el motivo base. Así `diagnosis.json.audit_result` puede evidenciar
+   cuántas veces tuvo efecto.
+4. La respuesta de la Máquina replica `execution_recipe` y agrega
+   `execution_recipe_effect: {"eligible_n": N, "triggered_n": N,
+   "missing_input_n": N}`. Son conteos de evidencia, no un criterio de éxito.
+5. Una receta ausente significa ejecución base. Una receta presente no se
+   combina con otra, incluso si su área vuelve a ser `main_area` en el nuevo
+   diagnóstico.
+
+### Relación con ENTRADA y COSTOS
+
+`entry_*` y `cost_*` no usan `execution_recipe`: generan una nueva
+`entries.jsonl` filtrada o reflejada, con nuevo hash. Deben dejar
+`execution_recipe` ausente. La Máquina rechaza como `INVALID` una revisión que
+mezcle población transformada y receta de ejecución en el mismo salto desde la
+revisión padre; eso preserva atribución causal de una variante por vuelta.
+
+### Rechazos obligatorios
+
+La Máquina debe responder `INVALID`, sin severidad interpretable, si ocurre
+cualquiera de estos casos:
+
+- clave extra o faltante en `execution_recipe`;
+- `area` no coincide con el ID o con la categoría atacada declarada;
+- ID no listado, hash de catálogo distinto o versión diferente de `1.0`;
+- hash/entradas diferentes a la revisión padre para una receta de ejecución;
+- receta aplicada a una entrada sin los insumos causales requeridos sin que el
+  resultado reporte el faltante;
+- más de una receta, más de una transformación o un intento de adjuntar
+  parámetros libres a la misma revisión.
+
+Este anexo sigue sujeto a las seis integridades M1b y a las invariantes de
+`LOOP_PROTOCOL.md`. No incorpora criterio de mejora, límite de intentos, OOS,
+promoción, UI ni ninguna capacidad de despliegue.

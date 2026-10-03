@@ -268,6 +268,19 @@
 - **Conteo consolidado:** 13 variantes Fase 2b + 15 vistas Fase 2d + A + B + 6 filtros combinados + 3 mapas de tamaño + 4 salidas multiseñal = **43 hipótesis/variantes probadas; 0 PASS robustos**. Las 13 nuevas del Frente 4 no cambian el veredicto anterior.
 - **Veredicto Frente 4:** SALIDA continúa como la causa de mayor severidad en MA3 y Band Touch; ninguna de las tres familias nuevas probadas (filtros combinados, tamaño por régimen, salida multiseñal) produjo un arreglo robusto sobre datos alineados. **Frente 4 queda 100% cerrado y agotado; no queda ninguna familia preregistrada sin correr.** No se modificó producción, StrategyProfiles, VIRE, el agente vivo ni el Laboratorio de Diagnóstico cerrado.
 
+## 2026-10-03 — Referencia vigente Band Touch y reproducibilidad de auditoría
+
+- `agent/backtest/lab_artifacts/m2-band-20260927/result.json` queda **OBSOLETO como referencia numérica**. Fue generado antes de que el mismo commit `c0ed73a` cambiara la severidad COSTOS desde `round(max(0,-gross_edge_pct)*20)` a la fórmula vigente de déficit contra costo; por eso registraba COSTOS 11 aun con `gross_edge_pct=-0.5527057058532558`.
+- La referencia vigente es `agent/backtest/lab_artifacts/m2-band-20261003/{result.json,informe.md,manual_inputs.json,progress.json}`. Se regeneró por auditoría de sólo lectura con el código vigente: N=82, integridad válida, severidad `ENTRADA=0, COSTOS=100, PAYOFF=4, SALIDA=72, SL=7, TIMEOUT=0`, `main_area=COSTOS`; SHA-256 de `result.json`: `006ca50d08634951e5a335550566348a84c3efc0b524e8cfe8a46866e8f7e5eb`.
+- **Limitación permanente de reproducibilidad Band Touch:** el adaptador consulta `/app/live-research/klines.db` (`agent/backtest/lab_adapters/band_touch.py`), una fuente de velas mutable sin snapshot/hash versionado. Las dos corridas conservaron N, retornos, severidad y veredictos de integridad, pero `forward_1h_variance` cambió de `16.54682918860291` a `16.510500026847076`. Futuras re-corridas pueden variar levemente en valores finos por correcciones de velas; no se deben presentar esos decimales como una reproducción bit a bit sin congelar la fuente.
+
+## 2026-10-03 — Fase B, smoke real de receta declarativa
+
+- Prueba de ejecución real: MA3 alineado, 9.400 entradas, receta cerrada `exit_giveback_10`, simulada por `lab_core.simulate` dentro de la auditoría genérica. Evidencia: `verge-backtest:/app/backtest/lab_artifacts/research-loop-ma3-giveback-20261003/result.json`.
+- Resultado negativo coherente con Fase 2b: expectativa neta de `+0.05396975815362904 %` (baseline MA3) a `-0.06654479793539002 %`; SALIDA de 34 a 60 y COSTOS de 0 a 83. La receta disparó en 9.081/9.400 trades (96,61 %). Integridad: PASS. No es una mejora ni una candidata de promoción.
+- **Pendiente explícito, no terminado:** el motor puede calcular el resultado real de una receta cerrada, pero todavía no materializa antes de correr los artefactos formales del protocolo en `research_loop/<candidate_id>/<revision>/`: `candidate.json`, `entries.jsonl` y `diagnosis.json` con hashes e inmutabilidad. Ese empaquetado formal queda para otra sesión; no debe presentarse esta prueba como el ciclo protocolario completo.
+- Fase C permanece fuera: no se implementaron criterio de mejora, límite de intentos, lectura OOS, promoción ni escritura en `StrategyProfiles`, agente o ledger.
+
 ## 2026-09-30 — Autorización explícita de Nico para despliegue del Scan Ledger
 
 - Nico autorizó textualmente que no requiere supervisión en vivo y que, si el despliegue limpio del ledger lo necesita, pueden cerrarse todas las posiciones abiertas del agente vivo. Todo cierre deberá registrarse con el motivo exacto `autorizado para despliegue de ledger`.
