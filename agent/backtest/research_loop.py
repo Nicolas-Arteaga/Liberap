@@ -1,6 +1,7 @@
 """Bucle Research↔Máquina aislado: artefactos inmutables, nunca producción."""
 from __future__ import annotations
 import datetime as dt
+import os
 import hashlib
 import json
 import shutil
@@ -24,6 +25,10 @@ def canonical(value): return hashlib.sha256(json.dumps(value, sort_keys=True, se
 def now(): return dt.datetime.now(dt.timezone.utc).isoformat().replace('+00:00','Z')
 def dump(path, value): Path(path).write_text(json.dumps(value, ensure_ascii=False, indent=2)+'\n', encoding='utf8')
 def git_commit():
+    # El contenedor de auditoría no monta .git; el invocador formal aporta
+    # el SHA que ya verificó en el checkout de integración.
+    if commit := os.environ.get('RESEARCH_SOURCE_COMMIT'):
+        return commit
     try: return subprocess.check_output(['git','rev-parse','HEAD'], text=True).strip()
     except Exception: return 'unknown'
 def state_path(root): return Path(root)/'pipeline_state.json'
@@ -54,6 +59,18 @@ def materialize_adapter(root, adapter_name, candidate_id):
       'entry_definition':{'source':adapter.entry_definition.source,'condition':adapter.entry_definition.condition,'execution_time':adapter.entry_definition.execution_time,'side_convention':adapter.entry_definition.side_convention},
       'candle_source':{'key':src.key,'interval':src.interval,'start_ms':src.start_ms,'end_ms':src.end_ms},'split_policy':policy,
       'entries_artifact':{'path':'entries.jsonl','sha256':sha(ep),'count':len(entries)}}
+    dump(dest/'candidate.json',manifest); verify_revision(dest); set_state(root,candidate_id,'Research generado',len(entries),len(entries),0,'revisión 1 inmutable'); return dest
+
+def materialize_candidate(root, adapter_name, candidate_id, entries, condition, display_name):
+    """Entrada formal Fase A: Research aporta señales normalizadas, nunca código."""
+    root=Path(root); dest=root/candidate_id/'1'; _new(dest); set_state(root,candidate_id,'Research generando',detail=display_name)
+    adapter=get_adapter(adapter_name); entries=list(entries); dest.mkdir(parents=True); ep=dest/'entries.jsonl'; ep.write_bytes(_entries(entries))
+    split=adapter.split_policy; policy=({'kind':'fixed_time','train_validation_ms':split.train_validation_ms,'validation_oos_ms':split.validation_oos_ms} if hasattr(split,'train_validation_ms') else {'kind':'temporal_quantile_50_25_25'})
+    src=adapter.candle_source; manifest={'protocol_version':'1.0-draft','candidate_id':candidate_id,'revision':1,'display_name':display_name,'submitted_at_utc':now(),
+      'research_run':{'run_id':'e2e:ma3-risk-filter-v1','family':'entry_risk_filter','hypothesis':condition,'source_commit':git_commit()},
+      'adapter_definition':{'name':adapter.definition.name,'display_name':display_name,'aliases':[candidate_id],'population':adapter.definition.population,'bar_ms':adapter.definition.bar_ms,'cost_pct':adapter.definition.cost_pct,'require_coverage':adapter.definition.require_coverage},
+      'entry_definition':{'source':'MA3 stream congelado + filtro de riesgo inicial','condition':condition,'execution_time':adapter.entry_definition.execution_time,'side_convention':adapter.entry_definition.side_convention},
+      'candle_source':{'key':src.key,'interval':src.interval,'start_ms':src.start_ms,'end_ms':src.end_ms},'split_policy':policy,'entries_artifact':{'path':'entries.jsonl','sha256':sha(ep),'count':len(entries)}}
     dump(dest/'candidate.json',manifest); verify_revision(dest); set_state(root,candidate_id,'Research generado',len(entries),len(entries),0,'revisión 1 inmutable'); return dest
 
 def verify_revision(path):
