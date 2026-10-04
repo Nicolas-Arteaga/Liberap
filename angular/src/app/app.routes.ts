@@ -90,6 +90,11 @@ export const APP_ROUTES: Routes = [
           .then(c => c.DiagnosticLabComponent),
       },
       {
+        path: 'research-loop',
+        loadComponent: () => import('./research-loop/research-loop.component')
+          .then(c => c.ResearchLoopComponent),
+      },
+      {
         path: 'invariant-research',
         loadComponent: () => import('./invariant-research/invariant-research.component')
           .then(c => c.InvariantResearchComponent),

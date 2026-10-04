@@ -17,6 +17,7 @@ import sqlite3
 import uuid
 import threading
 import time
+from pathlib import Path
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -39,6 +40,7 @@ from backtest import liquidation_research
 from backtest import liquidation_event_research
 from backtest import forced_flow_research
 from backtest import cross_venue_research
+from backtest import research_loop
 
 app = FastAPI(title="Verge Backtest API")
 app.add_middleware(
@@ -49,6 +51,51 @@ app.add_middleware(
 )
 
 LAB_ARTIFACTS = os.path.join(os.path.dirname(__file__), "lab_artifacts")
+RESEARCH_LOOP_ROOT = os.path.join(os.path.dirname(__file__), "research_loop")
+
+
+@app.get("/research/loop/status")
+def research_loop_status():
+    """Estado observable del bucle; no inicia ni modifica investigación."""
+    return research_loop.state(Path(RESEARCH_LOOP_ROOT))
+
+
+@app.get("/research/loop/improved")
+def research_loop_improved():
+    """Snapshots promovidos sólo por Fase C; nunca StrategyProfiles."""
+    root = Path(RESEARCH_LOOP_ROOT)
+    items = []
+    if root.exists():
+        for history in root.glob("*/history.json"):
+            data = json.loads(history.read_text(encoding="utf8"))
+            if data.get("status") == "IMPROVED":
+                items.append({"candidate_id": data["candidate_id"], "history": data,
+                              "snapshot": str(history.parent.relative_to(root))})
+    return {"items": items}
+
+
+@app.post("/research/loop/{candidate_id}/retry")
+def research_loop_retry(candidate_id: str):
+    """Reintento acotado desde IMPROVED; no acepta recetas ni código del cliente."""
+    root = Path(RESEARCH_LOOP_ROOT)
+    history = research_loop.history_path(root, candidate_id)
+    if not history.exists():
+        raise HTTPException(status_code=404, detail="candidato inexistente")
+    if json.loads(history.read_text(encoding="utf8")).get("status") != "IMPROVED":
+        raise HTTPException(status_code=409, detail="sólo snapshots IMPROVED pueden reenviarse")
+    job_id = f"research-loop:{candidate_id}:{uuid.uuid4()}"
+    _jobs[job_id] = {"status": "running", "done": 0, "total": 1, "kind": "research_loop_retry"}
+    def run():
+        try:
+            catalog = Path(os.environ.get("IMPROVEMENT_CATALOG",
+                str(Path(__file__).resolve().parents[2] / "IMPROVEMENT_FAMILIES.md")))
+            child, result = research_loop.rerun_improved(root, candidate_id, catalog)
+            _jobs[job_id].update({"status": "completed", "done": 1,
+                                  "result": {"revision": child.name, "history": result}})
+        except Exception as exc:
+            _jobs[job_id].update({"status": "failed", "error": str(exc)})
+    threading.Thread(target=run, daemon=True).start()
+    return {"jobId": job_id, "safety": "research_only"}
 
 
 @app.get("/research/laboratory/{strategy}")

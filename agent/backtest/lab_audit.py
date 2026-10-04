@@ -134,6 +134,33 @@ def audit_adapter(adapter, entries=None, progress=None, execution_variant=None):
                                win_rate, pct(gave_back, len(reached)), pct(sl_cf, len(sl)),
                                pct(len(timeout), len(rows)), timeout_mean)
     main_area = max(severity, key=severity.get)
+    # Fase C decide exclusivamente con TRAIN/VALIDATION. OOS queda presente
+    # como evidencia separada y no interviene en la elección de variante.
+    split_metrics = {}
+    for split in ('TRAIN', 'VALIDATION', 'OOS'):
+        subset = [row for row in rows if row['split'] == split]
+        subset_wins = [row for row in subset if row['ret'] > 0]
+        subset_losses = [row for row in subset if row['ret'] <= 0]
+        subset_avg_win = mean([row['ret'] for row in subset_wins])
+        subset_avg_loss = abs(mean([row['ret'] for row in subset_losses])) if subset_losses else None
+        subset_be = (100 * subset_avg_loss / (subset_avg_loss + subset_avg_win)
+                     if subset_avg_win and subset_avg_loss else None)
+        subset_reached = [row for row in subset if row['mfe'] >= 2]
+        subset_sl = [row for row in subset if row['reason'] == 'SL']
+        subset_timeout = [row for row in subset if row['reason'].startswith('timeout')]
+        subset_timeout_mean = mean([row['ret'] for row in subset_timeout])
+        split_metrics[split] = {
+            'n': len(subset),
+            'net_expectancy_pct': mean([row['ret'] for row in subset]),
+            'gross_edge_pct': mean([row['ret'] + adapter.cost_pct for row in subset]),
+            'severity': severity_scores(
+                mean([row['fwd'][24] for row in subset if row['fwd'][24] is not None]),
+                mean([row['ret'] + adapter.cost_pct for row in subset]), adapter.cost_pct,
+                subset_be, pct(len(subset_wins), len(subset)),
+                pct(sum(row['ret'] < 0 for row in subset_reached), len(subset_reached)),
+                pct(sum(bool(row['cf_sl_reaches_tp']) for row in subset_sl), len(subset_sl)),
+                pct(len(subset_timeout), len(subset)), subset_timeout_mean),
+        }
     result = {
         'valid': integrity_report['valid'], 'integrity': integrity_report, 'n': len(rows),
         'forward_return_pct_day_block_ci': fwd, 'gross_edge_pct': gross,
@@ -145,6 +172,7 @@ def audit_adapter(adapter, entries=None, progress=None, execution_variant=None):
         'timeout_mean_return_pct': timeout_mean, 'reasons': reasons, 'severity': severity,
         'severity_formula': 'ENTRADA=max(0,-media_24h*20); COSTOS=max(0,-edge_bruto*20); PAYOFF=max(0,win_equilibrio-win_real); SALIDA=porcentaje que llegó a +2% y terminó en pérdida; SL=porcentaje contrafactual que habría llegado al TP; TIMEOUT=porcentaje_timeout*max(0,-retorno_timeout). Frecuencia sin daño no suma. Todo limitado a 0..100.',
         'main_area': main_area, 'fidelity': adapter.fidelity_result,
+        'split_metrics': split_metrics,
     }
     facts = {
         'ENTRADA': 'Retorno medio 1/4/12/24/48h con IC bootstrap por día: ' + ', '.join(f'{h}h={fmt(fwd[h]["mean"])}% [{fmt(fwd[h]["lo"])}, {fmt(fwd[h]["hi"])}], n={fwd[h]["n"]}, días={fwd[h]["n_days"]}' for h in C.FWD_HOURS),
