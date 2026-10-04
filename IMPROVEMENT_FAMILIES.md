@@ -211,7 +211,8 @@ PAYOFF:  payoff_tp_short_50, payoff_break_even_1r, payoff_trailing_2r
 SALIDA:  exit_giveback_10, exit_giveback_25, exit_giveback_50,
           exit_opposite_ma_profile, exit_opposite_ma_or_close_below_ma7,
           exit_opposite_ma_or_giveback_25,
-          exit_close_below_ma7_or_giveback_25, exit_all_three_confirmation
+          exit_close_below_ma7_or_giveback_25, exit_all_three_confirmation,
+          exit_atr_trail_0_5_after_1r, exit_ema50_close_trail
 SL:      sl_atr_1_0, sl_atr_1_5, sl_atr_2_0
 TIMEOUT: timeout_12h, timeout_24h, timeout_36h, timeout_24h_if_losing
 ```
@@ -265,3 +266,41 @@ cualquiera de estos casos:
 Este anexo sigue sujeto a las seis integridades M1b y a las invariantes de
 `LOOP_PROTOCOL.md`. No incorpora criterio de mejora, límite de intentos, OOS,
 promoción, UI ni ninguna capacidad de despliegue.
+
+## Anexo C — extensiones investigadas (2026-10-04, catálogo cerrado v1.1)
+
+Esta ampliación no cambia los resultados anteriores ni autoriza ejecución. Cada
+regla fue añadida antes de observar resultados de una estrategia concreta. Las
+fuentes, calidad de evidencia y límites de datos están en
+`RESEARCH_IMPROVEMENT_SOURCES.md`.
+
+### ENTRADA — régimen y confluencia causal
+
+| ID | Regla exacta | Insumos causales | Fuente/evidencia |
+| --- | --- | --- | --- |
+| `entry_adx14_ge_25` | Conservar sólo si ADX(14) de la última vela 1 h cerrada es >= 25; ADX usa Wilder sobre 14 velas cerradas. | OHLCV 1 h, 28 velas previas | Arda (SSRN 2025): las estrategias de bandas dependen de régimen/direccionalidad; no prueba este corte concreto. |
+| `entry_realized_vol_20_mid` | Conservar sólo si la desviación estándar muestral de 20 retornos log 1 h previos está entre percentiles causales 33 y 67 de la historia del símbolo. | cierres 1 h, >=20 observaciones | Prakash et al. (arXiv:2004.09963) valida evitación de riesgo dinámica por regímenes; tercil medio es preregistro discreto local. |
+| `entry_rsi14_oversold_ma50_long` | LONG: RSI(14) 1 h <=30 y cierre 1 h > MA50; SHORT: RSI(14)>=70 y cierre<MA50. RSI Wilder, sólo velas cerradas. | cierres 1 h, >=50 velas, side | Paramashiva (SSRN 2026) backtestea RSI 14/30/70 y MA con costes/walk-forward; no demuestra la confluencia. |
+
+Son filtros: no alteran side, SL, TP, tamaño ni salida. Sin historia causal,
+la entrada se excluye y se reporta `missing_history_n`; no hay imputación.
+
+### SALIDA — trailing por volatilidad y estructura
+
+| ID | Regla exacta | Insumos causales | Fuente/evidencia |
+| --- | --- | --- | --- |
+| `exit_atr_trail_0_5_after_1r` | Tras alcanzar +1R, LONG cierra en la primera vela 5m cerrada con cierre <= máximo favorable cerrado menos 0.5*ATR14_1h; SHORT espejo. SL/TP tienen prioridad. | trayectoria 5m, ATR14_1h | Viaggi (SSRN 2026) estudia trailing ATR con entradas aleatorizadas y estima piso de ruido 0.38 ATR; 0.5 es la variante discreta más próxima por encima. |
+| `exit_ema50_close_trail` | Tras +1R, LONG cierra en el primer cierre 1h <= EMA50; SHORT en el primer cierre >= EMA50. SL/TP 5m tienen prioridad. | cierres 1h, trayectoria 5m | Bhatti (SSRN 2026) usa EMA50 a cierre como trailing en backtest intradía; evidencia XAU/USD, no cripto. |
+
+No se agrega `partial_exit`: el contrato registra un solo cierre y no modela
+cantidad remanente, doble comisión ni SL residual. Tampoco hay múltiplos ATR
+libres: sólo estos IDs.
+
+### COSTOS — oportunidad intradía
+
+| ID | Regla exacta | Insumos causales | Fuente/evidencia |
+| --- | --- | --- | --- |
+| `cost_hourly_range_ge_2x_roundtrip` | Conservar sólo si `(high-low)/close*100` de última vela 1h cerrada >= `2.0 * cost_pct`. | OHLCV 1h, cost_pct | Perera (SSRN 2026) evidencia que costes pueden consumir 93% de un stop pequeño en SOL/USDT; 2.0 es constante preregistrada, no optimizada. |
+
+El rango no estima spread: es un proxy de oportunidad, no coste real ni
+liquidez ejecutable.
