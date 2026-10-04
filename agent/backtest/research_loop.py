@@ -28,8 +28,9 @@ def git_commit():
     except Exception: return 'unknown'
 def state_path(root): return Path(root)/'pipeline_state.json'
 def set_state(root, candidate_id, phase, done=0, total=0, eta_seconds=None, detail=''):
-    root=Path(root); root.mkdir(parents=True,exist_ok=True)
-    dump(state_path(root), {'candidate_id':candidate_id,'phase':phase,'started_at_utc':now(),'updated_at_utc':now(),
+    root=Path(root); root.mkdir(parents=True,exist_ok=True); previous=state(root)
+    started = previous.get('started_at_utc') if previous.get('candidate_id') == candidate_id and previous.get('phase') == phase else now()
+    dump(state_path(root), {'candidate_id':candidate_id,'phase':phase,'started_at_utc':started,'updated_at_utc':now(),
       'done':done,'total':total,'eta_seconds':eta_seconds,'detail':detail})
 def state(root):
     path=state_path(root)
