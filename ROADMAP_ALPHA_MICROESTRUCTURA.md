@@ -107,6 +107,46 @@ Listing S3 `data/futures/um/daily/<dataset>/BTCUSDT/`, primer archivo disponible
 tamaños actuales por día. El host `data.binance.vision` (CDN) estaba bloqueado desde mi sandbox
 (HTTP 403); solo respondió el listing S3. GPT debe verificarlo desde Windows (§7).
 
+### 1.6 Arquitectura: cómo funciona el sistema construido **[GPT]**
+
+Fuente: reportes de GPT. El código vive en worktrees de Windows y yo no lo leí; tratar esto como
+mapa conceptual, no como auditoría del código. Los nombres "Research" y "Máquina" son apodos
+informales de GPT, no módulos. Los archivos son los que se indican abajo.
+
+| Pieza | Archivo (según GPT) | Qué hace |
+|---|---|---|
+| **Candidato** | `candidate.json` + `entries.jsonl` | Estrategia congelada como "revisión 1" inmutable: lista de entradas históricas (símbolo, lado, hora, precio, reglas de SL/TP) + hashes. |
+| **Puerta de admisión** | `verify_revision()` | Sin pasar esto no entra a la cola ni al orquestador (Fase A). |
+| **Máquina (auditor)** | `lab_audit.py` | Rehace las entradas sobre velas históricas con fees y funding. TRAIN/VALIDATION deciden; OOS se toca una sola vez y solo si TV pasa. Devuelve expectancy bruta y neta, win rate y una severidad 0–100 por categoría (COSTOS, SALIDA, SL, PAYOFF, ENTRADA, TIMEOUT). `main_area` = la que más sangra. Es el diagnóstico de dónde pierde plata. |
+| **Orquestador ("Research")** | `research_loop.py` | Automatiza lo que antes decidía GPT a mano. Lee el diagnóstico y ataca las categorías por severidad descendente. Prueba variantes con `variant_id` fijo de un catálogo cerrado (`IMPROVEMENT_FAMILIES.md`): giveback 10/25/50, SL por ATR, TP corto, breakeven, trailing, timeout 12 h, filtros de costo y de entrada (ADX, volatilidad). Cada variante crea una revisión hija inmutable que se re-audita. |
+| **Veredictos** | `history.json` | `IMPROVED` (mejora relativa que pasa TV y OOS), corte positivo (TV y OOS con neto > 0; **nunca ocurrió**), o `DISCARDED_CATALOG_PARTIAL` tras 10 intentos fallidos. Las variantes sin ejecutor o sin insumo se marcan `NOT_APPLICABLE_MISSING_INPUT` y no cuentan como intento. |
+| **Capa de performance** | `audit_context.py`, `lab_core.py` | Caché LRU de velas y series derivadas (ATR, ADX, rango, vol) y trayectorias compactas por trade de las que se derivan las variantes. Bajó un candidato de ~50 min a ~7,8 min. |
+| **Cola (F2)** | `research_queue.py` (SQLite) | Admite solo candidatos válidos, deduplica por `candidate_id`, claim atómico, consumidor que llama al orquestador. 1 worker por límite de memoria (~7 GiB c/u). Estados: PENDING/RUNNING/IMPROVED/DISCARDED/INVALID/FAILED. |
+| **Fábrica (F1)** | `evolutionary_lab.py` (ex "Laboratorio Cuántico") | Solo generador: arma genomas de bloques (MA, RSI, Bollinger, ADX, level sweep, ma_pullback…) sobre TOP-40 con máx. una señal por símbolo/día, los materializa y los encola. `lab_control_server.py` (endpoint de despliegue) **eliminado**: no hay camino a producción. |
+| **Funding** | `funding_history.py`, `funding_history.db` | Eventos de funding por settlement; cobertura incompleta invalida la auditoría, nunca imputa cero. |
+
+Flujo completo:
+
+```
+Fábrica ─► verify_revision ─► Cola ─► Orquestador ◄──► Máquina (TV/OOS + costos + funding)
+(genomas)   (puerta)         (SQLite) (elige variante)        │
+                                                              ▼
+                                    veredicto IMPROVED / DISCARDED ─► revisión humana
+                                                                      (nada va solo a producción)
+```
+
+Debilidades conocidas y dónde las ataca este roadmap:
+
+| Debilidad | Tarea |
+|---|---|
+| Costo del pipeline = solo fee de taker (0,08 % RT), sin spread ni slippage | T1.3 |
+| Signo del funding validado solo con ejemplo documental, no con cuenta real | T1.4 (queda pendiente Income History real) |
+| `IMPROVED` es mejora relativa contra la revisión anterior, no rentabilidad | Gates de Fase 3 |
+| Tope de 10 intentos + orden por severidad: categorías enteras nunca se prueban (MA Slope nunca llegó a ENTRADA) | Fase 3 (política de intentos) |
+| Sin corrección por comparaciones múltiples en 560 genomas × 10 intentos | Fase 2 y 3 |
+| Cada revisión se compara contra la anterior, no acumula transformaciones | Fase 3 |
+| Todo el código vive sin commit en Windows | T0.1 |
+
 ---
 
 ## 2. Correcciones a lo que dije antes en esta sesión
@@ -143,6 +183,29 @@ probable ahí que en otro cruce de medias.
 
 Cómo se vería un edge usable **[PROPUESTA]**: eventos de baja frecuencia y movimiento grande
 (≥ 15–20 bp netos tras costos reales), no scalps de 3 bp.
+
+### 3.1 Visión profesional **[PROPUESTA]**
+
+1. **El sistema es un motor de falsación, no un inventor de estrategias.** Solo prueba retoques
+   paramétricos de un catálogo chico. Si el edge bruto es cero o negativo (RSI14), ningún retoque
+   lo arregla. Que diga "no" seguido es lo esperable; su valor es que no miente.
+2. **La arquitectura está bien; el combustible no.** La Fábrica genera combinaciones de
+   MA/RSI/Bollinger, una familia que el repo ya había declarado agotada. En los 560 genomas, 0
+   tuvo neto positivo en TV y OOS.
+3. **El orden correcto es mecanismo → máquina → fábrica.**
+   - Un event-study con placebo decide si existe un mecanismo (OI y flujo forzado, Fase 2).
+   - La Máquina audita reglas concretas con costos realistas.
+   - Recién ahí la Fábrica genera parametrizaciones de un mecanismo ya validado, no indicadores
+     al azar.
+4. **Tres capas con responsabilidades separadas:**
+   - A. Hipótesis/event-study: ¿existe el efecto, sobrevive al placebo y a la corrección múltiple?
+   - B. Máquina + orquestador: ¿una regla concreta sigue siendo rentable tras costos realistas
+     y OOS único?
+   - C. Forward en simulación: ¿se sostiene con fills y spreads reales?
+5. **Mejor uso de la Máquina:** puerta obligatoria para cualquier estrategia candidata, nueva o
+   ya existente en StrategyProfiles, antes de arriesgar plata. No como generadora masiva.
+6. **Disciplina de ensayos:** cada genoma y cada variante cuenta como un test. Sin ese
+   contador, 40.000 combinaciones siempre van a producir "ganadoras" por azar (R45).
 
 ---
 
@@ -227,6 +290,12 @@ partición por régimen BTC; quitar los k mejores eventos/símbolos; costo v2.
 - Gates: TV decide, OOS una sola vez, quitar top-3 trades, 2º split independiente, motor de
   portafolio real (capital 450, 3 slots compartidos — ya hubo un bug que daba 3 slots por símbolo
   y sobreestimaba 4,8× **[REPO: PROGRESS_LOG 2026-08-03]**).
+- Política de intentos del orquestador **[PROPUESTA]**: no declarar `DISCARDED` por tope de 10
+  intentos sin haber probado al menos una variante de cada categoría que tenga ejecutor; y
+  completar los ejecutores faltantes (salidas multiseñal, `exit_atr_trail_0_5_after_1r`,
+  `exit_ema50_close_trail`) o registrar explícitamente el veredicto como catálogo parcial.
+- Distinguir en `history.json` `catalog_completeness: COMPLETE | PARTIAL` y la lista de variantes
+  sin ejecutor (hoy solo dice `DISCARDED_CATALOG_PARTIAL`).
 
 ### Fase 4 — Solo con Fase 3 en PASS: forward en simulación
 
