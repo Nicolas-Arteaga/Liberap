@@ -23,7 +23,7 @@ Ventana: 2025-12-01 .. 2026-08-17 (igual que klines_clean).
   python download_oi_metrics.py --audit
 """
 import os, io, sys, json, zipfile, sqlite3, argparse, datetime as dt
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
@@ -134,29 +134,44 @@ def backfill(db_path, universe_path, d0, d1, workers, coverage_out):
     _ensure(conn)
     syms = _universe(universe_path)
     days = list(_days(d0, d1))
-    jobs = [(s, d) for s in syms for d in days]
-    print(f">>> oi_metrics backfill: {len(syms)} símbolos × {len(days)} días = {len(jobs)} requests", flush=True)
+    job_count = len(syms) * len(days)
+    print(f">>> oi_metrics backfill: {len(syms)} símbolos × {len(days)} días = {job_count} requests", flush=True)
     total = 0; done = 0; s404 = 0; serr = 0
-    per_sym = {s: 0 for s in syms}
+    # Never create one Future per historical day.  A 200-symbol, multi-year
+    # backfill has tens of thousands of requests; keeping only a small bounded
+    # window makes an interrupted run safely resumable without unbounded RSS.
+    max_inflight = max(workers, workers * 4)
+
+    def consume(future):
+        nonlocal total, done, s404, serr
+        sym, _day, st, rows = future.result()
+        done += 1
+        if rows:
+            conn.executemany("INSERT OR IGNORE INTO oi_metrics VALUES (?,?,?,?,?,?,?,?)", rows)
+            total += len(rows)
+        elif st == 404:
+            s404 += 1
+        else:
+            serr += 1
+        if done % 1000 == 0:
+            conn.commit()
+            print(f"  {done}/{job_count}  filas_leidas={total}  404={s404}  err={serr}", flush=True)
+
     with ThreadPoolExecutor(max_workers=workers) as ex:
-        futs = [ex.submit(_fetch, s, d) for s, d in jobs]
-        for fut in as_completed(futs):
-            sym, day, st, rows = fut.result()
-            done += 1
-            if rows:
-                conn.executemany("INSERT OR IGNORE INTO oi_metrics VALUES (?,?,?,?,?,?,?,?)", rows)
-                total += len(rows); per_sym[sym] += len(rows)
-            elif st == 404:
-                s404 += 1
-            else:
-                serr += 1
-            if done % 1000 == 0:
-                conn.commit()
-                print(f"  {done}/{len(jobs)}  filas={total}  404={s404}  err={serr}", flush=True)
+        pending = set()
+        for sym in syms:
+            for day in days:
+                pending.add(ex.submit(_fetch, sym, day))
+                if len(pending) >= max_inflight:
+                    completed, pending = wait(pending, return_when=FIRST_COMPLETED)
+                    for future in completed:
+                        consume(future)
+        while pending:
+            completed, pending = wait(pending, return_when=FIRST_COMPLETED)
+            for future in completed:
+                consume(future)
     conn.commit()
-    print(f"\n>>> listo. filas nuevas={total}  404={s404}  err={serr}")
-    zero = [s for s, n in per_sym.items() if n == 0]
-    print(f">>> símbolos sin datos: {len(zero)} {zero}")
+    print(f"\n>>> listo. filas_leidas={total}  404={s404}  err={serr}")
     report = coverage_report(conn, coverage_out)
     print(f">>> coverage: {report['summary']}")
     conn.close()
