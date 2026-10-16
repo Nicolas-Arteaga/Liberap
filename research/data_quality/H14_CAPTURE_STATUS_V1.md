@@ -20,6 +20,17 @@ and no H14 study may run. This is a **data-source block**, not a negative
 strategy result and not permission to replace the dataset with a different
 venue or synthetic events.
 
+## Uptime instrumentation limitation
+
+`agent/liquidation_tracker.py` writes a `heartbeat` only from `on_message`
+after an incoming websocket message and five elapsed minutes. It does **not**
+write an independent periodic liveness heartbeat. Consequently, a gap in
+`liq_collector_health` cannot distinguish a dead collector from an unusually
+quiet feed, and the table cannot prove the protocol's 90% uptime condition.
+This makes the H14 gate stricter, not looser: even if data collection resumes,
+the source needs independently timed liveness evidence before the 90% claim
+can be made.
+
 ## Scope boundary
 
 Repairing or restarting the live collector/agent is intentionally outside this
