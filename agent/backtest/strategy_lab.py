@@ -35,10 +35,13 @@ import time
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from backtest.engine import TOP_40_SYMBOLS  # noqa: E402
-from setup_validator import validate_pre_trade  # noqa: E402
+# La canasta vive en el adaptador local y no importa el motor/config vivo.
+from backtest.lab_adapters.level_sweep import TOP_40_SYMBOLS  # noqa: E402
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "binance_vision_clean.db")
+# La Fábrica generator-only recibe explícitamente la base OHLC canónica de
+# sólo lectura; no depende del checkout ni del agente vivo.
+DB_PATH = os.environ.get("STRATEGY_LAB_DB", os.environ.get(
+    "LAB_CANONICAL_DB", os.path.join(os.path.dirname(__file__), "..", "data", "binance_vision_clean.db")))
 FOUND_PATH = os.path.join(os.path.dirname(__file__), "found_strategies.jsonl")
 PROGRESS_PATH = os.path.join(os.path.dirname(__file__), "lab_progress.log")
 TESTED_LOG = os.path.join(os.path.dirname(__file__), "lab_tested_all.jsonl")
@@ -81,7 +84,7 @@ def load_basket(conn):
     cur = conn.cursor()
     cur.execute("SELECT DISTINCT symbol FROM klines_clean WHERE interval='15m'")
     all_syms = [r[0] for r in cur.fetchall()]
-    basket = list(dict.fromkeys(TOP_40_SYMBOLS + all_syms))
+    basket = list(dict.fromkeys(list(TOP_40_SYMBOLS) + all_syms))
     return basket
 
 
@@ -424,6 +427,9 @@ def backtest_strategy(conn, basket, strat, apply_vetos=True, be_lock=False):
                 sl, tp = entry + sl_dist, entry - tp_dist
 
             if apply_vetos:
+                # Import diferido: el generador formal no aplica vetos vivos y
+                # por ello nunca carga config/Watchlist ni realiza red.
+                from setup_validator import validate_pre_trade
                 # Cambio real de 24h HISTORICO (velas atras = 1440min/tf_min),
                 # no el de Binance en vivo -- ver fix 2026-08-18 en setup_validator.py.
                 candles_per_day = max(1, int(1440 / strat["tf_min"]))
@@ -442,6 +448,62 @@ def backtest_strategy(conn, basket, strat, apply_vetos=True, be_lock=False):
             open_trade = {"side": sig, "entry": entry, "sl": sl, "tp": tp, "open_time": ts}
 
     return _apply_capital_sim(all_trades)
+
+
+def materialize_formal_entries(conn, basket, strat, min_horizon_ms=720 * 60 * 60 * 1000,
+                               max_signals_per_symbol_day: int | None = None):
+    """Señales crudas y causales para Research, sin ejecución ni selección.
+
+    A diferencia de ``backtest_strategy``, no simula PnL, no aplica cupos,
+    no consulta validadores de producción y no mira velas posteriores al
+    cierre que confirma la señal. La Máquina decide después, mediante el
+    contrato Fase A, si esa población tiene mérito investigable.
+    """
+    out = []
+    bar_ms = int(strat['tf_min']) * 60_000
+    for symbol in basket:
+        rows = load_15m(conn, symbol)
+        if len(rows) < 3000:
+            continue
+        candles = resample(rows, strat['tf_min']) if strat['tf_min'] != 15 else rows
+        if len(candles) < 250:
+            continue
+        closes = [c[4] for c in candles]
+        highs = [c[2] for c in candles]
+        lows = [c[3] for c in candles]
+        volumes = [c[5] for c in candles]
+        atr = atr_series(candles, 14)
+        final_signal_open = candles[-1][0] - min_horizon_ms
+        lookback = strat['lookback']
+        day_counts = {}
+        for index in range(210, len(candles)):
+            timestamp, _open, _high, _low, close, _volume = candles[index]
+            if timestamp > final_signal_open:
+                continue
+            atr_value = atr[index]
+            if not atr_value or atr_value <= 0:
+                continue
+            level_high = max(highs[index - lookback:index]) if index >= lookback else None
+            level_low = min(lows[index - lookback:index]) if index >= lookback else None
+            side = detect_signal(strat, closes, highs, lows, index, level_high, level_low, volumes)
+            if side is None:
+                continue
+            if strat['side'] == 'LONG' and side != 0:
+                continue
+            if strat['side'] == 'SHORT' and side != 1:
+                continue
+            signal_day = (timestamp + bar_ms) // 86_400_000
+            if (max_signals_per_symbol_day is not None
+                    and day_counts.get(signal_day, 0) >= max_signals_per_symbol_day):
+                continue
+            risk = float(strat['atr_sl_mult']) * atr_value
+            reward = risk * float(strat['rr_mult'])
+            sl = close - risk if side == 0 else close + risk
+            tp = close + reward if side == 0 else close - reward
+            out.append({'open_ms': timestamp + bar_ms, 'symbol': symbol, 'entry': close,
+                        'side': side, 'sl': sl, 'tp': tp})
+            day_counts[signal_day] = day_counts.get(signal_day, 0) + 1
+    return sorted(out, key=lambda item: (item['open_ms'], item['symbol']))
 
 
 def _apply_capital_sim(trades):

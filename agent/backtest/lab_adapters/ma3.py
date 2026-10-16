@@ -33,7 +33,11 @@ class MA3Adapter(Adapter):
     )
     entry_definition = EntryDefinition(
         source="stream pickle congelado de Fase 2",
-        condition="señal MA Slope Caso 3 ya evaluada por engine.py",
+        condition=("SHORT 1h al cierre: SMA7>SMA25>SMA50>SMA99; pendiente "
+                   "normalizada de SMA7 en ventana 3 cambia de previa >=+0.2° "
+                   "a actual <=-0.2°; close queda a <=1% del máximo de las "
+                   "últimas 10 velas. SL=high máximo 10 velas +1%; TP "
+                   "estructural del perfil (mínimo 10%)."),
         execution_time="cierre de la hora: b + interval_ms",
     )
     candle_source = SQLiteCandleSource(

@@ -10,6 +10,7 @@ from collections import defaultdict
 
 import lab_core as C
 import lab_integrity as I
+from funding_history import BINANCE_USDM, FundingStore
 
 
 WHY = {
@@ -78,36 +79,151 @@ def day_block_ci(rows, horizon, rounds=1000):
     }
 
 
-def audit_adapter(adapter, entries=None, progress=None, execution_variant=None):
+def _attach_funding(audit, trade, side, funding_store, venue, accrual=None):
+    """Añade funding realizado; nunca inventa cero si falta cobertura."""
+    if accrual is None:
+        accrual = funding_store.accrued_funding(
+            {"symbol": trade["symbol"], "side": side, "entry": trade["entry"], "notional_usdt": 100.0},
+            audit["open_ms"], audit["close_ms"], venue,
+        )
+    audit["ret_before_funding_pct"] = audit["ret"]
+    audit["funding_status"] = accrual.status
+    audit["funding_event_count"] = accrual.event_count
+    audit["funding_coverage_reasons"] = list(accrual.coverage_reasons)
+    audit["funding_cashflow_usdt"] = accrual.cashflow_usdt
+    audit["funding_return_pct"] = accrual.return_pct
+    if accrual.complete:
+        audit["ret"] += accrual.return_pct
+    return accrual
+
+
+def audit_adapter(adapter, entries=None, progress=None, execution_variant=None,
+                  funding_store: FundingStore | None = None,
+                  funding_venue: str = BINANCE_USDM, return_rows: bool = False,
+                  allowed_splits: tuple[str, ...] | None = None,
+                  audit_context=None):
     """Produce el ``result.json`` y el informe M1b para cualquier Adapter.
 
     ``progress(processed, total, symbols_done, symbols_total)`` es opcional y
     no interviene en cálculos ni en el resultado.
     """
+    if funding_store is None and audit_context is not None:
+        funding_store = audit_context.funding_store
+    if funding_store is not None and not funding_store.sign_validated(funding_venue):
+        raise ValueError("FUNDING_SIGN_UNVALIDATED: falta muestra concordante de Binance Income History; no se calcula PnL neto con funding.")
     entries = adapter.entries() if entries is None else list(entries)
+    # El loop decide variantes exclusivamente con TRAIN/VALIDATION.  Filtrar
+    # aquí (antes de cargar velas/simular) garantiza que una auditoría
+    # intermedia ni siquiera lea trades OOS.  OOS se solicita explícitamente
+    # una sola vez después de un PASS TV.
+    if allowed_splits is not None:
+        allowed = set(allowed_splits)
+        entries = [trade for trade in entries if adapter.split_of(trade['open_ms']) in allowed]
+    if not entries:
+        raise ValueError("AUDIT_EMPTY_SPLIT: no hay entradas para los splits solicitados")
     by = defaultdict(list)
     for trade in entries:
         by[trade['symbol']].append(trade)
-    rows, integrity = [], []
+    rows, integrity, funding_incomplete = [], [], []
     for symbol_index, (symbol, trades) in enumerate(by.items(), 1):
-        candles = adapter.candles(symbol)
-        opens = [row[0] for row in candles]
-        hours = C.hourly_series(candles)
-        hour_starts = [row[0] for row in hours]
+        if audit_context is None:
+            candles = adapter.candles(symbol)
+            opens = [row[0] for row in candles]
+            hours = C.hourly_series(candles)
+            hour_starts = [row[0] for row in hours]
+            atr_before = lambda open_ms: C.atr_before(hours, hour_starts, open_ms)
+        else:
+            symbol_context = None
+
+            def require_symbol_context():
+                nonlocal symbol_context
+                if symbol_context is None:
+                    symbol_context = audit_context.symbol(symbol)
+                return symbol_context
         for trade in trades:
-            audit = C.audit_trade(candles, opens, adapter.bar_ms, trade,
-                                  C.atr_before(hours, hour_starts, trade['open_ms']),
-                                  adapter.split_of(trade['open_ms']), adapter.cost_pct)
+            split = adapter.split_of(trade['open_ms'])
+            if audit_context is None:
+                audit = C.audit_trade(candles, opens, adapter.bar_ms, trade,
+                                      atr_before(trade['open_ms']), split, adapter.cost_pct)
+                base_audit = dict(audit)
+                trade_key = None
+            else:
+                trade_key = audit_context.trade_key(trade, split, adapter.cost_pct)
+                def make_baseline():
+                    item = require_symbol_context()
+                    path = audit_context.trade_path(
+                        trade_key,
+                        lambda: C.materialize_trade_path(item.rows, item.opens, adapter.bar_ms, trade),
+                    )
+                    return C.audit_trade_from_path(path, adapter.bar_ms, trade,
+                                                   item.atr_before(trade['open_ms']), split, adapter.cost_pct)
+                audit = audit_context.baseline_audit(trade_key, make_baseline)
+                base_audit = dict(audit)
             if execution_variant:
-                px, reason = C.simulate(candles, opens, adapter.bar_ms, trade,
-                                        execution_variant, 'unconditional', -2.0,
-                                        C.atr_before(hours, hour_starts, trade['open_ms']))
+                if audit_context is None:
+                    px, reason, close_ms = C.simulate(candles, opens, adapter.bar_ms, trade,
+                                                      execution_variant, 'unconditional', -2.0,
+                                                      atr_before(trade['open_ms']), with_close_ms=True)
+                else:
+                    def make_variant():
+                        item = require_symbol_context()
+                        path = audit_context.trade_path(
+                            trade_key,
+                            lambda: C.materialize_trade_path(item.rows, item.opens, adapter.bar_ms, trade),
+                        )
+                        return C.simulate_variants_from_path(path, adapter.bar_ms, trade,
+                                                             (execution_variant,), 'unconditional', -2.0,
+                                                             item.atr_before(trade['open_ms']))[execution_variant]
+                    px, reason, close_ms = audit_context.variant_outcome(trade_key, execution_variant, make_variant)
                 audit['ret'] = C.pct(trade['side'], trade['entry'], px) - adapter.cost_pct
                 audit['reason'] = reason
+                audit['close_ms'] = close_ms
+            if funding_store is not None:
+                # Las variantes de salida/SL no invierten el lado salvo la
+                # variante de dirección, que no se usa por este research loop.
+                if audit_context is None:
+                    accrual = _attach_funding(audit, trade, trade['side'], funding_store, funding_venue)
+                else:
+                    funding_key = (trade_key, audit['close_ms'], trade['side'])
+                    accrual = audit_context.funding_accrual(
+                        funding_key,
+                        lambda: funding_store.accrued_funding(
+                            {"symbol": trade["symbol"], "side": trade["side"], "entry": trade["entry"], "notional_usdt": 100.0},
+                            audit["open_ms"], audit["close_ms"], funding_venue,
+                        ),
+                    )
+                    _attach_funding(audit, trade, trade['side'], funding_store, funding_venue, accrual)
+                if not accrual.complete:
+                    funding_incomplete.append({"symbol": trade["symbol"], "open_ms": audit["open_ms"],
+                                               "close_ms": audit["close_ms"], "reasons": list(accrual.coverage_reasons)})
             rows.append(audit)
-            integrity.append(I.check_trade(adapter, trade, candles, audit))
+            if audit_context is None:
+                integrity.append(I.check_trade(adapter, trade, candles, audit))
+            else:
+                static = audit_context.static_integrity(
+                    trade_key,
+                    lambda: I.check_trade(adapter, trade, require_symbol_context().rows, base_audit),
+                )
+                static['no_exit_before_entry'] = audit['age_h'] >= 0
+                integrity.append(static)
         if progress and (symbol_index % 25 == 0 or symbol_index == len(by)):
             progress(len(rows), len(entries), symbol_index, len(by))
+    if funding_incomplete:
+        # No presentar métricas contaminadas como netas. El caller puede hacer
+        # backfill adicional, excluir bajo una política explícita o invalidar
+        # el split; aquí elegimos invalidar de forma conservadora.
+        integrity_report = I.summarize(adapter, integrity, rows)
+        result = {
+            'valid': False, 'integrity': integrity_report, 'n': len(rows),
+            'funding_coverage': {'enabled': True, 'policy': 'invalidate',
+                                 'complete_trades': len(rows) - len(funding_incomplete),
+                                 'incomplete_trades': funding_incomplete},
+            'error': 'FUNDING_COVERAGE_INCOMPLETE: no se calcula PnL neto con funding parcial.',
+        }
+        report = ('# Auditoría inválida por cobertura de funding\n\n'
+                  f'- Trades sin cobertura completa: {len(funding_incomplete)}/{len(rows)}.\n'
+                  '- No se imputó funding cero ni se publicó expectativa neta.\n')
+        return result, report, []
     wins = [row for row in rows if row['ret'] > 0]
     losses = [row for row in rows if row['ret'] <= 0]
     fwd = {horizon: day_block_ci(rows, horizon) for horizon in C.FWD_HOURS}
@@ -137,7 +253,8 @@ def audit_adapter(adapter, entries=None, progress=None, execution_variant=None):
     # Fase C decide exclusivamente con TRAIN/VALIDATION. OOS queda presente
     # como evidencia separada y no interviene en la elección de variante.
     split_metrics = {}
-    for split in ('TRAIN', 'VALIDATION', 'OOS'):
+    reported_splits = tuple(allowed_splits) if allowed_splits is not None else ('TRAIN', 'VALIDATION', 'OOS')
+    for split in reported_splits:
         subset = [row for row in rows if row['split'] == split]
         subset_wins = [row for row in subset if row['ret'] > 0]
         subset_losses = [row for row in subset if row['ret'] <= 0]
@@ -173,6 +290,8 @@ def audit_adapter(adapter, entries=None, progress=None, execution_variant=None):
         'severity_formula': 'ENTRADA=max(0,-media_24h*20); COSTOS=max(0,-edge_bruto*20); PAYOFF=max(0,win_equilibrio-win_real); SALIDA=porcentaje que llegó a +2% y terminó en pérdida; SL=porcentaje contrafactual que habría llegado al TP; TIMEOUT=porcentaje_timeout*max(0,-retorno_timeout). Frecuencia sin daño no suma. Todo limitado a 0..100.',
         'main_area': main_area, 'fidelity': adapter.fidelity_result,
         'split_metrics': split_metrics,
+        'funding_coverage': ({'enabled': True, 'policy': 'invalidate', 'validation': funding_store.sign_validation_result(funding_venue), 'complete_trades': len(rows),
+                              'incomplete_trades': []} if funding_store is not None else {'enabled': False}),
     }
     facts = {
         'ENTRADA': 'Retorno medio 1/4/12/24/48h con IC bootstrap por día: ' + ', '.join(f'{h}h={fmt(fwd[h]["mean"])}% [{fmt(fwd[h]["lo"])}, {fmt(fwd[h]["hi"])}], n={fwd[h]["n"]}, días={fwd[h]["n_days"]}' for h in C.FWD_HOURS),
@@ -191,4 +310,4 @@ def audit_adapter(adapter, entries=None, progress=None, execution_variant=None):
         for key in severity:
             lines += [f'### [{key}] — severidad {severity[key]}/100', f'QUÉ PASA: {facts[key]}.', f'POR QUÉ IMPORTA: {WHY[key]}', f'EVIDENCIA: n={len(rows)}, `result.json`.', 'CONFIANZA: BAJA; no son selecciones reales de producción.', 'Qué NO se puede concluir: no prueba que cambiar solo esta regla mejore producción.']
         lines += ['## Motivos de salida', '| Motivo | N | % | Retorno medio |', '|---|---:|---:|---:|'] + [f'| {key} | {value["n"]} | {fmt(value["pct"])} | {fmt(value["mean_return"])} |' for key, value in reasons.items()] + ['## Qué no se pudo evaluar', adapter.fidelity_note, '## Qué haría alguien no técnico con esto', '- No cambiaría la estrategia en producción a partir de este informe.', '- Vigilaría las ganancias que superan +2 % porque muchas terminan en pérdida.', '- Esperaría la validación contra el ledger antes de modificar la salida.']
-    return result, '\n'.join(lines), [row['ret'] for row in rows]
+    return result, '\n'.join(lines), (rows if return_rows else [row['ret'] for row in rows])

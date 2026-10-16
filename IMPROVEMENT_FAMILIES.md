@@ -70,6 +70,8 @@ no cambian SL, TP, tamaño ni salida.
 | `entry_btc_bear_vol_high` | Conservar sólo entradas con `BTC24h < -2 %` y `vol_tercil=high`. | BTC24h, volatilidad causal | F4 filtros combinados |
 | `entry_btc_bull_vol_low` | Conservar sólo entradas con `BTC24h > +2 %` y `vol_tercil=low`. | BTC24h, volatilidad causal | F4 filtros combinados |
 | `entry_invert_side` | Cambiar cada LONG a SHORT y cada SHORT a LONG; intercambiar geométricamente SL/TP a la misma distancia porcentual de `entry`. | side, entry, SL, TP | Fase A/B v2 |
+| `entry_adx14_ge_25` | Conservar sólo si ADX(14) de la última vela 1 h cerrada es >=25; ADX Wilder usa 28 velas cerradas previas. | OHLCV 1 h, 28 velas previas | Arda (SSRN 2025); el corte es preregistrado, no optimizado. |
+| `entry_realized_vol_20_mid` | Conservar sólo si la desviación estándar muestral de 20 retornos log 1 h previos cae entre percentiles causales 33 y 67 de la historia previa del símbolo. | cierres 1 h, >=20 observaciones históricas | Prakash et al. (arXiv:2004.09963); tercil medio discreto local. |
 
 `entry_invert_side` no reinterpreta una señal: es una imagen especular fija.
 Los seis filtros son exactamente las seis intersecciones diagonales congeladas
@@ -85,6 +87,7 @@ reescriben comisiones/spread para hacer mejor un resultado.
 | `cost_atr14_ge_1_5x_roundtrip` | Conservar sólo si `ATR14_1h / entry * 100 >= 1.5 * cost_pct`. | ATR14_1h causal, entry, cost_pct |
 | `cost_atr14_ge_2_0x_roundtrip` | Conservar sólo si `ATR14_1h / entry * 100 >= 2.0 * cost_pct`. | ATR14_1h causal, entry, cost_pct |
 | `cost_volume_ge_1_5x_mean20` | Conservar sólo si el volumen de la última vela cerrada es al menos 1.5 veces la media simple de las 20 velas cerradas previas. | volumen causal |
+| `cost_hourly_range_ge_2x_roundtrip` | Conservar sólo si `(high-low)/close*100` de la última vela 1 h cerrada es >= `2.0 * cost_pct`. | OHLCV 1 h, cost_pct |
 
 `cost_pct` es el costo ida+y+vuelta que ya usa `AdapterDefinition` (por
 defecto, 0,08 %, es decir 0,04 % por lado). Estas reglas son filtros, no una

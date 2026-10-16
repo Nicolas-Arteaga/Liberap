@@ -26,13 +26,16 @@ Escribe TODO en los mismos archivos que strategy_lab.py (found_strategies.
 jsonl, lab_tested_all.jsonl, lab_current.json) -- el frontend/API no
 necesitan cambios, solo mejora el generador por dentro.
 """
+import argparse
 import sys
 import os
 import sqlite3
 import json
 import random
 import time
+import hashlib
 from datetime import datetime, timezone
+from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from backtest.strategy_lab import (  # noqa: E402
@@ -40,8 +43,10 @@ from backtest.strategy_lab import (  # noqa: E402
     load_basket, backtest_strategy, evaluate, strat_label,
     ENTRY_TYPES, TIMEFRAMES_MIN, MA_PAIRS, SIDES, ATR_SL_MULTS, RR_MULTS,
     LOOKBACKS, RSI_THRESH, MA_PULLBACK_SLOPE_MIN_PCT, VOLUME_MULTS,
-    random_strategy, BAR_MONTHLY_USD, MIN_TRADES_PER_HALF,
+    random_strategy, materialize_formal_entries, TOP_40_SYMBOLS, BAR_MONTHLY_USD, MIN_TRADES_PER_HALF,
 )
+from backtest.research_loop import materialize_factory_candidate
+from backtest.research_queue import ResearchQueue, drain
 
 POPULATION_SIZE = 24
 ELITE_FRAC = 0.30          # top 30% sobreviven intactos a la siguiente generacion
@@ -50,6 +55,13 @@ CROSSOVER_FRAC = 0.30      # 30% = cruces entre 2 elites
 # el resto (30%) se completa con random fresco, para no converger prematuro
 
 GEN_LOG_PATH = os.path.join(os.path.dirname(__file__), "evolutionary_generations.jsonl")
+FACTORY_ROOT = Path(__file__).resolve().parent / 'research_factory'
+FACTORY_QUEUE = Path(__file__).resolve().parents[1] / 'data' / 'research_queue_f1_pilot.db'
+CATALOG_PATH = Path(__file__).resolve().parents[2] / 'IMPROVEMENT_FAMILIES.md'
+FUNDING_DB = Path(__file__).resolve().parents[1] / 'data' / 'funding_history.db'
+MIN_FORMAL_ENTRIES = 90
+FACTORY_BASKET = tuple(TOP_40_SYMBOLS)
+MAX_SIGNALS_PER_SYMBOL_DAY = 1
 
 
 def fitness(result: dict) -> float:
@@ -190,7 +202,7 @@ def write_current(tried, found, generation, strat=None, t_start=None, days_cover
             pass
 
 
-def main():
+def _legacy_main():
     conn = sqlite3.connect(DB_PATH)
     basket = load_basket(conn)
 
@@ -267,6 +279,94 @@ def main():
             print(f"[EVO-LAB] *** ERROR en generacion {generation} (tried={tried}), continuando *** {type(e).__name__}: {e}", flush=True)
             time.sleep(1)
             population = [random_strategy() for _ in range(POPULATION_SIZE)]  # reset defensivo si algo se corrompio
+
+
+def _strategy_id(strat: dict) -> str:
+    """ID reproducible: mismo genoma no entra dos veces en la cola."""
+    raw = json.dumps({'genome': strat, 'universe': 'TOP_40',
+                      'max_signals_per_symbol_day': MAX_SIGNALS_PER_SYMBOL_DAY},
+                     sort_keys=True, separators=(',', ':')).encode('utf8')
+    return f"factory-{strat['entry_type']}-{hashlib.sha256(raw).hexdigest()[:16]}"
+
+
+def _condition(strat: dict) -> str:
+    return (
+        f"factory/{strat['entry_type']}; tf={strat['tf_min']}m; side={strat['side']}; "
+        f"ma_pair={strat['ma_pair']}; atr_sl_mult={strat['atr_sl_mult']}; rr_mult={strat['rr_mult']}; "
+        f"lookback={strat['lookback']}; rsi_thresh={strat['rsi_thresh']}; "
+        f"slope_min_pct={strat['slope_min_pct']}; volume_mult={strat['volume_mult']}"
+    )
+
+
+def emit_formal_batch(count: int, root=FACTORY_ROOT, queue_db=FACTORY_QUEUE,
+                      catalog=CATALOG_PATH, funding_db=FUNDING_DB, seed: int = 20261008) -> list[dict]:
+    """Generador puro: emite revisiones Fase A y las admite por la cola.
+
+    No llama ``backtest_strategy``/``evaluate`` (por tanto no proclama
+    ganadores), no inicia servicios y no conoce código de producción. Cada
+    candidato pasa por ``ResearchQueue.enqueue`` y, con ello,
+    ``verify_revision`` antes de poder ser consumido.
+    """
+    if count <= 0:
+        raise ValueError('count debe ser positivo')
+    random.seed(seed)
+    root, catalog, funding_db = Path(root).resolve(), Path(catalog).resolve(), Path(funding_db).resolve()
+    queue = ResearchQueue(queue_db)
+    conn = sqlite3.connect(DB_PATH)
+    basket = list(FACTORY_BASKET)
+    emitted, seen, budget = [], set(), count * 40
+    try:
+        while len(emitted) < count and budget:
+            budget -= 1
+            strat = random_strategy(); candidate_id = _strategy_id(strat)
+            if candidate_id in seen:
+                continue
+            seen.add(candidate_id)
+            # Si ya fue materializado, la inmutabilidad y la deduplicación de
+            # la cola hacen de esta emisión una operación segura/no-op.
+            revision = root / candidate_id / '1'
+            if not revision.exists():
+                entries = materialize_formal_entries(
+                    conn, basket, strat, max_signals_per_symbol_day=MAX_SIGNALS_PER_SYMBOL_DAY)
+                if len(entries) < MIN_FORMAL_ENTRIES:
+                    continue
+                definition = {'display_name': f"Factory {strat['entry_type']} {strat['tf_min']}m",
+                              'condition': _condition(strat), 'genome': strat,
+                              'generator': 'evolutionary_lab_generator_only',
+                              'universe': 'TOP_40',
+                              'max_signals_per_symbol_day': MAX_SIGNALS_PER_SYMBOL_DAY,
+                              'minimum_entries_preregistered': MIN_FORMAL_ENTRIES}
+                materialize_factory_candidate(root, candidate_id, entries, definition)
+            job = queue.enqueue(root, candidate_id, catalog, funding_db)
+            emitted.append({'candidate_id': candidate_id, 'entries': json.loads(
+                (revision / 'candidate.json').read_text(encoding='utf8'))['entries_artifact']['count'],
+                'queue_status': job['status']})
+    finally:
+        conn.close()
+    if len(emitted) != count:
+        raise RuntimeError(f'no se alcanzó el lote solicitado: {len(emitted)}/{count}')
+    return emitted
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(
+        description='Fábrica generator-only: materializa candidatos Fase A y jamás toca producción.')
+    parser.add_argument('--emit-batch', type=int, required=True,
+                        help='cantidad finita de candidatos formales a emitir')
+    parser.add_argument('--root', default=str(FACTORY_ROOT))
+    parser.add_argument('--queue-db', default=str(FACTORY_QUEUE))
+    parser.add_argument('--catalog', default=str(CATALOG_PATH))
+    parser.add_argument('--funding-db', default=str(FUNDING_DB))
+    parser.add_argument('--seed', type=int, default=20261008)
+    parser.add_argument('--consume', action='store_true',
+                        help='vacía la cola con un único worker después de emitir')
+    args = parser.parse_args(argv)
+    emitted = emit_formal_batch(args.emit_batch, args.root, args.queue_db, args.catalog,
+                                args.funding_db, args.seed)
+    result = {'emitted': emitted}
+    if args.consume:
+        result['consumer'] = drain(args.queue_db, requested_workers=1)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
