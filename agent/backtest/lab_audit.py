@@ -78,13 +78,18 @@ def day_block_ci(rows, horizon, rounds=1000):
     }
 
 
-def audit_adapter(adapter, entries=None, progress=None, execution_variant=None):
+def audit_adapter(adapter, entries=None, progress=None, execution_variant=None, allowed_splits=None):
     """Produce el ``result.json`` y el informe M1b para cualquier Adapter.
 
     ``progress(processed, total, symbols_done, symbols_total)`` es opcional y
     no interviene en cálculos ni en el resultado.
     """
     entries = adapter.entries() if entries is None else list(entries)
+    if allowed_splits is not None:
+        allowed_splits = frozenset(allowed_splits)
+        if not allowed_splits:
+            raise ValueError('allowed_splits no puede ser vacío')
+        entries = [trade for trade in entries if adapter.split_of(trade['open_ms']) in allowed_splits]
     by = defaultdict(list)
     for trade in entries:
         by[trade['symbol']].append(trade)
@@ -134,10 +139,12 @@ def audit_adapter(adapter, entries=None, progress=None, execution_variant=None):
                                win_rate, pct(gave_back, len(reached)), pct(sl_cf, len(sl)),
                                pct(len(timeout), len(rows)), timeout_mean)
     main_area = max(severity, key=severity.get)
-    # Fase C decide exclusivamente con TRAIN/VALIDATION. OOS queda presente
-    # como evidencia separada y no interviene en la elección de variante.
+    # Sólo se calcula el split solicitado. La Fase C puede así auditar
+    # TRAIN/VALIDATION sin abrir ni consultar una sola entrada OOS.
     split_metrics = {}
     for split in ('TRAIN', 'VALIDATION', 'OOS'):
+        if allowed_splits is not None and split not in allowed_splits:
+            continue
         subset = [row for row in rows if row['split'] == split]
         subset_wins = [row for row in subset if row['ret'] > 0]
         subset_losses = [row for row in subset if row['ret'] <= 0]

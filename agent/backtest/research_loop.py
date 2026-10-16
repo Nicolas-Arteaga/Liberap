@@ -4,6 +4,7 @@ import datetime as dt
 import os
 import hashlib
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -11,7 +12,9 @@ from pathlib import Path
 import lab_audit as A
 from lab_adapters import get_adapter
 
-RECIPES = {"SALIDA": ("exit_giveback_10", "exit_giveback_25", "exit_giveback_50"),
+RECIPES = {"COSTOS": ("cost_atr14_ge_1_5x_roundtrip", "cost_atr14_ge_2_0x_roundtrip",
+                        "cost_volume_ge_1_5x_mean20", "cost_hourly_range_ge_2x_roundtrip"),
+           "SALIDA": ("exit_giveback_10", "exit_giveback_25", "exit_giveback_50"),
            "SL": ("sl_atr_1_0", "sl_atr_1_5", "sl_atr_2_0"),
            "TIMEOUT": ("timeout_12h", "timeout_24h", "timeout_36h", "timeout_24h_if_losing"),
            "PAYOFF": ("payoff_tp_short_50", "payoff_break_even_1r", "payoff_trailing_2r")}
@@ -19,6 +22,14 @@ SIM_VARIANT = {"exit_giveback_10":"giveback_10", "exit_giveback_25":"giveback_25
  "sl_atr_1_0":"sl_atr_1.0", "sl_atr_1_5":"sl_atr_1.5", "sl_atr_2_0":"sl_atr_2.0",
  "timeout_12h":"time_exit_12h", "timeout_24h":"time_exit_24h", "timeout_36h":"time_exit_36h", "timeout_24h_if_losing":"time_stop_24h_if_losing",
  "payoff_tp_short_50":"tp_short_50", "payoff_break_even_1r":"break_even_1r", "payoff_trailing_2r":"trailing_2r"}
+COST_FILTER_MULTIPLIER = {
+    "cost_atr14_ge_1_5x_roundtrip": 1.5,
+    "cost_atr14_ge_2_0x_roundtrip": 2.0,
+}
+
+
+class MissingCausalInput(ValueError):
+    """Una variante cerrada no puede evaluarse sin el insumo que declara."""
 
 def sha(path): return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 def canonical(value): return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(',',':'), ensure_ascii=False).encode()).hexdigest()
@@ -43,6 +54,59 @@ def state(root):
 def _new(path):
     if path.exists(): raise FileExistsError(f'revisión inmutable ya existe: {path}')
 def _entries(entries): return ('\n'.join(json.dumps(x,ensure_ascii=False,sort_keys=True,separators=(',',':')) for x in entries)+'\n').encode()
+
+def catalog_families(catalog_path):
+    """Lee el orden publicado de tablas, no un orden elegido por el motor."""
+    families, area = {}, None
+    for line in Path(catalog_path).read_text(encoding='utf8').splitlines():
+        heading = re.match(r'^### (ENTRADA|COSTOS|PAYOFF|SALIDA|SL|TIMEOUT)\b', line)
+        if heading:
+            area = heading.group(1); families.setdefault(area, [])
+            continue
+        match = re.match(r'^\| `([a-z0-9_]+)` \|', line)
+        if area and match:
+            families[area].append(match.group(1))
+    return {key: tuple(value) for key, value in families.items()}
+
+def executable_variant(area, variant_id):
+    """Puente explícito entre catálogo y simulador; jamás interpreta código libre."""
+    if area == 'COSTOS' and variant_id in RECIPES['COSTOS']:
+        return None
+    if variant_id in SIM_VARIANT:
+        return SIM_VARIANT[variant_id]
+    raise MissingCausalInput(f'no hay ejecutor declarativo para {area}/{variant_id}')
+
+def apply_cost_filter(base, entries, variant_id):
+    """Transforma sólo población y sólo según reglas COSTOS publicadas.
+
+    Las velas normalizadas del contrato son OHLC (sin volumen); por eso la
+    variante de volumen queda explícitamente NOT_APPLICABLE, no se aproxima.
+    """
+    if variant_id == "cost_volume_ge_1_5x_mean20":
+        raise MissingCausalInput("OHLC normalizado no contiene volumen causal")
+    if variant_id not in (*COST_FILTER_MULTIPLIER, "cost_hourly_range_ge_2x_roundtrip"):
+        raise ValueError(f"cost variant fuera del catálogo cerrado: {variant_id}")
+    grouped = {}
+    for entry in entries:
+        grouped.setdefault(entry["symbol"], []).append(entry)
+    kept = []
+    for symbol, symbol_entries in grouped.items():
+        candles = base.candles(symbol)
+        hours = A.C.hourly_series(candles)
+        starts = [row[0] for row in hours]
+        for entry in symbol_entries:
+            end = __import__('bisect').bisect_right(starts, entry['open_ms'] - A.C.HOUR)
+            if variant_id == "cost_hourly_range_ge_2x_roundtrip":
+                if end < 1:
+                    continue
+                _ot, high, low, close = hours[end - 1]
+                eligible = bool(close) and ((high - low) / close * 100.0 >= 2.0 * base.cost_pct)
+            else:
+                atr = A.C.atr_before(hours, starts, entry['open_ms'])
+                eligible = bool(atr and entry['entry']) and (atr / entry['entry'] * 100.0 >= COST_FILTER_MULTIPLIER[variant_id] * base.cost_pct)
+            if eligible:
+                kept.append(entry)
+    return sorted(kept, key=lambda item: (item['open_ms'], item['symbol']))
 
 def materialize_adapter(root, adapter_name, candidate_id):
     """Crea candidate.json + entries.jsonl de revisión 1 desde un adaptador auditado."""
@@ -93,27 +157,58 @@ def _evidence(result):
     fwd24 = result['forward_return_pct_day_block_ci'].get(24, result['forward_return_pct_day_block_ci'].get('24'))
     return {'ENTRADA':{'metric':'forward_return_24h_mean_pct','value':fwd24['mean']},'COSTOS':{'metric':'gross_edge_pct','value':result['gross_edge_pct']},'PAYOFF':{'metric':'break_even_minus_win_rate_pp','value':(result['break_even_win_rate_pct'] or 0)-(result['win_rate_pct'] or 0)},'SALIDA':{'metric':'reached_2pct_ended_loss_pct','value':result['reached_2pct_ended_loss_pct']},'SL':{'metric':'sl_cf_reaches_tp_pct','value':result['sl_cf_reaches_tp_pct']},'TIMEOUT':{'metric':'timeout_damage','value':result['timeout_pct']*max(0,-(result['timeout_mean_return_pct'] or 0))}}
 
-def diagnose_revision(root,path,execution_variant=None):
-    """Ejecuta auditor real y materializa result/informe/diagnosis una sola vez."""
+def diagnose_revision(root,path,execution_variant=None,allowed_splits=('TRAIN','VALIDATION')):
+    """Diagnóstico de selección: por defecto nunca abre OOS."""
     root,path=Path(root),Path(path); dp=path/'diagnosis.json'; _new(dp); candidate,entries,fingerprint=verify_revision(path); base=get_adapter(candidate['adapter_definition']['name']); adapter=FrozenAdapter(base,entries); started=dt.datetime.now(dt.timezone.utc)
     def progress(done,total,symbols_done,symbols_total):
         elapsed=max(.001,(dt.datetime.now(dt.timezone.utc)-started).total_seconds()); set_state(root,candidate['candidate_id'],'Máquina auditando',done,total,int((total-done)*elapsed/max(done,1)),f'{symbols_done}/{symbols_total} símbolos')
     set_state(root,candidate['candidate_id'],'Máquina auditando',0,len(entries),None,'auditor real')
+    if 'OOS' in allowed_splits:
+        raise ValueError('diagnose_revision es sólo TRAIN/VALIDATION; use audit_oos_once')
     cached=path/'result.json'
     if cached.exists():
         result=json.loads(cached.read_text(encoding='utf8'))
     else:
-        result,report,_=A.audit_adapter(adapter,progress=progress,execution_variant=execution_variant); dump(cached,result); (path/'informe.md').write_text(report+'\n',encoding='utf8')
+        result,report,_=A.audit_adapter(adapter,progress=progress,execution_variant=execution_variant,allowed_splits=allowed_splits); dump(cached,result); (path/'informe.md').write_text(report+'\n',encoding='utf8')
     valid=result['integrity']['valid']; diagnosis={'protocol_version':'1.0-draft','candidate_id':candidate['candidate_id'],'revision':candidate['revision'],'status':'DIAGNOSED' if valid else 'INVALID','diagnosed_at_utc':now(),
-      'input_fingerprint':{**fingerprint,'research_source_commit':candidate['research_run']['source_commit']},'machine_fingerprint':{'machine_commit':git_commit(),'adapter_contract':'Adapter/EntryDefinition v1','candle_source_key':candidate['candle_source']['key']},'integrity':result['integrity'],'diagnosis':{'net_expectancy_pct':result['net_expectancy_pct'],'gross_edge_pct':result['gross_edge_pct'],'main_area':result['main_area'],'severity':result['severity'],'evidence_by_area':_evidence(result)},'train_validation':{'net_expectancy_pct':(result['split_metrics']['TRAIN']['net_expectancy_pct']+result['split_metrics']['VALIDATION']['net_expectancy_pct'])/2,'severity':{area:max(result['split_metrics']['TRAIN']['severity'][area],result['split_metrics']['VALIDATION']['severity'][area]) for area in result['severity']}},'oos_once':{'net_expectancy_pct':result['split_metrics']['OOS']['net_expectancy_pct'],'severity':result['split_metrics']['OOS']['severity']},'artifacts':{'result_json':'result.json','report_markdown':'informe.md','audit_result':result},'safety':{'research_status':'DIAGNOSED' if valid else 'INVALID','strategy_profile_write':False,'agent_execution':False,'ledger_write':False}}
+      'input_fingerprint':{**fingerprint,'research_source_commit':candidate['research_run']['source_commit']},'machine_fingerprint':{'machine_commit':git_commit(),'adapter_contract':'Adapter/EntryDefinition v1','candle_source_key':candidate['candle_source']['key']},'integrity':result['integrity'],'diagnosis':{'net_expectancy_pct':result['net_expectancy_pct'],'gross_edge_pct':result['gross_edge_pct'],'main_area':result['main_area'],'severity':result['severity'],'evidence_by_area':_evidence(result)},'train_validation':{'net_expectancy_pct':(result['split_metrics']['TRAIN']['net_expectancy_pct']+result['split_metrics']['VALIDATION']['net_expectancy_pct'])/2,'severity':{area:max(result['split_metrics']['TRAIN']['severity'][area],result['split_metrics']['VALIDATION']['severity'][area]) for area in result['severity']}},'oos_once':None,'artifacts':{'result_json':'result.json','report_markdown':'informe.md','audit_result':result},'safety':{'research_status':'DIAGNOSED' if valid else 'INVALID','strategy_profile_write':False,'agent_execution':False,'ledger_write':False}}
     dump(dp,diagnosis); set_state(root,candidate['candidate_id'],'sin actividad',len(entries),len(entries),0,'diagnóstico '+diagnosis['status']); return diagnosis
 
-def next_revision(root,diagnosis_path,catalog_path,variant_id=None):
+def audit_oos_once(root, path, execution_variant=None):
+    """Único acceso OOS, permitido exclusivamente después de PASS TV.
+
+    Guarda un artefacto separado e inmutable y rechaza una segunda consulta.
+    """
+    root,path=Path(root),Path(path); op=path/'oos_result.json'; _new(op)
+    candidate,entries,_=verify_revision(path); base=get_adapter(candidate['adapter_definition']['name']); adapter=FrozenAdapter(base,entries)
+    set_state(root,candidate['candidate_id'],'Máquina auditando OOS',0,len(entries),None,'única consulta OOS')
+    result,report,_=A.audit_adapter(adapter,execution_variant=execution_variant,allowed_splits=('OOS',))
+    dump(op,result); (path/'oos_informe.md').write_text(report+'\n',encoding='utf8')
+    return {'net_expectancy_pct':result['net_expectancy_pct'],'severity':result['severity'],'artifact':'oos_result.json'}
+
+def next_revision(root,diagnosis_path,catalog_path,variant_id=None,area_override=None):
     diagnosis=json.loads(Path(diagnosis_path).read_text(encoding='utf8'))
     if diagnosis.get('status')!='DIAGNOSED': raise ValueError('diagnosis debe estar DIAGNOSED')
-    area=diagnosis['diagnosis']['main_area']; variant=variant_id or RECIPES.get(area,(None,))[0]
+    area=area_override or diagnosis['diagnosis']['main_area']; variant=variant_id or RECIPES.get(area,(None,))[0]
     if variant not in RECIPES.get(area,()): raise ValueError(f'variant_id fuera del catálogo cerrado: {variant}')
-    root,parent=Path(root),Path(diagnosis_path).parent; catalog_sha=sha(catalog_path); manifest=json.loads((parent/'candidate.json').read_text(encoding='utf8')); child=root/manifest['candidate_id']/str(manifest['revision']+1); _new(child); set_state(root,manifest['candidate_id'],'Research aplicando variante',detail=variant); child.mkdir(parents=True); shutil.copy2(parent/'entries.jsonl',child/'entries.jsonl'); manifest['revision']+=1; manifest['submitted_at_utc']=now(); manifest['entries_artifact']['sha256']=sha(child/'entries.jsonl'); manifest['execution_recipe']={'recipe_version':'1.0','area':area,'variant_id':variant,'parent_revision':manifest['revision']-1,'catalog_sha256':catalog_sha}; dump(child/'candidate.json',manifest); verify_revision(child); return child
+    root,parent=Path(root),Path(diagnosis_path).parent; catalog_sha=sha(catalog_path); manifest,entries,_=verify_revision(parent); child=root/manifest['candidate_id']/str(manifest['revision']+1); _new(child)
+    # Resolver toda transformación antes de crear la revisión: una receta no
+    # aplicable jamás deja un directorio parcial que bloquee la inmutabilidad.
+    transformed = apply_cost_filter(get_adapter(manifest['adapter_definition']['name']), entries, variant) if area == 'COSTOS' else None
+    if transformed is not None and not transformed:
+        raise MissingCausalInput('filtro COSTOS produjo población vacía')
+    set_state(root,manifest['candidate_id'],'Research aplicando variante',detail=variant); child.mkdir(parents=True)
+    manifest['revision'] += 1; manifest['submitted_at_utc'] = now()
+    if area == 'COSTOS':
+        ep=child/'entries.jsonl'; ep.write_bytes(_entries(transformed))
+        manifest['entry_transform']={'area':area,'variant_id':variant,'parent_revision':manifest['revision']-1,
+          'catalog_sha256':catalog_sha,'parent_entry_count':len(entries),'child_entry_count':len(transformed)}
+    else:
+        ep=child/'entries.jsonl'; shutil.copy2(parent/'entries.jsonl',ep)
+        manifest['execution_recipe']={'recipe_version':'1.0','area':area,'variant_id':variant,
+          'parent_revision':manifest['revision']-1,'catalog_sha256':catalog_sha}
+    manifest['entries_artifact']['sha256']=sha(ep); manifest['entries_artifact']['count']=len([x for x in ep.read_text(encoding='utf8').splitlines() if x])
+    dump(child/'candidate.json',manifest); verify_revision(child); return child
 
 def evaluate_attempt(parent,child,area):
     """Fase C: sólo acepta métricas explícitas TRAIN/VALIDATION; jamás usa OOS para decidir."""
@@ -130,6 +225,68 @@ def record_attempt(root, candidate_id, attempt, allow_improved=False):
     failed=sum(x.get('status') in ('FAILED_ATTEMPT','FAILED_OOS') for x in current['attempts'])
     current['status']='DISCARDED' if failed >= MAX_ATTEMPTS else ('IMPROVED' if attempt.get('status')=='PASSED_OOS' else 'IN_REFINEMENT')
     dump(path,current); return current
+
+def _ordered_areas(diagnosis):
+    """Desempate estable por nombre; no selecciona con OOS ni por rendimiento."""
+    return [area for area, _score in sorted(diagnosis['diagnosis']['severity'].items(), key=lambda item: (-item[1], item[0]))]
+
+def _latest_diagnosed_revision(root, candidate_id):
+    revisions = sorted((p for p in (Path(root)/candidate_id).iterdir()
+                        if p.is_dir() and (p/'diagnosis.json').exists()), key=lambda p: int(p.name))
+    if not revisions:
+        raise FileNotFoundError(f'{candidate_id}: no hay diagnosis.json')
+    return revisions[-1]
+
+def _execution_for_revision(path):
+    recipe=json.loads((Path(path)/'candidate.json').read_text(encoding='utf8')).get('execution_recipe')
+    return SIM_VARIANT.get(recipe['variant_id']) if recipe else None
+
+def run_autonomous(root, candidate_id, catalog_path):
+    """Orquesta recetas cerradas hasta IMPROVED/DISCARDED sin tocar producción.
+
+    Sólo las variantes con ejecutor declarativo son auditables. Las que declaran
+    un insumo ausente se guardan append-only como NOT_APPLICABLE; no se inventa
+    una simulación ni se cuentan como fallo del límite de diez.
+    """
+    root=Path(root); families=catalog_families(catalog_path)
+    history_file=history_path(root,candidate_id)
+    history=json.loads(history_file.read_text(encoding='utf8')) if history_file.exists() else {'candidate_id':candidate_id,'attempts':[],'status':'IN_REFINEMENT'}
+    while history['status']=='IN_REFINEMENT':
+        parent_dir=_latest_diagnosed_revision(root,candidate_id)
+        parent=json.loads((parent_dir/'diagnosis.json').read_text(encoding='utf8'))
+        used={attempt.get('variant_id') for attempt in history['attempts']}
+        progressed=False
+        for area in _ordered_areas(parent):
+            for variant in families.get(area, ()):
+                if variant in used:
+                    continue
+                try:
+                    executable=executable_variant(area, variant)
+                    child=next_revision(root,parent_dir/'diagnosis.json',catalog_path,variant,area)
+                except MissingCausalInput as exc:
+                    history=record_attempt(root,candidate_id,{'status':'NOT_APPLICABLE_MISSING_INPUT','area':area,'variant_id':variant,'reason':str(exc)})
+                    progressed=True
+                    break
+                after=diagnose_revision(root,child,executable)
+                attempt=evaluate_attempt(parent,after,area)
+                attempt.update({'variant_id':variant,'parent_revision':parent['revision'],'child_revision':after['revision']})
+                if attempt['status']=='PASS_TRAIN_VALIDATION':
+                    before_oos=audit_oos_once(root,parent_dir,_execution_for_revision(parent_dir))
+                    after_oos=audit_oos_once(root,child,executable)
+                    oos_ok=(after_oos['severity'][area] < before_oos['severity'][area]
+                            and after_oos['net_expectancy_pct'] >= before_oos['net_expectancy_pct'])
+                    attempt['oos_before']=before_oos; attempt['oos_after']=after_oos
+                    attempt['status']='PASSED_OOS' if oos_ok else 'FAILED_OOS'
+                history=record_attempt(root,candidate_id,attempt)
+                progressed=True
+                break
+            if progressed:
+                break
+        if not progressed:
+            history['status']='DISCARDED'; history['terminal_reason']='CATALOG_EXHAUSTED'
+            dump(history_file,history)
+    set_state(root,candidate_id,'sin actividad',detail=history['status'])
+    return history
 
 def rerun_improved(root, candidate_id, catalog_path):
     """Una vuelta desde un snapshot IMPROVED; sólo recetas cerradas, sin ejecución libre."""

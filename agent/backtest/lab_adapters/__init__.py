@@ -168,7 +168,8 @@ def get_adapter(name: str) -> Adapter:
     from .ma3 import MA3Adapter
     from .band_touch import BandTouchAdapter
     from .level_sweep import LevelSweepAdapter
-    registry = (MA3Adapter, BandTouchAdapter, LevelSweepAdapter)
+    from .rsi_reversal import RSIReversalAdapter
+    registry = (MA3Adapter, BandTouchAdapter, LevelSweepAdapter, RSIReversalAdapter)
     key = name.strip().lower().replace(" ", "_")
     for cls in registry:
         if key == cls.name or key in tuple(a.lower().replace(" ", "_") for a in cls.aliases):
