@@ -52,11 +52,12 @@ def _load_funding(path: str | None, symbol: str, end_ms: int):
         return [], []
     conn = sqlite3.connect(f"file:{Path(path).resolve()}?mode=ro", uri=True)
     try:
-        # FundingStore v1 uses funding_events; the legacy cache uses funding_hist.
+        # FundingStore v1 uses historical_funding_events; the legacy cache
+        # uses funding_hist. Both remain read-only inputs here.
         names = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        if "funding_events" in names:
+        if "historical_funding_events" in names:
             rows = _rows(conn, """
-                SELECT funding_time_ms, funding_rate FROM funding_events
+                SELECT funding_time_ms, funding_rate FROM historical_funding_events
                 WHERE venue='binance_usdm' AND symbol=? AND rate_type='settlement_rate'
                   AND funding_time_ms<=? ORDER BY funding_time_ms
             """, (symbol, end_ms))

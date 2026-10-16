@@ -37,8 +37,8 @@ class MicrostructurePanelTests(unittest.TestCase):
             conn.close()
         conn = sqlite3.connect(self.funding)
         try:
-            conn.execute("CREATE TABLE funding_events(venue,symbol,funding_time_ms,rate_type,funding_rate)")
-            conn.execute("INSERT INTO funding_events VALUES ('binance_usdm','BTCUSDT',1000000,'settlement_rate',0.01)")
+            conn.execute("CREATE TABLE historical_funding_events(venue,symbol,funding_time_ms,rate_type,funding_rate)")
+            conn.execute("INSERT INTO historical_funding_events VALUES ('binance_usdm','BTCUSDT',1000000,'settlement_rate',0.01)")
             conn.commit()
         finally:
             conn.close()
