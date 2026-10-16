@@ -21,7 +21,8 @@ class MicrostructurePanelTests(unittest.TestCase):
                 CREATE TABLE taker_flow(symbol, interval, open_time, volume, quote_volume, trade_count, taker_buy_volume, taker_buy_quote);
             """)
             conn.executemany("INSERT INTO klines_clean VALUES ('BTCUSDT','5m',?,?,?,?,?,?)", [
-                (1_000_000, 10, 11, 9, 10, 1), (1_300_000, 10, 12, 10, 11, 1),
+                (700_000, 10, 11, 9, 10, 1), (1_000_000, 10, 11, 9, 10, 1),
+                (1_300_000, 10, 12, 10, 11, 1),
             ])
             conn.execute("INSERT INTO taker_flow VALUES ('BTCUSDT','5m',1000000,1,1,1,1,1)")
             conn.commit()
@@ -54,7 +55,8 @@ class MicrostructurePanelTests(unittest.TestCase):
 
     def test_funding_is_not_visible_before_settlement(self):
         rows = build_5m_panel('BTCUSDT', 700_000, 1_300_000, PanelPaths(self.price, self.oi, self.funding))
-        self.assertEqual(rows[0]['funding']['settled_at'], 1_000_000)
+        self.assertIsNone(rows[0]['funding'])
+        self.assertEqual(rows[1]['funding']['settled_at'], 1_000_000)
 
 
 if __name__ == '__main__':
