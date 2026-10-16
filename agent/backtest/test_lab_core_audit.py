@@ -16,6 +16,24 @@ def trade(**changes):
 
 
 class AuditPrimitiveTests(unittest.TestCase):
+    def test_batch_simulation_equals_individual_variants(self):
+        rows = [(index * H, 101 + index % 4, 97 - index % 3, 99 + index % 3)
+                for index in range(1, 80)]
+        item = trade(side=1, sl=105, tp=90)
+        variants = ("baseline", "giveback_10", "giveback_25", "giveback_50",
+                    "break_even_1r", "trailing_2r", "time_exit_12h",
+                    "time_exit_24h", "time_exit_36h", "time_stop_24h_if_losing",
+                    "sl_atr_1.0", "sl_atr_1.5", "sl_atr_2.0")
+        got = core.simulate_variants_batch(rows, [row[0] for row in rows], H, item,
+                                           variants, "unconditional", -2.0, 3.0)
+        for variant in variants:
+            self.assertEqual(
+                got[variant],
+                core.simulate(rows, [row[0] for row in rows], H, item, variant,
+                              "unconditional", -2.0, 3.0, with_close_ms=True),
+                variant,
+            )
+
     def test_simulate_detail_long_tp_records_path(self):
         rows = [(H, 104, 99, 103), (2 * H, 111, 102, 110)]
         got = core.simulate_detail(rows, [r[0] for r in rows], H, trade(), "unconditional", None)
@@ -58,6 +76,21 @@ class AuditPrimitiveTests(unittest.TestCase):
         got = core.simulate_detail(rows, [r[0] for r in rows], H, trade(tp=120), "unconditional", None)
         self.assertEqual(got["reason"], "timeout_48")
         self.assertEqual(got["px"], 101)
+
+    def test_compact_path_reproduces_baseline_and_lazy_variant(self):
+        rows = [(index * H, 103 + index % 3, 97 - index % 2, 100 + (index % 5) - 2)
+                for index in range(1, 100)]
+        item = trade(open_ms=10 * H, tp=120)
+        opens = [row[0] for row in rows]
+        path = core.materialize_trade_path(rows, opens, H, item)
+        self.assertEqual(
+            core.audit_trade_from_path(path, H, item, None, "TRAIN", .08),
+            core.audit_trade(rows, opens, H, item, None, "TRAIN", .08),
+        )
+        self.assertEqual(
+            core.simulate_variants_from_path(path, H, item, ("giveback_25",), "unconditional", -2.0, None)["giveback_25"],
+            core.simulate(rows, opens, H, item, "giveback_25", "unconditional", -2.0, None, with_close_ms=True),
+        )
 
 
 if __name__ == "__main__":

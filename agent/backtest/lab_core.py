@@ -10,6 +10,8 @@ baseline/tp_short_50/giveback_*/break_even_1r/trailing_2r) y `fase2b_ma3_exit_va
 from __future__ import annotations
 
 import bisect
+from array import array
+from dataclasses import dataclass
 
 HOUR = 3_600_000
 ATR_PERIOD = 14
@@ -75,8 +77,15 @@ def atr_before(hours, hour_starts, open_ms):
 
 
 # ----------------------------------------------------------------------------- simulador
-def simulate(rows, opens, bar_ms, trade, variant, mode, bias_pp, atr):
-    """Devuelve (precio_de_salida, motivo). SL se evalúa antes que TP dentro de la misma vela."""
+def simulate(rows, opens, bar_ms, trade, variant, mode, bias_pp, atr, with_close_ms=False):
+    """Devuelve ``(precio, motivo)`` o además ``close_ms`` si se pide.
+
+    El timestamp de salida es el cierre de la vela que produjo el evento.  No
+    cambia ninguna regla de fill; sólo vuelve explícita la ventana contable para
+    funding histórico.
+    """
+    def done(px, reason, close_ms):
+        return (px, reason, close_ms) if with_close_ms else (px, reason)
     entry, side, sl0, tp0 = trade["entry"], trade["side"], trade["sl"], trade["tp"]
     if variant == "inverted":
         side, sl0, tp0 = 1 - side, 2 * entry - sl0, 2 * entry - tp0
@@ -99,7 +108,7 @@ def simulate(rows, opens, bar_ms, trade, variant, mode, bias_pp, atr):
     for ot, high, low, close in rows[start:]:
         age = ot + bar_ms - open_ms
         if age > ceiling:
-            return close, "timeout_hard_720"
+            return done(close, "timeout_hard_720", ot + bar_ms)
         fav = pct(side, entry, low if side == 1 else high)
         if fav > max_fav:
             max_fav = fav
@@ -108,28 +117,200 @@ def simulate(rows, opens, bar_ms, trade, variant, mode, bias_pp, atr):
         eff_sl = entry if breakeven else sl
         if side == 1:
             if high >= eff_sl:
-                return eff_sl, "break_even" if breakeven else "SL"
+                return done(eff_sl, "break_even" if breakeven else "SL", ot + bar_ms)
             if low <= tp:
-                return tp * (1 - bias_pp / 100.0), "TP"
+                return done(tp * (1 - bias_pp / 100.0), "TP", ot + bar_ms)
         else:
             if low <= eff_sl:
-                return eff_sl, "break_even" if breakeven else "SL"
+                return done(eff_sl, "break_even" if breakeven else "SL", ot + bar_ms)
             if high >= tp:
-                return tp * (1 + bias_pp / 100.0), "TP"
+                return done(tp * (1 + bias_pp / 100.0), "TP", ot + bar_ms)
         if give is not None and max_fav > 0:
             if max_fav - pct(side, entry, close) >= max_fav * give / 100.0:
-                return close, "giveback"
+                return done(close, "giveback", ot + bar_ms)
         if variant == "trailing_2r" and max_fav >= 2 * be_thresh:
             if max_fav - pct(side, entry, close) >= 2 * be_thresh:
-                return close, "trailing"
+                return done(close, "trailing", ot + bar_ms)
         if time_hours and age >= time_hours * HOUR:
-            return close, "time_exit"
+            return done(close, "time_exit", ot + bar_ms)
         if variant == "time_stop_24h_if_losing" and age >= 24 * HOUR and pct(side, entry, close) < 0:
-            return close, "time_stop"
+            return done(close, "time_stop", ot + bar_ms)
         if age >= timeout:
             if mode == "unconditional" or pct(side, entry, close) < 0:
-                return close, "timeout_48"
-    return rows[-1][3], "nodata"
+                return done(close, "timeout_48", ot + bar_ms)
+    return done(rows[-1][3], "nodata", rows[-1][0] + bar_ms)
+
+
+def simulate_variants_batch(rows, opens, bar_ms, trade, variants, mode, bias_pp, atr):
+    """Simula varias reglas de salida sobre una única lectura de trayectoria.
+
+    Es semánticamente equivalente a llamar :func:`simulate` una vez por
+    variante, pero itera cada vela sólo una vez. No comparte estado entre
+    variantes: cada una conserva su MFE, break-even y condición de cierre.
+    """
+    states = {}
+    entry, original_side, original_sl, original_tp = trade["entry"], trade["side"], trade["sl"], trade["tp"]
+    for original_variant in variants:
+        side, sl0, tp0, variant = original_side, original_sl, original_tp, original_variant
+        if variant == "inverted":
+            side, sl0, tp0, variant = 1 - side, 2 * entry - sl0, 2 * entry - tp0, "baseline"
+        risk = abs(entry - sl0)
+        tp = tp0 if variant != "tp_short_50" else entry + (tp0 - entry) * 0.5
+        sl = sl0
+        if variant.startswith("sl_atr_") and atr:
+            distance = min(abs(entry - sl0), float(variant.split("_")[2]) * atr)
+            sl = entry + distance if side == 1 else entry - distance
+        states[original_variant] = {
+            "variant": variant, "side": side, "sl": sl, "tp": tp, "risk": risk,
+            "give": float(variant.split("_")[1]) if variant.startswith("giveback_") else None,
+            "time_hours": {"time_exit_12h": 12, "time_exit_24h": 24, "time_exit_36h": 36}.get(variant),
+            "max_fav": 0.0, "breakeven": False, "done": None,
+        }
+    start, ceiling, timeout = bisect.bisect_right(opens, trade["open_ms"]), CEILING_H * HOUR, TIMEOUT_H * HOUR
+    for ot, high, low, close in rows[start:]:
+        for state in states.values():
+            if state["done"] is not None:
+                continue
+            age = ot + bar_ms - trade["open_ms"]
+            if age > ceiling:
+                state["done"] = (close, "timeout_hard_720", ot + bar_ms)
+                continue
+            fav = pct(state["side"], entry, low if state["side"] == 1 else high)
+            state["max_fav"] = max(state["max_fav"], fav)
+            if state["variant"] == "break_even_1r" and state["max_fav"] >= state["risk"] / entry * 100.0:
+                state["breakeven"] = True
+            eff_sl = entry if state["breakeven"] else state["sl"]
+            if state["side"] == 1:
+                if high >= eff_sl:
+                    state["done"] = (eff_sl, "break_even" if state["breakeven"] else "SL", ot + bar_ms)
+                    continue
+                if low <= state["tp"]:
+                    state["done"] = (state["tp"] * (1 - bias_pp / 100.0), "TP", ot + bar_ms)
+                    continue
+            else:
+                if low <= eff_sl:
+                    state["done"] = (eff_sl, "break_even" if state["breakeven"] else "SL", ot + bar_ms)
+                    continue
+                if high >= state["tp"]:
+                    state["done"] = (state["tp"] * (1 + bias_pp / 100.0), "TP", ot + bar_ms)
+                    continue
+            if state["give"] is not None and state["max_fav"] > 0:
+                if state["max_fav"] - pct(state["side"], entry, close) >= state["max_fav"] * state["give"] / 100.0:
+                    state["done"] = (close, "giveback", ot + bar_ms)
+                    continue
+            if state["variant"] == "trailing_2r" and state["max_fav"] >= 2 * state["risk"] / entry * 100.0:
+                if state["max_fav"] - pct(state["side"], entry, close) >= 2 * state["risk"] / entry * 100.0:
+                    state["done"] = (close, "trailing", ot + bar_ms)
+                    continue
+            if state["time_hours"] and age >= state["time_hours"] * HOUR:
+                state["done"] = (close, "time_exit", ot + bar_ms)
+                continue
+            if state["variant"] == "time_stop_24h_if_losing" and age >= 24 * HOUR and pct(state["side"], entry, close) < 0:
+                state["done"] = (close, "time_stop", ot + bar_ms)
+                continue
+            if age >= timeout:
+                if mode == "unconditional" or pct(state["side"], entry, close) < 0:
+                    state["done"] = (close, "timeout_48", ot + bar_ms)
+    if not rows:
+        raise ValueError("simulate_variants_batch requiere velas")
+    return {name: state["done"] or (rows[-1][3], "nodata", rows[-1][0] + bar_ms)
+            for name, state in states.items()}
+
+
+@dataclass(frozen=True)
+class TradePath:
+    """Trayectoria compacta posterior a una entrada, acotada a timeout normal.
+
+    No duplica velas completas ni conserva resultados de variantes. Cada serie
+    usa arrays nativos, para que una población grande pueda compartir la ruta
+    base y derivar reglas bajo demanda.
+    """
+    opens: array
+    highs: array
+    lows: array
+    closes: array
+
+
+def materialize_trade_path(rows, opens, bar_ms, trade) -> TradePath:
+    """Materializa una sola vez la trayectoria necesaria hasta el timeout 48h."""
+    start = bisect.bisect_right(opens, trade["open_ms"])
+    limit = trade["open_ms"] + TIMEOUT_H * HOUR
+    ot, high, low, close = array("q"), array("d"), array("d"), array("d")
+    for row_open, row_high, row_low, row_close in rows[start:]:
+        ot.append(row_open)
+        high.append(row_high)
+        low.append(row_low)
+        close.append(row_close)
+        # simulate_detail puede decidir SL/TP sobre la primera vela cuyo cierre
+        # alcanza 48h, y después siempre termina por timeout incondicional.
+        if row_open + bar_ms >= limit:
+            break
+    return TradePath(ot, high, low, close)
+
+
+def simulate_variants_from_path(path: TradePath, bar_ms, trade, variants, mode, bias_pp, atr):
+    """Versión perezosa de :func:`simulate_variants_batch` sobre TradePath."""
+    rows = list(zip(path.opens, path.highs, path.lows, path.closes))
+    if not rows:
+        raise ValueError("simulate_variants_from_path requiere trayectoria")
+    # La ruta comienza estrictamente después de la entrada, por eso se evita
+    # buscarla de nuevo contra la serie OHLC completa.
+    return _simulate_variants_rows(rows, bar_ms, trade, variants, mode, bias_pp, atr)
+
+
+def _simulate_variants_rows(rows, bar_ms, trade, variants, mode, bias_pp, atr):
+    """Núcleo común para una ruta ya recortada; conserva semántica histórica."""
+    states = {}
+    entry, original_side, original_sl, original_tp = trade["entry"], trade["side"], trade["sl"], trade["tp"]
+    for original_variant in variants:
+        side, sl0, tp0, variant = original_side, original_sl, original_tp, original_variant
+        if variant == "inverted":
+            side, sl0, tp0, variant = 1 - side, 2 * entry - sl0, 2 * entry - tp0, "baseline"
+        risk = abs(entry - sl0)
+        tp = tp0 if variant != "tp_short_50" else entry + (tp0 - entry) * 0.5
+        sl = sl0
+        if variant.startswith("sl_atr_") and atr:
+            distance = min(abs(entry - sl0), float(variant.split("_")[2]) * atr)
+            sl = entry + distance if side == 1 else entry - distance
+        states[original_variant] = {"variant": variant, "side": side, "sl": sl, "tp": tp, "risk": risk,
+            "give": float(variant.split("_")[1]) if variant.startswith("giveback_") else None,
+            "time_hours": {"time_exit_12h": 12, "time_exit_24h": 24, "time_exit_36h": 36}.get(variant),
+            "max_fav": 0.0, "breakeven": False, "done": None}
+    ceiling, timeout = CEILING_H * HOUR, TIMEOUT_H * HOUR
+    for ot, high, low, close in rows:
+        for state in states.values():
+            if state["done"] is not None:
+                continue
+            age = ot + bar_ms - trade["open_ms"]
+            if age > ceiling:
+                state["done"] = (close, "timeout_hard_720", ot + bar_ms)
+                continue
+            fav = pct(state["side"], entry, low if state["side"] == 1 else high)
+            state["max_fav"] = max(state["max_fav"], fav)
+            if state["variant"] == "break_even_1r" and state["max_fav"] >= state["risk"] / entry * 100.0:
+                state["breakeven"] = True
+            eff_sl = entry if state["breakeven"] else state["sl"]
+            if state["side"] == 1:
+                if high >= eff_sl:
+                    state["done"] = (eff_sl, "break_even" if state["breakeven"] else "SL", ot + bar_ms); continue
+                if low <= state["tp"]:
+                    state["done"] = (state["tp"] * (1 - bias_pp / 100.0), "TP", ot + bar_ms); continue
+            else:
+                if low <= eff_sl:
+                    state["done"] = (eff_sl, "break_even" if state["breakeven"] else "SL", ot + bar_ms); continue
+                if high >= state["tp"]:
+                    state["done"] = (state["tp"] * (1 + bias_pp / 100.0), "TP", ot + bar_ms); continue
+            if state["give"] is not None and state["max_fav"] > 0 and state["max_fav"] - pct(state["side"], entry, close) >= state["max_fav"] * state["give"] / 100.0:
+                state["done"] = (close, "giveback", ot + bar_ms); continue
+            if state["variant"] == "trailing_2r" and state["max_fav"] >= 2 * state["risk"] / entry * 100.0 and state["max_fav"] - pct(state["side"], entry, close) >= 2 * state["risk"] / entry * 100.0:
+                state["done"] = (close, "trailing", ot + bar_ms); continue
+            if state["time_hours"] and age >= state["time_hours"] * HOUR:
+                state["done"] = (close, "time_exit", ot + bar_ms); continue
+            if state["variant"] == "time_stop_24h_if_losing" and age >= 24 * HOUR and pct(state["side"], entry, close) < 0:
+                state["done"] = (close, "time_stop", ot + bar_ms); continue
+            if age >= timeout and (mode == "unconditional" or pct(state["side"], entry, close) < 0):
+                state["done"] = (close, "timeout_48", ot + bar_ms)
+    return {name: state["done"] or (rows[-1][3], "nodata", rows[-1][0] + bar_ms) for name, state in states.items()}
 
 
 # ----------------------------------------------------------------------------- trayectoria
@@ -327,4 +508,60 @@ def audit_trade(rows, opens, bar_ms, trade, atr, split, cost_pct):
     return {"split": split, "symbol": trade["symbol"], "side": side, "day": dt.strftime("%Y-%m-%d"), "month": dt.strftime("%Y-%m"),
             "hour": dt.hour, "reason": d["reason"], "age_h": d["age_h"], "ret": ret, "mfe": d["mfe"], "mae": d["mae"],
             "sl_dist": sl_dist, "tp_dist": tp_dist, "cf_sl_reaches_tp": cf_tp,
-            "fwd": forward_returns(rows, opens, bar_ms, trade), "open_ms": trade["open_ms"]}
+            "fwd": forward_returns(rows, opens, bar_ms, trade), "open_ms": trade["open_ms"],
+            "close_ms": trade["open_ms"] + round(d["age_h"] * HOUR)}
+
+
+def audit_trade_from_path(path: TradePath, bar_ms, trade, atr, split, cost_pct):
+    """Equivalente exacto de :func:`audit_trade` sin volver a recorrer OHLC.
+
+    La ruta ya contiene sólo velas posteriores a la entrada y hasta 48h; ése
+    es exactamente el horizonte de la auditoría baseline incondicional.
+    """
+    rows = list(zip(path.opens, path.highs, path.lows, path.closes))
+    if not rows:
+        raise ValueError("audit_trade_from_path requiere trayectoria")
+
+    def detail(no_sl=False, no_tp=False):
+        entry, side, sl, tp = trade["entry"], trade["side"], trade["sl"], trade["tp"]
+        max_fav, max_adv = 0.0, 0.0
+        last = None
+        for ot, high, low, close in rows:
+            age = ot + bar_ms - trade["open_ms"]
+            fav = pct(side, entry, low if side == 1 else high)
+            adv = pct(side, entry, high if side == 1 else low)
+            max_fav, max_adv = max(max_fav, fav), min(max_adv, adv)
+            last = (close, age)
+            if age > CEILING_H * HOUR:
+                return {"px": close, "reason": "timeout_hard_720", "age_h": age / HOUR, "mfe": max_fav, "mae": max_adv}
+            if side == 1:
+                if not no_sl and high >= sl:
+                    return {"px": sl, "reason": "SL", "age_h": age / HOUR, "mfe": max_fav, "mae": max_adv}
+                if not no_tp and low <= tp:
+                    return {"px": tp, "reason": "TP", "age_h": age / HOUR, "mfe": max_fav, "mae": max_adv}
+            else:
+                if not no_sl and low <= sl:
+                    return {"px": sl, "reason": "SL", "age_h": age / HOUR, "mfe": max_fav, "mae": max_adv}
+                if not no_tp and high >= tp:
+                    return {"px": tp, "reason": "TP", "age_h": age / HOUR, "mfe": max_fav, "mae": max_adv}
+            if age >= TIMEOUT_H * HOUR:
+                return {"px": close, "reason": "timeout_48", "age_h": age / HOUR, "mfe": max_fav, "mae": max_adv}
+        return {"px": last[0], "reason": "nodata", "age_h": last[1] / HOUR, "mfe": max_fav, "mae": max_adv}
+
+    d = detail()
+    entry, side = trade["entry"], trade["side"]
+    cf_tp = detail(no_sl=True)["reason"] == "TP" if d["reason"] == "SL" else None
+    from datetime import datetime, timezone
+    forward = {}
+    for horizon in FWD_HOURS:
+        target = trade["open_ms"] + horizon * HOUR
+        index = bisect.bisect_right(path.opens, target - bar_ms) - 1
+        forward[horizon] = (pct(side, entry, path.closes[index])
+                            if index >= 0 and path.opens[index] + bar_ms > target - bar_ms else None)
+    dt = datetime.fromtimestamp(trade["open_ms"] / 1000, tz=timezone.utc)
+    return {"split": split, "symbol": trade["symbol"], "side": side, "day": dt.strftime("%Y-%m-%d"), "month": dt.strftime("%Y-%m"),
+            "hour": dt.hour, "reason": d["reason"], "age_h": d["age_h"],
+            "ret": pct(side, entry, d["px"]) - cost_pct, "mfe": d["mfe"], "mae": d["mae"],
+            "sl_dist": abs(entry - trade["sl"]) / entry * 100.0, "tp_dist": abs(entry - trade["tp"]) / entry * 100.0,
+            "cf_sl_reaches_tp": cf_tp, "fwd": forward, "open_ms": trade["open_ms"],
+            "close_ms": trade["open_ms"] + round(d["age_h"] * HOUR)}
