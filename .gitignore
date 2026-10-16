@@ -313,3 +313,9 @@ Conversacion-Verge-lab-diagnostico-2026-09-20_a_2026-09-27.md
 agent/backtest/lab_current.json
 agent/backtest/lab_tested_all.jsonl
 agent/backtest/evolutionary_generations.jsonl
+
+# Immutable code/protocols under research are versioned; downloaded Vision data,
+# coverage snapshots and process logs are reproducible local artifacts.
+research/data/
+research/logs/
+research/reports/*.json

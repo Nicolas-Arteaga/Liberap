@@ -20,6 +20,7 @@ y sí trae el símbolo en "s", a diferencia de lo que documentaba spot):
             "b": [[price, qty], ...], "a": [[price, qty], ...]}}
 """
 
+import os
 import time
 import logging
 
@@ -161,7 +162,11 @@ def run_orderbook_stream(agent_log=print, set_status=None):
                                         on_error=on_error, on_close=on_close)
             ws.run_forever()
             try:
-                cache.prune_old_ofi()
+                # Preserve research history through H14's 60--90 day gate.  An
+                # operator may lower/raise this explicit disk-budget setting;
+                # the former implicit 30-day deletion is no longer the default.
+                keep_hours = int(os.environ.get("VERGE_RESEARCH_OFI_KEEP_HOURS", str(24 * 400)))
+                cache.prune_old_ofi(keep_hours=keep_hours)
             except Exception as e:
                 agent_log(f"⚠️ Orderbook WS: prune_old_ofi falló ({type(e).__name__}: {e}).")
             time.sleep(5)

@@ -24,7 +24,8 @@ Ventana: 2025-12-01 .. 2026-08-17 (igual que klines_clean).
 """
 import os, io, sys, json, zipfile, sqlite3, argparse, datetime as dt
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import requests
+from urllib.error import HTTPError, URLError
+from urllib.request import urlopen
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DB = os.path.join(HERE, "data", "binance_vision_clean.db")
@@ -54,15 +55,21 @@ def _ensure(conn):
     conn.commit()
 
 
-def _days():
-    d = D0
-    while d <= D1:
+def _days(d0, d1):
+    d = d0
+    while d <= d1:
         yield d.strftime("%Y-%m-%d")
         d += dt.timedelta(days=1)
 
 
-def _universe():
-    return json.load(open(UNIV))["universe"]
+def _universe(path):
+    """Accept the legacy `universe` schema and immutable V1 `symbols` schema."""
+    with open(path, encoding="utf-8") as handle:
+        payload = json.load(handle)
+    symbols = payload.get("universe") or payload.get("symbols")
+    if not isinstance(symbols, list) or not symbols:
+        raise ValueError(f"universe has no non-empty universe/symbols list: {path}")
+    return sorted({str(symbol).upper() for symbol in symbols})
 
 
 def _parse_ct(s):
@@ -73,10 +80,9 @@ def _parse_ct(s):
 def _fetch(sym, day):
     url = f"{BASE}/{sym}/{sym}-metrics-{day}.zip"
     try:
-        r = requests.get(url, timeout=TIMEOUT)
-        if r.status_code != 200:
-            return sym, day, r.status_code, None
-        zf = zipfile.ZipFile(io.BytesIO(r.content))
+        with urlopen(url, timeout=TIMEOUT) as response:  # nosec B310: fixed public Vision URL
+            body = response.read()
+        zf = zipfile.ZipFile(io.BytesIO(body))
         rows = []
         with zf.open(zf.namelist()[0]) as f:
             for i, line in enumerate(f):
@@ -93,20 +99,46 @@ def _fetch(sym, day):
                         return None
                 rows.append((p[1], _parse_ct(p[0]), fl(p[2]), fl(p[3]), fl(p[4]), fl(p[5]), fl(p[6]), fl(p[7])))
         return sym, day, 200, rows
-    except Exception as e:
+    except HTTPError as error:
+        return sym, day, error.code, None
+    except (URLError, TimeoutError, OSError, zipfile.BadZipFile) as e:
         return sym, day, f"ERR {e}", None
 
 
-def backfill():
-    conn = sqlite3.connect(DB)
+def coverage_report(conn, out_path):
+    rows = conn.execute("""
+        SELECT symbol, COUNT(*), MIN(open_time), MAX(open_time)
+        FROM oi_metrics GROUP BY symbol ORDER BY symbol
+    """).fetchall()
+    report = {"schema_version": 1, "generated_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(), "symbols": {}}
+    for symbol, count, first, last in rows:
+        expected = (last - first) // 300_000 + 1
+        report["symbols"][symbol] = {
+            "rows": count, "first_open_time": first, "last_open_time": last,
+            "coverage_pct": round(100 * count / expected, 6) if expected else 0.0,
+            "gaps": expected - count,
+        }
+    report["summary"] = {
+        "symbols": len(rows),
+        "symbols_90pct": sum(value["coverage_pct"] >= 90 for value in report["symbols"].values()),
+    }
+    with open(out_path, "w", encoding="utf-8") as handle:
+        json.dump(report, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+    return report
+
+
+def backfill(db_path, universe_path, d0, d1, workers, coverage_out):
+    os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
+    conn = sqlite3.connect(db_path)
     _ensure(conn)
-    syms = _universe()
-    days = list(_days())
+    syms = _universe(universe_path)
+    days = list(_days(d0, d1))
     jobs = [(s, d) for s in syms for d in days]
     print(f">>> oi_metrics backfill: {len(syms)} símbolos × {len(days)} días = {len(jobs)} requests", flush=True)
     total = 0; done = 0; s404 = 0; serr = 0
     per_sym = {s: 0 for s in syms}
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
+    with ThreadPoolExecutor(max_workers=workers) as ex:
         futs = [ex.submit(_fetch, s, d) for s, d in jobs]
         for fut in as_completed(futs):
             sym, day, st, rows = fut.result()
@@ -125,11 +157,13 @@ def backfill():
     print(f"\n>>> listo. filas nuevas={total}  404={s404}  err={serr}")
     zero = [s for s, n in per_sym.items() if n == 0]
     print(f">>> símbolos sin datos: {len(zero)} {zero}")
+    report = coverage_report(conn, coverage_out)
+    print(f">>> coverage: {report['summary']}")
     conn.close()
 
 
-def audit():
-    conn = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
+def audit(db_path):
+    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     tot = conn.execute("SELECT COUNT(*) FROM oi_metrics").fetchone()[0]
     nsym = conn.execute("SELECT COUNT(DISTINCT symbol) FROM oi_metrics").fetchone()[0]
     gmin, gmax = conn.execute("SELECT MIN(open_time),MAX(open_time) FROM oi_metrics").fetchone()
@@ -160,10 +194,23 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--backfill", action="store_true")
     ap.add_argument("--audit", action="store_true")
+    ap.add_argument("--db", default=DB, help="isolated SQLite target; never point this at the live agent DB")
+    ap.add_argument("--universe", default=UNIV, help="frozen universe JSON")
+    ap.add_argument("--date-start", default=D0.isoformat())
+    ap.add_argument("--date-end", default=D1.isoformat())
+    ap.add_argument("--workers", type=int, default=MAX_WORKERS)
+    ap.add_argument("--coverage-out", default=None)
     a = ap.parse_args()
+    d0 = dt.date.fromisoformat(a.date_start)
+    d1 = dt.date.fromisoformat(a.date_end)
+    if d1 < d0:
+        ap.error("--date-end must not precede --date-start")
+    if not 1 <= a.workers <= MAX_WORKERS:
+        ap.error(f"--workers must be in 1..{MAX_WORKERS}")
+    coverage_out = a.coverage_out or f"{a.db}.coverage.json"
     if a.backfill:
-        backfill()
+        backfill(a.db, a.universe, d0, d1, a.workers, coverage_out)
     if a.audit:
-        audit()
+        audit(a.db)
     if not (a.backfill or a.audit):
         ap.print_help()
