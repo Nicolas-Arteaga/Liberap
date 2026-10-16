@@ -100,11 +100,13 @@ Listing S3 `data/futures/um/daily/<dataset>/BTCUSDT/`, primer archivo disponible
 | `aggTrades` | 2019-12-31 | todos los trades agregados |
 | `trades` | 2019-09-08 | crudo |
 | `bookDepth` | 2023-01-01 | profundidad por % de precio |
-| `bookTicker` | 2023-05-16 | mejor bid/ask ⇒ **spread real histórico** (zip de ~53 MB/día para BTC en 2023) |
+| `bookTicker` | 2023-05-16 → 2024 | mejor bid/ask. **CORRECCIÓN 2026-10-16:** para BTCUSDT hay archivos 2023 y 2024 pero NINGUNO en 2025 ni 2026 (último día exacto no verificado). **No cubre la ventana de investigación (2025-12 → hoy).** Sirve solo para calibrar spread por bucket de liquidez con un período anterior, nunca para medir el período actual. |
 | `liquidationSnapshot` | — | **no hay archivos** para um (coincide con `H14_...PROTOCOL.md` §3.3) |
 
-**No verificado:** fecha del último archivo publicado, cobertura de símbolos distintos de BTCUSDT,
-tamaños actuales por día. El host `data.binance.vision` (CDN) estaba bloqueado desde mi sandbox
+**Verificado después (2026-10-16):** `metrics` llega hasta 2026-10-15; `aggTrades`, `bookDepth` y
+`metrics` tienen archivos en 2026 para BTCUSDT.
+
+**No verificado:** cobertura de símbolos distintos de BTCUSDT, tamaños actuales por día. El host `data.binance.vision` (CDN) estaba bloqueado desde mi sandbox
 (HTTP 403); solo respondió el listing S3. GPT debe verificarlo desde Windows (§7).
 
 ### 1.6 Arquitectura: cómo funciona el sistema construido **[GPT]**
@@ -239,6 +241,11 @@ Cómo se vería un edge usable **[PROPUESTA]**: eventos de baja frecuencia y mov
   duplicados, cobertura por símbolo, y **regla anti-lookahead**: confirmar si `create_time` marca
   el fin o el inicio del bucket; si hay duda, usar un lag de un bucket (5 min), como ya hace
   `OPEN_INTEREST_COLLECTOR.md`.
+- **T1.3 (nota 2026-10-16):** `bookTicker` de Vision no cubre 2025–2026. Camino real: (a) colector
+  propio de bid/ask hacia adelante (~15 días para una base honesta); (b) mientras tanto, bandas de
+  costo de sensibilidad (p. ej. 10 / 26 / 36 bp RT, como en M18), nunca spreads inventados.
+  El event-study de Fase 2 mide el efecto **bruto** frente a placebo y control matcheado, que NO
+  depende del costo: se corre ya, con veredicto de mecanismo separado del veredicto económico.
 - **T1.3 Modelo de costos v2 con `bookTicker`.** Muestreo ex-ante: top-30 + 30 medios + 30
   ilíquidos por volumen, ~15 días repartidos en regímenes distintos (no todo el rango). Procesar
   un zip a la vez, **agregar en streaming** (spread efectivo mediano/p90 por símbolo y hora, tamaño
