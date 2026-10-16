@@ -78,7 +78,9 @@ def main() -> None:
             report["failed"][symbol] = f"{type(exc).__name__}: {exc}"
     with open(args.coverage_output, "w", encoding="utf-8") as handle:
         json.dump(report, handle, ensure_ascii=False, indent=2)
-    print(json.dumps(report, ensure_ascii=False, indent=2))
+    # Windows consoles commonly default to cp1252; retain the UTF-8 JSON file
+    # while making the terminal summary safe for every exchange symbol.
+    print(json.dumps(report, ensure_ascii=True, indent=2))
 
 
 if __name__ == "__main__":
