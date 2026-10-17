@@ -92,6 +92,18 @@ def pending_jobs(report: dict, datasets: tuple[str, ...], symbols: list[str], sa
                     yield dataset, symbol, day
 
 
+def batches(items, size: int):
+    """Yield bounded lists so a full daily scan cannot retain all futures."""
+    batch = []
+    for item in items:
+        batch.append(item)
+        if len(batch) == size:
+            yield batch
+            batch = []
+    if batch:
+        yield batch
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--universe", required=True)
@@ -132,20 +144,24 @@ def main() -> None:
             report = resumed
     if not 1 <= args.workers <= 32:
         parser.error("--workers must be in 1..32")
-    jobs = list(pending_jobs(report, datasets, symbols, sample_days))
+    jobs = pending_jobs(report, datasets, symbols, sample_days)
     # Each task is a HEAD only: parallelism reduces wall-clock latency without
     # retaining response bodies or raw market data.
+    completed = 0
     with ThreadPoolExecutor(max_workers=args.workers) as pool:
-        futures = {pool.submit(status, archive_url(dataset, symbol, day)): (dataset, symbol, day)
-                   for dataset, symbol, day in jobs}
-        completed = 0
-        for future in as_completed(futures):
-            dataset, symbol, day = futures[future]
-            report["datasets"][dataset][symbol][day.isoformat()] = future.result()
-            completed += 1
-            if completed % args.checkpoint_every == 0:
-                out.parent.mkdir(parents=True, exist_ok=True)
-                _atomic_write(out, report)
+        # At most 4x workers are in-flight.  This is deliberately not
+        # executor.map(), which eagerly consumes a large iterable on older
+        # Python versions.
+        for batch in batches(jobs, args.workers * 4):
+            futures = {pool.submit(status, archive_url(dataset, symbol, day)): (dataset, symbol, day)
+                       for dataset, symbol, day in batch}
+            for future in as_completed(futures):
+                dataset, symbol, day = futures[future]
+                report["datasets"][dataset][symbol][day.isoformat()] = future.result()
+                completed += 1
+                if completed % args.checkpoint_every == 0:
+                    out.parent.mkdir(parents=True, exist_ok=True)
+                    _atomic_write(out, report)
     out.parent.mkdir(parents=True, exist_ok=True)
     _atomic_write(out, report)
     summary = {
@@ -155,7 +171,7 @@ def main() -> None:
         )
         for dataset, symbols_report in report["datasets"].items()
     }
-    print(json.dumps({"symbols": len(symbols), "sample_days": len(sample_days), "probed_jobs": len(jobs),
+    print(json.dumps({"symbols": len(symbols), "sample_days": len(sample_days), "probed_jobs": completed,
                       "all_sample_days_available": summary}, sort_keys=True))
 
 
