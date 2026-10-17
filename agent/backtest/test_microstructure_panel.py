@@ -58,6 +58,22 @@ class MicrostructurePanelTests(unittest.TestCase):
         self.assertIsNone(rows[0]['funding'])
         self.assertEqual(rows[1]['funding']['settled_at'], 1_000_000)
 
+    def test_shifting_external_observation_forward_cannot_change_past_panel_rows(self):
+        """Regression guard: future OI/taker rows must not leak into past bars."""
+        before = build_5m_panel('BTCUSDT', 1_000_000, 1_300_000, PanelPaths(self.price, self.oi, self.funding))
+        oi = sqlite3.connect(self.oi)
+        price = sqlite3.connect(self.price)
+        try:
+            # A deliberately extreme future value would improve a naive score
+            # if it leaked backward. It becomes eligible only after its bar.
+            oi.execute("INSERT INTO oi_metrics VALUES ('BTCUSDT',1300000,999,999,999,999,999,999)")
+            price.execute("INSERT INTO taker_flow VALUES ('BTCUSDT','5m',1300000,999,999,999,999,999)")
+            oi.commit(); price.commit()
+        finally:
+            oi.close(); price.close()
+        after = build_5m_panel('BTCUSDT', 1_000_000, 1_300_000, PanelPaths(self.price, self.oi, self.funding))
+        self.assertEqual(before, after)
+
 
 if __name__ == '__main__':
     unittest.main()
