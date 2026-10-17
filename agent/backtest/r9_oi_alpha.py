@@ -22,21 +22,31 @@ from datetime import datetime, timezone
 from r7_common import zscore_causal, agg_pairs, rng
 
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.join(HERE, "..", "..")
-BV = os.path.join(HERE, "..", "data", "binance_vision_clean.db")
-UNIV = os.path.join(HERE, "..", "..", "research", "universe", "oi_universe.json")
+BV = os.environ.get("MICRO_PRICE_DB", os.path.join(HERE, "..", "data", "binance_vision_clean.db"))
+OI_DB = os.environ.get("MICRO_OI_DB", os.path.join(HERE, "..", "..", "research", "data", "oi_metrics_v1.db"))
+FUNDING_DB = os.environ.get("MICRO_FUNDING_DB", os.path.join(HERE, "..", "..", "research", "data", "funding_history_v1.db"))
+UNIV = os.environ.get("MICRO_UNIVERSE", os.path.join(HERE, "..", "..", "research", "universe", "microstructure_universe_v1.json"))
 BAR = 15 * 60 * 1000
 W = 4
-ROLL = 2880
-HOR = [1, 2, 4, 8, 16, 32, 96]
-COST_RT_BP = 20.0
+ROLL = 672  # 7 days of completed 15m bars; frozen in the Phase-2 preregistration.
+HOR = [4, 8, 16]  # H13: 1/2/4h. H15/H16 select their frozen subset below.
+# Sensitivity bands, not a fabricated cost_v2 estimate.
+COST_RT_BP = 26.0
 PLACEBO = 96
 rng2 = np.random.default_rng(20260911)
 
 
 def load_panel():
     con = sqlite3.connect(f"file:{BV}?mode=ro", uri=True)
-    syms = json.load(open(UNIV))["universe"]
-    have_oi = set(s for (s,) in con.execute("SELECT DISTINCT symbol FROM oi_metrics"))
+    con.execute("ATTACH DATABASE ? AS isolated_oi", (f"file:{os.path.abspath(OI_DB)}?mode=ro",))
+    con.execute("ATTACH DATABASE ? AS isolated_funding", (f"file:{os.path.abspath(FUNDING_DB)}?mode=ro",))
+    universe_doc = json.load(open(UNIV))
+    # Legacy freeze used ``universe``; the current ex-ante 200-symbol snapshot
+    # intentionally calls the same immutable list ``symbols``.
+    syms = universe_doc.get("symbols", universe_doc.get("universe"))
+    if not syms:
+        raise ValueError(f"snapshot sin lista de símbolos: {UNIV}")
+    have_oi = set(s for (s,) in con.execute("SELECT DISTINCT symbol FROM isolated_oi.oi_metrics"))
     have_tk = set(s for (s,) in con.execute("SELECT DISTINCT symbol FROM taker_flow WHERE interval='15m'"))
     P = {}
     for s in syms:
@@ -63,14 +73,16 @@ def load_panel():
         gls = np.full(len(kt), np.nan); ttls = np.full(len(kt), np.nan); tkls = np.full(len(kt), np.nan)
         for ot, so, sov, gl, tt, tk in con.execute(
                 "SELECT open_time,sum_oi,sum_oi_value,global_ls_acct,toptrader_ls_pos,taker_ls_vol "
-                "FROM oi_metrics WHERE symbol=? ORDER BY open_time", (s,)):
+                "FROM isolated_oi.oi_metrics WHERE symbol=? ORDER BY open_time", (s,)):
             if int(ot) % 900000 != 0:
                 continue
             i = pos.get(int(ot))
             if i is not None:
                 oi[i] = so; oiv[i] = sov; gls[i] = gl; ttls[i] = tt; tkls[i] = tk
         # funding (8h) -> step causal
-        fr = con.execute("SELECT calc_time,funding_rate FROM funding_hist WHERE symbol=? ORDER BY calc_time", (s,)).fetchall()
+        fr = con.execute("SELECT funding_time_ms,funding_rate FROM isolated_funding.historical_funding_events "
+                         "WHERE venue='binance_usdm' AND rate_type='settlement_rate' AND symbol=? "
+                         "ORDER BY funding_time_ms", (s,)).fetchall()
         fund = np.full(len(kt), np.nan)
         if fr:
             fct = np.array([x[0] for x in fr], np.int64); frr = np.array([x[1] for x in fr], float)
@@ -494,7 +506,7 @@ def main():
     out = {"generated_utc": datetime.now(timezone.utc).isoformat(),
            "panel_symbols": len(P), "span": [dd(span[0]), dd(span[1])],
            "H13C": H13, "H15": H15, "H15_ols": ols_out, "H16": H16, "H16_ols": h16ols, "M15": M15}
-    path = os.path.join(ROOT, "scratch_r9_oi_alpha.json")
+    path = os.environ.get("MICRO_RESULT_PATH", os.path.join(ROOT, "research", "reports", "phase2_oi_event_study_v2.json"))
     json.dump(out, open(path, "w"), indent=1, default=str)
     print(f"\nguardado {path}")
 

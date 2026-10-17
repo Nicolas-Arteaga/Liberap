@@ -396,12 +396,31 @@ def _store_oos_view(path, view):
     diagnosis['oos_once']=view
     dump(dp, diagnosis)
 
-def _set_terminal(root, candidate_id, status, reason, catalog_gaps):
+def _set_terminal(root, candidate_id, status, reason, catalog_gaps, attempted_areas=()):
+    """Persist a terminal outcome without pretending catalog coverage is full.
+
+    The historical ``DISCARDED_CATALOG_PARTIAL`` label was useful but too
+    coarse for a future reader: it did not say whether the attempt ceiling
+    prevented an executable family from being tried.  Keep the old status for
+    compatibility and add a machine-readable completeness contract.
+    """
     path=history_path(root,candidate_id)
     history=json.loads(path.read_text(encoding='utf8')) if path.exists() else {'candidate_id':candidate_id,'attempts':[]}
-    history.update({'status':status,'terminal_reason':reason,'catalog_coverage':{
-        'execution_variants_available':RECIPES,'not_executable_yet':UNIMPLEMENTED_CATALOG,
-        'catalog_complete':False},'closed_at_utc':now()})
+    attempted=set(attempted_areas)
+    executable_areas=set(RECIPES)
+    gaps={area:list(variants) for area,variants in catalog_gaps.items() if variants}
+    history.update({'status':status,'terminal_reason':reason,
+        'catalog_completeness':'COMPLETE' if not gaps else 'PARTIAL',
+        'missing_executors':gaps,
+        'attempt_policy':{
+            'max_attempts':MAX_ATTEMPTS,
+            'attempts_completed':len(history.get('attempts', [])),
+            'executable_areas_attempted':sorted(attempted),
+            'executable_areas_not_reached_before_terminal':sorted(executable_areas-attempted),
+            'rule':'no terminal exhaustive claim when documented variants lack executors'},
+        'catalog_coverage':{'execution_variants_available':RECIPES,
+            'not_executable_yet':gaps,'catalog_complete':not bool(gaps)},
+        'closed_at_utc':now()})
     dump(path,history)
     return history
 
@@ -437,7 +456,7 @@ def run_autonomous(root, candidate_id, catalog_path, funding_db=None):
         if area is None:
             return _set_terminal(root,candidate_id,'DISCARDED_CATALOG_PARTIAL',
                                  'agotadas las familias con ejecutor; el catálogo contiene variantes sin ejecutor',
-                                 UNIMPLEMENTED_CATALOG)
+                                 UNIMPLEMENTED_CATALOG, attempted_areas)
         variants=[v for v in RECIPES[area] if v not in used]
         if not variants:
             attempted_areas.add(area); continue
@@ -497,4 +516,4 @@ def run_autonomous(root, candidate_id, catalog_path, funding_db=None):
         attempted_areas.add(area)
     return _set_terminal(root,candidate_id,'DISCARDED_CATALOG_PARTIAL',
                          'límite de 10 intentos alcanzado; catálogo mantiene variantes sin ejecutor',
-                         UNIMPLEMENTED_CATALOG)
+                         UNIMPLEMENTED_CATALOG, attempted_areas)
