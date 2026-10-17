@@ -29,7 +29,9 @@ UNIV = os.environ.get("MICRO_UNIVERSE", os.path.join(HERE, "..", "..", "research
 BAR = 15 * 60 * 1000
 W = 4
 ROLL = 672  # 7 days of completed 15m bars; frozen in the Phase-2 preregistration.
-HOR = [4, 8, 16]  # H13: 1/2/4h. H15/H16 select their frozen subset below.
+# Shared superset: H13 reports 1/2/4h, H15 4/8/12h and H16 8/16/24h.
+# Selection happens in the report, never by dropping a calculated cell.
+HOR = [4, 8, 16, 32, 48, 64, 96]
 # Sensitivity bands, not a fabricated cost_v2 estimate.
 COST_RT_BP = 26.0
 PLACEBO = 96
