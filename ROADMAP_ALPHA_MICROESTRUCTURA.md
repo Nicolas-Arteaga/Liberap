@@ -35,6 +35,40 @@ Leyenda de confianza usada en todo el documento:
 
 ---
 
+## 0.1 CORRECCIÓN 2026-10-18 — leer antes que el resto
+
+Al revisar los resultados de la segunda pasada leí por fin las rondas de priorización del ledger
+(`ALPHA_HYPOTHESIS_LEDGER.md` L140–235) que yo había visto solo como títulos **[REPO]**:
+
+- **R29: "OI como disparador primario: FAILED".** 8 formulaciones predeclaradas (expansión,
+  contracción, aceleración y shock de OI, solas y combinadas con volumen y desacuerdo de precio)
+  sobre 43 símbolos; ninguna sobrevive TRAIN→VAL→OOS. Se solapa mucho con H13.
+- **R30/R31: "espacio OHLCV+volumen+OI agotado"** para señal direccional intradía y multi-día.
+- **R26:** la cascada de liquidaciones quedó bloqueada por colector caído, venue Bybit y falta de
+  histórico (el colector volvió a caerse: última captura hace ~60 h el 2026-10-16).
+- Lo que R31 deja **sin probar con rigor**: (1) liquidaciones reales (requiere colector vivo),
+  (2) order book histórico (no disponible), (3) on-chain, (4) `toptrader_ls_pos` /
+  `global_ls_acct` de `oi_metrics` con TRAIN→VAL→OOS→placebo.
+
+Consecuencias:
+1. Mi afirmación "H13 es la región abierta, prior MED" estaba mal calibrada: OI como disparador ya
+   falló. El prior de H13/H15/H16 baja a **LOW**. La segunda pasada lo confirma: H13-D dio +31,57 bp
+   bruto (short a 4 h), pero queda `PARK`, y con costos de 10 / 26 / 36 bp RT queda +21,6 / +5,6 /
+   -4,4 bp; con la banda realista (26 bp) está muy por debajo del umbral de +15 bp y de los
+   ≈ +16,7 bp que exige la economía (§5). H15/H16 sin evidencia incremental; H17 con 0 eventos.
+2. Prioridad nueva, en este orden y con **parada dura** (§4, Kill criteria):
+   a. **Familia de ratios long/short** (`toptrader_ls_pos`, `global_ls_acct`, `taker_ls_vol`):
+      los datos ya están en `oi_metrics`, costo de datos cero; pre-registrar una familia chica,
+      deduplicada contra R29.
+   b. **H14 formal con liquidaciones**, solo hacia adelante: requiere que el agente/colector esté
+      **vivo** (hoy no hay `verge_agent.py` corriendo) y ≥ 60 días continuos (≈ 2026-11-08 como
+      mínimo si se reinicia ya; el reloj se reinicia si hay huecos).
+3. Regla de decisión: si (a) y (b) fallan, **se detiene la búsqueda de alpha direccional en este
+   universo de datos** y no se pone dinero real. Seguir iterando indicadores o variantes del mismo
+   espacio sería repetir lo que R1–R31 ya cerraron.
+
+---
+
 ## 1. Estado verificado
 
 ### 1.1 Qué dice el repo (verdad de base)
