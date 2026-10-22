@@ -56,3 +56,30 @@ numéricos reproducibles pero **no un cierre económico definitivo**.
 3. Antes de decidir economía real, completar controles/BH de Fase 2 y madurar
    `cost_v2`. El resultado H13-D no autoriza operar: su signo neto cambia con
    las bandas de costo.
+
+## Familia de ratios long/short (LS_RATIO_EVENT_FAMILY_V1) — 2026-10-21
+
+Corrida única con `agent/backtest/ls_ratio_event_study.py` (commit 11c7548,
+congelado antes de ejecutar). Reporte: `research/reports/ls_ratio_event_study_v1.json`.
+163 símbolos, 2025-12 → 2026-08-17. Decisiones de implementación no cubiertas
+por el prerregistro están en `implementation_notes` del reporte.
+
+**Veredicto de mecanismo: 0/18 celdas PASS.** Solo una celda pasa BH
+(`global_ls_acct` cola alta 1h: efecto incremental -4,5 bp, con placebo de
+-2,3 bp en +48h, es decir mayormente drift). Las celdas con CI95 que excluye 0
+sin BH (`global_ls_acct` lo 8h, `toptrader_ls_pos` lo 4h) tienen mitades de
+distinto tamaño y no sobreviven a la corrección de 18 tests. 3 celdas
+`taker_ls_vol` cola baja: ~420 eventos, 39 símbolos, top-5 = 52,7 % (viola el
+límite 50 %), CI de ±100 bp.
+
+**Veredicto económico:** bruto en la dirección implícita ≤ ~12 bp en las celdas
+con muestra sólida; neto negativo en las tres bandas (10/26/36 bp) salvo
+`PENDIENTE_cost_v2` en 2 celdas (neto >0 solo con 10 bp, mecanismo FAILED). La
+única celda con neto positivo en todas las bandas (`taker_ls_vol|lo|8h`, +27 a
++53 bp) es ruido: n=421, CI incremental [-167,+55], mitades de signo opuesto.
+No autoriza nada.
+
+**Cierre parcial:** búsqueda direccional en este universo detenida para los
+ratios long/short; pendiente solo H14 (liquidaciones) por calendario. Con el
+agente apagado desde 2026-10-15, el test formal (≥60 días continuos) no puede
+ser antes de ~60 días después de que se reinicie la captura.
